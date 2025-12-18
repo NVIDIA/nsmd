@@ -25,6 +25,7 @@
 #include "nsmMsgTypesSensor.hpp"
 #include "nsmNumericSensor/nsmNumericAggregator.hpp"
 #include "progressCounters.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
 
@@ -464,8 +465,7 @@ requester::Coroutine
         lg2::error("NsmDevice::postPatchIO failed. eid={EID} rc={RC}", "EID",
                    eid, "RC", rc);
     }
-    progressCounters.increment(ProgressCounterType::PostPatch, rc,
-                               utils::getCurrentSteadyClockTimestampUs());
+    progressCounters().increment(ProgressCounterType::PostPatch, rc);
     co_return rc;
 }
 
@@ -529,6 +529,8 @@ requester::Coroutine NsmDevice::updateNsmDevice()
 
     std::vector<uint8_t> supportedMessageTypes;
     auto rc = co_await getSupportedNvidiaMessageType(supportedMessageTypes);
+    discoveryEvents().setValue(
+        DiscoveryEventType::GetSupportedNvidiaMessageType, rc);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("getSupportedNvidiaMessageType() failed, rc={RC} eid={EID}",
@@ -547,6 +549,12 @@ requester::Coroutine NsmDevice::updateNsmDevice()
     {
         std::vector<uint8_t> supportedCommands;
         rc = co_await getSupportedCommandCodes(messageType, supportedCommands);
+        discoveryEvents().setValue(
+            static_cast<DiscoveryEventType>(
+                static_cast<uint8_t>(
+                    DiscoveryEventType::GetSupportedCommandCodes0) +
+                messageType),
+            rc);
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::error(
@@ -718,6 +726,7 @@ requester::Coroutine NsmDevice::updateFruDeviceIntf()
                            NSM_GET_INVENTORY_INFORMATION))
     {
         rc = co_await getFRU(properties, getDeviceType());
+        discoveryEvents().setValue(DiscoveryEventType::GetFru, rc);
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC", rc,
@@ -1050,6 +1059,20 @@ void NsmDevice::dumpNsmDeviceInfo()
         "###### NsmDevice::dumpNsmDeviceInfo End for deviceType={DT}, deviceRole={ROLE}, static instanceNumber={INST} ######",
         "DT", getDeviceType(), "ROLE", getDeviceRole(), "INST",
         getInstanceNumber());
+}
+
+ProgressCounters& NsmDevice::progressCounters()
+{
+    if (!sensorProgressCounters)
+    {
+        sensorProgressCounters = std::make_shared<ProgressCounters>(eid);
+    }
+    return *sensorProgressCounters;
+}
+
+DiscoveryEvents& NsmDevice::discoveryEvents()
+{
+    return mctp::MctpDiscovery::getInstance().discoveryEvents(eid);
 }
 
 // FruInterfaceManager method implementations

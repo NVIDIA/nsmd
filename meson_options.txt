@@ -52,7 +52,7 @@ option(
 option(
     'sensor-progress-counters-dump-count-threshold',
     type: 'integer',
-    min: 1,
+    min: 0,
     max: 4294967295,
     description: 'The count threshold for sensor progress counter dumps',
     value: 100000,
@@ -60,7 +60,7 @@ option(
 option(
     'sensor-progress-counters-dump-time-threshold',
     type: 'integer',
-    min: 1,
+    min: 0,
     max: 4294967295,
     description: 'The time threshold for sensor progress counter dumps in microseconds',
     value: 600000000,
@@ -72,6 +72,14 @@ option(
     max: 16777216,
     description: 'The memfd size in bytes for sensor progress counter dumps',
     value: 65536,
+)
+option(
+    'discovery-progress-counters-memfd-size',
+    type: 'integer',
+    min: 4096,
+    max: 16777216,
+    description: 'The memfd size in bytes for discovery progress counter dumps',
+    value: 80640,
 )
 option(
     'sensor-polling-time-gpm',

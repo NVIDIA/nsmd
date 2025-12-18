@@ -166,9 +166,7 @@ void DelegatingEventHandler::delegate(eid_t eid, NsmType type,
 
     uint8_t rc = nsmDevice->eventDispatcher.handle(eid, type, eventId, event,
                                                    eventLen);
-    nsmDevice->progressCounters.increment(
-        ProgressCounterType::Event, rc,
-        utils::getCurrentSteadyClockTimestampUs());
+    nsmDevice->progressCounters().increment(ProgressCounterType::Event, rc);
 }
 
 } // namespace nsm

@@ -16,65 +16,130 @@
  */
 
 #pragma once
+#include "config.h"
 
-#include "progressCounterType.hpp"
-
-#include <memory>
+#include "counterProducer.hpp"
 
 namespace nsm
 {
 class NsmDevice;
-class DeviceCounterDumpObject;
-enum class PollingType;
 
-class ProgressCounters
+CountersTemplate class ProgressCountersBase
 {
+  private:
+    DeviceCounterDumpObject<CounterDataType, Size, MemFdBytesSize> dumpObject;
+    const size_t countThreshold;
+    const size_t timeThreshold;
+
+    uint32_t totalCount = 0;
+    uint32_t dumpIteration = 0;
+    uint64_t lastUpdateTime = 0;
+
+  protected:
+    ProgressCountersBase(const std::string& path,
+                         const std::string& description,
+                         const CountersHeaders& countersHeaders,
+                         size_t countThreshold = 0, size_t timeThreshold = 0);
+
+    virtual ~ProgressCountersBase() = default;
+
+    /**
+     * @brief Counters array
+     * @note The array is zero-initialized
+     */
+    CountersArray<CounterDataType, Size> counters{};
+
+    /**
+     * @brief Update the counters if the count threshold is exceeded and write
+     * the counters to the dump object
+     * @return true if the counters were updated, false otherwise
+     */
+    bool flushIfNeeded();
+
+    /**
+     * @brief Initialize the counters
+     * @note This method is called after the counters are created and before the
+     * counters are incremented. This method is used to initialize the counters
+     * to a default value.
+     */
+    virtual void initializeCounters() = 0;
+
+    /**
+     * @brief Update the counters and write the counters to the dump object
+     * @param time Current time in microseconds, defaults to current time
+     */
+    void updateCounters(
+        const uint64_t& time = utils::getCurrentSteadyClockTimestampUs());
+
+    /**
+     * @brief Increment the counter for the given counter type
+     * @param counterType Counter type
+     */
+    void increment(const uint32_t& counterType);
+
   public:
     /**
-     * @brief Constructor for ProgressCounters
-     * @param dev Reference to the NsmDevice
+     * @brief Update the counters if the time threshold is exceeded and write
+     * the counters to the dump object
+     * @param time Current time in microseconds
+     * @return true if the counters were updated, false otherwise
      */
-    ProgressCounters(NsmDevice& dev);
+    bool flushIfNeeded(const uint64_t& time);
+};
+
+using PollingCountersBase =
+    ProgressCountersBase<uint32_t, PollingCountersSize,
+                         SENSOR_PROGRESS_COUNTERS_MEMFD_SIZE>;
+
+enum class PollingType;
+class ProgressCounters : public PollingCountersBase
+{
+  private:
+    void initializeCounters() override final;
+
+  public:
+    ProgressCounters(eid_t eid);
 
     /**
      * @brief Increment the counter for the given polling type.
      * @param pollingType Polling type
      * @param rc nsm_sw_codes, nsm_completion_codes and nsm_reason_codes
-     * @param time Current time in microseconds
      */
-    void increment(const PollingType& pollingType, const uint8_t rc,
-                   const uint64_t& time);
+    void increment(const PollingType& pollingType, const uint8_t rc);
 
     /**
      * @brief Increment the counter for the given counter type and analyse the
      * return code for detecting error and timeout
      * @param counterType Counter type
      * @param rc nsm_sw_codes, nsm_completion_codes and nsm_reason_codes
-     * @param time Current time in microseconds
      */
-    void increment(const ProgressCounterType& counterType, const uint8_t rc,
-                   const uint64_t& time);
+    void increment(const ProgressCounterType& counterType, const uint8_t rc);
+};
 
+using DiscoveryEventsBase =
+    ProgressCountersBase<int8_t, DiscoveryEventsSize,
+                         DISCOVERY_PROGRESS_COUNTERS_MEMFD_SIZE>;
+class DiscoveryEvents : public DiscoveryEventsBase
+{
   private:
+    void initializeCounters() override final;
+
+  public:
+    DiscoveryEvents(eid_t eid);
+
     /**
      * @brief Increment the counter for the given counter type
      * @param counterType Counter type
-     * @param time Current time in microseconds
      */
-    void increment(const ProgressCounterType& counterType,
-                   const uint64_t& time);
+    void increment(const DiscoveryEventType& counterType);
 
-    void updateCounters();
-    void updateCountersIfNeeded();
-
-    NsmDevice& dev;
-
-    CountersArray counters{};
-    std::shared_ptr<DeviceCounterDumpObject> deviceCounterDumpObject;
-    uint32_t dumpIteration = 0;
-    uint32_t totalCount = 0;
-    uint64_t startTime = 0;
-    uint64_t lastUpdateTime = 0;
+    /**
+     * @brief Set the value for the given counter type and write the value to
+     * the dump object
+     * @param counterType Counter type
+     * @param value Value to set
+     */
+    void setValue(const DiscoveryEventType& counterType, const uint8_t value);
 };
 
 } // namespace nsm

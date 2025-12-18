@@ -85,6 +85,7 @@ class MctpDiscovery
     std::shared_ptr<nsm::NsmDevice>
         getNsmDeviceByIdentification(uint8_t deviceType, uint8_t instanceNumber,
                                      uint8_t deviceRole);
+    nsm::DiscoveryEvents& discoveryEvents(eid_t eid);
 
   private:
     static MctpDiscovery* instance;
@@ -176,6 +177,8 @@ class MctpDiscovery
     std::map<std::string, MctpInfo> cachedMctpInfoByPath;
     std::map<eid_t, std::queue<MctpInfo>> perEidQueuedMctpInfos;
     std::map<eid_t, std::coroutine_handle<>> perEidDiscoverNsmDeviceTaskHandle;
+    std::map<eid_t, std::shared_ptr<nsm::DiscoveryEvents>>
+        perEidDiscoveryEvents;
     std::map<uint8_t, std::map<uint16_t, std::shared_ptr<nsm::NsmDevice>>>
         deviceMap;
     DiscoveredEIDs discoveredEIDs;

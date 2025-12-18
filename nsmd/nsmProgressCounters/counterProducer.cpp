@@ -15,66 +15,72 @@
  * limitations under the License.
  */
 
-#include "counterProducer.hpp"
+#include "config.h"
 
-#include "globals.hpp"
+#include "counterProducer.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
-#include <algorithm>
 #include <ranges>
-#include <stdexcept>
 
 namespace nsm
 {
 
-DeviceCounterDumpObject::DeviceCounterDumpObject(uint8_t eid) :
-    CountersIntf(
-        utils::DBusHandler::getBus(),
-        std::string(progressCountersObjectBasePath / std::to_string(eid))
-            .c_str()),
-    eid(eid), fd(memfd_create("nsm_progress_counters", MFD_ALLOW_SEALING))
+#define DeviceCounterDumpObjectClass                                           \
+    DeviceCounterDumpObject<CounterDataType, Size, MemFdBytesSize>
+#define DeviceCounterDumpObjectTemplate(ReturnType)                            \
+    CountersTemplate ReturnType DeviceCounterDumpObjectClass
+
+CountersTemplate DeviceCounterDumpObjectClass::DeviceCounterDumpObject(
+    const std::string& path) :
+    CountersIntf(utils::DBusHandler::getBus(), path.c_str()),
+    fd(memfd_create("nsm_progress_counters", MFD_ALLOW_SEALING))
 {
-    lg2::info("Initialized dump object for device {ID}", "ID",
-              static_cast<int>(eid));
+    lg2::info("Initialized dump object {PATH}", "PATH", path);
 }
 
-sdbusplus::message::unix_fd DeviceCounterDumpObject::getFd()
+DeviceCounterDumpObjectTemplate(sdbusplus::message::unix_fd)::getFd()
 {
     return sdbusplus::message::unix_fd(fd);
 }
 
-bool DeviceCounterDumpObject::updateCounters(uint32_t key, uint64_t timestamp,
-                                             const CountersArray& counters)
+DeviceCounterDumpObjectTemplate(bool)::updateCounters(
+    const CountersDataRow<CounterDataType, Size>& rowData)
 {
     try
     {
         // Check if all counters are zero (empty)
-        if (std::ranges::all_of(counters,
+        if (std::ranges::all_of(rowData.counters,
                                 [](const auto& val) { return val == 0; }))
         {
             throw std::runtime_error("No counters to write");
         }
 
-        const auto row = key % maxRows; // Ensures data rotation in the file
+        const auto row = static_cast<uint32_t>(rowData.key) %
+                         maxRows; // Ensures data rotation in the file
 
-        const off_t pos = row * sizeof(CounterDataRow);
-        const CounterDataRow rowData = {key, timestamp, counters};
+        const off_t pos = row * sizeof(CountersDataRow<CounterDataType, Size>);
         if (!fd.write(pos, reinterpret_cast<const uint8_t*>(&rowData),
-                      sizeof(CounterDataRow)))
+                      sizeof(CountersDataRow<CounterDataType, Size>)))
         {
-            throw std::runtime_error(
-                std::format("Fd write error: {}", strerror(errno)));
+            throw std::runtime_error(strerror(errno));
         }
     }
     catch (const std::exception& e)
     {
         lg2::error(
-            "Failed to write dump data for Device={ID}, Key={KEY}, Error={ERR}",
-            "ID", eid, "KEY", static_cast<int>(key), "ERR", e.what());
+            "Failed to write dump data: Description={DESCRIPTION}, Key={KEY}, Error={ERR}",
+            "DESCRIPTION", description(), "KEY",
+            static_cast<uint32_t>(rowData.key), "ERR", e.what());
         return false;
     }
     return true;
 }
+
+// Explicit template instantiation for the types we use
+template class DeviceCounterDumpObject<uint32_t, PollingCountersSize,
+                                       SENSOR_PROGRESS_COUNTERS_MEMFD_SIZE>;
+template class DeviceCounterDumpObject<int8_t, DiscoveryEventsSize,
+                                       DISCOVERY_PROGRESS_COUNTERS_MEMFD_SIZE>;
 
 } // namespace nsm

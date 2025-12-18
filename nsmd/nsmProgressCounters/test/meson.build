@@ -41,7 +41,11 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = ['counterProducer_test', 'progressCounters_test']
+tests = [
+    'counterProducer_test',
+    'progressCounters_test',
+    'discoveryEvents_test',
+]
 
 tests_deps = [
     test_src,

@@ -23,6 +23,7 @@
 #include "common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmd/sensorManager.hpp"
+#include "progressCounters.hpp"
 
 #include <systemd/sd-bus.h>
 
@@ -274,6 +275,13 @@ requester::Coroutine
     msg.read(objPath, interfaces);
     populateMctpInfo(interfaces, objPath.str, mctpInfos);
 
+    if (!mctpInfos.empty())
+    {
+        auto eid = std::get<0>(mctpInfos[0]);
+        discoveryEvents(eid).increment(
+            nsm::DiscoveryEventType::InterfaceAddedSignal);
+    }
+
     // watch PropertiesChanged signal from au.com.codeconstruct.MCTP.Endpoint1
     // PDI
     if (enableMatches.find(objPath.str) == enableMatches.end())
@@ -423,6 +431,13 @@ requester::Coroutine
         {
             mctpInfos.push_back(mctpInfo);
         }
+        if (!mctpInfos.empty())
+        {
+            auto eid = std::get<0>(mctpInfos[0]);
+            discoveryEvents(eid).setValue(
+                nsm::DiscoveryEventType::ConnectivityAvailable,
+                (connectivity == "Available") ? 1 : 0);
+        }
     }
     co_return NSM_SW_SUCCESS;
 }
@@ -468,6 +483,9 @@ requester::Coroutine
     {
         mctpInfos.push_back(cachedMctpInfoByPath[objPath.str]);
         std::get<5>(mctpInfos[0]) = false;
+        eid_t eid = std::get<0>(mctpInfos[0]);
+        discoveryEvents(eid).increment(
+            nsm::DiscoveryEventType::InterfaceRemovedSignal);
     }
     else
     {
@@ -554,11 +572,15 @@ requester::Coroutine MctpDiscovery::discoverNsmDeviceTask(eid_t eid)
         MctpInfos mctpInfos{mctpInfo};
         if (active)
         {
-            co_await coSetdeviceStateOnlineTask(mctpInfos);
+            auto rc = co_await coSetdeviceStateOnlineTask(mctpInfos);
+            discoveryEvents(eid).setValue(
+                nsm::DiscoveryEventType::SetDeviceStateOnline, rc);
         }
         else
         {
-            co_await coSetdeviceStateOfflineTask(mctpInfos);
+            auto rc = co_await coSetdeviceStateOfflineTask(mctpInfos);
+            discoveryEvents(eid).setValue(
+                nsm::DiscoveryEventType::SetDeviceStateOffline, rc);
         }
         perEidQueuedMctpInfos[eid].pop();
         lg2::info("discoverNsmDeviceTask eid={EID}, size={SIZE}", "EID", eid,
@@ -571,16 +593,19 @@ requester::Coroutine MctpDiscovery::discoverNsmDeviceTask(eid_t eid)
 requester::Coroutine
     MctpDiscovery::coSetdeviceStateOnlineTask(const MctpInfos& mctpInfos)
 {
+    uint8_t overallRC = NSM_SW_SUCCESS;
     for (auto& mctpInfo : mctpInfos)
     {
         // try ping
         auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding, active,
                mctpObjPath] = mctpInfo;
         auto rc = co_await ping(eid);
+        discoveryEvents(eid).setValue(nsm::DiscoveryEventType::Ping, rc);
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::error("NSM ping failed, rc={RC} eid={EID}", "RC", rc, "EID",
                        eid);
+            overallRC = rc;
             continue;
         }
 
@@ -592,11 +617,14 @@ requester::Coroutine
         uint8_t instanceNumber = 0;
         rc = co_await getQueryDeviceIdentification(eid, deviceType,
                                                    instanceNumber);
+        discoveryEvents(eid).setValue(
+            nsm::DiscoveryEventType::QueryDeviceIdentification, rc);
         if (rc != NSM_SUCCESS)
         {
             lg2::error(
                 "NSM getQueryDeviceIdentification failed, rc={RC} eid={EID}",
                 "RC", rc, "EID", eid);
+            overallRC = rc;
             continue;
         }
 
@@ -609,6 +637,9 @@ requester::Coroutine
         auto nsmDevice = mapNsmDeviceUsingEid(eid, mctpUuid, deviceType,
                                               instanceNumber, configuredPath,
                                               true, mctpMedium, mctpBinding);
+        discoveryEvents(eid).setValue(
+            nsm::DiscoveryEventType::OnlineMapNsmDeviceUsingEid,
+            nsmDevice ? 1 : 0);
         if (nsmDevice)
         {
             lg2::info("initDeviceDiscovery for nsmDevice eid={EID}", "EID",
@@ -637,7 +668,7 @@ requester::Coroutine
     }
 
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return overallRC;
 }
 
 requester::Coroutine
@@ -656,6 +687,9 @@ requester::Coroutine
             nsmDevice = mapNsmDeviceUsingEid(
                 eid, uuid, mctpDeviceType, mctpDeviceInstanceNumber,
                 associatedPath, false, mctpMedium, mctpBinding);
+            discoveryEvents(eid).setValue(
+                nsm::DiscoveryEventType::OfflineMapNsmDeviceUsingEid,
+                nsmDevice ? 1 : 0);
         }
 
         if (nsmDevice)
@@ -667,6 +701,11 @@ requester::Coroutine
             {
                 nsmDevice->finishDeviceDiscovery();
             }
+        }
+        else
+        {
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_NULL;
         }
     }
 
@@ -1093,6 +1132,16 @@ std::shared_ptr<nsm::NsmDevice> MctpDiscovery::getNsmDeviceByIdentification(
         }
     }
     return ret;
+}
+
+nsm::DiscoveryEvents& MctpDiscovery::discoveryEvents(eid_t eid)
+{
+    if (perEidDiscoveryEvents.find(eid) == perEidDiscoveryEvents.end())
+    {
+        perEidDiscoveryEvents[eid] =
+            std::make_shared<nsm::DiscoveryEvents>(eid);
+    }
+    return *perEidDiscoveryEvents[eid];
 }
 
 void MctpDiscovery::handleMctpStateTransition(const std::string objPath,

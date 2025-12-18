@@ -30,7 +30,6 @@
 #include "nsmMsghandler.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
-#include "progressCounters.hpp"
 #include "requester/handler.hpp"
 #include "stateChangeLogger.hpp"
 #include "types.hpp"
@@ -55,6 +54,8 @@ class SensorManager;
 class NsmNumericAggregator;
 class NsmDevice;
 class NsmLongRunningEvent;
+class ProgressCounters;
+class DiscoveryEvents;
 using NsmDeviceTable = std::vector<std::shared_ptr<NsmDevice>>;
 using SensorQueue = CircularQueue<std::shared_ptr<NsmObject>>;
 
@@ -143,7 +144,7 @@ class NsmDevice :
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE), isDeviceActive(false),
         deviceType(deviceType), instanceNumber(instanceNumber),
         deviceRole(deviceRole), nsmMsgHandler(nsmMsgHandler),
-        objServer(objServer), progressCounters(*this)
+        objServer(objServer)
     {
         registerLongRunningEventHandler();
         if (remapPropName == "NSM_DEVICE_INSTANCE_NUMBER")
@@ -554,7 +555,7 @@ class NsmDevice :
     std::shared_ptr<NsmMessageHandler> nsmMsgHandler;
     std::shared_ptr<sdbusplus::asio::object_server> objServer;
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
-
+    std::shared_ptr<ProgressCounters> sensorProgressCounters = nullptr;
     const sdeventplus::Event event = sdeventplus::Event::get_default();
 
     void registerLongRunningEventHandler();
@@ -643,7 +644,8 @@ class NsmDevice :
     SensorQueue& longRunningSensors = sensors[PollingType::LongRunning];
     SensorQueue& staticSensors = sensors[PollingType::Static];
     SensorQueue& roundRobinSensors = sensors[PollingType::RoundRobin];
-    ProgressCounters progressCounters;
+    ProgressCounters& progressCounters();
+    DiscoveryEvents& discoveryEvents();
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,

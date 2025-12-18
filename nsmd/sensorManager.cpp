@@ -27,6 +27,7 @@
 #include "nsmObject.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
+#include "progressCounters.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorQueueMap.hpp"
 #include "utils.hpp"
@@ -532,7 +533,7 @@ requester::Coroutine SensorManagerImpl::updateLongRunningSensor(
 
     sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
     sensor->setLastUpdatedTimeStamp(t1);
-    nsmDevice->progressCounters.increment(PollingType::LongRunning, rc, t1);
+    nsmDevice->progressCounters().increment(PollingType::LongRunning, rc);
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
@@ -573,11 +574,11 @@ requester::Coroutine
 
         // Update progress counters
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
-        nsmDevice->progressCounters.increment(PollingType::Priority, rc, t1);
+        nsmDevice->progressCounters().increment(PollingType::Priority, rc);
         if ((t1 - t0) > pollingTimeInUsec)
         {
-            nsmDevice->progressCounters.increment(
-                ProgressCounterType::PriorityTimeExceeded, rc, t1);
+            nsmDevice->progressCounters().increment(
+                ProgressCounterType::PriorityTimeExceeded, rc);
         }
     }
 #ifdef LTTNG_TRACING
@@ -680,7 +681,7 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
         sensor->setLastUpdatedTimeStamp(t1);
 
-        nsmDevice->progressCounters.increment(pollingType, rc, t1);
+        nsmDevice->progressCounters().increment(pollingType, rc);
     }
 
     // Either we were able to succesfully update all sensors in one
@@ -739,6 +740,8 @@ requester::Coroutine
                                                     // CPU usage
         if (sleepTime > 0)
         {
+            nsmDevice->progressCounters().flushIfNeeded(t1);
+
             // The timer event for devices with no priority sensors can be
             // of low priority.
             co_await common::Sleep(event, sleepTime,

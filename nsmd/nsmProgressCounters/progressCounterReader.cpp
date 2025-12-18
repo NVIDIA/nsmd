@@ -22,32 +22,48 @@
 
 #include <unistd.h>
 
+#include <com/nvidia/Dump/Counters/server.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/message.hpp>
 
-#include <algorithm>
 #include <chrono>
 #include <ctime>
-#include <format>
-#include <iomanip>
 #include <iostream>
-#include <iterator>
-#include <ranges>
 #include <sstream>
 #include <string>
-#include <string_view>
 
 using namespace dbus;
 using namespace nsm;
 using std::cout;
 using std::endl;
 
-static constexpr std::array<std::string_view, CountersCount> counterNames = {
-    "Priority",  "GPM",        "LongRunning",
-    "Static",    "RoundRobin", "PriorityTimeExceeded",
-    "PostPatch", "Event",      "Error",
-    "Timeout",
+using CountersIntf =
+    sdbusplus::server::object_t<sdbusplus::com::nvidia::Dump::server::Counters>;
+
+template <typename CounterDataType>
+struct CountersDataReadRow
+{
+    CountersDataHeader header;
+    std::vector<CounterDataType> counters;
+    CountersDataReadRow(const std::vector<uint8_t>& buffer, size_t countersSize)
+    {
+        if (buffer.size() != (sizeof(CountersDataHeader) +
+                              sizeof(CounterDataType) * countersSize))
+        {
+            throw std::runtime_error("Invalid buffer size");
+        }
+        header = *reinterpret_cast<const CountersDataHeader*>(buffer.data());
+        counters = std::vector<CounterDataType>(countersSize, 0);
+        auto data = reinterpret_cast<const CounterDataType*>(
+            buffer.data() + sizeof(CountersDataHeader));
+        for (size_t i = 0; i < countersSize; i++)
+        {
+            counters[i] = data[i];
+        }
+    }
 };
+
+using CountersBufferCollection = std::vector<std::vector<uint8_t>>;
 
 static std::string formatTimestamp(uint64_t monotonicMicroseconds)
 {
@@ -72,69 +88,130 @@ static std::string formatTimestamp(uint64_t monotonicMicroseconds)
 }
 
 template <typename T>
-static std::string join(const std::array<T, CountersCount>& collection)
+static std::string join(const std::vector<T>& collection)
 {
     std::stringstream line;
     for (const auto& item : collection)
     {
-        line << "," << item;
+        if constexpr (std::is_same_v<T, std::string>)
+        {
+            line << "," << item;
+        }
+        else
+        {
+            line << "," << std::to_string(item);
+        }
     }
     return line.str();
 }
 
-static void printSortedData(std::vector<CounterDataRow>& data, int deviceEid)
+template <typename CounterDataType>
+static void printData(const std::string& path, const std::string& description,
+                      const CountersHeaders& countersHeaders,
+                      const CountersBufferCollection&& data)
 {
     if (data.empty())
     {
-        cout << "No dump data available for device " << deviceEid << endl;
+        cout << "No dump data available for " << description << " at path "
+             << path << endl;
         return;
     }
 
-    // sort the data by timestamp
-    std::ranges::sort(data,
-                      [](const CounterDataRow& a, const CounterDataRow& b) {
-        return a.timestamp < b.timestamp;
-    });
-
-    // Print the device and dump information
-    cout << "=====" << " Device " << deviceEid << " dump data (" << data.size()
-         << " entries, " << CountersCount << " counters) " << "=====" << endl;
+    // Print the path and dump information
+    std::stringstream header;
+    header << "====== " << "Dump data (" << data.size() << " entries, "
+           << countersHeaders.size() << " counters) for path (..."
+           << path.substr(progressCountersObjectBasePath.string().size()) << ")"
+           << " ======";
+    cout << header.str() << endl;
+    cout << "Description: " << description << endl;
 
     // Print the header in csv format
     cout << "DumpIteration,Timestamp";
-    cout << join(counterNames);
+    cout << join(countersHeaders);
     cout << endl;
 
     // Print the data in csv format
-    for (const auto& entry : data)
+    for (const auto& buffer : data)
     {
-        cout << entry.key << "," << formatTimestamp(entry.timestamp);
-        cout << join(entry.counters);
+        CountersDataReadRow<CounterDataType> row(buffer,
+                                                 countersHeaders.size());
+        cout << row.header.key << "," << formatTimestamp(row.header.timestamp);
+        cout << join(row.counters);
         cout << endl;
     }
-    cout << "==========================================================" << endl
-         << endl;
+    cout << std::string(header.str().size(), '=') << endl << endl;
+}
+
+template <typename CounterDataType>
+void processData(const std::string& path, const std::string& description,
+                 const CountersHeaders& countersHeaders, utils::CustomFD& fd)
+{
+    CountersBufferCollection data;
+    size_t rowSize = sizeof(CountersDataHeader) +
+                     sizeof(CounterDataType) * countersHeaders.size();
+    for (size_t pos = 0; pos < fd.size(); pos += rowSize)
+    {
+        auto buffer = std::vector<uint8_t>(rowSize);
+        if (!fd.read(pos, buffer.data(), buffer.size()))
+        {
+            lg2::error("Failed to read dump data: {PATH} at position {POS}",
+                       "PATH", path, "POS", pos);
+            break;
+        }
+        data.push_back(std::move(buffer));
+    }
+
+    // sort the data by timestamp
+    std::ranges::sort(data, [](const auto& a, const auto& b) {
+        if (a.size() < sizeof(CountersDataHeader) ||
+            b.size() < sizeof(CountersDataHeader))
+        {
+            return false; // Invalid buffers sort last
+        }
+        auto& rowA = *reinterpret_cast<const CountersDataHeader*>(a.data());
+        auto& rowB = *reinterpret_cast<const CountersDataHeader*>(b.data());
+        return rowA.timestamp < rowB.timestamp;
+    });
+
+    // dumping the output to the console
+    printData<CounterDataType>(path, description, countersHeaders,
+                               std::move(data));
 }
 
 static void showUsage(const char* programName)
 {
-    cout
-        << "Usage: " << programName << " [OPTIONS] [DEVICE_EID]\n"
-        << "\n"
-        << "Display progress counter data for NSM devices.\n"
-        << "\n"
-        << "OPTIONS:\n"
-        << "  -h, --help    Show this help message and exit\n"
-        << "\n"
-        << "ARGUMENTS:\n"
-        << "  DEVICE_EID    Show data only for specified device EID (integer)\n"
-        << "                If not specified, shows data for all devices\n"
-        << endl;
+    cout << "Usage: " << programName << " [OPTIONS] [name]\n"
+         << "\n"
+         << "Display progress counters data for NSM devices.\n"
+         << "\n"
+         << "OPTIONS:\n"
+         << "  -h, --help    Show this help message and exit\n"
+         << "\n"
+         << "ARGUMENTS:\n"
+         << "  name    Show data only for specified path suffix (string)\n"
+         << "                If not specified, shows data for all devices\n"
+         << endl;
+}
+
+template <typename T>
+static T getProperty(sdbusplus::bus::bus& bus, const std::string& path,
+                     const std::string& service,
+                     const std::string& propertyName)
+{
+    sdbusplus::message::message method =
+        bus.new_method_call(service.c_str(), path.c_str(),
+                            "org.freedesktop.DBus.Properties", "Get");
+    method.append("com.nvidia.Dump.Counters", propertyName);
+    auto reply = bus.call(method);
+    std::variant<T> propertyVariant;
+    reply.read(propertyVariant);
+    return std::get<T>(propertyVariant);
 }
 
 int main(int argc, char* argv[])
 {
-    int targetDeviceEid = -1; // -1 means show all devices
+    std::string targetPathSuffix = ""; // empty string means show all devices
 
     // Parse command line arguments
     for (int i = 1; i < argc; ++i)
@@ -148,18 +225,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            try
-            {
-                targetDeviceEid = std::stoi(arg);
-            }
-            catch (const std::exception&)
-            {
-                lg2::error(
-                    "Error: Invalid device EID '{ARG}'. Must be an integer.",
-                    "ARG", arg);
-                showUsage(argv[0]);
-                return 1;
-            }
+            targetPathSuffix = arg;
         }
     }
 
@@ -185,36 +251,34 @@ int main(int argc, char* argv[])
 
         for (const auto& [path, services] : objects)
         {
-            std::string pathStr = path;
-            auto eid = std::stoi(pathStr.substr(pathStr.find_last_of('/') + 1));
-
-            // Skip if specific device requested and this isn't it
-            if (targetDeviceEid != -1 && eid != targetDeviceEid)
+            // Skip if specific path suffix requested and this isn't it
+            if (!targetPathSuffix.empty() &&
+                path.find(targetPathSuffix) == std::string::npos)
             {
                 continue;
             }
 
-            utils::CustomFD fd(getFd(pathStr, services.front().first));
-            std::vector<CounterDataRow> data;
-            for (size_t i = 0; i < fd.size(); i += sizeof(CounterDataRow))
+            auto service = services.front().first;
+            utils::CustomFD fd(getFd(path, service));
+
+            auto countersHeaders = getProperty<CountersHeaders>(
+                bus, path, service, "CountersHeaders");
+            auto description = getProperty<std::string>(bus, path, service,
+                                                        "Description");
+            auto counterType = getProperty<CountersIntf::CounterType>(
+                bus, path, service, "CounterType");
+            if (counterType == CountersIntf::CounterType::INT8)
             {
-                CounterDataRow rowData;
-                off_t pos = i;
-                if (!fd.read(pos, reinterpret_cast<uint8_t*>(&rowData),
-                             sizeof(CounterDataRow)))
-                {
-                    break;
-                }
-                data.emplace_back(rowData);
+                processData<int8_t>(path, description, countersHeaders, fd);
             }
-
-            // dumping the output to the console
-            printSortedData(data, eid);
-
-            // If specific device was requested, we're done
-            if (targetDeviceEid == eid)
+            else if (counterType == CountersIntf::CounterType::UINT32)
             {
-                break;
+                processData<uint32_t>(path, description, countersHeaders, fd);
+            }
+            else
+            {
+                lg2::error("Unsupported counter type: {TYPE}", "TYPE",
+                           counterType);
             }
         }
     }

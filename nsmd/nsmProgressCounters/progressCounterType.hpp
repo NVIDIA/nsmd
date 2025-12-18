@@ -18,6 +18,8 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace nsm
 {
@@ -154,14 +156,187 @@ enum class ProgressCounterType
     EnumCount,
 };
 
-constexpr auto CountersCount =
-    static_cast<uint32_t>(ProgressCounterType::EnumCount);
-using CountersArray = std::array<uint32_t, CountersCount>;
+/**
+ * @brief Progress counter types for tracking device discovery operations
+ *
+ * These counters track different types of device discovery operations and their
+ * outcomes. Counters are incremented during device discovery and are
+ * periodically dumped to a memory file descriptor for monitoring and debugging.
+ */
+enum class DiscoveryEventType
+{
+    /**
+     * @brief MCTP interface added signal handler
+     *
+     * Incremented when: MCTP interface is added
+     * Values: -1 (not triggered), 0+ (count of signals)
+     */
+    InterfaceAddedSignal,
 
-struct __attribute__((packed)) CounterDataRow
+    /**
+     * @brief MCTP interface removed signal handler
+     *
+     * Incremented when: MCTP interface is removed
+     * Values: -1 (not triggered), 0+ (count of signals)
+     */
+    InterfaceRemovedSignal,
+
+    /**
+     * @brief Connectivity available property change
+     *
+     * Incremented when: Connectivity property changes
+     * Values: -1 (not set), 0 (not available), 1 (available)
+     */
+    ConnectivityAvailable,
+
+    /**
+     * @brief Online task: coSetdeviceStateOnlineTask return code
+     *
+     * Incremented when: Device online state task completes
+     * Values: -1 (not executed), RC (return code)
+     */
+    SetDeviceStateOnline,
+
+    /**
+     * @brief Online task: ping return code
+     *
+     * Incremented when: Ping command is executed during online discovery
+     * Values: -1 (not executed), RC (return code)
+     */
+    Ping,
+
+    /**
+     * @brief Online task: query device identification return code
+     *
+     * Incremented when: Query Device Identification during online discovery
+     * Values: -1 (not executed), RC (return code)
+     */
+    QueryDeviceIdentification,
+
+    /**
+     * @brief Online task: map NSM device using EID success
+     *
+     * Incremented when: Device mapping is attempted during online discovery
+     * Values: -1 (not attempted), 0 (failed), 1 (success)
+     */
+    OnlineMapNsmDeviceUsingEid,
+
+    /**
+     * @brief Online task: get supported NVIDIA message type return code
+     *
+     * Incremented when: Supported message types queried during online discovery
+     * Values: -1 (not executed), RC (return code)
+     */
+    GetSupportedNvidiaMessageType,
+
+    /**
+     * @brief Online task: get supported command codes for message type 0
+     *
+     * Incremented when: Command codes queried for message type 0
+     * Values: -1 (not executed), RC (return code)
+     */
+    GetSupportedCommandCodes0,
+
+    /**
+     * @brief Online task: get supported command codes for message type 1
+     *
+     * Incremented when: Command codes queried for message type 1
+     * Values: -1 (not executed), RC (return code)
+     */
+    GetSupportedCommandCodes1,
+
+    /**
+     * @brief Online task: get supported command codes for message type 2
+     *
+     * Incremented when: Command codes queried for message type 2
+     * Values: -1 (not executed), RC (return code)
+     */
+    GetSupportedCommandCodes2,
+
+    /**
+     * @brief Online task: get supported command codes for message type 3
+     *
+     * Incremented when: Command codes queried for message type 3
+     * Values: -1 (not executed), RC (return code)
+     */
+    GetSupportedCommandCodes3,
+
+    /**
+     * @brief Online task: get supported command codes for message type 4
+     *
+     * Incremented when: Command codes queried for message type 4
+     * Values: -1 (not executed), RC (return code)
+     */
+    GetSupportedCommandCodes4,
+
+    /**
+     * @brief Online task: get supported command codes for message type 5
+     *
+     * Incremented when: Command codes queried for message type 5
+     * Values: -1 (not executed), RC (return code)
+     */
+    GetSupportedCommandCodes5,
+
+    /**
+     * @brief Online task: get supported command codes for message type 6
+     *
+     * Incremented when: Command codes queried for message type 6
+     * Values: -1 (not executed), RC (return code)
+     */
+    GetSupportedCommandCodes6,
+
+    /**
+     * @brief Online task: get FRU device identification return code
+     *
+     * Incremented when: FRU information is retrieved during online discovery
+     * Values: -1 (not executed), RC (return code)
+     */
+    GetFru,
+
+    /**
+     * @brief Offline task: coSetdeviceStateOfflineTask return code
+     *
+     * Incremented when: Device offline state task completes
+     * Values: -1 (not executed), RC (return code)
+     */
+    SetDeviceStateOffline,
+
+    /**
+     * @brief Offline task: map NSM device using EID success
+     *
+     * Incremented when: Device mapping is attempted during offline discovery
+     * Values: -1 (not attempted), 0 (failed), 1 (success)
+     */
+    OfflineMapNsmDeviceUsingEid,
+
+    /**
+     * @brief Enum count used only for calculating the number of counters in the
+     * array.
+     * @note Needs to be last in the enum.
+     */
+    EnumCount
+};
+
+constexpr auto PollingCountersSize =
+    static_cast<uint32_t>(ProgressCounterType::EnumCount);
+
+constexpr auto DiscoveryEventsSize =
+    static_cast<uint32_t>(DiscoveryEventType::EnumCount);
+
+template <typename CounterDataType, std::size_t Size>
+using CountersArray = std::array<CounterDataType, Size>;
+
+using CountersHeaders = std::vector<std::string>;
+
+struct __attribute__((packed)) CountersDataHeader
 {
     uint32_t key;
     uint64_t timestamp;
-    CountersArray counters;
+};
+
+template <typename CounterDataType, std::size_t Size>
+struct __attribute__((packed)) CountersDataRow : CountersDataHeader
+{
+    CountersArray<CounterDataType, Size> counters;
 };
 } // namespace nsm

@@ -16,34 +16,31 @@
  */
 
 #pragma once
-#include "config.h"
-
 #include "progressCounterType.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 
 #include <com/nvidia/Dump/Counters/server.hpp>
 
-#include <unordered_map>
-
+namespace nsm
+{
 using CountersIntf =
     sdbusplus::server::object_t<sdbusplus::com::nvidia::Dump::server::Counters>;
 
-namespace nsm
-{
-class DeviceCounterDumpObject : public CountersIntf
+#define CountersTemplate                                                       \
+    template <typename CounterDataType, std::size_t Size,                      \
+              std::size_t MemFdBytesSize>
+
+CountersTemplate class DeviceCounterDumpObject : public CountersIntf
 {
   public:
-    DeviceCounterDumpObject(uint8_t eid);
-    bool updateCounters(uint32_t key, uint64_t timestamp,
-                        const CountersArray& counters);
+    DeviceCounterDumpObject(const std::string& path);
+    bool updateCounters(const CountersDataRow<CounterDataType, Size>& rowData);
 
   private:
-    uint8_t eid;
     utils::CustomFD fd;
-    static constexpr size_t maxRows = SENSOR_PROGRESS_COUNTERS_MEMFD_SIZE /
-                                      sizeof(CounterDataRow);
-
+    static constexpr size_t maxRows =
+        MemFdBytesSize / sizeof(CountersDataRow<CounterDataType, Size>);
     sdbusplus::message::unix_fd getFd() override;
 };
 

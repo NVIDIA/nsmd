@@ -32,10 +32,14 @@
 #include "counterProducer.hpp"
 
 using namespace ::testing;
-using namespace nsm;
 
 class CountersTest : public Test
 {};
+using CountersArray = nsm::CountersArray<uint32_t, nsm::PollingCountersSize>;
+using CounterDataRow = nsm::CountersDataRow<uint32_t, nsm::PollingCountersSize>;
+using DeviceCounterDumpObject =
+    nsm::DeviceCounterDumpObject<uint32_t, nsm::PollingCountersSize,
+                                 SENSOR_PROGRESS_COUNTERS_MEMFD_SIZE>;
 
 // Tests for CounterDataRow size
 TEST_F(CountersTest, CounterDataRowSize)
@@ -57,25 +61,25 @@ TEST_F(CountersTest, CounterDataRowSize)
 TEST_F(CountersTest, DeviceCounterDumpObjectCreation)
 {
     // Create a device counter dump object
-    DeviceCounterDumpObject deviceData(42);
+    DeviceCounterDumpObject deviceData("/tmp/test_42");
 
     EXPECT_GT(deviceData.maxRows,
               0); // maxRows is now constexpr and should be > 0
 
     // Test that maxRows is consistent across instances
-    DeviceCounterDumpObject deviceData2(43);
+    DeviceCounterDumpObject deviceData2("/tmp/test_43");
     EXPECT_EQ(deviceData.maxRows, deviceData2.maxRows);
 }
 
 TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCounters)
 {
-    DeviceCounterDumpObject deviceData(1);
+    DeviceCounterDumpObject deviceData("/tmp/test_1");
     CountersArray counters{};
     counters[0] = 10;
     counters[1] = 20;
 
     // First update should succeed
-    bool result = deviceData.updateCounters(0, 1000, counters);
+    bool result = deviceData.updateCounters({0, 1000, counters});
     EXPECT_TRUE(result);
 
     // maxRows should be calculated and > 0
@@ -84,28 +88,29 @@ TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCounters)
 
 TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCountersMultipleIterations)
 {
-    DeviceCounterDumpObject deviceData(1);
+    DeviceCounterDumpObject deviceData("/tmp/test_1");
     CountersArray counters{};
     counters[0] = 10;
 
     // Update counters for multiple iterations
-    bool result1 = deviceData.updateCounters(0, 1000, counters);
+    bool result1 = deviceData.updateCounters({0, 1000, counters});
     EXPECT_TRUE(result1);
 
-    bool result2 = deviceData.updateCounters(1, 2000, counters);
+    bool result2 = deviceData.updateCounters({1, 2000, counters});
     EXPECT_TRUE(result2);
 
-    bool result3 = deviceData.updateCounters(2, 3000, counters);
+    bool result3 = deviceData.updateCounters({2, 3000, counters});
     EXPECT_TRUE(result3);
 }
 
 TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCountersFailureEmptyCounters)
 {
-    DeviceCounterDumpObject deviceData(1);
+    DeviceCounterDumpObject deviceData("/tmp/test_1");
     CountersArray emptyCounters{}; // All zeros
 
-    // Update with empty counters should fail (as per the implementation)
-    bool result = deviceData.updateCounters(0, 1000, emptyCounters);
+    // Update with empty counters should fail (validation rejects all-zero
+    // counters)
+    bool result = deviceData.updateCounters({0, 1000, emptyCounters});
 
     EXPECT_FALSE(result);
 }
@@ -113,7 +118,7 @@ TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCountersFailureEmptyCounters)
 TEST_F(CountersTest,
        DeviceCounterDumpObjectUpdateCountersFailureAllZeroCounters)
 {
-    DeviceCounterDumpObject deviceData(1);
+    DeviceCounterDumpObject deviceData("/tmp/test_1");
     CountersArray allZeroCounters{};
     // Explicitly set all to zero to test std::ranges::all_of
     for (auto& counter : allZeroCounters)
@@ -121,48 +126,49 @@ TEST_F(CountersTest,
         counter = 0;
     }
 
-    // Update with all zero counters should fail
-    bool result = deviceData.updateCounters(0, 1000, allZeroCounters);
+    // Update with all zero counters should fail (validation rejects all-zero
+    // counters)
+    bool result = deviceData.updateCounters({0, 1000, allZeroCounters});
 
     EXPECT_FALSE(result);
 }
 
 TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCountersLargeTimestamps)
 {
-    DeviceCounterDumpObject deviceData(1);
+    DeviceCounterDumpObject deviceData("/tmp/test_1");
     CountersArray counters{};
     counters[0] = 10;
 
     // Test with large timestamp values
-    uint64_t largeStartTime = UINT64_MAX - 1000;
+    uint64_t largelastUpdateTime = UINT64_MAX - 1000;
 
-    bool result = deviceData.updateCounters(0, largeStartTime, counters);
+    bool result = deviceData.updateCounters({0, largelastUpdateTime, counters});
 
     EXPECT_TRUE(result);
 }
 
 TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCountersLargeDumpIteration)
 {
-    DeviceCounterDumpObject deviceData(1);
+    DeviceCounterDumpObject deviceData("/tmp/test_1");
     CountersArray counters{};
     counters[0] = 10;
 
     // First write to initialize the file
-    bool initResult = deviceData.updateCounters(0, 500, counters);
+    bool initResult = deviceData.updateCounters({0, 500, counters});
     EXPECT_TRUE(initResult);
 
     // Test with large dump iteration (key)
     uint32_t largeIteration = deviceData.maxRows * 10;
 
     // This should succeed - the key will be modulo'd by maxRows
-    bool result = deviceData.updateCounters(largeIteration, 1000, counters);
+    bool result = deviceData.updateCounters({largeIteration, 1000, counters});
 
     EXPECT_TRUE(result);
 }
 
 TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCountersManyCounters)
 {
-    DeviceCounterDumpObject deviceData(1);
+    DeviceCounterDumpObject deviceData("/tmp/test_1");
     // Create counters using all array elements
     CountersArray manyCounters{};
     for (int i = 0; i < 10; ++i)
@@ -170,30 +176,28 @@ TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCountersManyCounters)
         manyCounters[i] = uint32_t(i);
     }
 
-    bool result = deviceData.updateCounters(0, 1000, manyCounters);
+    bool result = deviceData.updateCounters({0, 1000, manyCounters});
 
     EXPECT_TRUE(result);
 }
 
 TEST_F(CountersTest, DeviceCounterDumpObjectRotationLogic)
 {
-    auto eid = 1;
-    DeviceCounterDumpObject deviceData(eid);
+    DeviceCounterDumpObject deviceData("/tmp/test_1");
     CountersArray counters{};
     counters[0] = 10;
 
     // Test rotation logic: key % maxRows
     for (uint32_t i = 0; i < 2 * deviceData.maxRows; i++)
     {
-        bool result = deviceData.updateCounters(i, i * 1000, counters);
+        bool result = deviceData.updateCounters({i, i * 1000, counters});
         EXPECT_TRUE(result) << "Failed at iteration " << i;
     }
 }
 
 TEST_F(CountersTest, DeviceCounterDumpObjectFileSizeAndDataIntegrity)
 {
-    auto eid = 1;
-    DeviceCounterDumpObject deviceData(eid);
+    DeviceCounterDumpObject deviceData("/tmp/test_1");
 
     // Prepare test data
     const uint32_t numIterations = 5;
@@ -214,8 +218,8 @@ TEST_F(CountersTest, DeviceCounterDumpObjectFileSizeAndDataIntegrity)
     // Update counters multiple times
     for (uint32_t i = 0; i < numIterations; i++)
     {
-        bool result = deviceData.updateCounters(testKeys[i], testTimestamps[i],
-                                                testCounters[i]);
+        bool result = deviceData.updateCounters(
+            {testKeys[i], testTimestamps[i], testCounters[i]});
         EXPECT_TRUE(result) << "Failed to update counters at iteration " << i;
     }
 
@@ -262,8 +266,7 @@ TEST_F(CountersTest, DeviceCounterDumpObjectFileSizeAndDataIntegrity)
 
 TEST_F(CountersTest, DeviceCounterDumpObjectRotationWithLargeKeys)
 {
-    auto eid = 2;
-    DeviceCounterDumpObject deviceData(eid);
+    DeviceCounterDumpObject deviceData("/tmp/test_2");
 
     uint32_t maxRows = deviceData.maxRows;
     CountersArray testCounters{};
@@ -280,8 +283,8 @@ TEST_F(CountersTest, DeviceCounterDumpObjectRotationWithLargeKeys)
     // Write data with large keys
     for (size_t i = 0; i < testKeys.size(); i++)
     {
-        bool result = deviceData.updateCounters(testKeys[i], i * 1000,
-                                                testCounters);
+        bool result =
+            deviceData.updateCounters({testKeys[i], i * 1000, testCounters});
         EXPECT_TRUE(result)
             << "Failed to update counters for key " << testKeys[i];
     }

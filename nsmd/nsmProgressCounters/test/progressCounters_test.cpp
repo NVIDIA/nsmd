@@ -26,7 +26,6 @@
 #define private public
 #define protected public
 
-#include "commonMock.hpp"
 #include "counterProducer.hpp"
 #include "nsmDevice.hpp"
 #include "progressCounterType.hpp"
@@ -38,9 +37,7 @@ using namespace nsm;
 class ProgressCountersTest : public Test
 {
   protected:
-    uuid_t uuid = "00000000-0000-0000-0000-000000000001";
-    MockNsmDeviceBase mockDevice{1, 1, "MCTP_UUID", uuid, 1};
-    ProgressCounters progressCounters{mockDevice};
+    ProgressCounters progressCounters{1};
 };
 
 // Test constructor
@@ -49,7 +46,6 @@ TEST_F(ProgressCountersTest, Constructor)
     // Verify initial state
     EXPECT_EQ(progressCounters.dumpIteration, 0);
     EXPECT_EQ(progressCounters.totalCount, 0);
-    EXPECT_EQ(progressCounters.startTime, 0);
     EXPECT_EQ(progressCounters.lastUpdateTime, 0);
 
     // Verify counters are initialized to zero
@@ -64,29 +60,25 @@ TEST_F(ProgressCountersTest, Constructor)
 // Test increment with PollingType
 TEST_F(ProgressCountersTest, IncrementWithPollingType)
 {
-    uint64_t currentTime = 1000000; // 1 second in microseconds
     uint8_t rc = NSM_SUCCESS;
 
     // Test Priority polling
-    progressCounters.increment(PollingType::Priority, rc, currentTime);
+    progressCounters.increment(PollingType::Priority, rc);
 
     EXPECT_EQ(
         progressCounters
             .counters[static_cast<uint32_t>(ProgressCounterType::Priority)],
         1);
     EXPECT_EQ(progressCounters.totalCount, 1);
-    EXPECT_EQ(progressCounters.startTime, currentTime);
-    EXPECT_EQ(progressCounters.lastUpdateTime, currentTime);
+    EXPECT_EQ(progressCounters.lastUpdateTime, 0); // Not set until flush/update
 }
 
 // Test increment with PollingType - GpuPerformanceMonitoring
 TEST_F(ProgressCountersTest, IncrementWithPollingTypeGPM)
 {
-    uint64_t currentTime = 2000000; // 2 seconds in microseconds
     uint8_t rc = NSM_SUCCESS;
 
-    progressCounters.increment(PollingType::GpuPerformanceMonitoring, rc,
-                               currentTime);
+    progressCounters.increment(PollingType::GpuPerformanceMonitoring, rc);
 
     EXPECT_EQ(progressCounters.counters[static_cast<uint32_t>(
                   ProgressCounterType::GpuPerformanceMonitoring)],
@@ -97,30 +89,25 @@ TEST_F(ProgressCountersTest, IncrementWithPollingTypeGPM)
 // Test increment with ProgressCounterType and NSM_SUCCESS
 TEST_F(ProgressCountersTest, IncrementWithProgressCounterTypeSuccess)
 {
-    uint64_t currentTime = 3000000; // 3 seconds in microseconds
     uint8_t rc = NSM_SUCCESS;
 
-    progressCounters.increment(ProgressCounterType::RoundRobin, rc,
-                               currentTime);
+    progressCounters.increment(ProgressCounterType::RoundRobin, rc);
 
     EXPECT_EQ(
         progressCounters
             .counters[static_cast<uint32_t>(ProgressCounterType::RoundRobin)],
         1);
     EXPECT_EQ(progressCounters.totalCount, 1);
-    EXPECT_EQ(progressCounters.startTime, currentTime);
-    EXPECT_EQ(progressCounters.lastUpdateTime, currentTime);
+    EXPECT_EQ(progressCounters.lastUpdateTime, 0); // Not set until flush/update
 }
 
 // Test increment with ProgressCounterType and NSM_SW_ERROR_TIMEOUT
 TEST_F(ProgressCountersTest, IncrementWithProgressCounterTypeTimeout)
 {
-    uint64_t currentTime = 4000000; // 4 seconds in microseconds
     uint8_t rc = NSM_SW_ERROR_TIMEOUT;
 
     // Try to increment RoundRobin, but it should increment Timeout instead
-    progressCounters.increment(ProgressCounterType::RoundRobin, rc,
-                               currentTime);
+    progressCounters.increment(ProgressCounterType::RoundRobin, rc);
 
     EXPECT_EQ(
         progressCounters
@@ -136,11 +123,10 @@ TEST_F(ProgressCountersTest, IncrementWithProgressCounterTypeTimeout)
 // Test increment with ProgressCounterType and error return code
 TEST_F(ProgressCountersTest, IncrementWithProgressCounterTypeError)
 {
-    uint64_t currentTime = 5000000; // 5 seconds in microseconds
     uint8_t rc = NSM_ERROR; // Any error code other than SUCCESS or TIMEOUT
 
     // Try to increment Static, but it should increment Error instead
-    progressCounters.increment(ProgressCounterType::Static, rc, currentTime);
+    progressCounters.increment(ProgressCounterType::Static, rc);
 
     EXPECT_EQ(progressCounters
                   .counters[static_cast<uint32_t>(ProgressCounterType::Error)],
@@ -154,17 +140,13 @@ TEST_F(ProgressCountersTest, IncrementWithProgressCounterTypeError)
 // Test multiple increments
 TEST_F(ProgressCountersTest, MultipleIncrements)
 {
-    uint64_t startTime = 1000000;
     uint8_t rc = NSM_SUCCESS;
 
     // Increment different counter types
-    progressCounters.increment(ProgressCounterType::Priority, rc, startTime);
-    progressCounters.increment(ProgressCounterType::Priority, rc,
-                               startTime + 100000);
-    progressCounters.increment(ProgressCounterType::RoundRobin, rc,
-                               startTime + 200000);
-    progressCounters.increment(ProgressCounterType::Static, rc,
-                               startTime + 300000);
+    progressCounters.increment(ProgressCounterType::Priority, rc);
+    progressCounters.increment(ProgressCounterType::Priority, rc);
+    progressCounters.increment(ProgressCounterType::RoundRobin, rc);
+    progressCounters.increment(ProgressCounterType::Static, rc);
 
     EXPECT_EQ(
         progressCounters
@@ -178,8 +160,7 @@ TEST_F(ProgressCountersTest, MultipleIncrements)
                   .counters[static_cast<uint32_t>(ProgressCounterType::Static)],
               1);
     EXPECT_EQ(progressCounters.totalCount, 4);
-    EXPECT_EQ(progressCounters.startTime, startTime);
-    EXPECT_EQ(progressCounters.lastUpdateTime, startTime + 300000);
+    EXPECT_EQ(progressCounters.lastUpdateTime, 0); // Not set until flush/update
 }
 
 // Test updateCounters
@@ -189,20 +170,18 @@ TEST_F(ProgressCountersTest, UpdateCounters)
     uint8_t rc = NSM_SUCCESS;
 
     // Add some counters
-    progressCounters.increment(ProgressCounterType::Priority, rc, currentTime);
-    progressCounters.increment(ProgressCounterType::RoundRobin, rc,
-                               currentTime);
+    progressCounters.increment(ProgressCounterType::Priority, rc);
+    progressCounters.increment(ProgressCounterType::RoundRobin, rc);
 
     EXPECT_EQ(progressCounters.totalCount, 2);
     EXPECT_EQ(progressCounters.dumpIteration, 0);
 
-    // Manually call updateCounters
-    progressCounters.updateCounters();
+    // Manually call updateCounters with time parameter
+    progressCounters.updateCounters(currentTime);
 
     // After update, counters should be reset
     EXPECT_EQ(progressCounters.totalCount, 0);
-    EXPECT_EQ(progressCounters.startTime, 0);
-    EXPECT_EQ(progressCounters.lastUpdateTime, 0);
+    EXPECT_EQ(progressCounters.lastUpdateTime, currentTime);
     EXPECT_EQ(progressCounters.dumpIteration, 1);
 
     // All counters should be zero
@@ -210,27 +189,21 @@ TEST_F(ProgressCountersTest, UpdateCounters)
     {
         EXPECT_EQ(counter, 0);
     }
-
-    // DeviceCounterDumpObject should be created
-    EXPECT_NE(progressCounters.deviceCounterDumpObject, nullptr);
 }
 
-// Test updateCountersIfNeeded - count threshold exceeded
-TEST_F(ProgressCountersTest, UpdateCountersIfNeededCountExceeded)
+// Test flushIfNeeded - count threshold exceeded
+TEST_F(ProgressCountersTest, flushIfNeededCountExceeded)
 {
-    uint64_t currentTime = 7000000;
     uint8_t rc = NSM_SUCCESS;
 
-    // Increment counters until threshold is exceeded (threshold uses >)
-    // Need THRESHOLD + 1 increments to trigger dump
-    for (uint32_t i = 0; i <= SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD;
-         i++)
+    // Increment counters until threshold is reached (threshold uses >=)
+    // Auto-flush happens when totalCount >= countThreshold
+    for (uint32_t i = 0; i < SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD; i++)
     {
-        progressCounters.increment(ProgressCounterType::Priority, rc,
-                                   currentTime + i * 1000);
+        progressCounters.increment(ProgressCounterType::Priority, rc);
     }
 
-    // After exceeding threshold, counters should be reset
+    // After reaching threshold, counters should be auto-reset by increment()
     EXPECT_EQ(progressCounters.totalCount, 0);
     EXPECT_EQ(progressCounters.dumpIteration, 1);
 
@@ -241,25 +214,37 @@ TEST_F(ProgressCountersTest, UpdateCountersIfNeededCountExceeded)
     }
 }
 
-// Test updateCountersIfNeeded - time threshold exceeded
-TEST_F(ProgressCountersTest, UpdateCountersIfNeededTimeExceeded)
+// Test flushIfNeeded - time threshold exceeded
+TEST_F(ProgressCountersTest, flushIfNeededTimeExceeded)
 {
-    uint64_t startTime = 8000000;
+    uint64_t lastUpdateTime = 8000000;
     uint8_t rc = NSM_SUCCESS;
 
-    // First increment to set startTime
-    progressCounters.increment(ProgressCounterType::Priority, rc, startTime);
+    // Increment some counters
+    progressCounters.increment(ProgressCounterType::Priority, rc);
+    progressCounters.increment(ProgressCounterType::Priority, rc);
 
+    EXPECT_EQ(progressCounters.totalCount, 2);
+
+    // Manually flush to set lastUpdateTime
+    progressCounters.updateCounters(lastUpdateTime);
+    EXPECT_EQ(progressCounters.dumpIteration, 1);
+    EXPECT_EQ(progressCounters.lastUpdateTime, lastUpdateTime);
+    EXPECT_EQ(progressCounters.totalCount, 0);
+
+    // Add more counters
+    progressCounters.increment(ProgressCounterType::Priority, rc);
     EXPECT_EQ(progressCounters.totalCount, 1);
-    EXPECT_EQ(progressCounters.startTime, startTime);
 
-    // Increment with time that exceeds threshold
-    uint64_t endTime = startTime + SENSOR_PROGRESS_COUNTERS_DUMP_TIME_THRESHOLD;
-    progressCounters.increment(ProgressCounterType::Priority, rc, endTime);
+    // Now flush with time that exceeds threshold
+    uint64_t endTime = lastUpdateTime +
+                       SENSOR_PROGRESS_COUNTERS_DUMP_TIME_THRESHOLD;
+    bool flushed = progressCounters.flushIfNeeded(endTime);
+    EXPECT_TRUE(flushed);
 
     // After exceeding time threshold, counters should be reset
     EXPECT_EQ(progressCounters.totalCount, 0);
-    EXPECT_EQ(progressCounters.dumpIteration, 1);
+    EXPECT_EQ(progressCounters.dumpIteration, 2);
 
     // All counters should be zero after dump
     for (const auto& counter : progressCounters.counters)
@@ -268,19 +253,23 @@ TEST_F(ProgressCountersTest, UpdateCountersIfNeededTimeExceeded)
     }
 }
 
-// Test updateCountersIfNeeded - neither threshold exceeded
-TEST_F(ProgressCountersTest, UpdateCountersIfNeededNoThreshold)
+// Test flushIfNeeded - neither threshold exceeded
+TEST_F(ProgressCountersTest, flushIfNeededNoThreshold)
 {
-    uint64_t startTime = 9000000;
+    uint64_t lastUpdateTime = 9000000;
     uint8_t rc = NSM_SUCCESS;
 
     // Increment a few times without exceeding thresholds
     uint32_t incrementCount = SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD / 2;
     for (uint32_t i = 0; i < incrementCount; i++)
     {
-        progressCounters.increment(ProgressCounterType::Priority, rc,
-                                   startTime + i * 1000);
+        progressCounters.increment(ProgressCounterType::Priority, rc);
     }
+
+    // Manually call flushIfNeeded - should not flush
+    bool flushed = progressCounters.flushIfNeeded(lastUpdateTime +
+                                                  (incrementCount - 1) * 1000);
+    EXPECT_FALSE(flushed);
 
     // Counters should NOT be reset
     EXPECT_EQ(progressCounters.totalCount, incrementCount);
@@ -294,29 +283,20 @@ TEST_F(ProgressCountersTest, UpdateCountersIfNeededNoThreshold)
 // Test all ProgressCounterType enum values
 TEST_F(ProgressCountersTest, AllCounterTypes)
 {
-    uint64_t currentTime = 10000000;
     uint8_t rc = NSM_SUCCESS;
 
     // Test each counter type (except EnumCount which is just for sizing)
-    progressCounters.increment(ProgressCounterType::Priority, rc, currentTime);
+    progressCounters.increment(ProgressCounterType::Priority, rc);
     progressCounters.increment(ProgressCounterType::GpuPerformanceMonitoring,
-                               rc, currentTime + 1000);
-    progressCounters.increment(ProgressCounterType::LongRunning, rc,
-                               currentTime + 2000);
-    progressCounters.increment(ProgressCounterType::Static, rc,
-                               currentTime + 3000);
-    progressCounters.increment(ProgressCounterType::RoundRobin, rc,
-                               currentTime + 4000);
-    progressCounters.increment(ProgressCounterType::PriorityTimeExceeded, rc,
-                               currentTime + 5000);
-    progressCounters.increment(ProgressCounterType::PostPatch, rc,
-                               currentTime + 6000);
-    progressCounters.increment(ProgressCounterType::Event, rc,
-                               currentTime + 7000);
-    progressCounters.increment(ProgressCounterType::Error, rc,
-                               currentTime + 8000);
-    progressCounters.increment(ProgressCounterType::Timeout, rc,
-                               currentTime + 9000);
+                               rc);
+    progressCounters.increment(ProgressCounterType::LongRunning, rc);
+    progressCounters.increment(ProgressCounterType::Static, rc);
+    progressCounters.increment(ProgressCounterType::RoundRobin, rc);
+    progressCounters.increment(ProgressCounterType::PriorityTimeExceeded, rc);
+    progressCounters.increment(ProgressCounterType::PostPatch, rc);
+    progressCounters.increment(ProgressCounterType::Event, rc);
+    progressCounters.increment(ProgressCounterType::Error, rc);
+    progressCounters.increment(ProgressCounterType::Timeout, rc);
 
     EXPECT_EQ(
         progressCounters
@@ -359,17 +339,14 @@ TEST_F(ProgressCountersTest, AllCounterTypes)
 // Test all PollingType enum values
 TEST_F(ProgressCountersTest, AllPollingTypes)
 {
-    uint64_t currentTime = 11000000;
     uint8_t rc = NSM_SUCCESS;
 
     // Test each polling type
-    progressCounters.increment(PollingType::Priority, rc, currentTime);
-    progressCounters.increment(PollingType::GpuPerformanceMonitoring, rc,
-                               currentTime + 1000);
-    progressCounters.increment(PollingType::LongRunning, rc,
-                               currentTime + 2000);
-    progressCounters.increment(PollingType::Static, rc, currentTime + 3000);
-    progressCounters.increment(PollingType::RoundRobin, rc, currentTime + 4000);
+    progressCounters.increment(PollingType::Priority, rc);
+    progressCounters.increment(PollingType::GpuPerformanceMonitoring, rc);
+    progressCounters.increment(PollingType::LongRunning, rc);
+    progressCounters.increment(PollingType::Static, rc);
+    progressCounters.increment(PollingType::RoundRobin, rc);
 
     // PollingType enums map directly to ProgressCounterType enums
     EXPECT_EQ(
@@ -396,37 +373,30 @@ TEST_F(ProgressCountersTest, AllPollingTypes)
 // Test multiple dump iterations
 TEST_F(ProgressCountersTest, MultipleDumpIterations)
 {
-    uint64_t currentTime = 12000000;
     uint8_t rc = NSM_SUCCESS;
 
-    // First batch - exceed count threshold
-    for (uint32_t i = 0; i <= SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD;
-         i++)
+    // First batch - reach count threshold (auto-flush via increment())
+    for (uint32_t i = 0; i < SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD; i++)
     {
-        progressCounters.increment(ProgressCounterType::Priority, rc,
-                                   currentTime + i * 1000);
+        progressCounters.increment(ProgressCounterType::Priority, rc);
     }
 
     EXPECT_EQ(progressCounters.dumpIteration, 1);
     EXPECT_EQ(progressCounters.totalCount, 0);
 
-    // Second batch - exceed count threshold again
-    for (uint32_t i = 0; i <= SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD;
-         i++)
+    // Second batch - reach count threshold again (auto-flush via increment())
+    for (uint32_t i = 0; i < SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD; i++)
     {
-        progressCounters.increment(ProgressCounterType::RoundRobin, rc,
-                                   currentTime + 100000 + i * 1000);
+        progressCounters.increment(ProgressCounterType::RoundRobin, rc);
     }
 
     EXPECT_EQ(progressCounters.dumpIteration, 2);
     EXPECT_EQ(progressCounters.totalCount, 0);
 
-    // Third batch - exceed count threshold again
-    for (uint32_t i = 0; i <= SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD;
-         i++)
+    // Third batch - reach count threshold again (auto-flush via increment())
+    for (uint32_t i = 0; i < SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD; i++)
     {
-        progressCounters.increment(ProgressCounterType::Event, rc,
-                                   currentTime + 200000 + i * 1000);
+        progressCounters.increment(ProgressCounterType::Event, rc);
     }
 
     EXPECT_EQ(progressCounters.dumpIteration, 3);
@@ -436,19 +406,14 @@ TEST_F(ProgressCountersTest, MultipleDumpIterations)
 // Test mixed success, timeout and error return codes
 TEST_F(ProgressCountersTest, MixedReturnCodes)
 {
-    uint64_t currentTime = 13000000;
-
     // Increment with different return codes
-    progressCounters.increment(ProgressCounterType::Priority, NSM_SUCCESS,
-                               currentTime);
-    progressCounters.increment(ProgressCounterType::Priority, NSM_SUCCESS,
-                               currentTime + 1000);
+    progressCounters.increment(ProgressCounterType::Priority, NSM_SUCCESS);
+    progressCounters.increment(ProgressCounterType::Priority, NSM_SUCCESS);
     progressCounters.increment(ProgressCounterType::RoundRobin,
-                               NSM_SW_ERROR_TIMEOUT, currentTime + 2000);
-    progressCounters.increment(ProgressCounterType::Static, NSM_ERROR,
-                               currentTime + 3000);
-    progressCounters.increment(ProgressCounterType::Event, 0x10,
-                               currentTime + 4000); // Some other error code
+                               NSM_SW_ERROR_TIMEOUT);
+    progressCounters.increment(ProgressCounterType::Static, NSM_ERROR);
+    progressCounters.increment(ProgressCounterType::Event,
+                               0x10); // Some other error code
 
     EXPECT_EQ(
         progressCounters
@@ -479,15 +444,13 @@ TEST_F(ProgressCountersTest, MixedReturnCodes)
 // If NVIDIA_PROGRESS_COUNTER is not defined, test that increment does nothing
 TEST_F(ProgressCountersTest, IncrementDisabledFeature)
 {
-    uint64_t currentTime = 1000000;
     uint8_t rc = NSM_SUCCESS;
 
     // Try to increment
-    progressCounters.increment(ProgressCounterType::Priority, rc, currentTime);
+    progressCounters.increment(ProgressCounterType::Priority, rc);
 
     // Nothing should change
     EXPECT_EQ(progressCounters.totalCount, 0);
-    EXPECT_EQ(progressCounters.startTime, 0);
     EXPECT_EQ(progressCounters.lastUpdateTime, 0);
 
     for (const auto& counter : progressCounters.counters)

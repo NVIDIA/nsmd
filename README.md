@@ -275,7 +275,7 @@ enum class ProgressCounterType
 };
 ```
 
-**Important**: Always add new counters before `EnumCount`, as `EnumCount` must remain the last entry for the `CountersCount` calculation.
+**Important**: Always add new counters before `EnumCount`, as `EnumCount` must remain the last entry for the `PollingCountersSize` calculation.
 
 #### 2. Update Documentation
 Add comprehensive documentation for your new counter in the `nsmd/nsmProgressCounters/progressCounterType.hpp` file:
@@ -297,29 +297,40 @@ Add your new counter to the "Counter Types and When They Are Incremented" sectio
 - Location in code
 - Purpose
 
-#### 3. Update Counter Names Map
-Add your counter name to the `counterNames` array in `nsmd/nsmProgressCounters/progressCounterReader.cpp`:
+#### 3. Update Counter Headers Map
+Add your counter name to the `return` vector in `nsmd/nsmProgressCounters/progressCounters.cpp`:
 
 ```cpp
-static constexpr std::array<std::string_view, CountersCount> counterNames = {
-    "Priority",  "GPM",        "LongRunning",
-    "Static",    "RoundRobin", "PriorityTimeExceeded",
-    "PostPatch", "Event",      "Error",
-    "Timeout",   "YourNewCounter",  // Add your counter name here
-};
+ProgressCounters::ProgressCounters(eid_t eid) :
+    PollingCountersBase(
+        SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD,
+        SENSOR_PROGRESS_COUNTERS_DUMP_TIME_THRESHOLD,
+        progressCountersObjectBasePath / "polling" / std::to_string(eid),
+        "Polling Progress Counters for device EID=" + std::to_string(eid),
+        {
+            "Priority",
+            "GPM",
+            "LongRunning",
+            "Static",
+            "RoundRobin",
+            "PriorityTimeExceeded",
+            "PostPatch",
+            "Event",
+            "Error",
+            "Timeout",
+            "YourNewCounter",  // Add your counter name here
+        })
+{}
 ```
 
-**Important**: The order must match the enum order in `ProgressCounterType`. This array is used by `nsmProgressCountersReader` to display counter names in CSV output.
+**Important**: The order must match the enum order in `ProgressCounterType`. This vector is exposed via D-Bus as the `CountersHeaders` property and is used by `nsmProgressCountersReader` to display counter names in CSV output.
 
 #### 4. Increment the Counter
 In the appropriate location in your code, increment the counter:
 
 ```cpp
 // For successful operations
-nsmDevice->progressCounters.increment(ProgressCounterType::YourNewCounter, rc, timestamp);
-
-// Or directly without return code checking
-nsmDevice->progressCounters.increment(ProgressCounterType::YourNewCounter, timestamp);
+nsmDevice->progressCounters().increment(ProgressCounterType::YourNewCounter, rc);
 ```
 
 ### Data Structure
@@ -327,16 +338,159 @@ nsmDevice->progressCounters.increment(ProgressCounterType::YourNewCounter, times
 Counters are stored in a packed structure for efficient memory usage:
 
 ```cpp
-struct __attribute__((packed)) CounterDataRow
+template <std::size_t Size>
+struct __attribute__((packed)) CountersDataRow
 {
-    uint32_t key;           // Iteration/dump key
-    uint64_t timestamp;     // Timestamp in microseconds
-    CountersArray counters; // Array of counter values
+    uint32_t key;                    // Iteration/dump key
+    uint64_t timestamp;              // Timestamp in microseconds
+    CountersArray<Size> counters;    // Array of counter values
 };
 ```
 
 The data rotates in the memfd using `key % maxRows` to ensure bounded memory usage.
 
+## Discovery Events
+
+The NSM daemon tracks device discovery operations using discovery event counters. These counters are stored in a memory-mapped file descriptor (memfd) and can be accessed via D-Bus for monitoring and debugging the device discovery process.
+
+### Discovery Event Types and Values
+
+Discovery event counters track the state of device discovery operations. Unlike polling counters which increment continuously, discovery event counters track the state or result of specific discovery operations. Each counter is initialized to `-1` (not executed/not triggered) and is updated as the discovery process progresses.
+
+#### Maintained DiscoveryEvents
+
+The following discovery events are maintained for each NSM device:
+
+#### 1. **InterfaceAddedSignal**
+- **Description**: Tracks MCTP interface added signal events
+- **When updated**: When MCTP interface is added
+- **Values**: 
+  - `-1`: Not triggered
+  - `0+`: Count of interface added signals received
+
+#### 2. **InterfaceRemovedSignal**
+- **Description**: Tracks MCTP interface removed signal events
+- **When updated**: When MCTP interface is removed
+- **Values**: 
+  - `-1`: Not triggered
+  - `0+`: Count of interface removed signals received
+
+#### 3. **ConnectivityAvailable**
+- **Description**: Tracks connectivity status changes
+- **When updated**: When device connectivity property changes
+- **Values**: 
+  - `-1`: Not set
+  - `0`: Not available
+  - `1`: Available
+
+#### 4. **SetDeviceStateOnline**
+- **Description**: Tracks online state transition task result
+- **When updated**: When device online state task completes
+- **Location**: Device online discovery task
+- **Values**: 
+  - `-1`: Not executed
+  - `RC`: NSM return code (0 = success, non-zero = error code)
+
+#### 5. **Ping**
+- **Description**: Tracks ping command result during online discovery
+- **When updated**: When ping command is executed during device online discovery
+- **Location**: Online discovery process
+- **Values**: 
+  - `-1`: Not executed
+  - `RC`: NSM return code (0 = success, non-zero = error code)
+
+#### 6. **QueryDeviceIdentification**
+- **Description**: Tracks device identification query result
+- **When updated**: When Query Device Identification is executed during online discovery
+- **Location**: Online discovery process
+- **Values**: 
+  - `-1`: Not executed
+  - `RC`: NSM return code (0 = success, non-zero = error code)
+
+#### 7. **OnlineMapNsmDeviceUsingEid**
+- **Description**: Tracks success of device mapping during online discovery
+- **When updated**: When device mapping is attempted using EID during online discovery
+- **Location**: Online discovery process
+- **Values**: 
+  - `-1`: Not attempted
+  - `0`: Failed
+  - `1`: Success
+
+#### 8. **GetSupportedNvidiaMessageType**
+- **Description**: Tracks supported NVIDIA message types query result
+- **When updated**: When supported message types are queried during online discovery
+- **Location**: Online discovery process
+- **Values**: 
+  - `-1`: Not executed
+  - `RC`: NSM return code (0 = success, non-zero = error code)
+
+#### 9-15. **GetSupportedCommandCodes0-6**
+- **Description**: Tracks supported command codes query results for message types 0-6
+- **When updated**: When command codes are queried for each message type during online discovery
+- **Location**: Online discovery process
+- **Values**: 
+  - `-1`: Not executed
+  - `RC`: NSM return code (0 = success, non-zero = error code)
+
+#### 16. **GetFru**
+- **Description**: Tracks FRU (Field Replaceable Unit) information retrieval result
+- **When updated**: When FRU information is retrieved during online discovery
+- **Location**: Online discovery process
+- **Values**: 
+  - `-1`: Not executed
+  - `RC`: NSM return code (0 = success, non-zero = error code)
+
+#### 17. **SetDeviceStateOffline**
+- **Description**: Tracks offline state transition task result
+- **When updated**: When device offline state task completes
+- **Location**: Device offline discovery task
+- **Values**: 
+  - `-1`: Not executed
+  - `RC`: NSM return code (0 = success, non-zero = error code)
+
+#### 18. **OfflineMapNsmDeviceUsingEid**
+- **Description**: Tracks success of device mapping during offline discovery
+- **When updated**: When device mapping is attempted using EID during offline discovery
+- **Location**: Offline discovery process
+- **Values**: 
+  - `-1`: Not attempted
+  - `0`: Failed
+  - `1`: Success
+
+### Configuration Options
+
+Discovery event counters share the progress counter configuration:
+
+- `progressCounter`: Enable/disable progress counter functionality (default: `enabled`)
+- `discovery-progress-counters-memfd-size`: Size of the memory-mapped file in bytes (default: `8192`)
+
+Discovery event counters are automatically dumped when any counter value changes after being set, ensuring each discovery operation snapshot is captured.
+
+### Accessing Discovery Event Data
+
+Discovery event data is exposed via D-Bus at:
+```
+/xyz/openbmc_project/progress_counters/discovery/<device_eid>
+```
+
+Use the `nsmProgressCountersReader` tool to read discovery event data:
+```bash
+# Read discovery events for all devices
+nsmProgressCountersReader
+
+# Read discovery events for specific device
+nsmProgressCountersReader <device_eid>
+```
+
+### Understanding Discovery Event Values
+
+Discovery event counters use signed 8-bit integers (`int8_t`) to represent three distinct states:
+
+1. **Not Executed/Triggered** (`-1`): The operation has not been performed yet
+2. **Failure** (`0` or error code): The operation failed or returned an error
+3. **Success** (`1` or `0` for success): The operation completed successfully
+
+This three-state model allows distinguishing between operations that haven't run yet versus operations that ran but failed.
 
 
 ## Artifacts

@@ -100,6 +100,10 @@ conf_data.set(
     'SENSOR_PROGRESS_COUNTERS_MEMFD_SIZE',
     get_option('sensor-progress-counters-memfd-size'),
 )
+conf_data.set(
+    'DISCOVERY_PROGRESS_COUNTERS_MEMFD_SIZE',
+    get_option('discovery-progress-counters-memfd-size'),
+)
 conf_data.set('RESPONSE_TIME_OUT', get_option('response-time-out'))
 conf_data.set(
     'RESPONSE_TIME_OUT_LONG_RUNNING',
