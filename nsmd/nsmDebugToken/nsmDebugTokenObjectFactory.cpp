@@ -84,7 +84,7 @@ static requester::Coroutine createNsmDebugToken(SensorManager& manager,
     {
         auto object = std::make_shared<NsmDebugTokenUnifiedObject>(
             bus, chassisName, uuid);
-        device->addStaticSensor(object);
+        device->addSensor(object, PollingType::RoundRobin);
         manager.debugTokenList.push_back(object);
     }
 

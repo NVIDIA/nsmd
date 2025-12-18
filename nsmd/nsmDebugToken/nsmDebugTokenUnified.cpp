@@ -428,12 +428,15 @@ requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(
                                                 &tlvPayloadLen);
     if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error("DebugToken: decode_nsm_query_token_resp: "
-                   "eid={EID} ret={RET} cc={CC} rc={RC} len={LEN}",
-                   "EID", eid, "RET", decodeRc, "CC", cc, "RC", reasonCode,
-                   "LEN", responseLen);
+        if (shouldLog("decode_nsm_query_token_resp", reasonCode, cc, decodeRc))
+        {
+            lg2::error("DebugToken: decode_nsm_query_token_resp: "
+                       "eid={EID} ret={RET} cc={CC} rc={RC} len={LEN}",
+                       "EID", eid, "RET", decodeRc, "CC", cc, "RC", reasonCode,
+                       "LEN", responseLen);
+        }
         // coverity[missing_return]
-        co_return decodeRc;
+        co_return NSM_SW_ERROR;
     }
     std::vector<uint8_t> tlvPayload(tlvPayloadLen);
     decodeRc = decode_nsm_query_token_resp(responseMsg.get(), responseLen, &cc,
@@ -441,11 +444,14 @@ requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(
                                            &tlvPayloadLen);
     if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        LG2_ERROR_FLT("decode_nsm_query_token_resp failure "
-                      "| reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-                      "REASONCODE", reasonCode, "CC", cc, "RC", decodeRc);
+        if (shouldLog("decode_nsm_query_token_resp", reasonCode, cc, decodeRc))
+        {
+            LG2_ERROR_FLT("decode_nsm_query_token_resp failure "
+                          "| reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+                          "REASONCODE", reasonCode, "CC", cc, "RC", decodeRc);
+        }
         // coverity[missing_return]
-        co_return decodeRc;
+        co_return NSM_SW_ERROR;
     }
     auto tlv = debug_token::tlv_decoder::Structure();
     try
@@ -454,9 +460,13 @@ requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(
     }
     catch (const std::exception& e)
     {
-        lg2::error("DebugToken: queryToken TLV decode: {ERR}", "ERR", e.what());
+        if (shouldLog("queryToken_TLV_decode", reasonCode, cc, NSM_SW_ERROR))
+        {
+            lg2::error("DebugToken: queryToken TLV decode: {ERR}", "ERR",
+                       e.what());
+        }
         // coverity[missing_return]
-        co_return decodeRc;
+        co_return NSM_SW_ERROR;
     }
 
     uint8_t installStatus = 0;
@@ -468,8 +478,11 @@ requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(
     }
     catch (const std::exception& e)
     {
-        lg2::error("DebugToken: failed to get installation status: {ERR}",
-                   "ERR", e.what());
+        if (shouldLog("get_installation_status", reasonCode, cc, NSM_SW_ERROR))
+        {
+            lg2::error("DebugToken: failed to get installation status: {ERR}",
+                       "ERR", e.what());
+        }
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
@@ -480,10 +493,24 @@ requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(
     }
     catch (const std::exception& e)
     {
-        lg2::error("DebugToken: failed to get processing status: {ERR}", "ERR",
-                   e.what());
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR;
+        if (installStatus != 0)
+        {
+            if (shouldLog("get_processing_status", reasonCode, cc,
+                          NSM_SW_ERROR))
+            {
+                lg2::error("DebugToken: failed to get processing status: {ERR}",
+                           "ERR", e.what());
+            }
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR;
+        }
+        // ProcessingStatus not present, set to false and continue
+        if (shouldLog("get_processing_status", reasonCode, cc, NSM_SW_SUCCESS))
+        {
+            lg2::info(
+                "DebugToken: ProcessingStatus not present, setting to false");
+        }
+        procStatus = 0;
     }
     installationStatus(installStatus != 0);
     processingStatus(procStatus != 0);
@@ -496,19 +523,30 @@ requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(
     }
     catch (const std::exception& e)
     {
-        lg2::info("DebugToken: failed to get token types: {ERR}", "ERR",
-                  e.what());
+        if (shouldLog("get_token_types", reasonCode, cc, NSM_SW_ERROR))
+        {
+            lg2::info("DebugToken: failed to get token types: {ERR}", "ERR",
+                      e.what());
+        }
     }
     if (tokenTypesSubtypes.size() % 2 != 0)
     {
-        lg2::error("DebugToken: invalid token types / subtypes size: {SIZE}",
-                   "SIZE", tokenTypesSubtypes.size());
+        if (shouldLog("invalid_token_types_size", reasonCode, cc, NSM_SW_ERROR))
+        {
+            lg2::error(
+                "DebugToken: invalid token types / subtypes size: {SIZE}",
+                "SIZE", tokenTypesSubtypes.size());
+        }
         co_return NSM_SW_ERROR;
     }
     if (installStatus != 0 && tokenTypesSubtypes.size() == 0)
     {
-        lg2::error(
-            "DebugToken: token installed but no token types / subtypes reported");
+        if (shouldLog("token_installed_but_no_token_types", reasonCode, cc,
+                      NSM_SW_ERROR))
+        {
+            lg2::error(
+                "DebugToken: token installed but no token types / subtypes reported");
+        }
         co_return NSM_SW_ERROR;
     }
     std::vector<std::tuple<uint32_t, uint32_t>> tokenTypes;
