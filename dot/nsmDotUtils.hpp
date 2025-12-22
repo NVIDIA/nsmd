@@ -18,11 +18,16 @@
 #pragma once
 
 #include <openssl/bio.h>
+#include <openssl/core_names.h>
+#include <openssl/evp.h>
+#include <openssl/params.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nsm
 {
@@ -103,6 +108,21 @@ bool decodeKeyData(const std::string& input, uint8_t* output,
  */
 bool buildKeyAuthData(uint32_t authScheme, const uint8_t* ecdsaKey,
                       const uint8_t* lmsKey, uint8_t* output);
+
+/**
+ * @brief Decode PEM-formatted ECDSA key to binary data
+ *
+ * Converts PEM-formatted ECDSA P-384 public key to binary format.
+ * Only valid for ECDSA keys (expectedSize must be ECDSA_KEY_SIZE).
+ *
+ * @param input PEM-formatted input string (must contain -----BEGIN/-----END
+ * markers)
+ * @param output Output buffer for decoded data
+ * @param expectedSize Expected output size in bytes (must be ECDSA_KEY_SIZE)
+ * @return true if decoding succeeded, false otherwise
+ */
+bool decodePEMKey(const std::string& input, uint8_t* output,
+                  size_t expectedSize);
 
 } // namespace dot
 } // namespace nsm

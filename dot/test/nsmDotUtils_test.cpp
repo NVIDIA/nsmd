@@ -17,8 +17,13 @@
 
 #include "nsmDotUtils.hpp"
 
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+
 #include <array>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -186,4 +191,134 @@ TEST(BIOPtrTest, MoveAssignment)
     EXPECT_FALSE(bioPtr1);
     EXPECT_TRUE(bioPtr2);
     EXPECT_EQ(bioPtr2.get(), bio1);
+}
+
+TEST(DecodePEMKeyTest, EmptyInputReturnsFalse)
+{
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    EXPECT_FALSE(decodePEMKey("", output, ECDSA_KEY_SIZE));
+}
+
+TEST(DecodePEMKeyTest, NullOutputReturnsFalse)
+{
+    std::string pemKey =
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE+kgsKd+pG4sxoxgz74FzMvMGEus5jfJA\n"
+        "DBoqGuZt4QpdbxnQqdTf0axWndLd0Y5DpKNx2ZwANYGXXTBcoW77wBehN9ILJLWi\n"
+        "wUrhAKJUqRDqISYCcYKHtGP6V3kM+CyD\n"
+        "-----END PUBLIC KEY-----\n";
+    EXPECT_FALSE(decodePEMKey(pemKey, nullptr, ECDSA_KEY_SIZE));
+}
+
+TEST(DecodePEMKeyTest, ZeroExpectedSizeReturnsFalse)
+{
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    std::string pemKey =
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE+kgsKd+pG4sxoxgz74FzMvMGEus5jfJA\n"
+        "DBoqGuZt4QpdbxnQqdTf0axWndLd0Y5DpKNx2ZwANYGXXTBcoW77wBehN9ILJLWi\n"
+        "wUrhAKJUqRDqISYCcYKHtGP6V3kM+CyD\n"
+        "-----END PUBLIC KEY-----\n";
+    EXPECT_FALSE(decodePEMKey(pemKey, output, 0));
+}
+
+TEST(DecodePEMKeyTest, WrongExpectedSizeReturnsFalse)
+{
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    std::string pemKey =
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE+kgsKd+pG4sxoxgz74FzMvMGEus5jfJA\n"
+        "DBoqGuZt4QpdbxnQqdTf0axWndLd0Y5DpKNx2ZwANYGXXTBcoW77wBehN9ILJLWi\n"
+        "wUrhAKJUqRDqISYCcYKHtGP6V3kM+CyD\n"
+        "-----END PUBLIC KEY-----\n";
+    // Wrong size - should be ECDSA_KEY_SIZE (96), not LMS_KEY_SIZE (48)
+    EXPECT_FALSE(decodePEMKey(pemKey, output, LMS_KEY_SIZE));
+}
+
+TEST(DecodePEMKeyTest, InvalidPEMFormatMissingBeginMarker)
+{
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    std::string invalidPem =
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE+kgsKd+pG4sxoxgz74FzMvMGEus5jfJA\n"
+        "-----END PUBLIC KEY-----\n";
+    EXPECT_FALSE(decodePEMKey(invalidPem, output, ECDSA_KEY_SIZE));
+}
+
+TEST(DecodePEMKeyTest, InvalidPEMFormatMissingEndMarker)
+{
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    std::string invalidPem =
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE+kgsKd+pG4sxoxgz74FzMvMGEus5jfJA\n";
+    EXPECT_FALSE(decodePEMKey(invalidPem, output, ECDSA_KEY_SIZE));
+}
+
+TEST(DecodePEMKeyTest, InvalidPEMFormatMalformed)
+{
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    std::string invalidPem = "-----BEGIN PUBLIC KEY-----\n"
+                             "INVALID_BASE64_DATA!!!\n"
+                             "-----END PUBLIC KEY-----\n";
+    EXPECT_FALSE(decodePEMKey(invalidPem, output, ECDSA_KEY_SIZE));
+}
+
+TEST(DecodePEMKeyTest, ValidPEMKeyDecodesSuccessfully)
+{
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    // Valid P-384 ECDSA public key in PEM format
+    std::string pemKey =
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE+kgsKd+pG4sxoxgz74FzMvMGEus5jfJA\n"
+        "DBoqGuZt4QpdbxnQqdTf0axWndLd0Y5DpKNx2ZwANYGXXTBcoW77wBehN9ILJLWi\n"
+        "wUrhAKJUqRDqISYCcYKHtGP6V3kM+CyD\n"
+        "-----END PUBLIC KEY-----\n";
+    EXPECT_TRUE(decodePEMKey(pemKey, output, ECDSA_KEY_SIZE));
+    // Verify output is not all zeros (key was decoded)
+    bool hasNonZero = false;
+    for (size_t i = 0; i < ECDSA_KEY_SIZE; ++i)
+    {
+        if (output[i] != 0)
+        {
+            hasNonZero = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(hasNonZero);
+}
+
+TEST(DecodeKeyDataTest, PEMFormatDelegatesToDecodePEMKey)
+{
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    // Valid P-384 ECDSA public key in PEM format
+    std::string pemKey =
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE+kgsKd+pG4sxoxgz74FzMvMGEus5jfJA\n"
+        "DBoqGuZt4QpdbxnQqdTf0axWndLd0Y5DpKNx2ZwANYGXXTBcoW77wBehN9ILJLWi\n"
+        "wUrhAKJUqRDqISYCcYKHtGP6V3kM+CyD\n"
+        "-----END PUBLIC KEY-----\n";
+    EXPECT_TRUE(decodeKeyData(pemKey, output, ECDSA_KEY_SIZE));
+    // Verify output is not all zeros (key was decoded)
+    bool hasNonZero = false;
+    for (size_t i = 0; i < ECDSA_KEY_SIZE; ++i)
+    {
+        if (output[i] != 0)
+        {
+            hasNonZero = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(hasNonZero);
+}
+
+TEST(DecodeKeyDataTest, PEMFormatWithWrongSizeReturnsFalse)
+{
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    std::string pemKey =
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE+kgsKd+pG4sxoxgz74FzMvMGEus5jfJA\n"
+        "DBoqGuZt4QpdbxnQqdTf0axWndLd0Y5DpKNx2ZwANYGXXTBcoW77wBehN9ILJLWi\n"
+        "wUrhAKJUqRDqISYCcYKHtGP6V3kM+CyD\n"
+        "-----END PUBLIC KEY-----\n";
+    // Wrong size - should fail
+    EXPECT_FALSE(decodeKeyData(pemKey, output, LMS_KEY_SIZE));
 }

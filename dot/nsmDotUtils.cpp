@@ -19,12 +19,15 @@
 
 #include <endian.h>
 #include <openssl/bio.h>
+#include <openssl/bn.h>
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
+#include <openssl/pem.h>
 
-#include <algorithm>
+#include <array>
 #include <charconv>
 #include <cstring>
+#include <string_view>
 #include <vector>
 
 namespace nsm
@@ -155,6 +158,11 @@ bool decodeKeyData(const std::string& input, uint8_t* output,
         return false;
     }
 
+    if (decodePEMKey(input, output, expectedSize))
+    {
+        return true;
+    }
+
     if (decodeBase64(input, output, expectedSize))
     {
         return true;
@@ -181,6 +189,85 @@ bool buildKeyAuthData(uint32_t authScheme, const uint8_t* ecdsaKey,
     std::memcpy(output + AUTH_SCHEME_SIZE, ecdsaKey, ECDSA_KEY_SIZE);
     std::memcpy(output + AUTH_SCHEME_SIZE + ECDSA_KEY_SIZE, lmsKey,
                 LMS_KEY_SIZE);
+    return true;
+}
+
+bool decodePEMKey(const std::string& input, uint8_t* output,
+                  size_t expectedSize)
+{
+    if (input.empty() || !output || expectedSize != ECDSA_KEY_SIZE)
+    {
+        return false;
+    }
+
+    BIOPtr bio{BIO_new_mem_buf(input.data(), static_cast<int>(input.size()))};
+    if (!bio)
+    {
+        return false;
+    }
+
+    std::unique_ptr<EVP_PKEY, decltype(&::EVP_PKEY_free)> pubKey{
+        PEM_read_bio_PUBKEY(bio.get(), nullptr, nullptr, nullptr),
+        &::EVP_PKEY_free};
+    if (!pubKey)
+    {
+        return false;
+    }
+
+    if (EVP_PKEY_get_id(pubKey.get()) != EVP_PKEY_EC)
+    {
+        return false;
+    }
+
+    std::unique_ptr<EVP_PKEY_CTX, decltype(&::EVP_PKEY_CTX_free)> ctx{
+        EVP_PKEY_CTX_new(pubKey.get(), nullptr), &::EVP_PKEY_CTX_free};
+    if (!ctx)
+    {
+        return false;
+    }
+
+    if (EVP_PKEY_public_check(ctx.get()) != 1)
+    {
+        return false;
+    }
+
+    BIGNUM* x = nullptr;
+    BIGNUM* y = nullptr;
+
+    if (EVP_PKEY_get_bn_param(pubKey.get(), OSSL_PKEY_PARAM_EC_PUB_X, &x) != 1)
+    {
+        return false;
+    }
+
+    if (EVP_PKEY_get_bn_param(pubKey.get(), OSSL_PKEY_PARAM_EC_PUB_Y, &y) != 1)
+    {
+        BN_free(x);
+        return false;
+    }
+
+    std::unique_ptr<BIGNUM, decltype(&::BN_free)> xPtr{x, &::BN_free};
+    std::unique_ptr<BIGNUM, decltype(&::BN_free)> yPtr{y, &::BN_free};
+
+    const size_t coordinateSize = expectedSize / 2;
+
+    if (static_cast<size_t>(BN_num_bytes(xPtr.get())) > coordinateSize ||
+        static_cast<size_t>(BN_num_bytes(yPtr.get())) > coordinateSize)
+    {
+        return false;
+    }
+
+    if (BN_bn2binpad(xPtr.get(), output, coordinateSize) !=
+        static_cast<int>(coordinateSize))
+    {
+        return false;
+    }
+
+    if (BN_bn2binpad(yPtr.get(), output + coordinateSize, coordinateSize) !=
+        static_cast<int>(coordinateSize))
+    {
+        return false;
+    }
+
     return true;
 }
 
