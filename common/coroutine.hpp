@@ -245,6 +245,7 @@ struct Coroutine
         auto co = task();
         if (!co.handle)
         {
+            co.handle = nullptr;
             return true; // no new coroutine
         }
 
@@ -252,6 +253,7 @@ struct Coroutine
         if (co.handle.done())
         {
             co.handle.destroy();
+            co.handle = nullptr;
             return true;
         }
 
