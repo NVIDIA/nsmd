@@ -222,7 +222,7 @@ TEST(GetRotInformation, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_TYPE_FIRMWARE, responseMsg->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_FW_GET_EROT_STATE_INFORMATION, responseTest->hdr.command);
-	EXPECT_EQ(25, responseTest->hdr.telemetry_count);
+	EXPECT_EQ(26, responseTest->hdr.telemetry_count);
 }
 
 TEST(GetRotInformation, testGoodEncodeResponse2)
@@ -296,7 +296,7 @@ TEST(GetRotInformation, testGoodEncodeResponse2)
 	EXPECT_EQ(NSM_TYPE_FIRMWARE, responseMsg->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_FW_GET_EROT_STATE_INFORMATION, responseTest->hdr.command);
-	EXPECT_EQ(25, responseTest->hdr.telemetry_count);
+	EXPECT_EQ(26, responseTest->hdr.telemetry_count);
 }
 
 TEST(GetRotInformation, testGoodDecodeResponse)

@@ -393,6 +393,10 @@ int encode_nsm_query_get_erot_state_parameters_resp(
 	    fw_info->fq_resp_hdr.boot_status_code, &msg_size);
 	telemetry_count++;
 	encode_nsm_firmware_aggregate_tag_uint8(
+	    &ptr, NSM_FIRMWARE_GLOBAL_FAILOVER_POLICY,
+	    fw_info->fq_resp_hdr.global_failover_policy, &msg_size);
+	telemetry_count++;
+	encode_nsm_firmware_aggregate_tag_uint8(
 	    &ptr, NSM_FIRMWARE_FIRMWARE_SLOT_COUNT,
 	    fw_info->fq_resp_hdr.firmware_slot_count, &msg_size);
 	telemetry_count++;
@@ -589,6 +593,19 @@ int decode_nsm_query_firmware_header_information(
 					    "CURRENT, "
 					    "value = 0x%08x\n",
 					    fw_info_hdr->ap_sku_id);)
+			}
+		} else if (tag == NSM_FIRMWARE_GLOBAL_FAILOVER_POLICY) {
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint8(
+			    ptr, &tag, &valid,
+			    &(fw_info_hdr->global_failover_policy),
+			    payload_size);
+			if (rc_ok) {
+				(*telemetry_count)--;
+				DBG2(printf(
+					 "Decoded "
+					 "NSM_FIRMWARE_GLOBAL_FAILOVER_POLICY, "
+					 "value = 0x%02x\n",
+					 fw_info_hdr->global_failover_policy);)
 			}
 		} else {
 			/* Skip unsupported tag */

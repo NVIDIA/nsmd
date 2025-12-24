@@ -80,6 +80,7 @@ enum nsm_firmware_state_information_fields {
 	NSM_FIRMWARE_INBAND_UPDATE_POLICY_CURRENT = 17,	    // Enum8
 	NSM_FIRMWARE_BACKGROUND_COPY_POLICY_CURRENT = 18,   // Enum8
 	NSM_FIRMWARE_AP_SKU_ID = 19,			    // NvU32
+	NSM_FIRMWARE_GLOBAL_FAILOVER_POLICY = 20,	    // Enum8
 };
 
 /** @brief NSM code authentication key permissions request type
@@ -95,6 +96,7 @@ enum nsm_rot_property_values {
 	NSM_ROT_PROPERTY_REDUNDANCY_POLICY = 0,
 	NSM_ROT_PROPERTY_INBAND_UPDATE_POLICY = 1,
 	NSM_ROT_PROPERTY_AP_SKU_ID = 2,
+	NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY = 3,
 };
 
 /** @brief NSM RoT Redundancy Policy values (Property = 0)
@@ -129,6 +131,16 @@ enum nsm_rot_ap_sku_id_lifespan {
  * 4 bytes for SKU ID + 1 byte for lifespan
  */
 #define NSM_ROT_AP_SKU_ID_ARGUMENT_LENGTH 5
+
+/** @brief NSM RoT Global Failover Policy values (Property = 3)
+ */
+enum nsm_rot_global_failover_policy {
+	NSM_ROT_GLOBAL_FAILOVER_POLICY_NO_FAILOVER = 0,
+	NSM_ROT_GLOBAL_FAILOVER_POLICY_AUTOMATIC_FAILOVER = 1,
+	NSM_ROT_GLOBAL_FAILOVER_POLICY_NOT_APPLICABLE = 0xFF,
+};
+
+#define NSM_ROT_GLOBAL_FAILOVER_POLICY_ARGUMENT_LENGTH 1
 
 /** @brief NSM RoT In-band Update Policy values (Property = 1)
  */
@@ -173,6 +185,7 @@ struct nsm_firmware_erot_state_info_hdr_resp {
 	uint8_t inband_update_policy_current;
 	uint8_t background_copy_policy_current;
 	uint32_t ap_sku_id;
+	uint8_t global_failover_policy;
 };
 
 /* This is the maximum string length for firmware

@@ -201,6 +201,9 @@ class GetRotInformation : public CommandInterface
             erot_info.fq_resp_hdr.background_copy_policy_current);
         result["AP SKU ID"] =
             static_cast<uint32_t>(erot_info.fq_resp_hdr.ap_sku_id);
+        result["Global failover policy"] = mapEnumToString(
+            static_cast<uint32_t>(erot_info.fq_resp_hdr.global_failover_policy),
+            globalFailoverPolicyMap);
 
         std::vector<ordered_json> slots;
         for (int i = 0; i < erot_info.fq_resp_hdr.firmware_slot_count; i++)
@@ -268,6 +271,12 @@ class GetRotInformation : public CommandInterface
         {7, "Pending image copy"},
         {8, "Image copy in progress"},
         {9, "Failed image copy"}};
+
+    const std::unordered_map<uint32_t, std::string> globalFailoverPolicyMap = {
+        {NSM_ROT_GLOBAL_FAILOVER_POLICY_NO_FAILOVER, "No Failover"},
+        {NSM_ROT_GLOBAL_FAILOVER_POLICY_AUTOMATIC_FAILOVER,
+         "Automatic Failover"},
+        {NSM_ROT_GLOBAL_FAILOVER_POLICY_NOT_APPLICABLE, "Not Applicable"}};
 
     std::string mapEnumToString(
         uint32_t value,
@@ -901,34 +910,41 @@ class SetRoTProperty : public CommandInterface
         ccOptionGroup
             ->add_option(
                 "-p,--property", property,
-                "Property (0: Redundancy Policy, 1: In-band Update Policy, 2: AP SKU ID)")
-            ->check(CLI::Range(0, 2))
+                "Property (0: Redundancy Policy, 1: In-band Update Policy, 2: AP "
+                "SKU ID, 3: Global Failover Policy)")
+            ->check(CLI::Range(0, 3))
             ->required();
         ccOptionGroup
             ->add_option(
                 "-r,--redundancy-policy", redundancyPolicy,
-                "Redundancy Policy (0: Manual Background Copy, 1: Automatic Background Copy) - only for Property 0")
+                "Redundancy Policy (0: Manual Background Copy, 1: Automatic Background Copy) - only for Redundancy Policy")
             ->check(CLI::Range(0, 1));
         ccOptionGroup
             ->add_option(
                 "-u,--update-policy", updatePolicy,
-                "In-band Update Policy (0: Disable, 1: Enable) - only for Property 1")
+                "In-band Update Policy (0: Disable, 1: Enable) - only for In-band Update Policy")
             ->check(CLI::Range(0, 1));
         ccOptionGroup
             ->add_option(
                 "-a,--ap-sku-id", apSkuId,
-                "AP SKU ID (32-bit unsigned integer) - only for Property 2")
+                "AP SKU ID (32-bit unsigned integer) - only for AP SKU ID")
             ->check(CLI::Range(0U, UINT32_MAX));
         ccOptionGroup
             ->add_option(
+                "-g,--global-failover-policy", globalFailoverPolicy,
+                "Global Failover Policy (0: No Failover, 1: Automatic Failover) - only for Global Failover Policy")
+            ->check(CLI::Range(0, 1));
+        ccOptionGroup
+            ->add_option(
                 "-l,--lifespan", lifespan,
-                "Lifespan (0: Persistent, 1: One-shot for Property 0, Volatile for Property 1)")
+                "Lifespan (0: Persistent, 1: One-shot for Redundancy Policy, Volatile for In-band Update Policy) - not applicable for Global Failover Policy")
             ->check(CLI::Range(0, 1));
         // Add parse callback to validate conditional requirements based on
         // property value
         app->parse_complete_callback([this, ccOptionGroup]() {
             auto apSkuIdOption = ccOptionGroup->get_option("--ap-sku-id");
-            if (property == 2 && apSkuIdOption->count() == 0)
+            if (property == NSM_ROT_PROPERTY_AP_SKU_ID &&
+                apSkuIdOption->count() == 0)
             {
                 throw CLI::ValidationError(
                     "--ap-sku-id",
@@ -942,7 +958,7 @@ class SetRoTProperty : public CommandInterface
         std::vector<uint8_t> requestMsg(
             sizeof(nsm_msg_hdr) +
             sizeof(nsm_firmware_set_rot_property_req_command));
-        nsm_firmware_set_rot_property_req nsm_req;
+        nsm_firmware_set_rot_property_req nsm_req = {};
         nsm_req.component_classification = htole16(classification);
         nsm_req.component_classification_index = index;
         nsm_req.component_identifier = htole16(identifier);
@@ -970,6 +986,13 @@ class SetRoTProperty : public CommandInterface
             // Copy AP SKU ID to argument_data
             memcpy(&nsm_req.argument_data[0], &apSkuId, sizeof(uint32_t));
             nsm_req.argument_data[4] = lifespan;
+        }
+        else if (property == NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY)
+        {
+            // Property 3: Global Failover Policy (no lifespan)
+            nsm_req.argument_length =
+                NSM_ROT_GLOBAL_FAILOVER_POLICY_ARGUMENT_LENGTH;
+            nsm_req.argument_data[0] = globalFailoverPolicy;
         }
 
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
@@ -1007,6 +1030,7 @@ class SetRoTProperty : public CommandInterface
     uint8_t updatePolicy{DEFAULT_VALUE};
     uint8_t lifespan{};
     uint32_t apSkuId{0};
+    uint8_t globalFailoverPolicy{DEFAULT_VALUE};
 
     static constexpr uint8_t ARGUMENT_DATA_LENGTH = 2;
     static constexpr uint8_t AP_SKU_ID_DATA_LENGTH = 5;
