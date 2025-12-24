@@ -409,16 +409,18 @@ class NsmPowerSmoothingV2 : public NsmPowerSmoothing
         uint8_t cc{};
         uint16_t telemetry_count{};
         size_t consumed_len{};
+        uint16_t reason_code = ERR_NULL;
         auto response_data = reinterpret_cast<const uint8_t*>(responseMsg);
         int rc = decode_get_powersmoothing_featinfo_v2_resp(
             responseMsg, responseLen, &consumed_len, &cc, &telemetry_count);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            lg2::debug("decode_get_powersmoothing_featinfo_v2_resp successful");
+            clearErrorBitMap("decode_get_powersmoothing_featinfo_v2_resp");
         }
         else
         {
-            lg2::error("decode_get_powersmoothing_featinfo_v2_resp failed");
+            logHandleResponseMsg("decode_get_powersmoothing_featinfo_v2_resp",
+                                 reason_code, cc, rc);
             return cc ? cc : rc;
         }
 
@@ -822,16 +824,18 @@ class NsmCurrentPowerSmoothingProfileV2 : public NsmCurrentPowerSmoothingProfile
         uint8_t cc{};
         uint16_t telemetry_count{};
         size_t consumed_len{};
+        uint16_t reason_code = ERR_NULL;
         auto response_data = reinterpret_cast<const uint8_t*>(responseMsg);
         int rc = decode_get_current_profile_info_v2_resp(
             responseMsg, responseLen, &consumed_len, &cc, &telemetry_count);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            lg2::debug("decode_get_current_profile_info_resp_v2 successful");
+            clearErrorBitMap("decode_get_current_profile_info_v2_resp");
         }
         else
         {
-            lg2::error("decode_get_current_profile_info_resp_v2 failed");
+            logHandleResponseMsg("decode_get_current_profile_info_v2_resp",
+                                 reason_code, cc, rc);
             return cc ? cc : rc;
         }
 
@@ -1166,19 +1170,19 @@ class NsmPowerSmoothingAdminOverrideV2 : public NsmPowerSmoothingAdminOverride
         uint8_t cc{};
         uint16_t telemetry_count{};
         size_t consumed_len{};
+        uint16_t reason_code = ERR_NULL;
         auto response_data = reinterpret_cast<const uint8_t*>(responseMsg);
         auto rc = decode_get_admin_override_profile_info_v2_resp(
             responseMsg, responseLen, &consumed_len, &cc, &telemetry_count);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            lg2::debug(
-                "decode_get_admin_override_profile_info_v2_resp successful");
+            clearErrorBitMap("decode_get_admin_override_profile_info_v2_resp");
         }
         else
         {
-            lg2::error(
-                "decode_get_admin_override_profile_info_v2_resp failed cc={CC}, rc={RC}",
-                "CC", cc, "RC", rc);
+            logHandleResponseMsg(
+                "decode_get_admin_override_profile_info_v2_resp", reason_code,
+                cc, rc);
             return rc;
         }
 
@@ -1614,18 +1618,18 @@ class NsmPowerProfileCollectionV2 : public NsmPowerProfileCollection
         uint8_t cc{};
         uint16_t telemetry_count{};
         size_t consumed_len{};
+        uint16_t reason_code = ERR_NULL;
         auto response_data = reinterpret_cast<const uint8_t*>(responseMsg);
         auto rc = decode_get_preset_profile_info_v2_resp(
             responseMsg, responseLen, &consumed_len, &cc, &telemetry_count);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            lg2::debug("decode_get_preset_profile_info_v2_resp successful");
+            clearErrorBitMap("decode_get_preset_profile_info_v2_resp");
         }
         else
         {
-            lg2::error(
-                "decode_get_preset_profile_info_v2_resp failed cc={CC}, rc={RC}",
-                "CC", cc, "RC", rc);
+            logHandleResponseMsg("decode_get_preset_profile_info_v2_resp",
+                                 reason_code, cc, rc);
             return rc;
         }
 
