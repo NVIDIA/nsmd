@@ -645,6 +645,13 @@ class MockupResponder
         getLeakDetectionInfoHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        dotDisableHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        dotOverrideHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        dotRecoveryHandler(const nsm_msg* requestMsg, size_t requestLen);
+
   private:
     std::optional<Response>
         getQueryScalarGroupTelemetryResponse(uint8_t requestInstanceId,

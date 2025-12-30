@@ -777,6 +777,12 @@ std::optional<Response>
                     return dotGetInfoHandler(request, requestLen);
                 case NSM_FW_DOT_GET_STATUS:
                     return dotGetStatusHandler(request, requestLen);
+                case NSM_FW_DOT_DISABLE:
+                    return dotDisableHandler(request, requestLen);
+                case NSM_FW_DOT_OVERRIDE:
+                    return dotOverrideHandler(request, requestLen);
+                case NSM_FW_DOT_RECOVERY:
+                    return dotRecoveryHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -8446,4 +8452,143 @@ std::optional<std::vector<uint8_t>>
 
     return response;
 }
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotDisableHandler(const nsm_msg* requestMsg,
+                                       size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("Processing DOT Disable request");
+    }
+
+    struct nsm_dot_disable_req dot_disable_req;
+    auto rc = decode_nsm_dot_disable_req(requestMsg, requestLen,
+                                         &dot_disable_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Disable: decode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT Disable request decoded successfully");
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_disable_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t dummy_dot_blob[DOT_BLOB_SIZE];
+    for (int i = 0; i < DOT_BLOB_SIZE; i++)
+    {
+        dummy_dot_blob[i] = static_cast<uint8_t>((i * 7 + 31) % 256);
+    }
+
+    rc = encode_nsm_dot_disable_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                     reason_code, dummy_dot_blob, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Disable: encode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT Disable: operation completed successfully");
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotOverrideHandler(const nsm_msg* requestMsg,
+                                        size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("Processing DOT Override request");
+    }
+
+    struct nsm_dot_override_req dot_override_req;
+    auto rc = decode_nsm_dot_override_req(requestMsg, requestLen,
+                                          &dot_override_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Override: decode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT Override request decoded successfully");
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    rc = encode_nsm_dot_override_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                      reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Override: encode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT Override: operation completed successfully");
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotRecoveryHandler(const nsm_msg* requestMsg,
+                                        size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("Processing DOT Recovery request");
+    }
+
+    struct nsm_dot_recovery_req dot_recovery_req;
+    auto rc = decode_nsm_dot_recovery_req(requestMsg, requestLen,
+                                          &dot_recovery_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Recovery: decode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT Recovery request decoded successfully");
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    rc = encode_nsm_dot_recovery_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                      reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Recovery: encode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT Recovery: operation completed successfully");
+    }
+
+    return response;
+}
+
 } // namespace MockupResponder
