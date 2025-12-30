@@ -2351,6 +2351,417 @@ TEST(DotCAKBypass, testBoundaryConditions)
 	EXPECT_EQ(0x1234, reason_code);
 }
 
+TEST(DotOverride, testGoodEncodeRequest)
+{
+	nsm_dot_override_req dot_req;
+	// Fill signature with sequential pattern: 0x00-0xFF cycling
+	dot_test::fillPatternSequential(dot_req.signature, DOT_SIGNATURE_SIZE,
+					0);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_override_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_override_req(0, &dot_req, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_TRUE(dot_test::validateNSMRequestHeader(request));
+
+	nsm_dot_override_req_command *req =
+	    (nsm_dot_override_req_command *)request->payload;
+	EXPECT_EQ(NSM_FW_DOT_OVERRIDE, req->hdr.command);
+	EXPECT_EQ(sizeof(nsm_dot_override_req), le16toh(req->hdr.data_size));
+
+	for (size_t i = 0; i < DOT_SIGNATURE_SIZE; i++) {
+		EXPECT_EQ((i % 256), req->dot_override_req.signature[i]);
+	}
+}
+
+TEST(DotOverride, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_override_req_command));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	request->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	request->hdr.request = 1;
+	request->hdr.datagram = 0;
+	request->hdr.instance_id = 0;
+	request->hdr.ocp_type = OCP_TYPE;
+	request->hdr.ocp_version = OCP_VERSION_V2;
+	request->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	nsm_dot_override_req_command *req_cmd =
+	    (nsm_dot_override_req_command *)request->payload;
+	req_cmd->hdr.command = NSM_FW_DOT_OVERRIDE;
+	req_cmd->hdr.data_size = htole16(sizeof(nsm_dot_override_req));
+
+	dot_test::fillPatternSequential(req_cmd->dot_override_req.signature,
+					DOT_SIGNATURE_SIZE, 0x42);
+
+	nsm_dot_override_req dot_req;
+	auto rc =
+	    decode_nsm_dot_override_req(request, requestMsg.size(), &dot_req);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	for (size_t i = 0; i < DOT_SIGNATURE_SIZE; i++) {
+		EXPECT_EQ(((i + 0x42) % 256), dot_req.signature[i]);
+	}
+}
+
+TEST(DotOverride, testShortDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) + 10);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	nsm_dot_override_req dot_req;
+	auto rc =
+	    decode_nsm_dot_override_req(request, requestMsg.size(), &dot_req);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DotOverride, testNullDecodeRequest)
+{
+	nsm_dot_override_req dot_req;
+
+	auto rc = decode_nsm_dot_override_req(NULL, 100, &dot_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_override_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	rc = decode_nsm_dot_override_req(request, requestMsg.size(), NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotOverride, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_override_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+	auto rc =
+	    encode_nsm_dot_override_resp(0, NSM_SUCCESS, reason_code, response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, response->hdr.nvidia_msg_type);
+
+	nsm_dot_override_resp *resp =
+	    (nsm_dot_override_resp *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_OVERRIDE, resp->command);
+	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
+	EXPECT_EQ(0, resp->reserved);
+	EXPECT_EQ(0, resp->data_size);
+}
+
+TEST(DotOverride, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x00,		 // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		 // OCP_TYPE=8, OCP_VER=10 (V2)
+	    NSM_TYPE_FIRMWARE,	 // NVIDIA_MSG_TYPE
+	    NSM_FW_DOT_OVERRIDE, // command
+	    NSM_SUCCESS,	 // completion code
+	    0x00,
+	    0x00, // reserved (uint16_t)
+	    0x04,
+	    0x00,		 // data size (4 bytes for inner response)
+	    NSM_FW_DOT_OVERRIDE, // response command_code
+	    NSM_SUCCESS,	 // response completion_code
+	    0x00,
+	    0x00 // reserved (uint16_t)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0xFFFF;
+	auto rc =
+	    decode_nsm_dot_override_resp(response, msg_len, &cc, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+}
+
+TEST(DotOverride, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x00,		 // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		 // OCP_TYPE=8, OCP_VER=10 (V2)
+	    NSM_TYPE_FIRMWARE,	 // NVIDIA_MSG_TYPE
+	    NSM_FW_DOT_OVERRIDE, // command
+	    NSM_ERROR,		 // completion code (error)
+	    0x12,
+	    0x34 // reason code 0x3412 (little endian)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	auto rc =
+	    decode_nsm_dot_override_resp(response, msg_len, &cc, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_ERROR, cc);
+	EXPECT_EQ(0x3412, reason_code);
+}
+
+TEST(DotOverride, testEncodeDecodeRoundTrip)
+{
+	nsm_dot_override_req original_req;
+	dot_test::fillPatternMultiplied(original_req.signature,
+					DOT_SIGNATURE_SIZE, 7);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_override_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_dot_override_req(5, &original_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_override_req decoded_req;
+	rc = decode_nsm_dot_override_req(request, requestMsg.size(),
+					 &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	for (size_t i = 0; i < DOT_SIGNATURE_SIZE; i++) {
+		EXPECT_EQ(original_req.signature[i], decoded_req.signature[i]);
+	}
+}
+
+TEST(DotOverride, testEncodeDecodeResponseRoundTrip)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_override_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t original_reason_code = ERR_NULL;
+	uint8_t original_cc = NSM_SUCCESS;
+
+	auto rc = encode_nsm_dot_override_resp(7, original_cc,
+					       original_reason_code, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t decoded_cc = 0;
+	uint16_t decoded_reason_code = 0xFFFF;
+
+	rc = decode_nsm_dot_override_resp(response, responseMsg.size(),
+					  &decoded_cc, &decoded_reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(original_cc, decoded_cc);
+	EXPECT_EQ(original_reason_code, decoded_reason_code);
+
+	nsm_dot_override_resp *resp =
+	    (nsm_dot_override_resp *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_OVERRIDE, resp->command);
+	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
+	EXPECT_EQ(0, resp->reserved);
+
+	std::vector<uint8_t> errorResponseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+	auto error_response =
+	    reinterpret_cast<nsm_msg *>(errorResponseMsg.data());
+
+	uint16_t error_reason_code = 0xABCD;
+	uint8_t error_cc = NSM_ERROR;
+
+	rc = encode_nsm_dot_override_resp(3, error_cc, error_reason_code,
+					  error_response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t decoded_error_cc = 0;
+	uint16_t decoded_error_reason_code = 0;
+
+	rc = decode_nsm_dot_override_resp(
+	    error_response, errorResponseMsg.size(), &decoded_error_cc,
+	    &decoded_error_reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(error_cc, decoded_error_cc);
+	EXPECT_EQ(error_reason_code, decoded_error_reason_code);
+}
+
+TEST(DotOverride, testNullPointerHandling)
+{
+	nsm_dot_override_req dot_req;
+	dot_test::fillPatternSequential(dot_req.signature, DOT_SIGNATURE_SIZE,
+					0);
+
+	auto rc = encode_nsm_dot_override_req(0, &dot_req, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_override_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	rc = encode_nsm_dot_override_req(0, NULL, request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_nsm_dot_override_resp(0, NSM_SUCCESS, ERR_NULL, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	rc = decode_nsm_dot_override_resp(NULL, 100, &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_override_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	// First encode a valid response for testing
+	rc = encode_nsm_dot_override_resp(0, NSM_SUCCESS, ERR_NULL, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Now test with null cc pointer
+	rc = decode_nsm_dot_override_resp(response, responseMsg.size(), NULL,
+					  &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_nsm_dot_override_resp(response, responseMsg.size(), &cc,
+					  NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotOverride, testDataIntegrity)
+{
+	const struct {
+		const char *name;
+		uint8_t signaturePatternStart;
+		uint8_t signatureMultiplier;
+	} test_cases[] = {
+	    {"all_zeros", 0x00, 0},   {"all_ones", 0xFF, 0},
+	    {"alternating", 0xAA, 0}, {"sequential", 0x00, 0},
+	    {"multiplied", 0x00, 7},
+	};
+
+	for (const auto &test : test_cases) {
+		nsm_dot_override_req original_req;
+
+		if (test.signatureMultiplier == 0) {
+			if (test.signaturePatternStart == 0x00 &&
+			    strcmp(test.name, "all_zeros") == 0) {
+				dot_test::fillPatternConstant(
+				    original_req.signature, DOT_SIGNATURE_SIZE,
+				    0x00);
+			} else if (test.signaturePatternStart == 0xFF) {
+				dot_test::fillPatternConstant(
+				    original_req.signature, DOT_SIGNATURE_SIZE,
+				    0xFF);
+			} else if (test.signaturePatternStart == 0xAA) {
+				dot_test::fillPatternConstant(
+				    original_req.signature, DOT_SIGNATURE_SIZE,
+				    0xAA);
+			} else {
+				dot_test::fillPatternSequential(
+				    original_req.signature, DOT_SIGNATURE_SIZE,
+				    test.signaturePatternStart);
+			}
+		} else {
+			dot_test::fillPatternMultiplied(
+			    original_req.signature, DOT_SIGNATURE_SIZE,
+			    test.signatureMultiplier);
+		}
+
+		std::vector<uint8_t> requestMsg(
+		    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_override_req_command));
+		auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+		auto rc =
+		    encode_nsm_dot_override_req(0, &original_req, request);
+		ASSERT_EQ(rc, NSM_SW_SUCCESS)
+		    << "Encoding failed for test case: " << test.name;
+
+		nsm_dot_override_req decoded_req;
+		rc = decode_nsm_dot_override_req(request, requestMsg.size(),
+						 &decoded_req);
+		ASSERT_EQ(rc, NSM_SW_SUCCESS)
+		    << "Decoding failed for test case: " << test.name;
+
+		for (size_t i = 0; i < DOT_SIGNATURE_SIZE; i++) {
+			EXPECT_EQ(original_req.signature[i],
+				  decoded_req.signature[i])
+			    << "Signature mismatch at byte " << i
+			    << " for test case: " << test.name;
+		}
+	}
+}
+
+TEST(DotOverride, testBoundaryConditions)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_override_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	nsm_dot_override_req dot_req;
+	memset(&dot_req, 0, sizeof(dot_req));
+
+	auto rc = encode_nsm_dot_override_req(0, &dot_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_override_req decoded_req;
+	rc = decode_nsm_dot_override_req(request, requestMsg.size(),
+					 &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	rc = decode_nsm_dot_override_req(request, requestMsg.size() - 1,
+					 &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_nsm_dot_override_req(request, sizeof(nsm_msg_hdr),
+					 &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_override_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	rc = encode_nsm_dot_override_resp(0, NSM_SUCCESS, ERR_NULL, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc;
+	uint16_t reason_code;
+
+	// Valid size
+	rc = decode_nsm_dot_override_resp(response, responseMsg.size(), &cc,
+					  &reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Error response - manually create to test decode with proper V2 format
+	std::vector<uint8_t> errorMsg = {
+	    0x10,
+	    0xDE,		 // PCI Vendor ID (little endian)
+	    0x00,		 // Request=0, Datagram=0, Instance=0
+	    0x8A,		 // OCP_VER=10 (V2), Nvidia msg type=6
+	    NSM_TYPE_FIRMWARE,	 // Nvidia msg type (firmware)
+	    NSM_FW_DOT_OVERRIDE, // command
+	    NSM_ERROR,		 // completion code (error)
+	    0x34,
+	    0x12 // reason code 0x1234 (little endian)
+	};
+	auto error_response = reinterpret_cast<nsm_msg *>(errorMsg.data());
+
+	rc = decode_nsm_dot_override_resp(error_response, errorMsg.size(), &cc,
+					  &reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_ERROR, cc);
+	EXPECT_EQ(0x1234, reason_code);
+}
+
 TEST(ImageCopyControl, testGoodEncodeRequestNoComponents)
 {
 	// Test encoding Image Copy Control request with no components (Query

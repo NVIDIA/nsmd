@@ -823,6 +823,105 @@ struct nsm_dot_get_status_resp {
 			       Locked, 3=Mutable Disabled */
 } __attribute__((packed));
 
+/** @struct nsm_dot_override_req
+ *
+ *  Structure representing DOT OVERRIDE request parameters.
+ *  According to spec:
+ *  - signature: 1840-byte vendor signature over challenge
+ *    - ECDSA-only: 96 bytes ECDSA + 1744 bytes padding (zeros)
+ *    - Hybrid: 96 bytes ECDSA + 1744 bytes LMS
+ *  Total size: 1852 bytes (12-byte header + 1840-byte signature)
+ */
+struct nsm_dot_override_req {
+	uint8_t signature[DOT_SIGNATURE_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_override_req_command
+ *
+ *  Structure representing DOT OVERRIDE request command.
+ *  Uses nsm_common_req_v2 for large payload support.
+ */
+struct nsm_dot_override_req_command {
+	struct nsm_common_req_v2 hdr;
+	struct nsm_dot_override_req dot_override_req;
+} __attribute__((packed));
+
+/** @struct nsm_dot_override_resp
+ *
+ *  Structure representing DOT OVERRIDE response.
+ *  Command code: 0x26
+ *  Contains only success / error information.
+ */
+typedef struct nsm_common_resp nsm_dot_override_resp;
+
+/** @struct nsm_dot_disable_req
+ *
+ *  Structure representing DOT DISABLE request parameters.
+ *  According to spec:
+ *  - LAK.pub: 148-byte key authentication data per spec
+ *  - unlock_method: 4-byte unlock method for future DOT_UNLOCK_CHALLENGE
+ *  - s_challenge: 32-byte static nonce (only when unlock_method == 2)
+ *  - signature: 1840-byte LAK signature
+ */
+struct nsm_dot_disable_req {
+	uint8_t lak_pub[DOT_KEY_AUTH_DATA_SIZE];
+	uint32_t unlock_method;
+	uint8_t s_challenge[DOT_STATIC_CHALLENGE_SIZE];
+	uint8_t signature[DOT_SIGNATURE_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_disable_req_command
+ *
+ *  Structure representing DOT DISABLE request command.
+ *  Uses nsm_common_req_v2 for large payload support.
+ */
+struct nsm_dot_disable_req_command {
+	struct nsm_common_req_v2 hdr;
+	struct nsm_dot_disable_req dot_disable_req;
+} __attribute__((packed));
+
+/** @struct nsm_dot_disable_resp
+ *
+ *  Structure representing DOT DISABLE response.
+ *  Command code: 0x25
+ *  Contains DOT blob (1024 bytes) on success.
+ */
+struct nsm_dot_disable_resp {
+	uint8_t command;
+	uint8_t completion_code;
+	uint16_t reserved;
+	uint16_t data_size;
+	uint8_t dot_blob[DOT_BLOB_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_recovery_req
+ *
+ *  Structure representing DOT RECOVERY request parameters.
+ *  According to spec:
+ *  - dot_blob: 1024-byte DOT backup that is used for recovery
+ */
+struct nsm_dot_recovery_req {
+	uint8_t dot_blob[DOT_BLOB_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_recovery_req_command
+ *
+ *  Structure representing DOT RECOVERY request command.
+ *  Uses nsm_common_req_v2 for large payload support.
+ */
+struct nsm_dot_recovery_req_command {
+	struct nsm_common_req_v2 hdr;
+	struct nsm_dot_recovery_req dot_recovery_req;
+} __attribute__((packed));
+
+/** @struct nsm_dot_recovery_resp
+ *
+ *  Structure representing DOT RECOVERY response.
+ *  Command code: 0x28
+ *  Contains only success / error information.
+ */
+typedef struct nsm_common_resp nsm_dot_recovery_resp;
+
 /** @struct nsm_firmware_aggregate_tag
  *
  *  Structure representing firmware aggregate tag format
@@ -1974,6 +2073,154 @@ int encode_nsm_dot_cak_rotate_resp(uint8_t instance_id, uint8_t cc,
 int decode_nsm_dot_cak_rotate_resp(const struct nsm_msg *msg, size_t msg_len,
 				   uint8_t *cc, uint16_t *reason_code,
 				   uint8_t *dot_blob);
+
+/**
+ * @brief Encode NSM DOT OVERRIDE request
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] dot_override_req - Pointer to DOT OVERRIDE request parameters
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_override_req(
+    uint8_t instance_id, const struct nsm_dot_override_req *dot_override_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT OVERRIDE request
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] dot_override_req - Pointer to store decoded request
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_override_req(const struct nsm_msg *msg, size_t msg_len,
+				struct nsm_dot_override_req *dot_override_req);
+
+/**
+ * @brief Encode NSM DOT OVERRIDE response
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code (used if completion code indicates
+ * error)
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_override_resp(uint8_t instance_id, uint8_t cc,
+				 uint16_t reason_code, struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT OVERRIDE response
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] cc - Pointer to store completion code
+ * @param[out] reason_code - Pointer to store reason code
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_override_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code);
+
+/**
+ * @brief Encode NSM DOT DISABLE request
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] dot_disable_req - Pointer to DOT DISABLE request parameters
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_disable_req(
+    uint8_t instance_id, const struct nsm_dot_disable_req *dot_disable_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT DISABLE request
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] dot_disable_req - Pointer to store decoded request
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_disable_req(const struct nsm_msg *msg, size_t msg_len,
+			       struct nsm_dot_disable_req *dot_disable_req);
+
+/**
+ * @brief Encode NSM DOT DISABLE response
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code (used if completion code indicates
+ * error)
+ * @param[in] dot_blob - Pointer to 1024-byte DOT blob (NULL if error)
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_disable_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, const uint8_t *dot_blob,
+				struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT DISABLE response
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] cc - Pointer to store completion code
+ * @param[out] reason_code - Pointer to store reason code
+ * @param[out] dot_blob - Pointer to store 1024-byte DOT blob (can be NULL)
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_disable_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
+				uint8_t *dot_blob);
+
+/**
+ * @brief Encode NSM DOT RECOVERY request
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] dot_recovery_req - Pointer to DOT RECOVERY request parameters
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_recovery_req(
+    uint8_t instance_id, const struct nsm_dot_recovery_req *dot_recovery_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT RECOVERY request
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] dot_recovery_req - Pointer to store decoded request
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_recovery_req(const struct nsm_msg *msg, size_t msg_len,
+				struct nsm_dot_recovery_req *dot_recovery_req);
+
+/**
+ * @brief Encode NSM DOT RECOVERY response
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code (used if completion code indicates
+ * error)
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_recovery_resp(uint8_t instance_id, uint8_t cc,
+				 uint16_t reason_code, struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT RECOVERY response
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] cc - Pointer to store completion code
+ * @param[out] reason_code - Pointer to store reason code
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_recovery_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code);
 
 #ifdef __cplusplus
 }
