@@ -55,6 +55,21 @@ struct DotLockParams
 };
 
 /**
+ * @brief Parameters for DOT Disable operation
+ */
+struct DotDisableParams
+{
+    DotActionIntf::KeyAuthScheme lakKeyAuthScheme;
+    std::string lakEcdsaKey;
+    std::string lakLmsKey;
+    DotActionIntf::UnlockMethod unlockMethod;
+    std::string staticChallenge;
+    DotActionIntf::KeyAuthScheme disableSignatureAuthScheme;
+    std::string ecdsaSignature;
+    std::string lmsSignature;
+};
+
+/**
  * @brief Object that provides DOT (Device Ownership Transfer) functionality.
  *
  * This class implements DOT functionality by inheriting from
@@ -218,6 +233,70 @@ class NsmDotObject : public NsmObject, public DotActionIntf
                   std::string ecdsaSignature,
                   std::string lmsSignature) override;
 
+    /**
+     * @brief Disable DOT and transition from uninitialized to disabled state
+     *
+     * @param lakKeyAuthScheme LAK key authentication scheme
+     * @param lakEcdsaKey LAK ECDSA key data
+     * @param lakLmsKey LAK LMS key data
+     * @param unlockMethod Unlock method for disable operation
+     * @param staticChallenge Static challenge (required when UnlockMethod is
+     * StaticValue)
+     * @param disableSignatureAuthScheme Signature authentication scheme
+     * @param ecdsaSignature ECDSA signature
+     * @param lmsSignature LMS signature
+     * @return Object path for monitoring the async operation status
+     * @throws Common::Error::InvalidArgument if parameters are invalid
+     * @throws Common::Error::InternalFailure if encoding fails
+     * @throws Common::Error::Unavailable if async operation manager is
+     * unavailable
+     */
+    sdbusplus::message::object_path
+        disable(DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
+                std::string lakEcdsaKey, std::string lakLmsKey,
+                DotActionIntf::UnlockMethod unlockMethod,
+                std::string staticChallenge,
+                DotActionIntf::KeyAuthScheme disableSignatureAuthScheme,
+                std::string ecdsaSignature, std::string lmsSignature) override;
+
+    /**
+     * @brief Override DOT to reset ownership state
+     *
+     * Override DOT when valid DOT data can no longer be recovered. Requires
+     * vendor signature signed by Nvidia vendor key. UnlockChallenge with
+     * VendorUnlock type should be used prior to Override.
+     *
+     * @param vendorSignatureAuthScheme Vendor signature authentication scheme
+     * @param ecdsaSignature ECDSA signature with challenge from
+     * UnlockChallenge
+     * @param lmsSignature LMS signature with challenge from UnlockChallenge
+     * @return Object path for monitoring the async operation status
+     * @throws Common::Error::InvalidArgument if signature data is invalid
+     * @throws Common::Error::InternalFailure if encoding fails
+     * @throws Common::Error::Unavailable if async operation manager is
+     * unavailable
+     */
+    sdbusplus::message::object_path
+        override(DotActionIntf::KeyAuthScheme vendorSignatureAuthScheme,
+                 std::string ecdsaSignature, std::string lmsSignature) override;
+
+    /**
+     * @brief Recover corrupted DOT data using backup data
+     *
+     * Recover corrupted DOT data using backup data. Unlike Override, this
+     * method does not require vendor signature. UnlockChallenge should be used
+     * prior to Recovery.
+     *
+     * @param dotData File descriptor containing backup DOT data
+     * @return Object path for monitoring the async operation status
+     * @throws Common::Error::InvalidArgument if DOT data is invalid
+     * @throws Common::Error::InternalFailure if encoding fails
+     * @throws Common::Error::Unavailable if async operation manager is
+     * unavailable
+     */
+    sdbusplus::message::object_path
+        recoverDOT(sdbusplus::message::unix_fd dotData) override;
+
   private:
     /**
      * @brief Async handler for DOT CAK Install operation
@@ -325,6 +404,48 @@ class NsmDotObject : public NsmObject, public DotActionIntf
         std::string ecdsaSignature, std::string lmsSignature,
         std::shared_ptr<AsyncStatusIntf> statusIntf,
         std::shared_ptr<AsyncValueIntf> valueIntf);
+
+    /**
+     * @brief Async handler for DOT Disable operation
+     *
+     * @param params Disable operation parameters
+     * @param statusIntf Async status interface
+     * @param valueIntf Async value interface
+     * @return Coroutine result code
+     */
+    requester::Coroutine
+        disableAsyncHandler(const DotDisableParams& params,
+                            std::shared_ptr<AsyncStatusIntf> statusIntf,
+                            std::shared_ptr<AsyncValueIntf> valueIntf);
+
+    /**
+     * @brief Async handler for DOT Override operation
+     *
+     * @param vendorSignatureAuthScheme Vendor signature authentication scheme
+     * @param ecdsaSignature ECDSA signature
+     * @param lmsSignature LMS signature
+     * @param statusIntf Async status interface
+     * @param valueIntf Async value interface
+     * @return Coroutine result code
+     */
+    requester::Coroutine overrideAsyncHandler(
+        DotActionIntf::KeyAuthScheme vendorSignatureAuthScheme,
+        std::string ecdsaSignature, std::string lmsSignature,
+        std::shared_ptr<AsyncStatusIntf> statusIntf,
+        std::shared_ptr<AsyncValueIntf> valueIntf);
+
+    /**
+     * @brief Async handler for DOT Recovery operation
+     *
+     * @param dotData File descriptor containing backup DOT blob
+     * @param statusIntf Async status interface
+     * @param valueIntf Async value interface
+     * @return Coroutine result code
+     */
+    requester::Coroutine
+        recoverDOTAsyncHandler(sdbusplus::message::unix_fd dotData,
+                               std::shared_ptr<AsyncStatusIntf> statusIntf,
+                               std::shared_ptr<AsyncValueIntf> valueIntf);
 
     /**
      * @brief Handle send errors for DOT operations

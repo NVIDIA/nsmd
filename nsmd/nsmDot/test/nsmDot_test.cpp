@@ -25,11 +25,46 @@
 #include "nsmDot.hpp"
 #include "test/mockSensorManager.hpp"
 
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <cstring>
+#include <vector>
+
 using namespace nsm;
 using namespace ::testing;
+using sdbusplus::message::unix_fd;
 
 NsmDeviceTable devices;
 std::shared_ptr<MockNsmDeviceBase> mockDevice;
+
+/**
+ * @brief Creates a temporary file with the given data and returns its file
+ * descriptor
+ *
+ * Creates a temporary file using mkstemp, writes the provided data to it,
+ * resets the file position to the beginning, and unlinks the file (keeping
+ * the fd open for use). The caller is responsible for closing the fd.
+ *
+ * @param data The data to write to the temporary file
+ * @return File descriptor of the temporary file, or -1 on error
+ */
+int createTempFileWithData(const std::vector<uint8_t>& data)
+{
+    char tempPath[] = "/tmp/dot_recovery_test_XXXXXX";
+    int fd = mkstemp(tempPath);
+    EXPECT_NE(fd, -1);
+
+    if (fd != -1)
+    {
+        ssize_t written = write(fd, data.data(), data.size());
+        EXPECT_EQ(written, static_cast<ssize_t>(data.size()));
+        lseek(fd, 0, SEEK_SET);
+        unlink(tempPath);
+    }
+
+    return fd;
+}
 
 class NsmDotTest : public Test, public SensorManagerTest
 {
@@ -138,6 +173,44 @@ class NsmDotTest : public Test, public SensorManagerTest
         auto rc = encode_nsm_dot_get_info_resp(
             0, completionCode, reasonCode, version, fuseChangeState,
             transfersRemaining, dotBlob.data(), dotBlob.size(), msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        return response;
+    }
+
+    Response createDotDisableResponse(uint8_t completionCode = NSM_SUCCESS,
+                                      uint16_t reasonCode = 0)
+    {
+        Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_dot_disable_resp),
+                          0);
+        auto msg = reinterpret_cast<nsm_msg*>(response.data());
+
+        std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE, 0xAA);
+        auto rc = encode_nsm_dot_disable_resp(0, completionCode, reasonCode,
+                                              dotBlob.data(), msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        return response;
+    }
+
+    Response createDotOverrideResponse(uint8_t completionCode = NSM_SUCCESS,
+                                       uint16_t reasonCode = 0)
+    {
+        Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(response.data());
+
+        auto rc = encode_nsm_dot_override_resp(0, completionCode, reasonCode,
+                                               msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        return response;
+    }
+
+    Response createDotRecoveryResponse(uint8_t completionCode = NSM_SUCCESS,
+                                       uint16_t reasonCode = 0)
+    {
+        Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(response.data());
+
+        auto rc = encode_nsm_dot_recovery_resp(0, completionCode, reasonCode,
+                                               msg);
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
         return response;
     }
@@ -254,6 +327,66 @@ class NsmDotTest : public Test, public SensorManagerTest
         auto rc = dotObject
                       ->getInfoAsyncHandler(statusInterface, valueInterface)
                       .await_resume();
+        return std::make_tuple(rc, statusInterface, valueInterface);
+    }
+
+    auto callDisableAsync()
+    {
+        const auto [_, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        // Valid ECDSA key (96 bytes in hex)
+        std::string ecdsaKey = std::string(192, '0'); // 96 bytes * 2 hex chars
+        std::string lmsKey = "";
+        std::string ecdsaSig = std::string(192, '1'); // 96 bytes * 2 hex chars
+        std::string lmsSig = "";
+
+        DotDisableParams params{DotActionIntf::KeyAuthScheme::Ecdsa,
+                                ecdsaKey,
+                                lmsKey,
+                                DotActionIntf::UnlockMethod::OwnerUnlock,
+                                "",
+                                DotActionIntf::KeyAuthScheme::Ecdsa,
+                                ecdsaSig,
+                                lmsSig};
+
+        auto rc = dotObject
+                      ->disableAsyncHandler(params, statusInterface,
+                                            valueInterface)
+                      .await_resume();
+        return std::make_tuple(rc, statusInterface, valueInterface);
+    }
+
+    auto callOverrideAsync()
+    {
+        const auto [_, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        std::string ecdsaSig = std::string(192, '2'); // 96 bytes * 2 hex chars
+        std::string lmsSig = "";
+
+        auto rc = dotObject
+                      ->overrideAsyncHandler(
+                          DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaSig, lmsSig,
+                          statusInterface, valueInterface)
+                      .await_resume();
+        return std::make_tuple(rc, statusInterface, valueInterface);
+    }
+
+    auto callRecoveryAsync()
+    {
+        const auto [_, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE, 0xAA);
+        int fd = createTempFileWithData(dotBlob);
+        ASSERT_NE(fd, -1);
+
+        auto rc = dotObject
+                      ->recoverDOTAsyncHandler(unix_fd(fd), statusInterface,
+                                               valueInterface)
+                      .await_resume();
+        close(fd);
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
 
@@ -963,4 +1096,335 @@ TEST_F(NsmDotTest, CAKRotateHybridModeWithoutLmsSignature)
                              lmsKey, DotActionIntf::KeyAuthScheme::Hybrid,
                              ecdsaSignature, lmsSignature),
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, DisableSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotDisableResponse()));
+
+    auto path = dotObject->disable(
+        DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '0'), "",
+        DotActionIntf::UnlockMethod::OwnerUnlock, "",
+        DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '1'), "");
+
+    EXPECT_NE(path, sdbusplus::message::object_path{});
+}
+
+TEST_F(NsmDotTest, DisableInvalidLAKEcdsaKey)
+{
+    EXPECT_THROW(
+        dotObject->disable(DotActionIntf::KeyAuthScheme::Ecdsa, "invalid_key",
+                           "", DotActionIntf::UnlockMethod::OwnerUnlock, "",
+                           DotActionIntf::KeyAuthScheme::Ecdsa,
+                           std::string(192, '1'), ""),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, DisableHybridModeWithoutLmsKey)
+{
+    EXPECT_THROW(
+        dotObject->disable(
+            DotActionIntf::KeyAuthScheme::Hybrid, std::string(192, '0'),
+            "", // Missing LMS key
+            DotActionIntf::UnlockMethod::OwnerUnlock, "",
+            DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '1'), ""),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, DisableHybridSignatureWithoutLmsSignature)
+{
+    EXPECT_THROW(
+        dotObject->disable(
+            DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '0'), "",
+            DotActionIntf::UnlockMethod::OwnerUnlock, "",
+            DotActionIntf::KeyAuthScheme::Hybrid, std::string(192, '1'),
+            ""), // Missing LMS signature
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, DisableStaticUnlockMethodWithoutChallenge)
+{
+    EXPECT_THROW(
+        dotObject->disable(
+            DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '0'), "",
+            DotActionIntf::UnlockMethod::StaticValue,
+            "", // Missing static challenge
+            DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '1'), ""),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, DisableAsyncHandlerSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotDisableResponse()));
+
+    const auto [rc, statusInterface, valueInterface] = callDisableAsync();
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    auto value = valueInterface->value();
+    auto blob = std::get<std::vector<uint8_t>>(value);
+    EXPECT_EQ(blob.size(), DOT_BLOB_SIZE);
+}
+
+TEST_F(NsmDotTest, DisableAsyncHandlerDeviceError)
+{
+    Response errorResponse = createDotDisableResponse(NSM_ERROR, 0xFFFF);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce([errorResponse](eid_t, Request&,
+                                  std::shared_ptr<const nsm_msg>& responseMsg,
+                                  size_t& responseLen) -> requester::Coroutine {
+        // Set correct length for error response (non-success resp is smaller)
+        responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+        if (responseLen > 0)
+        {
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+                [](const nsm_msg* ptr) { free((void*)ptr); });
+            memcpy((uint8_t*)responseMsg.get(), errorResponse.data(),
+                   responseLen);
+        }
+        co_return NSM_SW_SUCCESS;
+    });
+
+    const auto [rc, statusInterface, valueInterface] = callDisableAsync();
+
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple),
+              static_cast<uint16_t>(0xFFFF)); /* Reason code */
+    EXPECT_EQ(std::get<1>(tuple), "DOT Disable failed");
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmDotTest, DisableAsyncHandlerSendFailure)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotDisableResponse(), NSM_ERROR));
+
+    const auto [rc, statusInterface, _] = callDisableAsync();
+
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+}
+
+TEST_F(NsmDotTest, OverrideSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotOverrideResponse()));
+
+    auto path = dotObject->override(DotActionIntf::KeyAuthScheme::Ecdsa,
+                                    std::string(192, '2'), "");
+
+    EXPECT_NE(path, sdbusplus::message::object_path{});
+}
+
+TEST_F(NsmDotTest, OverrideHybridSignatureWithoutLmsSignature)
+{
+    EXPECT_THROW(
+        dotObject->override(DotActionIntf::KeyAuthScheme::Hybrid,
+                            std::string(192, '2'),
+                            ""), // Missing LMS signature
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, OverrideAsyncHandlerSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotOverrideResponse()));
+
+    const auto [rc, statusInterface, valueInterface] = callOverrideAsync();
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    auto value = valueInterface->value();
+    auto blob = std::get<std::vector<uint8_t>>(value);
+    EXPECT_TRUE(blob.empty()); // Override returns empty vector on success
+}
+
+TEST_F(NsmDotTest, OverrideAsyncHandlerDeviceError)
+{
+    Response errorResponse = createDotOverrideResponse(NSM_ERROR, 0xFFFF);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce([errorResponse](eid_t, Request&,
+                                  std::shared_ptr<const nsm_msg>& responseMsg,
+                                  size_t& responseLen) -> requester::Coroutine {
+        // Set correct length for error response (non-success resp is smaller)
+        responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+        if (responseLen > 0)
+        {
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+                [](const nsm_msg* ptr) { free((void*)ptr); });
+            memcpy((uint8_t*)responseMsg.get(), errorResponse.data(),
+                   responseLen);
+        }
+        co_return NSM_SW_SUCCESS;
+    });
+
+    const auto [rc, statusInterface, valueInterface] = callOverrideAsync();
+
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple),
+              static_cast<uint16_t>(0xFFFF)); /* Reason code */
+    EXPECT_EQ(std::get<1>(tuple), "DOT Override failed");
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmDotTest, OverrideAsyncHandlerSendFailure)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotOverrideResponse(), NSM_ERROR));
+
+    const auto [rc, statusInterface, _] = callOverrideAsync();
+
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+}
+
+TEST_F(NsmDotTest, RecoverySuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotRecoveryResponse()));
+
+    // Valid DOT blob (1024 bytes)
+    std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE, 0xAA);
+    int fd = createTempFileWithData(dotBlob);
+    ASSERT_NE(fd, -1);
+
+    auto path = dotObject->recoverDOT(unix_fd(fd));
+    close(fd);
+
+    EXPECT_NE(path, sdbusplus::message::object_path{});
+}
+
+TEST_F(NsmDotTest, RecoveryEmptyDotData)
+{
+    EXPECT_THROW(
+        dotObject->recoverDOT(unix_fd(-1)),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, RecoveryAsyncHandlerSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotRecoveryResponse()));
+
+    const auto [rc, statusInterface, valueInterface] = callRecoveryAsync();
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    auto value = valueInterface->value();
+    auto blob = std::get<std::vector<uint8_t>>(value);
+    EXPECT_TRUE(blob.empty()); // Recovery returns empty vector on success
+}
+
+TEST_F(NsmDotTest, RecoveryAsyncHandlerInvalidDotBlob)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO).Times(0);
+
+    const auto [_, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    // Invalid DOT blob (wrong size - only 10 bytes instead of 1024)
+    std::vector<uint8_t> invalidDotBlob(10, 0xAA);
+    int fd = createTempFileWithData(invalidDotBlob);
+    ASSERT_NE(fd, -1);
+
+    auto rc = dotObject
+                  ->recoverDOTAsyncHandler(unix_fd(fd), statusInterface,
+                                           valueInterface)
+                  .await_resume();
+    close(fd);
+
+    EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::InvalidArgument);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple), static_cast<uint16_t>(NSM_ERR_INVALID_DATA));
+}
+
+TEST_F(NsmDotTest, RecoveryAsyncHandlerEmptyDotBlob)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO).Times(0);
+
+    const auto [_, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    // Empty DOT blob
+    std::vector<uint8_t> emptyDotBlob;
+    int fd = createTempFileWithData(emptyDotBlob);
+    ASSERT_NE(fd, -1);
+
+    auto rc = dotObject
+                  ->recoverDOTAsyncHandler(unix_fd(fd), statusInterface,
+                                           valueInterface)
+                  .await_resume();
+    close(fd);
+
+    EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::InvalidArgument);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple), static_cast<uint16_t>(NSM_ERR_INVALID_DATA));
+}
+
+TEST_F(NsmDotTest, RecoveryAsyncHandlerDeviceError)
+{
+    Response errorResponse = createDotRecoveryResponse(NSM_ERROR, 0xFFFF);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce([errorResponse](eid_t, Request&,
+                                  std::shared_ptr<const nsm_msg>& responseMsg,
+                                  size_t& responseLen) -> requester::Coroutine {
+        // Set correct length for error response (non-success resp is smaller)
+        responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+        if (responseLen > 0)
+        {
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+                [](const nsm_msg* ptr) { free((void*)ptr); });
+            memcpy((uint8_t*)responseMsg.get(), errorResponse.data(),
+                   responseLen);
+        }
+        co_return NSM_SW_SUCCESS;
+    });
+
+    const auto [rc, statusInterface, valueInterface] = callRecoveryAsync();
+
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple),
+              static_cast<uint16_t>(0xFFFF)); /* Reason code */
+    EXPECT_EQ(std::get<1>(tuple), "DOT Recovery failed");
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmDotTest, RecoveryAsyncHandlerSendFailure)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotRecoveryResponse(), NSM_ERROR));
+
+    const auto [rc, statusInterface, _] = callRecoveryAsync();
+
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
 }

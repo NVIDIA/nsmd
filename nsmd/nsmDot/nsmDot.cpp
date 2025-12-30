@@ -28,9 +28,12 @@
 #include "nsmSensor.hpp"
 #include "sensorManager.hpp"
 
+#include <unistd.h>
+
 #include <phosphor-logging/lg2.hpp>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstring>
 #include <exception>
 #include <format>
@@ -1226,6 +1229,541 @@ requester::Coroutine NsmDotObject::cakRotateAsyncHandler(
 
     lg2::debug("Dot: CAK Rotate successful: eid={EID}", "EID", eid);
     valueIntf->value(dotBlob);
+    statusIntf->status(AsyncOperationStatusType::Success);
+    co_return NSM_SW_SUCCESS;
+}
+
+sdbusplus::message::object_path NsmDotObject::disable(
+    DotActionIntf::KeyAuthScheme lakKeyAuthScheme, std::string lakEcdsaKey,
+    std::string lakLmsKey, DotActionIntf::UnlockMethod unlockMethod,
+    std::string staticChallenge,
+    DotActionIntf::KeyAuthScheme disableSignatureAuthScheme,
+    std::string ecdsaSignature, std::string lmsSignature)
+{
+    uint8_t lakEcdsaBuf[dot::ECDSA_KEY_SIZE] = {0};
+    if (!dot::decodeKeyData(lakEcdsaKey, lakEcdsaBuf, dot::ECDSA_KEY_SIZE))
+    {
+        lg2::error("Dot: Invalid LAK ECDSA key data");
+        throw Common::Error::InvalidArgument();
+    }
+
+    if (lakKeyAuthScheme == DotActionIntf::KeyAuthScheme::Hybrid &&
+        lakLmsKey.empty())
+    {
+        lg2::error("Dot: Hybrid mode requires LAK LMS key");
+        throw Common::Error::InvalidArgument();
+    }
+
+    if (disableSignatureAuthScheme == DotActionIntf::KeyAuthScheme::Hybrid &&
+        lmsSignature.empty())
+    {
+        lg2::error("Dot: Hybrid signature mode requires LMS signature");
+        throw Common::Error::InvalidArgument();
+    }
+
+    if (unlockMethod == DotActionIntf::UnlockMethod::StaticValue &&
+        staticChallenge.empty())
+    {
+        lg2::error("Dot: Static unlock method requires static challenge");
+        throw Common::Error::InvalidArgument();
+    }
+
+    const auto [objPath, statusIntf, valueIntf] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+    if (objPath.empty())
+    {
+        throw Common::Error::Unavailable();
+    }
+
+    DotDisableParams params{lakKeyAuthScheme, lakEcdsaKey,
+                            lakLmsKey,        unlockMethod,
+                            staticChallenge,  disableSignatureAuthScheme,
+                            ecdsaSignature,   lmsSignature};
+
+    disableAsyncHandler(params, statusIntf, valueIntf).detach();
+
+    return objPath;
+}
+
+requester::Coroutine NsmDotObject::disableAsyncHandler(
+    const DotDisableParams& params, std::shared_ptr<AsyncStatusIntf> statusIntf,
+    std::shared_ptr<AsyncValueIntf> valueIntf)
+{
+    lg2::debug("Dot: disableAsyncHandler started");
+
+    statusIntf->status(AsyncOperationStatusType::InProgress);
+
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    if (!device)
+    {
+        lg2::error("Dot: Device not found for UUID");
+        statusIntf->status(AsyncOperationStatusType::ResourceNotFound);
+        valueIntf->value(
+            std::make_tuple(DOT_ERROR_DEVICE_NOT_FOUND, "Device not found"));
+        co_return NSM_SW_ERROR;
+    }
+
+    auto eid = device->getEid();
+
+    nsm_dot_disable_req dotReq = {};
+
+    if (!buildAndValidateLAKAuthData(params.lakKeyAuthScheme,
+                                     params.lakEcdsaKey, params.lakLmsKey,
+                                     dotReq.lak_pub, statusIntf, valueIntf))
+    {
+        co_return NSM_ERR_INVALID_DATA;
+    }
+
+    dotReq.unlock_method = static_cast<uint32_t>(params.unlockMethod);
+
+    if (params.unlockMethod == DotActionIntf::UnlockMethod::StaticValue)
+    {
+        if (!dot::decodeKeyData(params.staticChallenge, dotReq.s_challenge,
+                                DOT_STATIC_CHALLENGE_SIZE))
+        {
+            lg2::error("Dot: Invalid static challenge data");
+            statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+            valueIntf->value(
+                std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                                "Invalid static challenge"));
+            co_return NSM_ERR_INVALID_DATA;
+        }
+    }
+    else
+    {
+        memset(dotReq.s_challenge, 0, DOT_STATIC_CHALLENGE_SIZE);
+    }
+
+    uint8_t ecdsaSigBuf[DOT_SIGNATURE_ECDSA_SIZE] = {0};
+    if (!dot::decodeKeyData(params.ecdsaSignature, ecdsaSigBuf,
+                            DOT_SIGNATURE_ECDSA_SIZE))
+    {
+        lg2::error("Dot: Invalid ECDSA signature data");
+        statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+        valueIntf->value(
+            std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                            "Invalid ECDSA signature"));
+        co_return NSM_ERR_INVALID_DATA;
+    }
+
+    memcpy(dotReq.signature, ecdsaSigBuf, DOT_SIGNATURE_ECDSA_SIZE);
+
+    if (params.disableSignatureAuthScheme ==
+        DotActionIntf::KeyAuthScheme::Hybrid)
+    {
+        uint8_t lmsSigBuf[DOT_SIGNATURE_LMS_SIZE] = {0};
+        if (!dot::decodeKeyData(params.lmsSignature, lmsSigBuf,
+                                DOT_SIGNATURE_LMS_SIZE))
+        {
+            lg2::error("Dot: Invalid LMS signature data");
+            statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+            valueIntf->value(
+                std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                                "Invalid LMS signature"));
+            co_return NSM_ERR_INVALID_DATA;
+        }
+        memcpy(dotReq.signature + DOT_SIGNATURE_ECDSA_SIZE, lmsSigBuf,
+               DOT_SIGNATURE_LMS_SIZE);
+    }
+    else
+    {
+        memset(dotReq.signature + DOT_SIGNATURE_ECDSA_SIZE, 0,
+               DOT_SIGNATURE_LMS_SIZE);
+    }
+
+    auto request = std::make_shared<Request>(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_disable_req_command));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
+    auto rc = encode_nsm_dot_disable_req(0, &dotReq, requestMsg);
+    std::string msg = utils::requestMsgToHexString(*request);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("Dot: encode_nsm_dot_disable_req: rc={RC}", "RC", rc);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+        throw Common::Error::InternalFailure();
+    }
+
+    lg2::debug(
+        "Dot: disable request encoded, sending to eid={EID} reqSize={SIZE}",
+        "EID", eid, "SIZE", request->size());
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto sendRc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                               responseLen);
+
+    lg2::debug(
+        "Dot: disable postPatchIO returned: eid={EID} rc={RC} responseLen={LEN}",
+        "EID", eid, "RC", sendRc, "LEN", responseLen);
+
+    if (sendRc != NSM_SW_SUCCESS)
+    {
+        handleSendError(sendRc, eid, statusIntf, valueIntf);
+        co_return sendRc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+
+    lg2::debug("Dot: disable response received: eid={EID} len={LEN}", "EID",
+               eid, "LEN", responseLen);
+
+    auto decodeRc = decode_nsm_dot_disable_resp(
+        responseMsg.get(), responseLen, &cc, &reasonCode, dotBlob.data());
+
+    lg2::debug(
+        "Dot: disable decode result: eid={EID} decodeRc={RC} cc={CC} reasonCode={REASON}",
+        "EID", eid, "RC", decodeRc, "CC", cc, "REASON", reasonCode);
+
+    if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "Dot: decode_nsm_dot_disable_resp: "
+            "eid={EID} rc={RC} cc={CC} reasonCode={REASON} len={LEN} msg={MSG}",
+            "EID", eid, "RC", decodeRc, "CC", cc, "REASON", reasonCode, "LEN",
+            responseLen, "MSG", msg);
+        auto error = dot::formatDotDeviceError(cc, reasonCode,
+                                               NSM_FW_DOT_DISABLE);
+        valueIntf->value(error);
+        statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        co_return decodeRc;
+    }
+
+    if (dotBlob.empty())
+    {
+        lg2::info("Dot: disable response blob is empty: eid={EID}", "EID", eid);
+        auto error = std::make_tuple(static_cast<uint16_t>(NSM_SW_ERROR),
+                                     "DOT Disable blob is empty");
+        valueIntf->value(error);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+        co_return NSM_SW_ERROR;
+    }
+
+    lg2::info("Dot: Disable completed successfully: eid={EID}", "EID", eid);
+    valueIntf->value(dotBlob);
+    statusIntf->status(AsyncOperationStatusType::Success);
+    co_return NSM_SW_SUCCESS;
+}
+
+sdbusplus::message::object_path NsmDotObject::override(
+    DotActionIntf::KeyAuthScheme vendorSignatureAuthScheme,
+    std::string ecdsaSignature, std::string lmsSignature)
+{
+    if (vendorSignatureAuthScheme == DotActionIntf::KeyAuthScheme::Hybrid &&
+        lmsSignature.empty())
+    {
+        lg2::error("Dot: Hybrid signature mode requires LMS signature");
+        throw Common::Error::InvalidArgument();
+    }
+
+    const auto [objPath, statusIntf, valueIntf] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+    if (objPath.empty())
+    {
+        throw Common::Error::Unavailable();
+    }
+
+    overrideAsyncHandler(vendorSignatureAuthScheme, ecdsaSignature,
+                         lmsSignature, statusIntf, valueIntf)
+        .detach();
+
+    return objPath;
+}
+
+requester::Coroutine NsmDotObject::overrideAsyncHandler(
+    DotActionIntf::KeyAuthScheme vendorSignatureAuthScheme,
+    std::string ecdsaSignature, std::string lmsSignature,
+    std::shared_ptr<AsyncStatusIntf> statusIntf,
+    std::shared_ptr<AsyncValueIntf> valueIntf)
+{
+    lg2::debug("Dot: overrideAsyncHandler started");
+
+    statusIntf->status(AsyncOperationStatusType::InProgress);
+
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    if (!device)
+    {
+        lg2::error("Dot: Device not found for UUID");
+        statusIntf->status(AsyncOperationStatusType::ResourceNotFound);
+        valueIntf->value(
+            std::make_tuple(DOT_ERROR_DEVICE_NOT_FOUND, "Device not found"));
+        co_return NSM_SW_ERROR;
+    }
+
+    auto eid = device->getEid();
+
+    nsm_dot_override_req dotReq = {};
+
+    if (vendorSignatureAuthScheme == DotActionIntf::KeyAuthScheme::Ecdsa)
+    {
+        uint8_t ecdsaSigBuf[DOT_SIGNATURE_ECDSA_SIZE] = {0};
+        if (!dot::decodeKeyData(ecdsaSignature, ecdsaSigBuf,
+                                DOT_SIGNATURE_ECDSA_SIZE))
+        {
+            lg2::error("Dot: Invalid ECDSA signature data");
+            statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+            valueIntf->value(
+                std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                                "Invalid ECDSA signature"));
+            co_return NSM_ERR_INVALID_DATA;
+        }
+        memcpy(dotReq.signature, ecdsaSigBuf, DOT_SIGNATURE_ECDSA_SIZE);
+        memset(dotReq.signature + DOT_SIGNATURE_ECDSA_SIZE, 0,
+               DOT_SIGNATURE_LMS_SIZE);
+    }
+    else
+    {
+        uint8_t ecdsaSigBuf[DOT_SIGNATURE_ECDSA_SIZE] = {0};
+        if (!dot::decodeKeyData(ecdsaSignature, ecdsaSigBuf,
+                                DOT_SIGNATURE_ECDSA_SIZE))
+        {
+            lg2::error("Dot: Invalid ECDSA signature data");
+            statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+            valueIntf->value(
+                std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                                "Invalid ECDSA signature"));
+            co_return NSM_ERR_INVALID_DATA;
+        }
+
+        uint8_t lmsSigBuf[DOT_SIGNATURE_LMS_SIZE] = {0};
+        if (!dot::decodeKeyData(lmsSignature, lmsSigBuf,
+                                DOT_SIGNATURE_LMS_SIZE))
+        {
+            lg2::error("Dot: Invalid LMS signature data");
+            statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+            valueIntf->value(
+                std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                                "Invalid LMS signature"));
+            co_return NSM_ERR_INVALID_DATA;
+        }
+
+        memcpy(dotReq.signature, ecdsaSigBuf, DOT_SIGNATURE_ECDSA_SIZE);
+        memcpy(dotReq.signature + DOT_SIGNATURE_ECDSA_SIZE, lmsSigBuf,
+               DOT_SIGNATURE_LMS_SIZE);
+    }
+
+    auto request = std::make_shared<Request>(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_override_req_command));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
+    auto rc = encode_nsm_dot_override_req(0, &dotReq, requestMsg);
+    std::string msg = utils::requestMsgToHexString(*request);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("Dot: encode_nsm_dot_override_req: rc={RC}", "RC", rc);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+        throw Common::Error::InternalFailure();
+    }
+
+    lg2::debug(
+        "Dot: override request encoded, sending to eid={EID} reqSize={SIZE}",
+        "EID", eid, "SIZE", request->size());
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto sendRc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                               responseLen);
+
+    lg2::debug(
+        "Dot: override postPatchIO returned: eid={EID} rc={RC} responseLen={LEN}",
+        "EID", eid, "RC", sendRc, "LEN", responseLen);
+
+    if (sendRc != NSM_SW_SUCCESS)
+    {
+        handleSendError(sendRc, eid, statusIntf, valueIntf);
+        co_return sendRc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+
+    auto decodeRc = decode_nsm_dot_override_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reasonCode);
+
+    lg2::debug("Dot: override decode result: eid={EID} decodeRc={RC} cc={CC} "
+               "reasonCode={REASON}",
+               "EID", eid, "RC", decodeRc, "CC", cc, "REASON", reasonCode);
+
+    if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "Dot: decode_nsm_dot_override_resp: eid={EID} rc={RC} cc={CC} "
+            "reasonCode={REASON} len={LEN} msg={MSG}",
+            "EID", eid, "RC", decodeRc, "CC", cc, "REASON", reasonCode, "LEN",
+            responseLen, "MSG", msg);
+        auto error = dot::formatDotDeviceError(cc, reasonCode,
+                                               NSM_FW_DOT_OVERRIDE);
+        valueIntf->value(error);
+        statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        co_return decodeRc;
+    }
+
+    lg2::info("Dot: Override completed successfully: eid={EID}", "EID", eid);
+    valueIntf->value(std::vector<uint8_t>{});
+    statusIntf->status(AsyncOperationStatusType::Success);
+    co_return NSM_SW_SUCCESS;
+}
+
+sdbusplus::message::object_path
+    NsmDotObject::recoverDOT(sdbusplus::message::unix_fd dotData)
+{
+    if (dotData.fd < 0)
+    {
+        lg2::error("Dot: Invalid file descriptor for DOT blob data");
+        throw Common::Error::InvalidArgument();
+    }
+
+    auto dupFd = dup(dotData.fd);
+    if (dupFd < 0)
+    {
+        lg2::error("Dot: Failed to duplicate file descriptor: {ERR}", "ERR",
+                   strerror(errno));
+        throw Common::Error::InternalFailure();
+    }
+
+    auto seekRc = lseek(dupFd, 0, SEEK_SET);
+    if (seekRc < 0)
+    {
+        lg2::error("Dot: lseek failed: {RETURNCODE} {ERROR}", "RETURNCODE",
+                   seekRc, "ERROR", strerror(errno));
+        close(dupFd);
+        throw Common::Error::InternalFailure();
+    }
+
+    const auto [objPath, statusIntf, valueIntf] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+    if (objPath.empty())
+    {
+        close(dupFd);
+        throw Common::Error::Unavailable();
+    }
+
+    recoverDOTAsyncHandler(sdbusplus::message::unix_fd(dupFd), statusIntf,
+                           valueIntf)
+        .detach();
+
+    return objPath;
+}
+
+requester::Coroutine NsmDotObject::recoverDOTAsyncHandler(
+    sdbusplus::message::unix_fd dotData,
+    std::shared_ptr<AsyncStatusIntf> statusIntf,
+    std::shared_ptr<AsyncValueIntf> valueIntf)
+{
+    lg2::debug("Dot: recoveryAsyncHandler started");
+
+    statusIntf->status(AsyncOperationStatusType::InProgress);
+
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    if (!device)
+    {
+        lg2::error("Dot: Device not found for UUID");
+        statusIntf->status(AsyncOperationStatusType::ResourceNotFound);
+        valueIntf->value(
+            std::make_tuple(DOT_ERROR_DEVICE_NOT_FOUND, "Device not found"));
+        co_return NSM_SW_ERROR;
+    }
+
+    auto eid = device->getEid();
+
+    nsm_dot_recovery_req dotReq = {};
+    std::vector<uint8_t> dotDataBuffer;
+
+    try
+    {
+        utils::readFdToBuffer(dotData.fd, dotDataBuffer);
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Dot: Failed to read DOT blob from file descriptor: {ERROR}",
+                   "ERROR", e.what());
+        statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+        valueIntf->value(
+            std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                            "Failed to read DOT blob from file descriptor"));
+        co_return NSM_ERR_INVALID_DATA;
+    }
+
+    if (dotDataBuffer.empty())
+    {
+        lg2::error("Dot: DOT blob data is empty");
+        statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+        valueIntf->value(
+            std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                            "DOT blob data is empty"));
+        co_return NSM_ERR_INVALID_DATA;
+    }
+
+    if (dotDataBuffer.size() != DOT_BLOB_SIZE)
+    {
+        lg2::error(
+            "Dot: Invalid DOT blob size: expected={EXPECTED}, actual={ACTUAL}",
+            "EXPECTED", DOT_BLOB_SIZE, "ACTUAL", dotDataBuffer.size());
+        statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+        valueIntf->value(
+            std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                            "Invalid DOT blob size"));
+        co_return NSM_ERR_INVALID_DATA;
+    }
+
+    std::copy_n(dotDataBuffer.data(), DOT_BLOB_SIZE, dotReq.dot_blob);
+
+    auto request = std::make_shared<Request>(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_recovery_req_command));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
+    auto rc = encode_nsm_dot_recovery_req(0, &dotReq, requestMsg);
+    std::string msg = utils::requestMsgToHexString(*request);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("Dot: encode_nsm_dot_recovery_req: rc={RC}", "RC", rc);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+        throw Common::Error::InternalFailure();
+    }
+
+    lg2::debug(
+        "Dot: recovery request encoded, sending to eid={EID} reqSize={SIZE}",
+        "EID", eid, "SIZE", request->size());
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto sendRc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                               responseLen);
+
+    lg2::debug(
+        "Dot: recovery postPatchIO returned: eid={EID} rc={RC} responseLen={LEN}",
+        "EID", eid, "RC", sendRc, "LEN", responseLen);
+
+    if (sendRc != NSM_SW_SUCCESS)
+    {
+        handleSendError(sendRc, eid, statusIntf, valueIntf);
+        co_return sendRc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+
+    auto decodeRc = decode_nsm_dot_recovery_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reasonCode);
+
+    lg2::debug("Dot: recovery decode result: eid={EID} decodeRc={RC} cc={CC} "
+               "reasonCode={REASON}",
+               "EID", eid, "RC", decodeRc, "CC", cc, "REASON", reasonCode);
+
+    if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "Dot: decode_nsm_dot_recovery_resp: eid={EID} rc={RC} cc={CC} "
+            "reasonCode={REASON} len={LEN} msg={MSG}",
+            "EID", eid, "RC", decodeRc, "CC", cc, "REASON", reasonCode, "LEN",
+            responseLen, "MSG", msg);
+        auto error = dot::formatDotDeviceError(cc, reasonCode,
+                                               NSM_FW_DOT_RECOVERY);
+        valueIntf->value(error);
+        statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        co_return decodeRc;
+    }
+
+    valueIntf->value(std::vector<uint8_t>{});
     statusIntf->status(AsyncOperationStatusType::Success);
     co_return NSM_SW_SUCCESS;
 }
