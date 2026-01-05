@@ -1035,8 +1035,8 @@ std::optional<std::vector<uint8_t>>
         // Property 2: AP SKU ID
         uint32_t apSkuId;
         memcpy(&apSkuId, &rot_req.argument_data[0], sizeof(uint32_t));
-        // Convert from big-endian to host byte order
-        apSkuId = be32toh(apSkuId);
+        // Convert from little-endian to host byte order
+        apSkuId = le32toh(apSkuId);
         uint8_t lifespan = rot_req.argument_data[4];
 
         if (lifespan > 1)

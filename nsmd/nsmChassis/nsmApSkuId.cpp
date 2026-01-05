@@ -92,8 +92,7 @@ uint8_t NsmApSkuIdObject::handleResponseMsg(const struct nsm_msg* responseMsg,
         return cc ? cc : rc;
     }
 
-    // Convert from big-endian to host byte order for display consistency
-    uint32_t apSkuIdValue = __builtin_bswap32(erot_info.fq_resp_hdr.ap_sku_id);
+    uint32_t apSkuIdValue = erot_info.fq_resp_hdr.ap_sku_id;
 
     // Format SKU as hex string and update the D-Bus interface property
     std::string apSkuIdStr = formatApSkuId(apSkuIdValue);

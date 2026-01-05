@@ -168,9 +168,8 @@ requester::Coroutine updateApSkuIdHandler(
     nsm_req.property = NSM_ROT_PROPERTY_AP_SKU_ID;
     nsm_req.argument_length = NSM_ROT_AP_SKU_ID_ARGUMENT_LENGTH;
 
-    // Store SKU ID in big-endian (network byte order) format in first 4 bytes
-    uint32_t skuIdBE = htobe32(skuIdValue);
-    memcpy(&nsm_req.argument_data[0], &skuIdBE, sizeof(uint32_t));
+    // Store SKU ID in first 4 bytes
+    memcpy(&nsm_req.argument_data[0], &skuIdValue, sizeof(uint32_t));
 
     // Store lifespan (persistent) in the 5th byte
     nsm_req.argument_data[4] = NSM_ROT_AP_SKU_ID_LIFESPAN_PERSISTENT;

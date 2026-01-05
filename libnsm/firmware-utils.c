@@ -1745,6 +1745,17 @@ int encode_nsm_firmware_set_rot_property_req(
 	    sizeof(struct nsm_firmware_set_rot_property_req);
 	memcpy(&request->rot_property_req, fw_req,
 	       sizeof(struct nsm_firmware_set_rot_property_req));
+
+	// Convert AP SKU ID to little-endian if this is an AP SKU ID property
+	if (request->rot_property_req.property == NSM_ROT_PROPERTY_AP_SKU_ID) {
+		uint32_t sku_id;
+		memcpy(&sku_id, request->rot_property_req.argument_data,
+		       sizeof(uint32_t));
+		sku_id = htole32(sku_id);
+		memcpy(request->rot_property_req.argument_data, &sku_id,
+		       sizeof(uint32_t));
+	}
+
 	return NSM_SW_SUCCESS;
 }
 

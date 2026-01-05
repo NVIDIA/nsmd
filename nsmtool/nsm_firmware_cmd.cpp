@@ -967,9 +967,8 @@ class SetRoTProperty : public CommandInterface
         {
             // Property 2: AP SKU ID
             nsm_req.argument_length = AP_SKU_ID_DATA_LENGTH;
-            // Convert AP SKU ID to little-endian and copy to argument_data
-            uint32_t apSkuIdLE = htole32(apSkuId);
-            memcpy(&nsm_req.argument_data[0], &apSkuIdLE, sizeof(uint32_t));
+            // Copy AP SKU ID to argument_data
+            memcpy(&nsm_req.argument_data[0], &apSkuId, sizeof(uint32_t));
             nsm_req.argument_data[4] = lifespan;
         }
 
