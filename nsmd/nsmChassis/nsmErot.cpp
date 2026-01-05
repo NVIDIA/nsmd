@@ -269,6 +269,28 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 allCurrentIfaceProperties.at("ImageCopyPolicyEnabled"));
         }
 
+        bool enableFailoverPolicy = false;
+        if (allCurrentIfaceProperties.count("SetRotPropertyList"))
+        {
+            try
+            {
+                auto propertyList = std::get<std::vector<std::string>>(
+                    allCurrentIfaceProperties.at("SetRotPropertyList"));
+
+                if (std::find(propertyList.begin(), propertyList.end(),
+                              "FAILOVER_POLICY") != propertyList.end())
+                {
+                    enableFailoverPolicy = true;
+                }
+            }
+            catch (const std::exception& e)
+            {
+                lg2::error(
+                    "Failed to parse SetRotPropertyList for chassis:{CHASSIS}: {ERROR}",
+                    "CHASSIS", name, "ERROR", e.what());
+            }
+        }
+
         auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
         if (!device)
@@ -301,6 +323,7 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
             nullptr;
         std::shared_ptr<NsmImageCopyPolicyObject> imageCopyPolicySensor =
             nullptr;
+        std::shared_ptr<NsmFailoverPolicyObject> failoverPolicy = nullptr;
         std::shared_ptr<NsmImageCopyObject> imageCopyObject = nullptr;
 
         std::vector<SlotInfo> allSlots;
@@ -504,6 +527,30 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                         "com.nvidia.InbandUpdatePolicy", "InbandUpdatePolicy",
                         AsyncSetOperationInfo{inbandUpdatePolicyHandler,
                                               inbandUpdatePolicy, device});
+            }
+
+            if (failoverPolicy == nullptr && enableFailoverPolicy)
+            {
+                failoverPolicy = std::make_shared<NsmFailoverPolicyObject>(
+                    bus, name, uuid, slot.classification, slot.identifier,
+                    static_cast<uint8_t>(slot.index));
+                device->addSensor(failoverPolicy, PollingType::RoundRobin);
+
+                // Register Async.Set handler for FailoverPolicy property
+                auto inventoryPath = std::string(chassisInventoryBasePath) +
+                                     "/" + name;
+
+                nsm::AsyncSetOperationHandler failoverPolicyHandler = std::bind(
+                    &updateFailoverPolicyHandler, std::placeholders::_1,
+                    std::placeholders::_2, std::placeholders::_3,
+                    slot.classification, slot.identifier,
+                    static_cast<uint8_t>(slot.index));
+                AsyncOperationManager::getInstance()
+                    ->getDispatcher(inventoryPath)
+                    ->addAsyncSetOperation(
+                        "com.nvidia.FailoverPolicy", "FailoverPolicy",
+                        AsyncSetOperationInfo{failoverPolicyHandler,
+                                              failoverPolicy, device});
             }
 
             if (imageCopyObject == nullptr and imageCopyEnabled)

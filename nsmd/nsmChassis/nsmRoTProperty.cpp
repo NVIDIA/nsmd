@@ -271,6 +271,224 @@ requester::Coroutine updateInbandUpdatePolicyHandler(
         value, status, device, classification, identifier, index);
 }
 
+void NsmFailoverPolicy::updateProperties(
+    const struct ::nsm_firmware_erot_state_info_resp& erot_info)
+{
+    using FailoverPolicyState =
+        sdbusplus::common::com::nvidia::FailoverPolicy::FailoverPolicyState;
+
+    bool invalidValue = false;
+    switch (erot_info.fq_resp_hdr.global_failover_policy)
+    {
+        case NSM_ROT_GLOBAL_FAILOVER_POLICY_AUTOMATIC_FAILOVER:
+            failoverPolicy(FailoverPolicyState::AutomaticFailover);
+            break;
+        case NSM_ROT_GLOBAL_FAILOVER_POLICY_NO_FAILOVER:
+            failoverPolicy(FailoverPolicyState::NoFailover);
+            break;
+        case NSM_ROT_GLOBAL_FAILOVER_POLICY_NOT_APPLICABLE:
+            failoverPolicy(FailoverPolicyState::Unknown);
+            break;
+        default:
+            invalidValue = true;
+            break;
+    }
+
+    if (shouldLog("Invalid global_failover_policy", invalidValue) &&
+        invalidValue)
+    {
+        LG2_ERROR(
+            "Invalid global_failover_policy value: {VALUE}, FailoverPolicy property not updated",
+            "VALUE", erot_info.fq_resp_hdr.global_failover_policy);
+    }
+}
+
+NsmFailoverPolicyObject::NsmFailoverPolicyObject(sdbusplus::bus::bus& bus,
+                                                 const std::string& chassisName,
+                                                 const uuid_t& uuid,
+                                                 uint16_t classificationIn,
+                                                 uint16_t identifierIn,
+                                                 uint8_t indexIn) :
+    NsmSensor(chassisName, "NSM_ChassisRoT"), objectPath(getPath(chassisName)),
+    classification(classificationIn), identifier(identifierIn), index(indexIn)
+{
+    lg2::info("NsmFailoverPolicy: create object: {PATH}", "PATH",
+              objectPath.c_str());
+    nsmFailoverPolicy = std::make_unique<NsmFailoverPolicy>(
+        bus, objectPath, uuid, classification, identifier, index, *this);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmFailoverPolicyObject::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_firmware_get_erot_state_info_req));
+    struct ::nsm_firmware_erot_state_info_req erot_req = {};
+    erot_req.component_classification = classification;
+    erot_req.component_classification_index = index;
+    erot_req.component_identifier = identifier;
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_nsm_query_get_erot_state_parameters_req(
+        instanceId, &erot_req, requestMsg);
+    if (rc)
+    {
+        lg2::error("encode_nsm_query_get_erot_state_parameters_req failed."
+                   " eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmFailoverPolicyObject::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    nsm_firmware_erot_state_info_resp erot_info = {};
+
+    auto rc = decode_nsm_query_get_erot_state_parameters_resp(
+        responseMsg, responseLen, &cc, &reason_code, &erot_info);
+
+    if (shouldLog("decode_nsm_query_get_erot_state_parameters_resp",
+                  reason_code, cc, rc))
+    {
+        LG2_ERROR(
+            "decode_nsm_query_get_erot_state_parameters_resp failed. reasonCode={REASONCODE}, cc={CC}, rc={RC}",
+            "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    }
+
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        free(erot_info.slot_info);
+        return cc ? cc : rc;
+    }
+
+    nsmFailoverPolicy->updateProperties(erot_info);
+    free(erot_info.slot_info);
+    return cc ? cc : rc;
+}
+
+requester::Coroutine FailoverPolicyHandler::updateFailoverPolicy(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint16_t classification,
+    uint16_t identifier, uint8_t index)
+{
+    using FailoverPolicyState =
+        sdbusplus::common::com::nvidia::FailoverPolicy::FailoverPolicyState;
+
+    const std::string* policyStr = std::get_if<std::string>(&value);
+
+    if (!policyStr)
+    {
+        LG2_ERROR("updateFailoverPolicy: invalid argument type");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    auto policyStateOpt = sdbusplus::common::com::nvidia::FailoverPolicy::
+        convertStringToFailoverPolicyState(*policyStr);
+    if (!policyStateOpt.has_value())
+    {
+        LG2_ERROR(
+            "updateFailoverPolicy: invalid failover policy value: {VALUE}",
+            "VALUE", *policyStr);
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    auto policyState = policyStateOpt.value();
+    uint8_t policyValue;
+    if (policyState == FailoverPolicyState::AutomaticFailover)
+    {
+        policyValue = NSM_ROT_GLOBAL_FAILOVER_POLICY_AUTOMATIC_FAILOVER;
+    }
+    else if (policyState == FailoverPolicyState::NoFailover)
+    {
+        policyValue = NSM_ROT_GLOBAL_FAILOVER_POLICY_NO_FAILOVER;
+    }
+    else
+    {
+        LG2_ERROR("updateFailoverPolicy: unsupported policy state");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    auto eid = device->getEid();
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_firmware_set_rot_property_req_command));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+    struct ::nsm_firmware_set_rot_property_req nsm_req = {};
+
+    nsm_req.component_classification = classification;
+    nsm_req.component_classification_index = index;
+    nsm_req.component_identifier = identifier;
+    nsm_req.property = NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY;
+    nsm_req.argument_length = 1;
+    nsm_req.argument_data[0] = policyValue;
+
+    auto rc = encode_nsm_firmware_set_rot_property_req(0, &nsm_req, requestMsg);
+    if (shouldLog("encode_nsm_firmware_set_rot_property_req", uint16_t(0),
+                  uint8_t(0), rc))
+    {
+        LG2_ERROR(
+            "updateFailoverPolicy: encode_nsm_firmware_set_rot_property_req failed. eid={EID} rc={RC}, policy={POLICY}",
+            "EID", eid, "RC", rc, "POLICY", *policyStr);
+    }
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        *status = AsyncOperationStatusType::InternalFailure;
+        co_return rc;
+    }
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
+    if (shouldLog("postPatchIO", uint16_t(0), uint8_t(0), rc))
+    {
+        LG2_ERROR("updateFailoverPolicy: postPatchIO failed. eid={EID} rc={RC}",
+                  "EID", eid, "RC", utils::nsmSwCodeToString(rc));
+    }
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return rc;
+    }
+
+    uint8_t cc = 0;
+    uint16_t reasonCode = 0;
+    rc = decode_nsm_firmware_set_rot_property_resp(
+        responseMsg.get(), responseLen, &cc, &reasonCode);
+
+    if (shouldLog("decode_nsm_firmware_set_rot_property_resp", reasonCode, cc,
+                  rc))
+    {
+        LG2_ERROR(
+            "updateFailoverPolicy: decode_nsm_firmware_set_rot_property_resp failed. reasonCode={REASONCODE}, cc={CC}, rc={RC}",
+            "REASONCODE", utils::nsmReasonCodeToString(reasonCode), "CC",
+            utils::nsmCompletionCodeToString(cc), "RC",
+            utils::nsmSwCodeToString(rc));
+    }
+    if ((rc != NSM_SW_SUCCESS) || (cc != NSM_SUCCESS))
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return cc ? cc : rc;
+    }
+
+    *status = AsyncOperationStatusType::Success;
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine updateFailoverPolicyHandler(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint16_t classification,
+    uint16_t identifier, uint8_t index)
+{
+    FailoverPolicyHandler handler;
+    co_return co_await handler.updateFailoverPolicy(
+        value, status, device, classification, identifier, index);
+}
+
 void NsmImageCopy::setImageCopyResult(std::shared_ptr<AsyncValueIntf> valueIntf,
                                       uint8_t cc, uint16_t reasonCode,
                                       ImageCopyRequestStatus status,

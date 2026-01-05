@@ -23,6 +23,7 @@
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 
+#include <com/nvidia/FailoverPolicy/server.hpp>
 #include <com/nvidia/ImageCopy/server.hpp>
 #include <com/nvidia/ImageCopyPolicy/server.hpp>
 #include <com/nvidia/InbandUpdatePolicy/server.hpp>
@@ -40,6 +41,8 @@ using namespace sdbusplus::common::xyz::openbmc_project::software;
 using namespace sdbusplus::server;
 using InbandUpdatePolicyIntf =
     object_t<sdbusplus::server::com::nvidia::InbandUpdatePolicy>;
+using FailoverPolicyIntf =
+    object_t<sdbusplus::server::com::nvidia::FailoverPolicy>;
 using ImageCopyIntf = object_t<sdbusplus::server::com::nvidia::ImageCopy>;
 using ImageCopyPolicyIntf =
     object_t<sdbusplus::server::com::nvidia::ImageCopyPolicy>;
@@ -130,6 +133,92 @@ class InbandUpdatePolicyHandler : public StateChangeLogger
  * interface.
  */
 requester::Coroutine updateInbandUpdatePolicyHandler(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint16_t classification,
+    uint16_t identifier, uint8_t index);
+
+class NsmFailoverPolicy : public FailoverPolicyIntf, public StateChangeLogger
+{
+  public:
+    NsmFailoverPolicy(sdbusplus::bus::bus& bus, const std::string& objPath,
+                      const uuid_t& uuidIn, uint16_t classificationIn,
+                      uint16_t identifierIn, uint8_t indexIn,
+                      NsmSensor& nsmSensor) :
+        FailoverPolicyIntf(bus, objPath.c_str()), uuid(uuidIn),
+        classification(classificationIn), identifier(identifierIn),
+        index(indexIn), nsmSensor(nsmSensor)
+    {}
+
+    virtual ~NsmFailoverPolicy() = default;
+
+    void updateProperties(
+        const struct ::nsm_firmware_erot_state_info_resp& erot_info);
+
+  private:
+    uuid_t uuid;
+    uint16_t classification;
+    uint16_t identifier;
+    uint8_t index;
+    NsmSensor& nsmSensor;
+};
+
+/**
+ * @brief Object class for Global Failover Policy that inherits from NsmSensor
+ */
+class NsmFailoverPolicyObject : public NsmSensor
+{
+  private:
+    std::string getPath(const std::string& chassisName)
+    {
+        return std::string(chassisInventoryBasePath) + "/" + chassisName;
+    }
+
+  public:
+    NsmFailoverPolicyObject(sdbusplus::bus::bus& bus,
+                            const std::string& chassisName, const uuid_t& uuid,
+                            uint16_t classificationIn, uint16_t identifierIn,
+                            uint8_t indexIn);
+
+    NsmFailoverPolicyObject() = delete;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::string objectPath;
+    std::unique_ptr<NsmFailoverPolicy> nsmFailoverPolicy;
+    uint16_t classification;
+    uint16_t identifier;
+    uint8_t index;
+};
+
+/**
+ * @brief Handler class for async Failover Policy operation
+ * This class is used to handle writes to the FailoverPolicy property
+ * on the FailoverPolicy D-Bus interface. It inherits from StateChangeLogger
+ * to enable state-aware logging.
+ */
+class FailoverPolicyHandler : public StateChangeLogger
+{
+  public:
+    FailoverPolicyHandler() = default;
+    virtual ~FailoverPolicyHandler() = default;
+
+    requester::Coroutine updateFailoverPolicy(
+        const AsyncSetOperationValueType& value,
+        AsyncOperationStatusType* status, std::shared_ptr<NsmDevice> device,
+        uint16_t classification, uint16_t identifier, uint8_t index);
+};
+
+/**
+ * @brief Standalone wrapper for async Failover Policy operation
+ * This function is registered with addAsyncSetOperation to handle
+ * writes to the FailoverPolicy property via com.nvidia.Async.Set.
+ */
+requester::Coroutine updateFailoverPolicyHandler(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device, uint16_t classification,
     uint16_t identifier, uint8_t index);
