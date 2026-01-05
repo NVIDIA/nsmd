@@ -1,4 +1,5 @@
 sources += [
+    'nsmDebugToken/debugTokenUtils.cpp',
     'nsmDebugToken/nsmDebugTokenAggregation.cpp',
     'nsmDebugToken/nsmDebugTokenNIC.cpp',
     'nsmDebugToken/nsmDebugTokenObjectFactory.cpp',

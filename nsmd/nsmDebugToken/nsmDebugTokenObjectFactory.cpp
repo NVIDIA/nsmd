@@ -70,6 +70,12 @@ static requester::Coroutine createNsmDebugToken(SensorManager& manager,
     {
         uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
     }
+    std::string debugTokenDeviceType{};
+    if (allCurrentIfaceProperties.count("DebugTokenDeviceType"))
+    {
+        debugTokenDeviceType = std::get<std::string>(
+            allCurrentIfaceProperties.at("DebugTokenDeviceType"));
+    }
 
     auto device = manager.getNsmDeviceFromStaticUUID(uuid);
     if (std::find(debugTokenType.begin(), debugTokenType.end(), "NIC") !=
@@ -83,7 +89,7 @@ static requester::Coroutine createNsmDebugToken(SensorManager& manager,
         debugTokenType.end())
     {
         auto object = std::make_shared<NsmDebugTokenUnifiedObject>(
-            bus, chassisName, uuid);
+            bus, chassisName, uuid, debugTokenDeviceType);
         device->addSensor(object, PollingType::RoundRobin);
         manager.debugTokenList.push_back(object);
     }

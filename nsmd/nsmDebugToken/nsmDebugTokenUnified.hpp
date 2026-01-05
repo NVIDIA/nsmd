@@ -22,6 +22,7 @@
 #include "types.hpp"
 
 #include <com/nvidia/DebugToken/Action/server.hpp>
+#include <com/nvidia/DebugToken/Common/server.hpp>
 #include <com/nvidia/DebugToken/Status/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 
@@ -61,9 +62,11 @@ class NsmDebugTokenUnifiedObject :
      * @param bus D-Bus bus interface for communication
      * @param name Object name for the debug token object instance
      * @param uuid Device UUID associated with this debug token object
+     * @param debugTokenDeviceType Device type from Entity Manager configuration
      */
     NsmDebugTokenUnifiedObject(sdbusplus::bus::bus& bus,
-                               const std::string& name, const uuid_t& uuid);
+                               const std::string& name, const uuid_t& uuid,
+                               const std::string& debugTokenDeviceType);
 
     /**
      * @brief Erases a debug token of the specified type
@@ -72,12 +75,18 @@ class NsmDebugTokenUnifiedObject :
      * device. The operation is performed asynchronously and returns immediately
      * with an object path for monitoring the operation status.
      *
-     * @param tokenType Type of the token to erase
+     * @param eraseType Type of erase operation (enum)
+     * @param tokenType Type of the token to erase (enum), used when eraseType
+     * is TokenType
      * @return Object path for monitoring the async operation status
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path eraseToken(uint32_t tokenType);
+    sdbusplus::message::object_path eraseToken(
+        sdbusplus::server::com::nvidia::debug_token::Action::EraseType
+            eraseType,
+        sdbusplus::server::com::nvidia::debug_token::Common::Types tokenType)
+        override;
 
     /**
      * @brief Installs a debug token from a file descriptor
@@ -244,5 +253,6 @@ class NsmDebugTokenUnifiedObject :
 
     uuid_t uuid;
     size_t installationChunkSize{0};
+    std::string deviceTypeStr; // Device type string for token mapping
 };
 } // namespace nsm

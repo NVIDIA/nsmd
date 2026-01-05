@@ -22,6 +22,7 @@
 #include "debug-token/tlv.h"
 #include "debug-token/types.h"
 
+#include "debugTokenUtils.hpp"
 #include "globals.hpp"
 #include "nsmDevice.hpp"
 #include "nsmSensor.hpp"
@@ -45,9 +46,9 @@
 namespace nsm
 {
 
-NsmDebugTokenUnifiedObject::NsmDebugTokenUnifiedObject(sdbusplus::bus::bus& bus,
-                                                       const std::string& name,
-                                                       const uuid_t& uuid) :
+NsmDebugTokenUnifiedObject::NsmDebugTokenUnifiedObject(
+    sdbusplus::bus::bus& bus, const std::string& name, const uuid_t& uuid,
+    const std::string& debugTokenDeviceType) :
     NsmObject(name, "NSM_DebugTokenUnified"),
     DebugTokenActionIntf(bus, (debugTokenObjectBasePath / name).c_str()),
     DebugTokenStatusIntf(bus, (debugTokenObjectBasePath / name).c_str()),
@@ -55,6 +56,8 @@ NsmDebugTokenUnifiedObject::NsmDebugTokenUnifiedObject(sdbusplus::bus::bus& bus,
 {
     lg2::info("DebugToken: create Unified object: {PATH}", "PATH",
               debugTokenObjectBasePath / name);
+
+    this->deviceTypeStr = debugTokenDeviceType;
 }
 
 requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
@@ -244,16 +247,49 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
-    NsmDebugTokenUnifiedObject::eraseToken(uint32_t tokenType)
+sdbusplus::message::object_path NsmDebugTokenUnifiedObject::eraseToken(
+    sdbusplus::server::com::nvidia::debug_token::Action::EraseType eraseType,
+    sdbusplus::server::com::nvidia::debug_token::Common::Types tokenType)
 {
+    using EraseTypeEnum =
+        sdbusplus::server::com::nvidia::debug_token::Action::EraseType;
+
+    uint32_t tokenTypeValue = 0;
+
+    switch (eraseType)
+    {
+        case EraseTypeEnum::TokenType:
+        {
+            tokenTypeValue = token_utils::tokenTypeToUint32(tokenType,
+                                                            deviceTypeStr);
+            if (tokenTypeValue == 0)
+            {
+                lg2::error(
+                    "DebugToken: Invalid or unsupported token type for erase: {TYPE}",
+                    "TYPE", sdbusplus::message::convert_to_string(tokenType));
+                throw Common::Error::InvalidArgument();
+            }
+            break;
+        }
+        case EraseTypeEnum::EraseAll:
+        {
+            tokenTypeValue = 0xFFFFFFFF;
+            break;
+        }
+        case EraseTypeEnum::EraseAllAndRatchetCounterIncreased:
+        {
+            tokenTypeValue = 0xFFFFFFFE;
+            break;
+        }
+    }
+
     const auto [objPath, statusIntf, valueIntf] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
     if (objPath.empty())
     {
         throw Common::Error::Unavailable();
     }
-    eraseTokenAsyncHandler(tokenType, statusIntf, valueIntf).detach();
+    eraseTokenAsyncHandler(tokenTypeValue, statusIntf, valueIntf).detach();
     return objPath;
 }
 
@@ -549,15 +585,29 @@ requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(
         }
         co_return NSM_SW_ERROR;
     }
-    std::vector<std::tuple<uint32_t, uint32_t>> tokenTypes;
+    using TokenTypeEnum =
+        sdbusplus::common::com::nvidia::debug_token::Common::Types;
+    using TokenSubtypeEnum =
+        sdbusplus::common::com::nvidia::debug_token::Common::SubTypes;
+
+    std::vector<std::tuple<TokenTypeEnum, std::vector<TokenSubtypeEnum>>>
+        tokenTypesEnum;
+
     auto tokenTypeItr = tokenTypesSubtypes.begin();
     while (tokenTypeItr != tokenTypesSubtypes.end())
     {
         auto type = *tokenTypeItr++;
         auto subtype = *tokenTypeItr++;
-        tokenTypes.push_back(std::make_tuple(type, subtype));
+
+        TokenTypeEnum typeEnum = token_utils::tokenTypeToEnum(type,
+                                                              deviceTypeStr);
+        std::vector<TokenSubtypeEnum> subtypeEnums =
+            token_utils::tokenSubtypeBitmapToEnumArray(type, subtype,
+                                                       deviceTypeStr);
+
+        tokenTypesEnum.push_back(std::make_tuple(typeEnum, subtypeEnums));
     }
-    tokenType(tokenTypes);
+    tokenType(tokenTypesEnum);
 
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
