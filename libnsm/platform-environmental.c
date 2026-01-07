@@ -6386,3 +6386,382 @@ int decode_get_workload_power_profile_info_data_resp(
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_get_leak_detection_info_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_leak_detection_info_req *request =
+	    (struct nsm_get_leak_detection_info_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_LEAK_DETECTION_INFO;
+	request->hdr.data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_leak_detection_info_req(const struct nsm_msg *msg,
+				       size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_leak_detection_info_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_leak_detection_info_req *request =
+	    (struct nsm_get_leak_detection_info_req *)msg->payload;
+
+	if (request->hdr.data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_leak_detection_info_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint8_t number_of_sensors, uint8_t number_of_threshold_levels,
+    uint8_t *sensors_data, size_t sensors_data_len, struct nsm_msg *msg)
+{
+	if (msg == NULL || sensors_data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_LEAK_DETECTION_INFO, msg);
+	}
+
+	struct nsm_get_leak_detection_info_resp *response =
+	    (struct nsm_get_leak_detection_info_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_LEAK_DETECTION_INFO;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(sizeof(number_of_sensors) +
+		    sizeof(number_of_threshold_levels) + sensors_data_len);
+	response->number_of_sensors = number_of_sensors;
+	response->number_of_threshold_levels = number_of_threshold_levels;
+
+	// Calculate each sensor expected data size
+	size_t expected_sensor_info_size =
+	    sizeof(uint8_t) + sizeof(uint8_t) +
+	    (number_of_threshold_levels * sizeof(uint16_t)) + sizeof(uint16_t);
+
+	if (sensors_data_len > 0) {
+		uint8_t *src_ptr = sensors_data;
+		uint8_t *dst_ptr = response->sensors_data;
+
+		// process each sensor data info
+		for (uint8_t i = 0; i < number_of_sensors; i++) {
+			struct nsm_leak_detection_sensors_data *curr_sensor =
+			    (struct nsm_leak_detection_sensors_data *)src_ptr;
+
+			*dst_ptr++ = curr_sensor->sensor_id;
+			*dst_ptr++ = curr_sensor->leak_state;
+
+			// Copy thresholds (uint16 array) with htole16
+			for (uint8_t j = 0; j < number_of_threshold_levels;
+			     j++) {
+				uint16_t threshold =
+				    htole16(curr_sensor->thresholds[j]);
+				memcpy(dst_ptr, &threshold, sizeof(uint16_t));
+				dst_ptr += sizeof(uint16_t);
+			}
+
+			// Copy adc_reading (uint16) with htole16
+			uint16_t adc_reading =
+			    htole16(curr_sensor->adc_reading);
+			memcpy(dst_ptr, &adc_reading, sizeof(uint16_t));
+			dst_ptr += sizeof(uint16_t);
+
+			src_ptr += expected_sensor_info_size;
+		}
+	}
+
+	return NSM_SUCCESS;
+}
+
+int decode_get_leak_detection_info_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code,
+					uint8_t *number_of_sensors,
+					uint8_t *number_of_threshold_levels,
+					uint8_t *sensors_data,
+					size_t *sensors_data_len)
+{
+	if (number_of_sensors == NULL || number_of_threshold_levels == NULL ||
+	    sensors_data == NULL || sensors_data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_leak_detection_info_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_leak_detection_info_resp *response =
+	    (struct nsm_get_leak_detection_info_resp *)msg->payload;
+
+	*number_of_sensors = response->number_of_sensors;
+	*number_of_threshold_levels = response->number_of_threshold_levels;
+	uint16_t data_size = le16toh(response->hdr.data_size);
+	*sensors_data_len = data_size - sizeof(response->number_of_sensors) -
+			    sizeof(response->number_of_threshold_levels);
+
+	// Calculate each sensor expected data size
+	size_t expected_sensor_info_size =
+	    sizeof(uint8_t) + sizeof(uint8_t) +
+	    (*number_of_threshold_levels * sizeof(uint16_t)) + sizeof(uint16_t);
+
+	if (*sensors_data_len <
+	    (*number_of_sensors * expected_sensor_info_size)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	if (*sensors_data_len > 0) {
+		uint8_t *src_ptr = response->sensors_data;
+		uint8_t *dst_ptr = sensors_data;
+
+		// process each sensor data info
+		for (uint8_t i = 0; i < *number_of_sensors; i++) {
+			struct nsm_leak_detection_sensors_data *curr_sensor =
+			    (struct nsm_leak_detection_sensors_data *)dst_ptr;
+
+			curr_sensor->sensor_id = *src_ptr++;
+			curr_sensor->leak_state = *src_ptr++;
+
+			// Copy thresholds (uint16 array) with le16toh
+			for (uint8_t j = 0; j < *number_of_threshold_levels;
+			     j++) {
+				uint16_t threshold;
+				memcpy(&threshold, src_ptr, sizeof(uint16_t));
+				curr_sensor->thresholds[j] = le16toh(threshold);
+				src_ptr += sizeof(uint16_t);
+			}
+
+			// Copy adc_reading (uint16) with le16toh
+			uint16_t adc_reading;
+			memcpy(&adc_reading, src_ptr, sizeof(uint16_t));
+			curr_sensor->adc_reading = le16toh(adc_reading);
+			src_ptr += sizeof(uint16_t);
+
+			dst_ptr += expected_sensor_info_size;
+		}
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_leak_detection_thresholds_req(uint8_t instance_id,
+					     uint8_t number_of_sensors,
+					     uint8_t number_of_threshold_levels,
+					     uint8_t *thresholds_data,
+					     size_t thresholds_data_len,
+					     struct nsm_msg *msg)
+{
+	if (msg == NULL || thresholds_data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_leak_detection_thresholds_req *request =
+	    (struct nsm_set_leak_detection_thresholds_req *)msg->payload;
+
+	size_t data_size =
+	    sizeof(request->number_of_sensors) +
+	    sizeof(request->number_of_threshold_levels) +
+	    ((number_of_sensors * (number_of_threshold_levels + 1)) *
+	     sizeof(uint16_t));
+
+	request->hdr.command = NSM_SET_LEAK_DETECTION_THRESHOLDS;
+	request->hdr.data_size = (uint8_t)data_size;
+	request->number_of_sensors = number_of_sensors;
+	request->number_of_threshold_levels = number_of_threshold_levels;
+
+	// Calculate each sensor expected data size
+	size_t expected_sensor_info_size =
+	    sizeof(struct nsm_leak_detection_thresholds_data) +
+	    ((number_of_threshold_levels - 1) * sizeof(uint16_t));
+
+	// Validate thresholds_data_len matches expected size
+	size_t expected_total_size =
+	    expected_sensor_info_size * number_of_sensors;
+	if (thresholds_data_len < expected_total_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	// Copy thresholds data with byte order conversion
+	uint8_t *src_ptr = thresholds_data;
+	uint8_t *dst_ptr = request->thresholds_data;
+
+	for (uint8_t i = 0; i < number_of_sensors; i++) {
+		struct nsm_leak_detection_thresholds_data *src_sensor =
+		    (struct nsm_leak_detection_thresholds_data *)src_ptr;
+		struct nsm_leak_detection_thresholds_data *dst_sensor =
+		    (struct nsm_leak_detection_thresholds_data *)dst_ptr;
+
+		dst_sensor->sensor_id = src_sensor->sensor_id;
+		dst_sensor->reserved = 0;
+
+		for (uint8_t j = 0; j < number_of_threshold_levels; j++) {
+			dst_sensor->thresholds[j] =
+			    htole16(src_sensor->thresholds[j]);
+		}
+
+		src_ptr += expected_sensor_info_size;
+		dst_ptr += expected_sensor_info_size;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_leak_detection_thresholds_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *number_of_sensors,
+    uint8_t *number_of_threshold_levels, uint8_t *thresholds_data,
+    size_t *thresholds_data_len)
+{
+	if (msg == NULL || number_of_sensors == NULL ||
+	    number_of_threshold_levels == NULL || thresholds_data == NULL ||
+	    thresholds_data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_set_leak_detection_thresholds_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_leak_detection_thresholds_req *request =
+	    (struct nsm_set_leak_detection_thresholds_req *)msg->payload;
+
+	*number_of_sensors = request->number_of_sensors;
+	*number_of_threshold_levels = request->number_of_threshold_levels;
+
+	// Calculate each sensor expected data size
+	size_t expected_sensor_info_size =
+	    sizeof(struct nsm_leak_detection_thresholds_data) +
+	    ((*number_of_threshold_levels - 1) * sizeof(uint16_t));
+
+	*thresholds_data_len = *number_of_sensors * expected_sensor_info_size;
+
+	// Extract thresholds data with byte order conversion
+	uint8_t *src_ptr = request->thresholds_data;
+	uint8_t *dst_ptr = thresholds_data;
+
+	for (uint8_t i = 0; i < *number_of_sensors; i++) {
+		struct nsm_leak_detection_thresholds_data *src_sensor =
+		    (struct nsm_leak_detection_thresholds_data *)src_ptr;
+		struct nsm_leak_detection_thresholds_data *dst_sensor =
+		    (struct nsm_leak_detection_thresholds_data *)dst_ptr;
+
+		dst_sensor->sensor_id = src_sensor->sensor_id;
+		dst_sensor->reserved = 0;
+
+		for (uint8_t j = 0; j < *number_of_threshold_levels; j++) {
+			dst_sensor->thresholds[j] =
+			    le16toh(src_sensor->thresholds[j]);
+		}
+
+		src_ptr += expected_sensor_info_size;
+		dst_ptr += expected_sensor_info_size;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_leak_detection_thresholds_resp(uint8_t instance_id, uint8_t cc,
+					      uint16_t reason_code,
+					      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_SET_LEAK_DETECTION_THRESHOLDS, msg);
+	}
+
+	struct nsm_set_leak_detection_thresholds_resp *response =
+	    (struct nsm_set_leak_detection_thresholds_resp *)msg->payload;
+
+	response->hdr.command = NSM_SET_LEAK_DETECTION_THRESHOLDS;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(0);
+
+	return NSM_SUCCESS;
+}
+
+int decode_set_leak_detection_thresholds_resp(const struct nsm_msg *msg,
+					      size_t msg_len, uint8_t *cc,
+					      uint16_t *reason_code)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_set_leak_detection_thresholds_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	return NSM_SW_SUCCESS;
+}

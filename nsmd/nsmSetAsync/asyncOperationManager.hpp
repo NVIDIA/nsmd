@@ -49,7 +49,7 @@ using AsyncSetOperationValueType = std::variant<
     bool, uint8_t, uint16_t, int16_t, uint32_t, int32_t, uint64_t, int64_t,
     double, std::string, std::vector<uint8_t>, std::tuple<bool, uint32_t>,
     std::vector<std::tuple<std::string, uint32_t>>,
-    std::vector<std::tuple<std::string, std::variant<bool, uint32_t>>>>;
+    std::vector<std::tuple<std::string, std::variant<bool, uint32_t, double>>>>;
 using AsyncCallOperationValueType = AsyncSetOperationValueType;
 
 using AsyncSetOperationHandler = std::function<requester::Coroutine(
