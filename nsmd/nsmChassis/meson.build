@@ -31,6 +31,7 @@ valid_chassis = [
     'power-subsystem',
     'write-protected-jumper',
     'aer-error',
+    'leak-detection',
     'erot',
     'security-rbp',
     'processor-module-power-control',
@@ -101,6 +102,9 @@ if include_all_chassis or include_chassis_list.contains('write-protected-jumper'
 endif
 if include_all_chassis or include_chassis_list.contains('aer-error')
     sources += ['nsmChassis/nsmAERError.cpp']
+endif
+if include_all_chassis or include_chassis_list.contains('leak-detection')
+    sources += ['nsmChassis/nsmLeakDetection.cpp']
 endif
 if include_all_chassis or include_chassis_list.contains('erot')
     sources += ['nsmChassis/nsmErot.cpp', 'nsmChassis/nsmRoTProperty.cpp']

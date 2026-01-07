@@ -547,6 +547,8 @@ std::optional<Response>
                     return getRowRemappingCountsHandler(request, requestLen);
                 case NSM_GET_ROW_REMAP_AVAILABILITY:
                     return getRowRemapAvailabilityHandler(request, requestLen);
+                case NSM_GET_LEAK_DETECTION_INFO:
+                    return getLeakDetectionInfoHandler(request, requestLen);
                 case NSM_GET_MEMORY_CAPACITY_UTILIZATION:
                     return getMemoryCapacityUtilHandler(request, requestLen,
                                                         true, longRunningEvent);
@@ -5115,6 +5117,77 @@ std::optional<std::vector<uint8_t>>
                    "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getLeakDetectionInfoHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    auto rc = decode_get_leak_detection_info_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_leak_detection_info_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    // Mock data: 2 sensors with 3 threshold levels each
+    constexpr uint8_t numberOfSensors = 2;
+    constexpr uint8_t numberOfThresholdLevels = 3;
+
+    // Calculate expected sensor info size
+    size_t expectedSensorInfoSize =
+        sizeof(uint8_t) + sizeof(uint8_t) +
+        (numberOfThresholdLevels * sizeof(uint16_t)) + sizeof(uint16_t);
+    size_t sensorsDataLen = numberOfSensors * expectedSensorInfoSize;
+
+    // Allocate buffer for sensors data
+    std::vector<uint8_t> sensorsDataBuf(sensorsDataLen, 0);
+
+    // Populate mock sensor data using the structure
+    uint8_t* ptr = sensorsDataBuf.data();
+    for (uint8_t i = 0; i < numberOfSensors; i++)
+    {
+        auto* sensor =
+            reinterpret_cast<struct nsm_leak_detection_sensors_data*>(ptr);
+        sensor->sensor_id = i;
+        sensor->leak_state =
+            (i == 0) ? 0 : 1; // First sensor no leak, second has leak
+        sensor->thresholds[0] = 100 + (i * 10); // Threshold 1
+        sensor->thresholds[1] = 200 + (i * 10); // Threshold 2
+        sensor->thresholds[2] = 300 + (i * 10); // Threshold 3
+        sensor->adc_reading = 150 + (i * 20);   // ADC reading
+        ptr += expectedSensorInfoSize;
+    }
+
+    // Calculate response size
+    size_t responseSize = sizeof(nsm_msg_hdr) +
+                          sizeof(nsm_get_leak_detection_info_resp) - 1 +
+                          sensorsDataLen;
+    std::vector<uint8_t> response(responseSize, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_leak_detection_info_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, numberOfSensors,
+        numberOfThresholdLevels, sensorsDataBuf.data(), sensorsDataLen,
+        responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_leak_detection_info_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info(
+            "getLeakDetectionInfoHandler: numberOfSensors={NS}, numberOfThresholdLevels={NTL}",
+            "NS", numberOfSensors, "NTL", numberOfThresholdLevels);
+    }
+
     return response;
 }
 

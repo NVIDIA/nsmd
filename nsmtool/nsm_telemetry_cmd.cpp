@@ -4144,6 +4144,209 @@ class GetRowRemapAvailability : public CommandInterface
     }
 };
 
+class GetLeakDetectionInfo : public CommandInterface
+{
+  public:
+    ~GetLeakDetectionInfo() = default;
+    GetLeakDetectionInfo() = delete;
+    GetLeakDetectionInfo(const GetLeakDetectionInfo&) = delete;
+    GetLeakDetectionInfo(GetLeakDetectionInfo&&) = default;
+    GetLeakDetectionInfo& operator=(const GetLeakDetectionInfo&) = delete;
+    GetLeakDetectionInfo& operator=(GetLeakDetectionInfo&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_leak_detection_info_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_leak_detection_info_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint8_t numberOfSensors = 0;
+        uint8_t numberOfThresholdLevels = 0;
+        uint16_t reason_code = ERR_NULL;
+
+        // Allocate buffer large enough for sensors data
+        std::vector<uint8_t> sensorsData(payloadLength, 0);
+        size_t sensorsDataLen = sensorsData.size();
+
+        auto rc = decode_get_leak_detection_info_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &numberOfSensors,
+            &numberOfThresholdLevels, sensorsData.data(), &sensorsDataLen);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reason_code)
+                      << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["NumberOfSensors"] = numberOfSensors;
+        result["NumberOfThresholdLevels"] = numberOfThresholdLevels;
+
+        // Parse each sensor's data
+        size_t expectedSensorInfoSize =
+            sizeof(uint8_t) + sizeof(uint8_t) +
+            (numberOfThresholdLevels * sizeof(uint16_t)) + sizeof(uint16_t);
+        uint8_t* ptr = sensorsData.data();
+
+        ordered_json sensorsArray = ordered_json::array();
+        for (uint8_t i = 0; i < numberOfSensors; i++)
+        {
+            auto* sensor =
+                reinterpret_cast<struct nsm_leak_detection_sensors_data*>(ptr);
+
+            ordered_json sensorJson;
+            sensorJson["SensorId"] = sensor->sensor_id;
+            sensorJson["LeakState"] = sensor->leak_state;
+            sensorJson["ADCReading"] =
+                static_cast<uint16_t>(sensor->adc_reading);
+
+            ordered_json thresholdsArray = ordered_json::array();
+            for (uint8_t j = 0; j < numberOfThresholdLevels; j++)
+            {
+                thresholdsArray.push_back(
+                    static_cast<uint16_t>(sensor->thresholds[j]));
+            }
+            sensorJson["Thresholds"] = thresholdsArray;
+            sensorJson["Unit"] = "mV";
+
+            sensorsArray.push_back(sensorJson);
+            ptr += expectedSensorInfoSize;
+        }
+        result["Sensors"] = sensorsArray;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
+class SetLeakDetectionThresholds : public CommandInterface
+{
+  public:
+    ~SetLeakDetectionThresholds() = default;
+    SetLeakDetectionThresholds() = delete;
+    SetLeakDetectionThresholds(const SetLeakDetectionThresholds&) = delete;
+    SetLeakDetectionThresholds(SetLeakDetectionThresholds&&) = default;
+    SetLeakDetectionThresholds&
+        operator=(const SetLeakDetectionThresholds&) = delete;
+    SetLeakDetectionThresholds&
+        operator=(SetLeakDetectionThresholds&&) = default;
+
+    explicit SetLeakDetectionThresholds(const char* type, const char* name,
+                                        CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-s,--sensorId", sensorId, "Sensor ID")->required();
+        app->add_option("-n,--numberOfThresholds", numberOfThresholds,
+                        "Number of thresholds")
+            ->required();
+        app->add_option("-t,--thresholds", thresholds,
+                        "Array of threshold values in mV (e.g., 100 200 300)")
+            ->required()
+            ->expected(-1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        // Validate threshold count matches
+        if (thresholds.size() != static_cast<size_t>(numberOfThresholds))
+        {
+            std::cerr << "Error: Number of threshold values ("
+                      << thresholds.size()
+                      << ") does not match numberOfThresholds ("
+                      << static_cast<int>(numberOfThresholds) << ")\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        // Print all the input args to log
+        std::cout << "[SetLeakDetectionThresholds] SensorId: "
+                  << static_cast<int>(sensorId) << std::endl;
+        std::cout << "[SetLeakDetectionThresholds] NumberOfThresholds: "
+                  << static_cast<int>(numberOfThresholds) << std::endl;
+        std::cout << "[SetLeakDetectionThresholds] Thresholds (mV):";
+
+        for (const auto& value : thresholds)
+        {
+            std::cout << " " << value;
+        }
+        std::cout << std::endl;
+
+        // Calculate expected sensor info size (for single sensor)
+        size_t expectedSensorInfoSize =
+            sizeof(struct nsm_leak_detection_thresholds_data) +
+            ((numberOfThresholds - 1) * sizeof(uint16_t));
+        size_t thresholdsDataLen = expectedSensorInfoSize;
+
+        // Allocate buffer for thresholds data
+        std::vector<uint8_t> thresholdsData(thresholdsDataLen, 0);
+
+        // Populate thresholds data for single sensor
+        auto* sensor =
+            reinterpret_cast<struct nsm_leak_detection_thresholds_data*>(
+                thresholdsData.data());
+
+        sensor->sensor_id = sensorId;
+        sensor->reserved = 0;
+
+        for (uint8_t j = 0; j < numberOfThresholds; j++)
+        {
+            sensor->thresholds[j] = thresholds[j];
+        }
+
+        // Calculate request message size
+        size_t requestMsgSize =
+            sizeof(nsm_msg_hdr) +
+            sizeof(struct nsm_set_leak_detection_thresholds_req) - 1 +
+            thresholdsDataLen;
+
+        std::vector<uint8_t> requestMsg(requestMsgSize);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        // Use number_of_sensors = 1 for single sensor
+        auto rc = encode_set_leak_detection_thresholds_req(
+            instanceId, 1, numberOfThresholds, thresholdsData.data(),
+            thresholdsDataLen, request);
+
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+
+        auto rc = decode_set_leak_detection_thresholds_resp(
+            responsePtr, payloadLength, &cc, &reasonCode);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t sensorId = 0;
+    uint8_t numberOfThresholds = 0;
+    std::vector<uint16_t> thresholds;
+};
+
 class GetMemoryCapacityUtil : public CommandInterface
 {
   public:
@@ -6152,6 +6355,16 @@ void registerCommand(CLI::App& app)
         "GetRowRemapAvailability", "get Row Remapping Availability ");
     commands.push_back(std::make_unique<GetRowRemapAvailability>(
         "telemetry", "GetRowRemapAvailability", getRowRemapAvailability));
+
+    auto getLeakDetectionInfo = telemetry->add_subcommand(
+        "GetLeakDetectionInfo", "get Leak Detection Info");
+    commands.push_back(std::make_unique<GetLeakDetectionInfo>(
+        "telemetry", "GetLeakDetectionInfo", getLeakDetectionInfo));
+
+    auto setLeakDetectionThresholds = telemetry->add_subcommand(
+        "SetLeakDetectionThresholds", "set Leak Detection Thresholds");
+    commands.push_back(std::make_unique<SetLeakDetectionThresholds>(
+        "telemetry", "SetLeakDetectionThresholds", setLeakDetectionThresholds));
 
     auto getMemoryCapacityUtil = telemetry->add_subcommand(
         "GetMemoryCapacityUtil", "Get memory Capacity Capacity Utilization");

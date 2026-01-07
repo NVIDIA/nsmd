@@ -51,6 +51,8 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_MIG_MODE = 0x4d,
 	NSM_SET_CLOCK_LIMIT = 0x10,
 	NSM_GET_CLOCK_LIMIT = 0x11,
+	NSM_SET_LEAK_DETECTION_THRESHOLDS = 0x16,
+	NSM_GET_LEAK_DETECTION_INFO = 0x17,
 	NSM_GET_CURRENT_CLOCK_FREQUENCY = 0x0B,
 	NSM_GET_CLOCK_EVENT_REASON_CODES = 0x44,
 	NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME = 0x46,
@@ -786,6 +788,200 @@ struct nsm_get_row_remap_availability_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_row_remap_availability data;
 } __attribute__((packed));
+/** @enum nsm_leak_state
+ *
+ *  Enum representing the state of leak detection sensor.
+ */
+enum nsm_leak_state {
+	NSM_LEAK_STATE_NOMINAL_READING = 0,
+	NSM_LEAK_STATE_LEAK = 1,
+	NSM_LEAK_STATE_SENSOR_SHORT = 2,
+	NSM_LEAK_STATE_SENSOR_OPEN = 3
+};
+
+/** @enum nsm_leak_threshold_level
+ *
+ *  Enum representing the level of leak detection threshold.
+ */
+enum nsm_leak_threshold_level {
+	NSM_LEAK_THRESHOLD_LEVEL_MIN_LEAK = 0,
+	NSM_LEAK_THRESHOLD_LEVEL_MAX_LEAK = 1,
+	NSM_LEAK_THRESHOLD_LEVEL_MAX_NORMAL = 2
+};
+/** @struct nsm_get_leak_detection_info_req
+ *
+ *  Structure representing NSM get leak detection info request.
+ */
+struct nsm_get_leak_detection_info_req {
+	struct nsm_common_req hdr;
+} __attribute__((packed));
+
+/** @struct nsm_leak_detection_sensors_data
+ *
+ *  Structure representing NSM leak detection sensors data.
+ */
+struct nsm_leak_detection_sensors_data {
+	uint8_t sensor_id;
+	uint8_t leak_state;
+	uint16_t adc_reading;
+	uint16_t thresholds[1];
+} __attribute__((packed));
+
+/** @struct nsm_get_leak_detection_info_resp
+ *
+ *  Structure representing NSM get leak detection info response.
+ */
+struct nsm_get_leak_detection_info_resp {
+	struct nsm_common_resp hdr;
+	uint8_t number_of_sensors;
+	uint8_t number_of_threshold_levels;
+	uint8_t sensors_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_leak_detection_thresholds_data
+ *
+ *  Structure representing NSM leak detection thresholds data.
+ */
+struct nsm_leak_detection_thresholds_data {
+	uint8_t sensor_id;
+	uint8_t reserved;
+	uint16_t thresholds[1];
+} __attribute__((packed));
+
+/** @struct nsm_set_leak_detection_thresholds_req
+ *
+ *  Structure representing NSM set leak detection thresholds request.
+ */
+struct nsm_set_leak_detection_thresholds_req {
+	struct nsm_common_req hdr;
+	uint8_t number_of_sensors;
+	uint8_t number_of_threshold_levels;
+	uint8_t thresholds_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_set_leak_detection_thresholds_resp
+ *
+ *  Structure representing NSM set leak detection thresholds response.
+ */
+struct nsm_set_leak_detection_thresholds_resp {
+	struct nsm_common_resp hdr;
+} __attribute__((packed));
+
+/** @brief Encode a Get Leak Detection Info request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_leak_detection_info_req(uint8_t instance_id,
+				       struct nsm_msg *msg);
+
+/** @brief Decode a Get Leak Detection Info request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_leak_detection_info_req(const struct nsm_msg *msg,
+				       size_t msg_len);
+
+/** @brief Encode a Get Leak Detection Info response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] number_of_sensors - Number of leak detection sensors
+ *  @param[in] number_of_threshold_levels - Number of threshold levels per
+ * sensor
+ *  @param[in] sensors_data - Pointer to sensors data array
+ *  @param[in] sensors_data_len - Length of sensors data in bytes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_leak_detection_info_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint8_t number_of_sensors, uint8_t number_of_threshold_levels,
+    uint8_t *sensors_data, size_t sensors_data_len, struct nsm_msg *msg);
+
+/** @brief Decode a Get Leak Detection Info response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Pointer to response message completion code
+ *  @param[out] reason_code - Pointer to reason code
+ *  @param[out] number_of_sensors - Pointer to number of leak detection sensors
+ *  @param[out] number_of_threshold_levels - Pointer to number of threshold
+ * levels
+ *  @param[out] sensors_data - Buffer to store decoded sensor data
+ *  @param[out] sensors_data_len - On input, size of buffer; on output, bytes
+ * written
+ *  @return nsm_completion_codes
+ */
+int decode_get_leak_detection_info_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code,
+					uint8_t *number_of_sensors,
+					uint8_t *number_of_threshold_levels,
+					uint8_t *sensors_data,
+					size_t *sensors_data_len);
+
+/** @brief Encode a Set Leak Detection Thresholds request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] number_of_sensors - Number of sensors
+ *  @param[in] number_of_threshold_levels - Number of threshold levels
+ *  @param[in] thresholds_data - Pointer to thresholds data array
+ *  @param[in] thresholds_data_len - Length of thresholds data in bytes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_leak_detection_thresholds_req(uint8_t instance_id,
+					     uint8_t number_of_sensors,
+					     uint8_t number_of_threshold_levels,
+					     uint8_t *thresholds_data,
+					     size_t thresholds_data_len,
+					     struct nsm_msg *msg);
+
+/** @brief Decode a Set Leak Detection Thresholds request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] number_of_sensors - Pointer to number of sensors
+ *  @param[out] number_of_threshold_levels - Pointer to number of threshold
+ * levels
+ *  @param[out] thresholds_data - Buffer to store decoded thresholds data
+ *  @param[out] thresholds_data_len - On input, size of buffer; on output, bytes
+ * written
+ *  @return nsm_completion_codes
+ */
+int decode_set_leak_detection_thresholds_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *number_of_sensors,
+    uint8_t *number_of_threshold_levels, uint8_t *thresholds_data,
+    size_t *thresholds_data_len);
+
+/** @brief Encode a Set Leak Detection Thresholds response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_leak_detection_thresholds_resp(uint8_t instance_id, uint8_t cc,
+					      uint16_t reason_code,
+					      struct nsm_msg *msg);
+
+/** @brief Decode a Set Leak Detection Thresholds response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Pointer to response message completion code
+ *  @param[out] reason_code - Pointer to reason code
+ *  @return nsm_completion_codes
+ */
+int decode_set_leak_detection_thresholds_resp(const struct nsm_msg *msg,
+					      size_t msg_len, uint8_t *cc,
+					      uint16_t *reason_code);
 
 #ifdef ENABLE_GRACE_SPI_OPERATIONS
 /** @brief Encode a spi command request

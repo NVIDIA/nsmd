@@ -638,6 +638,9 @@ class MockupResponder
         dotGetInfoHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         dotGetStatusHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getLeakDetectionInfoHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
 
   private:
     std::optional<Response>
