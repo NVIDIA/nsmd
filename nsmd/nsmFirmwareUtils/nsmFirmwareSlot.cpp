@@ -87,13 +87,17 @@ void NsmFirmwareSlot::update(
     const struct ::nsm_firmware_erot_state_info_hdr_resp& fq_resp_hdr)
 {
     static constexpr FirmwareState stateTbl[] = {
-        FirmwareState::Unknown,
-        FirmwareState::Activated,
-        FirmwareState::PendingActivation,
-        FirmwareState::Staged,
-        FirmwareState::WriteInProgress,
-        FirmwareState::Inactive,
-        FirmwareState::FailedAuthentication};
+        FirmwareState::Unknown,              // 0
+        FirmwareState::Activated,            // 1
+        FirmwareState::PendingActivation,    // 2
+        FirmwareState::Staged,               // 3
+        FirmwareState::WriteInProgress,      // 4
+        FirmwareState::Inactive,             // 5
+        FirmwareState::FailedAuthentication, // 6
+        FirmwareState::ImageCopyPending,     // 7
+        FirmwareState::ImageCopyInProgress,  // 8
+        FirmwareState::ImageCopyFailed       // 9
+    };
     FirmwareBuildType btype = info.build_type == 0
                                   ? FirmwareBuildType::Development
                                   : FirmwareBuildType::Release;
