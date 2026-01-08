@@ -41,14 +41,20 @@ using UpdateSKUIntf = object_t<sdbusplus::server::com::nvidia::UpdateSKU>;
  * to determine if the chassis supports SKU update operations via
  * com.nvidia.Async.Set on the SKU property.
  */
-class NsmUpdateApSkuIdIntf : public UpdateSKUIntf
+class NsmUpdateApSkuIdIntf : public NsmObject
 {
   public:
-    NsmUpdateApSkuIdIntf(sdbusplus::bus::bus& bus, const char* path) :
-        UpdateSKUIntf(bus, path)
+    NsmUpdateApSkuIdIntf(sdbusplus::bus::bus& bus, const std::string& name,
+                         const std::string& type,
+                         const std::string& inventoryObjPath) :
+        NsmObject(name, type), updateSkuIntf(std::make_unique<UpdateSKUIntf>(
+                                   bus, inventoryObjPath.c_str()))
     {}
 
     virtual ~NsmUpdateApSkuIdIntf() = default;
+
+  private:
+    std::unique_ptr<UpdateSKUIntf> updateSkuIntf;
 };
 
 /**

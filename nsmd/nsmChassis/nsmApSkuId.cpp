@@ -40,7 +40,8 @@ ApSkuIdConfiguration::ApSkuIdConfiguration(
 NsmApSkuIdObject::NsmApSkuIdObject(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const uuid_t& uuidIn, std::shared_ptr<ProgressIntf> progressIntfIn,
-    uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn) :
+    uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn,
+    const std::vector<utils::Association>& associations) :
     NsmSensor(name, type), objectPath(getPath(name)),
     classification(classificationIn), identifier(identifierIn), index(indexIn)
 {
@@ -48,11 +49,31 @@ NsmApSkuIdObject::NsmApSkuIdObject(
               objectPath.c_str());
     apSkuIdObject = std::make_unique<ApSkuIdConfiguration>(
         bus, objectPath, uuidIn, progressIntfIn, *this);
+
+    if (!associations.empty())
+    {
+        std::vector<utils::Association> filteredAssociations;
+        for (const auto& assoc : associations)
+        {
+            if (assoc.forward == "inventory_SKU")
+            {
+                filteredAssociations.push_back(assoc);
+            }
+        }
+
+        if (!filteredAssociations.empty())
+        {
+            associationDefinitionsIntf =
+                std::make_unique<AssociationDefinitionsIntf>(
+                    bus, objectPath.c_str());
+            associationDefinitionsIntf->associations(
+                utils::getAssociations(filteredAssociations));
+        }
+    }
 }
 
 std::optional<std::vector<uint8_t>>
-    NsmApSkuIdObject::genRequestMsg(__attribute__((unused)) eid_t eid,
-                                    uint8_t instanceId)
+    NsmApSkuIdObject::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_firmware_get_erot_state_info_req));
@@ -94,7 +115,6 @@ uint8_t NsmApSkuIdObject::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     uint32_t apSkuIdValue = erot_info.fq_resp_hdr.ap_sku_id;
 
-    // Format SKU as hex string and update the D-Bus interface property
     std::string apSkuIdStr = formatApSkuId(apSkuIdValue);
     apSkuIdObject->sku(apSkuIdStr);
 

@@ -167,6 +167,34 @@ requester::Coroutine parseSlots(const std::string& path, uint64_t slotCount,
         {
             slot.isRoT = std::get<bool>(allSlotIfaceProperties.at("IsRoT"));
         }
+        slot.reportSkuWithNsm = false;
+        if (allSlotIfaceProperties.count("ReportSkuWithNsm"))
+        {
+            slot.reportSkuWithNsm =
+                std::get<bool>(allSlotIfaceProperties.at("ReportSkuWithNsm"));
+        }
+
+        slot.enableUpdateSKU = false;
+        if (allSlotIfaceProperties.count("SetRotPropertyList"))
+        {
+            try
+            {
+                auto propertyList = std::get<std::vector<std::string>>(
+                    allSlotIfaceProperties.at("SetRotPropertyList"));
+
+                if (std::find(propertyList.begin(), propertyList.end(),
+                              "AP_SKU_ID") != propertyList.end())
+                {
+                    slot.enableUpdateSKU = true;
+                }
+            }
+            catch (const std::exception& e)
+            {
+                lg2::error(
+                    "Failed to parse SetRotPropertyList for slot:{SLOT}: {ERROR}",
+                    "SLOT", slot.slotName, "ERROR", e.what());
+            }
+        }
 
         if (slot.fwType == "EC")
         {
@@ -260,8 +288,11 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
         std::map<std::string, std::shared_ptr<NsmMinSecVersionObject>>
             apMinSecVersionMap;
 
-        std::shared_ptr<NsmApSkuIdObject> skuIdSensor = nullptr;
-        std::shared_ptr<NsmUpdateApSkuIdIntf> updateSkuIntf = nullptr;
+        std::map<std::string, std::shared_ptr<NsmApSkuIdObject>>
+            apSkuIdSensorMap;
+        std::map<std::string, std::shared_ptr<NsmUpdateApSkuIdIntf>>
+            apUpdateSkuIntfMap;
+
         std::shared_ptr<NsmBuildTypeObject> ecFirmwareType = nullptr;
         std::shared_ptr<ProgressIntf> ecProgressIntf = nullptr;
         std::shared_ptr<NsmKeyMgmt> ecKeyMgmt = nullptr;
@@ -271,39 +302,6 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
         std::shared_ptr<NsmImageCopyPolicyObject> imageCopyPolicySensor =
             nullptr;
         std::shared_ptr<NsmImageCopyObject> imageCopyObject = nullptr;
-
-        // Check if SKU update is enabled by looking for "AP_SKU_ID" in
-        // SetRotPropertyList
-        bool enableUpdateSKU = false;
-        // Store AP component identification for SKU updates
-        uint16_t apClassification = 0;
-        uint16_t apIdentifier = 0;
-        uint8_t apIndex = 0;
-        bool apComponentFound = false;
-        if (allCurrentIfaceProperties.count("SetRotPropertyList"))
-        {
-            try
-            {
-                auto propertyList = std::get<std::vector<std::string>>(
-                    allCurrentIfaceProperties.at("SetRotPropertyList"));
-
-                // Check if "AP_SKU_ID" is present in the list
-                if (std::find(propertyList.begin(), propertyList.end(),
-                              "AP_SKU_ID") != propertyList.end())
-                {
-                    enableUpdateSKU = true;
-                    lg2::info(
-                        "SKU Update enabled for chassis:{CHASSIS} - AP_SKU_ID found in SetRotPropertyList",
-                        "CHASSIS", name);
-                }
-            }
-            catch (const std::exception& e)
-            {
-                lg2::error(
-                    "Failed to parse SetRotPropertyList for chassis:{CHASSIS}: {ERROR}",
-                    "CHASSIS", name, "ERROR", e.what());
-            }
-        }
 
         std::vector<SlotInfo> allSlots;
         uint8_t parseRc = co_await parseSlots(path, slotCount, rotSlotInterface,
@@ -333,14 +331,6 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                             slot.identifier);
                 }
                 apFirmwareTypeMap[slotKey]->addSlotObject(slotObject);
-
-                if (!apComponentFound)
-                {
-                    apClassification = slot.classification;
-                    apIdentifier = slot.identifier;
-                    apIndex = static_cast<uint8_t>(slot.index);
-                    apComponentFound = true;
-                }
 
                 if (apProgressIntfMap.find(slot.chassisName) ==
                     apProgressIntfMap.end())
@@ -405,6 +395,51 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                     lg2::info(
                         "ImageCopyPolicy interface created successfully for chassis:{CHASSIS}",
                         "CHASSIS", name);
+                }
+                if (slot.reportSkuWithNsm &&
+                    apSkuIdSensorMap.find(slot.chassisName) ==
+                        apSkuIdSensorMap.end())
+                {
+                    apSkuIdSensorMap[slot.chassisName] =
+                        std::make_shared<NsmApSkuIdObject>(
+                            bus, slot.chassisName, type, uuid,
+                            apProgressIntfMap[slot.chassisName],
+                            slot.classification, slot.identifier,
+                            static_cast<uint8_t>(slot.index),
+                            slot.associations);
+                    device->addSensor(apSkuIdSensorMap[slot.chassisName],
+                                      PollingType::RoundRobin);
+                }
+
+                if (slot.enableUpdateSKU &&
+                    apUpdateSkuIntfMap.find(slot.chassisName) ==
+                        apUpdateSkuIntfMap.end())
+                {
+                    auto inventoryPath = std::string(chassisInventoryBasePath) +
+                                         "/" + slot.chassisName;
+                    lg2::info(
+                        "Creating UpdateSKU interface for chassis:{CHASSIS} path:{PATH} with AP component (class={CLASS}, id={ID}, idx={IDX})",
+                        "CHASSIS", slot.chassisName, "PATH", inventoryPath,
+                        "CLASS", slot.classification, "ID", slot.identifier,
+                        "IDX", static_cast<uint8_t>(slot.index));
+                    apUpdateSkuIntfMap[slot.chassisName] =
+                        std::make_shared<NsmUpdateApSkuIdIntf>(
+                            bus, slot.chassisName, type, inventoryPath);
+                    device->addDeviceSensors(
+                        apUpdateSkuIntfMap[slot.chassisName]);
+                    nsm::AsyncSetOperationHandler updateSkuHandler =
+                        std::bind(&updateApSkuIdHandler, std::placeholders::_1,
+                                  std::placeholders::_2, std::placeholders::_3,
+                                  slot.classification, slot.identifier,
+                                  static_cast<uint8_t>(slot.index));
+                    AsyncOperationManager::getInstance()
+                        ->getDispatcher(inventoryPath)
+                        ->addAsyncSetOperation(
+                            "xyz.openbmc_project.Inventory.Decorator.SKU",
+                            "SKU",
+                            AsyncSetOperationInfo{
+                                updateSkuHandler,
+                                apSkuIdSensorMap[slot.chassisName], device});
                 }
             }
             else // EC
@@ -519,56 +554,6 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
         auto securityCfg = std::make_shared<NsmSecurityCfgObject>(
             bus, name, type, uuid, rotProgressIntf);
         device->addSensor(securityCfg, PollingType::RoundRobin);
-
-        // Create SKU and Async.Set interface for chassis with SKU update
-        // enabled
-        if (apComponentFound && enableUpdateSKU)
-        {
-            if (skuIdSensor == nullptr)
-            {
-                skuIdSensor = std::make_shared<NsmApSkuIdObject>(
-                    bus, name, type, uuid, nullptr, apClassification,
-                    apIdentifier, apIndex);
-                device->addSensor(skuIdSensor, PollingType::RoundRobin);
-            }
-
-            if (updateSkuIntf == nullptr)
-            {
-                auto inventoryPath = std::string(chassisInventoryBasePath) +
-                                     "/" + name;
-                lg2::info(
-                    "Creating SKU Update interface for chassis:{CHASSIS} path:{PATH} with AP component (class={CLASS}, id={ID}, idx={IDX})",
-                    "CHASSIS", name, "PATH", inventoryPath, "CLASS",
-                    apClassification, "ID", apIdentifier, "IDX", apIndex);
-                updateSkuIntf = std::make_shared<NsmUpdateApSkuIdIntf>(
-                    bus, inventoryPath.c_str());
-                nsm::AsyncSetOperationHandler updateSkuHandler =
-                    std::bind(&updateApSkuIdHandler, std::placeholders::_1,
-                              std::placeholders::_2, std::placeholders::_3,
-                              apClassification, apIdentifier, apIndex);
-                AsyncOperationManager::getInstance()
-                    ->getDispatcher(inventoryPath)
-                    ->addAsyncSetOperation(
-                        "xyz.openbmc_project.Inventory.Decorator.SKU", "SKU",
-                        AsyncSetOperationInfo{updateSkuHandler, skuIdSensor,
-                                              device});
-                lg2::info(
-                    "SKU Update interface created successfully for chassis:{CHASSIS}",
-                    "CHASSIS", name);
-            }
-        }
-        else if (enableUpdateSKU && !apComponentFound)
-        {
-            lg2::warning(
-                "SKU Update enabled but no AP component found for chassis:{CHASSIS}",
-                "CHASSIS", name);
-        }
-        else if (!enableUpdateSKU)
-        {
-            lg2::info(
-                "SKU Update NOT enabled for chassis:{CHASSIS} (EnableUpdateSKU=false)",
-                "CHASSIS", name);
-        }
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;

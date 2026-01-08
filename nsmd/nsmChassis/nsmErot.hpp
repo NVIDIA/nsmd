@@ -40,6 +40,8 @@ struct SlotInfo
     std::vector<utils::Association> associations;
     std::string chassisName;
     bool isRoT = false;
+    bool reportSkuWithNsm = false;
+    bool enableUpdateSKU = false;
 };
 
 class NsmBuildTypeObject : public NsmSensor

@@ -24,6 +24,7 @@
 #include "utils.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
+#include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/Progress/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/SKU/server.hpp>
 
@@ -36,6 +37,7 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 using ApSkuIdIntf = object_t<Inventory::Decorator::server::SKU>;
 using ProgressIntf = object_t<Common::server::Progress>;
+using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
 
 class ApSkuIdConfiguration : public ApSkuIdIntf
 {
@@ -67,7 +69,8 @@ class NsmApSkuIdObject : public NsmSensor
                      const std::string& type, const uuid_t& uuid,
                      std::shared_ptr<ProgressIntf> progressIntfIn,
                      uint16_t classificationIn, uint16_t identifierIn,
-                     uint8_t indexIn);
+                     uint8_t indexIn,
+                     const std::vector<utils::Association>& associations);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -87,6 +90,7 @@ class NsmApSkuIdObject : public NsmSensor
   private:
     std::string objectPath;
     std::unique_ptr<ApSkuIdConfiguration> apSkuIdObject;
+    std::unique_ptr<AssociationDefinitionsIntf> associationDefinitionsIntf;
     uint16_t classification;
     uint16_t identifier;
     uint8_t index;

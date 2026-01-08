@@ -41,8 +41,16 @@ NsmFirmwareSlot::NsmFirmwareSlot(
 {
     lg2::info("NsmFirmwareSlot - {CHASSIS} - {SLOT}", "CHASSIS", chassisPath,
               "SLOT", slotNum);
+    std::vector<utils::Association> filteredAssociationsList;
+    for (const auto& association : associations)
+    {
+        if (association.forward == "software")
+        {
+            filteredAssociationsList.push_back(association);
+        }
+    }
     AssociationDefinitionsIntf::associations(
-        utils::getAssociations(associations));
+        utils::getAssociations(filteredAssociationsList));
     slotId(slotNum);
     type(fwType);
     extendedVersion("NA");
