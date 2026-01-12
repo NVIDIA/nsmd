@@ -443,9 +443,15 @@ class NsmDevice :
     }
 
     /** @brief mark the device as ready */
-    void changeDeviceReadyState(bool state)
+    void markDeviceAsReady()
     {
-        isDeviceReady = state;
+        isDeviceReady= true;
+    }
+
+    /** @brief mark the device as not ready */
+    void markDeviceAsNotReady()
+    {
+        isDeviceReady= false;
     }
 
     void initDeviceDiscovery()

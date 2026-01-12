@@ -244,7 +244,7 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
                     nsmDevice->staticSensors.push(sensor);
                 }
 
-                nsmDevice->changeDeviceReadyState(false);
+                nsmDevice->markDeviceAsNotReady();
             }
             checkAllDevicesReady();
         }
@@ -642,7 +642,7 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
         {
             // The Device isn't ready but we have found our first
             // refreshed sensor. Mark the device ready.
-            nsmDevice->changeDeviceReadyState(true);
+            nsmDevice->markDeviceAsReady();
             checkAllDevicesReady();
         }
 
@@ -689,7 +689,7 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
     // both cases.
     if (!sensors.hasSensorsToUpdate() && !nsmDevice->isReady())
     {
-        nsmDevice->changeDeviceReadyState(true);
+        nsmDevice->markDeviceAsReady();
         checkAllDevicesReady();
     }
 
