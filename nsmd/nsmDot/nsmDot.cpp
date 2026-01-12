@@ -48,7 +48,7 @@ constexpr uint32_t DOT_KEY_AUTH_SCHEME_HYBRID = 1;
 constexpr uint32_t DOT_LOCK_ENABLE = 0;
 constexpr uint32_t DOT_LOCK_DISABLE = 1;
 constexpr size_t DOT_SIGNATURE_ECDSA_SIZE = 96;
-constexpr size_t DOT_SIGNATURE_LMS_SIZE = 1744;
+constexpr size_t DOT_SIGNATURE_LMS_SIZE = 1740;
 constexpr size_t DOT_SIGNATURE_TOTAL_SIZE = 1840;
 constexpr uint8_t DOT_STATUS_MASK = 0x03;
 constexpr uint8_t DOT_STATUS_UNINITIALIZED = 0;
@@ -515,7 +515,7 @@ requester::Coroutine
 
     auto eid = device->getEid();
 
-    nsm_dot_lock_req dotReq;
+    nsm_dot_lock_req dotReq = {};
 
     if (!buildAndValidateCAKAuthData(params.cakKeyAuthScheme,
                                      params.cakEcdsaKey, params.cakLmsKey,
@@ -724,7 +724,25 @@ requester::Coroutine NsmDotObject::unlockChallengeAsyncHandler(
     auto eid = device->getEid();
 
     nsm_dot_unlock_challenge_req unlockChallengeReq;
-    unlockChallengeReq.unlock_type = static_cast<uint32_t>(unlockType);
+
+    if (unlockType == DotActionIntf::UnlockType::OwnerUnlock)
+    {
+        unlockChallengeReq.unlock_type = 1;
+    }
+    else if (unlockType == DotActionIntf::UnlockType::VendorUnlock)
+    {
+        unlockChallengeReq.unlock_type = 2;
+    }
+    else
+    {
+        lg2::error("Dot: Invalid unlock type: {TYPE}", "TYPE",
+                   static_cast<uint32_t>(unlockType));
+        statusIntf->status(AsyncOperationStatusType::InvalidArgument);
+        valueIntf->value(
+            std::make_tuple(static_cast<uint16_t>(NSM_ERR_INVALID_DATA),
+                            "Invalid unlock type"));
+        co_return NSM_ERR_INVALID_DATA;
+    }
 
     auto request = std::make_shared<Request>(
         sizeof(nsm_msg_hdr) + sizeof(nsm_dot_unlock_challenge_req_command));
@@ -838,7 +856,7 @@ requester::Coroutine NsmDotObject::unlockAsyncHandler(
 
     auto eid = device->getEid();
 
-    nsm_dot_unlock_req dotReq;
+    nsm_dot_unlock_req dotReq = {};
 
     if (!buildAndValidateSignatureData(unlockSignatureAuthScheme,
                                        ecdsaSignature, lmsSignature,
@@ -1123,7 +1141,7 @@ requester::Coroutine NsmDotObject::cakRotateAsyncHandler(
 
     auto eid = device->getEid();
 
-    nsm_dot_cak_rotate_req dotReq;
+    nsm_dot_cak_rotate_req dotReq = {};
 
     if (!buildAndValidateCAKAuthData(cakKeyAuthScheme, cakEcdsaKey, cakLmsKey,
                                      dotReq.new_cak, statusIntf, valueIntf))
