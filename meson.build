@@ -283,6 +283,39 @@ deps = [
     openssl_dep,
 ]
 
+#
+# Retry backoff configuration (single, unambiguous array option: [maxRetries, delayMs])
+#
+retry_backoff = get_option('retry-backoff')
+if retry_backoff.length() != 2
+    error('retry-backoff must have exactly two items: [maxRetries, delayMs]')
+endif
+
+max_retries = retry_backoff[0].to_int()
+delay_ms = retry_backoff[1].to_int()
+
+if max_retries < 0 or max_retries > 255
+    error('retry-backoff: maxRetries must be 0..255')
+endif
+if delay_ms < 1 or delay_ms > 4294967295
+    error('retry-backoff: delayMs must be 1..4294967295')
+endif
+
+retry_conf = configuration_data()
+retry_conf.set('RETRY_BACKOFF_MAX_RETRIES', max_retries)
+retry_conf.set('RETRY_BACKOFF_DELAY_MS', delay_ms)
+
+configure_file(
+    output: 'retry_backoff_config.h',
+    configuration: retry_conf
+)
+
+add_project_arguments(
+    '-include',
+    join_paths(meson.current_build_dir(), 'retry_backoff_config.h'),
+    language: ['c', 'cpp'],
+)
+
 if get_option('shmem').enabled() and not cx8_features
     nvidia_shmem = dependency('nvidia-tal', required: true)
     deps += nvidia_shmem

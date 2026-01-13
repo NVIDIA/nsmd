@@ -242,6 +242,13 @@ option(
 )
 
 option(
+    'retry-backoff',
+    type: 'array',
+    description: 'Constant-delay backoff as [maxRetries, delayMs]',
+    value: ['3', '300'] # defaults: 3 retries, 300ms delay
+)
+
+option(
     'enable-in-kernel-mctp',
     type: 'feature',
     value: 'disabled',

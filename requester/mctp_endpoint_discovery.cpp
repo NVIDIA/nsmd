@@ -24,6 +24,7 @@
 #include "dBusAsyncUtils.hpp"
 #include "nsmd/sensorManager.hpp"
 #include "progressCounters.hpp"
+#include <functional>
 
 #include <systemd/sd-bus.h>
 
@@ -50,6 +51,8 @@ MctpDiscovery::MctpDiscovery(
     sdbusplus::asio::object_server& objServer) :
     bus(bus), handler(handler), nsmMsgHandler(nsmMsgHandler),
     eidTable(eidTable), nsmDevices(nsmDevices), objServer(objServer),
+    prober(nsmMsgHandler, requester::retry::LinearBackoffConfig{},
+           std::bind_front(&MctpDiscovery::SendRecvNsmMsg, this)),
     mctpEndpointAddedSignal(
         bus,
         sdbusplus::bus::match::rules::interfacesAdded(
@@ -715,88 +718,16 @@ requester::Coroutine
 
 requester::Coroutine MctpDiscovery::ping(eid_t eid)
 {
-    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
-    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-
-    auto rc = encode_ping_req(DEFAULT_INSTANCE_ID, requestMsg);
-    if (rc != NSM_SW_SUCCESS)
-    {
-        lg2::error("ping failed. eid={EID} rc={RC}", "EID", eid, "RC",
-                   utils::nsmSwCodeToString(rc));
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
-    std::shared_ptr<const nsm_msg> respMsg;
-    size_t respLen = 0;
-    rc = co_await SendRecvNsmMsg(eid, request, respMsg, &respLen);
-    if (rc)
-    {
-        // coverity[missing_return]
-        co_return rc;
-    }
-
-    uint8_t cc = NSM_SUCCESS;
-    uint16_t reasonCode = ERR_NULL;
-    rc = decode_ping_resp(respMsg.get(), respLen, &cc, &reasonCode);
-    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
-    {
-        lg2::error(
-            "ping decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
-            "EID", eid, "CC", utils::nsmCompletionCodeToString(cc),
-            "REASONCODE", utils::nsmReasonCodeToString(reasonCode), "RC",
-            utils::nsmSwCodeToString(rc));
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return co_await prober.ping(eid);
 }
 
 requester::Coroutine MctpDiscovery::getQueryDeviceIdentification(
     eid_t eid, uint8_t& deviceIdentification, uint8_t& deviceInstance)
 {
-    Request request(sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_query_device_identification_req));
-    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    auto rc = encode_nsm_query_device_identification_req(DEFAULT_INSTANCE_ID,
-                                                         requestMsg);
-    if (rc != NSM_SW_SUCCESS)
-    {
-        lg2::error(
-            "encode_nsm_query_device_identification_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
-    std::shared_ptr<const nsm_msg> responseMsg;
-    size_t responseLen = 0;
-    rc = co_await SendRecvNsmMsg(eid, request, responseMsg, &responseLen);
-    if (rc)
-    {
-        // coverity[missing_return]
-        co_return rc;
-    }
-
-    uint8_t cc = NSM_SUCCESS;
-    uint16_t reasonCode = ERR_NULL;
-    rc = decode_query_device_identification_resp(
-        responseMsg.get(), responseLen, &cc, &reasonCode, &deviceIdentification,
-        &deviceInstance);
-    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
-    {
-        lg2::error(
-            "decode_query_device_identification_resp failed. eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
-            "EID", eid, "CC", utils::nsmCompletionCodeToString(cc),
-            "REASONCODE", utils::nsmReasonCodeToString(reasonCode), "RC",
-            utils::nsmSwCodeToString(rc));
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return co_await prober.getQueryDeviceIdentification(
+        eid, deviceIdentification, deviceInstance);
 }
 
 requester::Coroutine

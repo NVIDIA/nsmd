@@ -20,12 +20,16 @@
 #include "common/types.hpp"
 #include "nsmd/nsmDevice.hpp"
 #include "nsmd/socket_handler.hpp"
+#include "requester/retry_backoff_utils.hpp"
+#include "requester/mctp_endpoint_prober.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus/match.hpp>
 
+#include <map>
 #include <filesystem>
 #include <initializer_list>
+#include <optional>
 #include <vector>
 
 namespace mctp
@@ -108,6 +112,8 @@ class MctpDiscovery
     EidTable& eidTable;
     nsm::NsmDeviceTable& nsmDevices;
     sdbusplus::asio::object_server& objServer;
+    // Dedicated prober to handle ping/query with backoff
+    requester::MctpEndpointProber prober;
     /** @brief Used to watch for new MCTP endpoints */
     sdbusplus::bus::match_t mctpEndpointAddedSignal;
 

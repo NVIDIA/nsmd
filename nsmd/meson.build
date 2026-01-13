@@ -7,6 +7,7 @@ sources = [
     '../dot/dotErrorHandler.cpp',
     '../libnsm/base.c',
     '../libnsm/requester/mctp.c',
+    '../requester/mctp_endpoint_prober.cpp',
     '../requester/mctp_endpoint_discovery.cpp',
     '../requester/request_timeout_tracker.cpp',
     'sensorManager.cpp',
