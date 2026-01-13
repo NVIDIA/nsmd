@@ -22,3 +22,6 @@ rules:
 
       Attach logs + diff file and update RESULT before merging.
     block_merge: true
+    
+reviews:
+  commit_status: false
