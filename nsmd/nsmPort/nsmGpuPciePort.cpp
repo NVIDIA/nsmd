@@ -465,7 +465,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
 
             nsmDevice->addSensor(
                 std::make_shared<NsmPCIeLinkSpeed<PCIeEccIntf>>(
-                    pcieDeviceProvider, deviceIndex),
+                    pcieDeviceProvider, deviceIndex, false),
                 priority);
 
             auto pciePortIntf =

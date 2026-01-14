@@ -17,23 +17,22 @@
 
 #include "nsmPCIeLinkSpeed.hpp"
 
+#include "nsmDevice.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 
 namespace nsm
 {
 
-NsmPCIeLinkSpeedBase::NsmPCIeLinkSpeedBase(const NsmObject& provider,
-                                           uint8_t deviceIndex) :
-    NsmSensor(provider), deviceIndex(deviceIndex)
-{}
-
 NsmPCIeLinkSpeedBase::NsmPCIeLinkSpeedBase(
-    const NsmObject& provider, uint8_t multiPortType, uint8_t multiPortIndex,
-    uint8_t multiPortUpstreamPortNumber) :
-    NsmSensor(provider), isMultiPciePortEnabled(true),
-    multiPortType(multiPortType), multiPortIndex(multiPortIndex),
-    multiPortUpstreamPortNumber(multiPortUpstreamPortNumber)
-{}
+    const NsmObject& provider, uint8_t deviceIndexOrUpstreamPortCount,
+    bool isMultiPciePortEnabled) : NsmSensor(provider)
+{
+    this->isMultiPciePortEnabled = isMultiPciePortEnabled;
+    (isMultiPciePortEnabled)
+        ? this->upstreamPortCount = deviceIndexOrUpstreamPortCount
+        : this->deviceIndex = deviceIndexOrUpstreamPortCount;
+}
 
 std::optional<Request>
     NsmPCIeLinkSpeedBase::genSinglePCIeRequestMsg(eid_t eid, uint8_t instanceId)
@@ -54,8 +53,9 @@ std::optional<Request>
     return request;
 }
 
-std::optional<Request>
-    NsmPCIeLinkSpeedBase::genMultiPCIeRequestMsg(eid_t eid, uint8_t instanceId)
+std::optional<Request> NsmPCIeLinkSpeedBase::genMultiPCIeRequestMsg(
+    eid_t eid, uint8_t instanceId, uint8_t multiPortType,
+    uint8_t multiPortIndex, uint8_t multiPortUpstreamPortNumber)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_multiport_query_scalar_group_telemetry_v2_req));
@@ -82,14 +82,87 @@ std::optional<Request>
 std::optional<Request> NsmPCIeLinkSpeedBase::genRequestMsg(eid_t eid,
                                                            uint8_t instanceId)
 {
-    if (isMultiPciePortEnabled)
+    return genSinglePCIeRequestMsg(eid, instanceId);
+}
+
+requester::Coroutine
+    NsmPCIeLinkSpeedBase::update(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    if (!isMultiPciePortEnabled)
     {
-        return genMultiPCIeRequestMsg(eid, instanceId);
+        co_return co_await NsmSensor::update(nsmDevice);
     }
-    else
+
+    // Incase of multi PCIe port, get the max from all the upstream ports
+    uint8_t multiPortType = 0;
+    uint8_t multiPortIndex = 0;
+    uint8_t multiPortUpstreamPortNumber = 0;
+
+    nsm_query_scalar_group_telemetry_group_1 max_data{
+        .negotiated_link_speed = 1, // Gen1
+        .negotiated_link_width = 0,
+        .target_link_speed = 0,
+        .max_link_speed = 1, // Gen1
+        .max_link_width = 0,
+    };
+
+    while (multiPortUpstreamPortNumber < upstreamPortCount)
     {
-        return genSinglePCIeRequestMsg(eid, instanceId);
+        auto requestMsg = genMultiPCIeRequestMsg(nsmDevice->getEid(), 0,
+                                                 multiPortType, multiPortIndex,
+                                                 multiPortUpstreamPortNumber);
+        if (!requestMsg.has_value())
+        {
+            lg2::error(
+                "NsmSensor::update: genRequestMsg failed, name={NAME}, eid={EID}",
+                "NAME", getName(), "EID", nsmDevice->getEid());
+            co_return NSM_SW_ERROR;
+        }
+
+        std::shared_ptr<const nsm_msg> responseMsg;
+        size_t responseLen = 0;
+        auto rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), *requestMsg,
+                                               responseMsg, responseLen);
+        if (rc)
+        {
+            co_return rc;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        nsm_query_scalar_group_telemetry_group_1 upPortData{};
+        uint16_t size = 0;
+
+        rc = decode_query_scalar_group_telemetry_v1_group1_resp(
+            responseMsg.get(), responseLen, &cc, &size, &reasonCode,
+            &upPortData);
+
+        LG2_ERROR_FLT(
+            "NsmPCIeLinkSpeedBase multi PCIe port decode_query_scalar_group_telemetry_v1_group1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
+        if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
+        {
+            if (upPortData.negotiated_link_speed >
+                max_data.negotiated_link_speed)
+                max_data.negotiated_link_speed =
+                    upPortData.negotiated_link_speed;
+            if (upPortData.negotiated_link_width >
+                max_data.negotiated_link_width)
+                max_data.negotiated_link_width =
+                    upPortData.negotiated_link_width;
+            if (upPortData.target_link_speed > max_data.target_link_speed)
+                max_data.target_link_speed = upPortData.target_link_speed;
+            if (upPortData.max_link_speed > max_data.max_link_speed)
+                max_data.max_link_speed = upPortData.max_link_speed;
+            if (upPortData.max_link_width > max_data.max_link_width)
+                max_data.max_link_width = upPortData.max_link_width;
+        }
+        multiPortUpstreamPortNumber++;
     }
+    handleResponse(max_data);
+
+    co_return NSM_SUCCESS;
 }
 
 uint8_t

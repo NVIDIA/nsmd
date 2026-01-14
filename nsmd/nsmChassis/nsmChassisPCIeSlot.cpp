@@ -76,7 +76,7 @@ requester::Coroutine
     pcieSlotProvider.invoke(pdiMethod(slotType),
                             PCIeSlotIntf::convertSlotTypesFromString(slotType));
     device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
-                          pcieSlotProvider, deviceIndex),
+                          pcieSlotProvider, deviceIndex, false),
                       priority);
 
     std::vector<utils::Association> associations{};

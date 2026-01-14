@@ -328,7 +328,7 @@ struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
   private:
     std::shared_ptr<NsmPCIeLinkSpeed<PCIeDeviceIntf>> sensor =
         std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(pcieDevice,
-                                                           deviceIndex);
+                                                           deviceIndex, false);
 
   protected:
     void SetUp() override

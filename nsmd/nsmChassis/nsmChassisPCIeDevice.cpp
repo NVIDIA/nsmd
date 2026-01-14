@@ -123,9 +123,9 @@ void createChassisPCIeDevicePCIeDevice(
     pcieDeviceObject.invoke(
         pdiMethod(deviceType),
         PCIeDeviceIntf::convertDeviceTypesFromString(deviceType));
-    device->addSensor(
-        std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(pcieDeviceObject, 0),
-        PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY);
+    device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
+                          pcieDeviceObject, 0, false),
+                      PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY);
 
     for (auto& id : functionIds)
     {
@@ -165,13 +165,19 @@ void createChassisPCIeDeviceMultiPortPCIeDevice(
         functionIds = std::get<std::vector<uint64_t>>(
             allCurrentIfaceProperties.at("Functions"));
     }
+    uint64_t upstreamPortCount = 1;
+    if (allCurrentIfaceProperties.count("UpstreamPortCount"))
+    {
+        upstreamPortCount = std::get<uint64_t>(
+            allCurrentIfaceProperties.at("UpstreamPortCount"));
+    }
     auto pcieDeviceObject = NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName,
                                                                  name);
     pcieDeviceObject.invoke(
         pdiMethod(deviceType),
         PCIeDeviceIntf::convertDeviceTypesFromString(deviceType));
     device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-                          pcieDeviceObject, 0, 0, 0),
+                          pcieDeviceObject, upstreamPortCount, true),
                       PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY);
 
     for (auto& id : functionIds)

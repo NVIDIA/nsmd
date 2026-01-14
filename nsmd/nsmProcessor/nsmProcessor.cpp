@@ -523,7 +523,7 @@ static void createPCIe(std::shared_ptr<NsmDevice> nsmDevice,
     auto pcieDeviceProvider = NsmInterfaceProvider(name, type, inventoryObjPath,
                                                    pcieECCIntf);
     nsmDevice->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeEccIntf>>(
-                             pcieDeviceProvider, deviceId),
+                             pcieDeviceProvider, deviceId, false),
                          priority);
     for (auto idx = 0; idx < count; idx++)
     {
