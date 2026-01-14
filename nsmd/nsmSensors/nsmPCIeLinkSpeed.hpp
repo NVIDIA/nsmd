@@ -45,29 +45,31 @@ using PCIeEccIntf =
 class NsmPCIeLinkSpeedBase : public NsmSensor
 {
   public:
-    NsmPCIeLinkSpeedBase(const NsmObject& provider, uint8_t deviceIndex);
-    NsmPCIeLinkSpeedBase(const NsmObject& provider, uint8_t multiPortType,
-                         uint8_t multiPortIndex,
-                         uint8_t multiPortUpstreamPortNumber);
+    NsmPCIeLinkSpeedBase(const NsmObject& provider,
+                         uint8_t deviceIndexOrUpstreamPortCount,
+                         bool isMultiPciePortEnabled);
     NsmPCIeLinkSpeedBase() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
                                          uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
-    std::optional<Request> genSinglePCIeRequestMsg(eid_t eid,
-                                                   uint8_t instanceId);
-    std::optional<Request> genMultiPCIeRequestMsg(eid_t eid,
-                                                  uint8_t instanceId);
+
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   protected:
+    std::optional<Request> genSinglePCIeRequestMsg(eid_t eid,
+                                                   uint8_t instanceId);
+    std::optional<Request>
+        genMultiPCIeRequestMsg(eid_t eid, uint8_t instanceId,
+                               uint8_t multiPortType, uint8_t multiPortIndex,
+                               uint8_t multiPortUpstreamPortNumber);
+
     virtual void handleResponse(
         const nsm_query_scalar_group_telemetry_group_1& data) = 0;
     uint8_t deviceIndex;
     bool isMultiPciePortEnabled = false;
-    uint8_t multiPortType;
-    uint8_t multiPortIndex;
-    uint8_t multiPortUpstreamPortNumber;
+    uint8_t upstreamPortCount;
 
     static PCIeSlotIntf::Generations generation(uint32_t value);
     static PCIeDeviceIntf::PCIeTypes pcieType(uint32_t value);
@@ -89,25 +91,10 @@ class NsmPCIeLinkSpeed :
   public:
     NsmPCIeLinkSpeed() = delete;
     NsmPCIeLinkSpeed(const NsmInterfaceProvider<IntfType>& provider,
-                     uint8_t deviceIndex) :
-        NsmPCIeLinkSpeedBase(provider, deviceIndex),
-        NsmInterfaceContainer<IntfType>(provider)
-    {
-        nsm_query_scalar_group_telemetry_group_1 data{
-            .negotiated_link_speed = 1, // Gen1
-            .negotiated_link_width = 0,
-            .target_link_speed = 0,
-            .max_link_speed = 1, // Gen1
-            .max_link_width = 0,
-        };
-        handleResponse(data);
-        updateMetricOnSharedMemory();
-    }
-    NsmPCIeLinkSpeed(const NsmInterfaceProvider<IntfType>& provider,
-                     uint8_t multiPortType, uint8_t multiPortIndex,
-                     uint8_t multiPortUpstreamPortNumber) :
-        NsmPCIeLinkSpeedBase(provider, multiPortType, multiPortIndex,
-                             multiPortUpstreamPortNumber),
+                     uint8_t deviceIndexOrUpstreamPortCount,
+                     bool isMultiPciePortEnabled) :
+        NsmPCIeLinkSpeedBase(provider, deviceIndexOrUpstreamPortCount,
+                             isMultiPciePortEnabled),
         NsmInterfaceContainer<IntfType>(provider)
     {
         nsm_query_scalar_group_telemetry_group_1 data{

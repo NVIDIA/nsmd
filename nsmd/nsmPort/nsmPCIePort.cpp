@@ -102,8 +102,8 @@ requester::Coroutine createNsmPCIePort(SensorManager& manager,
     auto portStateObject =
         std::make_shared<NsmPCIePort<PortStateIntf>>(inventoryObjPath);
     auto portInfoObject = NsmPCIePort<NsmPortInfoIntf>(inventoryObjPath);
-    auto pcieLinkSpeed =
-        std::make_shared<NsmPCIeLinkSpeed<NsmPortInfoIntf>>(portInfoObject, 0);
+    auto pcieLinkSpeed = std::make_shared<NsmPCIeLinkSpeed<NsmPortInfoIntf>>(
+        portInfoObject, 0, false);
     auto portPCIeEccObject = NsmPCIePort<PCIeEccIntf>(inventoryObjPath);
     auto pcieErrorsGroup2 = std::make_shared<NsmPCIeErrors>(portPCIeEccObject,
                                                             0, GROUP_ID_2);
