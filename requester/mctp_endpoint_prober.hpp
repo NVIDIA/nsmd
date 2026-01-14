@@ -1,17 +1,16 @@
 #pragma once
+#include "libnsm/base.h"
+
+#include "common/coroutine.hpp"
+#include "common/types.hpp"
 #include "nsmMsghandler.hpp"
 #include "requester/request.hpp"
 #include "requester/retry_backoff_utils.hpp"
-#include "common/coroutine.hpp"
-#include "common/types.hpp"
+
 #include <functional>
-#include "libnsm/base.h"
-#include "common/types.hpp"
-
-#include <memory>
 #include <map>
+#include <memory>
 #include <optional>
-
 
 namespace requester
 {
@@ -25,14 +24,14 @@ class MctpEndpointProber
     explicit MctpEndpointProber(std::shared_ptr<nsm::NsmMessageHandler> handler,
                                 requester::retry::LinearBackoffConfig cfg = {},
                                 SendRecvFn sendRecvFn = nullptr) :
-        nsmMsgHandler(std::move(handler)),
-        cfg(cfg), sendRecvFn(std::move(sendRecvFn))
+        nsmMsgHandler(std::move(handler)), cfg(cfg),
+        sendRecvFn(std::move(sendRecvFn))
     {}
 
     requester::Coroutine ping(eid_t eid);
-    requester::Coroutine getQueryDeviceIdentification(eid_t eid,
-                                                      uint8_t& deviceIdentification,
-                                                      uint8_t& deviceInstance);
+    requester::Coroutine
+        getQueryDeviceIdentification(eid_t eid, uint8_t& deviceIdentification,
+                                     uint8_t& deviceInstance);
 
     std::optional<requester::retry::OperationSummary>
         getLastPingSummary(eid_t eid) const
@@ -56,6 +55,8 @@ class MctpEndpointProber
         return it->second;
     }
 
+    void logAllSummaries() const;
+
   private:
     requester::Coroutine pingOnce(eid_t eid, uint8_t& cc, uint16_t& reason);
     requester::Coroutine queryDeviceIdentificationOnce(eid_t eid, uint8_t& cc,
@@ -71,4 +72,3 @@ class MctpEndpointProber
 };
 
 } // namespace requester
-

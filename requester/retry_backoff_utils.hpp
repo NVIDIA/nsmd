@@ -1,6 +1,7 @@
 #pragma once
 
 #include "libnsm/base.h"
+
 #include "common/types.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -22,28 +23,29 @@ namespace requester::retry
  *
  * Telemetry:
  * - LinearBackoffStats: per-attempt delay and observed codes, total wait.
- * - OperationSummary: op outcome (attempts, success/fail, last cc/reason, total wait).
+ * - OperationSummary: op outcome (attempts, success/fail, last cc/reason, total
+ * wait).
  */
 struct LinearBackoffConfig
 {
-    uint8_t  maxRetries{static_cast<uint8_t>(RETRY_BACKOFF_MAX_RETRIES)};
+    uint8_t maxRetries{static_cast<uint8_t>(RETRY_BACKOFF_MAX_RETRIES)};
     uint32_t delayMs{static_cast<uint32_t>(RETRY_BACKOFF_DELAY_MS)};
 };
 
 struct LinearBackoffAttempt
 {
-    uint8_t      attemptIndex{0};
-    uint32_t     delayMs{0};
-    uint8_t      completionCode{0};
-    uint16_t     reasonCode{0};
+    uint8_t attemptIndex{0};
+    uint32_t delayMs{0};
+    uint8_t completionCode{0};
+    uint16_t reasonCode{0};
     nsm_sw_codes returnCode{NSM_SW_SUCCESS};
 };
 
 struct LinearBackoffStats
 {
-    LinearBackoffConfig               config{};
+    LinearBackoffConfig config{};
     std::vector<LinearBackoffAttempt> attempts{};
-    uint32_t                          totalWaitMs{0};
+    uint32_t totalWaitMs{0};
 };
 
 struct OperationSummary
@@ -58,7 +60,8 @@ struct OperationSummary
 };
 
 inline void logNotReadyRetry(const char* opName, eid_t eid, uint8_t attempt,
-                             uint8_t maxRetries, uint32_t delayMs, uint16_t reason)
+                             uint8_t maxRetries, uint32_t delayMs,
+                             uint16_t reason)
 {
     lg2::info(
         "{OP} not ready; retrying. eid={EID} attempt={ATTEMPT}/{MAX} delayMs={DELAY} reasonCode={REASON}",
@@ -68,9 +71,10 @@ inline void logNotReadyRetry(const char* opName, eid_t eid, uint8_t attempt,
 
 inline std::string formatSummary(const OperationSummary& s)
 {
-    return s.opName + ", Total attempts=" + std::to_string(s.totalAttempts) +
-           ", " + s.opName + "=" + (s.success ? "successful" : "failed after back off");
+    return s.opName + " eid=" + std::to_string(static_cast<unsigned>(s.eid)) +
+           ", Total attempts=" + std::to_string(s.totalAttempts) + ", " +
+           s.opName + "=" +
+           (s.success ? "successful" : "failed after back off");
 }
 
 } // namespace requester::retry
-

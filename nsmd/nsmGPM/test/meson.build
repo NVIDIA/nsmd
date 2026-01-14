@@ -18,6 +18,7 @@ dep_src_files = [
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../../requester/mctp_endpoint_discovery.cpp',
+    '../../../requester/mctp_endpoint_prober.cpp',
 ]
 
 if get_option('shmem').enabled()

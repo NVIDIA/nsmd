@@ -19,6 +19,7 @@
 #include "platform-environmental.h"
 
 #include "nsmDevice.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "requester/request_timeout_tracker.hpp"
 #include "sensorManager.hpp"
 
@@ -42,6 +43,7 @@ class NsmLogDumpIntf : public LogDumpIntf
         nsm::SensorManagerImpl::dumpReadinessLogs();
         nsm::SensorManagerImpl::dumpNsmDevicesInfo();
         requester::DeviceRequestTimeOutTracker::logFailures();
+        mctp::MctpDiscovery::logProberSummaries();
     }
 };
 

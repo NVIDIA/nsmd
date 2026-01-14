@@ -23,6 +23,7 @@ dep_src_files = [
     '../../libnsm/requester/mctp.c',
     '../../requester/request_timeout_tracker.cpp',
     '../../requester/mctp_endpoint_discovery.cpp',
+    '../../requester/mctp_endpoint_prober.cpp',
 ]
 
 if get_option('shmem').enabled()

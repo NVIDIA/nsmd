@@ -13,6 +13,7 @@ dep_src_files = [
     '../../../libnsm/platform-environmental.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
+    '../../../requester/mctp_endpoint_prober.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../../requester/mctp_endpoint_discovery.cpp',

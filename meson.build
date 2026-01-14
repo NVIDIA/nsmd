@@ -266,23 +266,6 @@ add_project_arguments(
     language: ['c', 'cpp'],
 )
 
-# Build dot utilities (needed by deps below)
-subdir('dot')
-
-openssl_dep = dependency('openssl', required: true)
-
-dynamic_linker = []
-
-deps = [
-    CLI11_dep,
-    nlohmann_json,
-    sdbusplus,
-    sdeventplus,
-    phosphor_dbus_interfaces,
-    phosphor_logging,
-    openssl_dep,
-]
-
 #
 # Retry backoff configuration (single, unambiguous array option: [maxRetries, delayMs])
 #
@@ -305,16 +288,30 @@ retry_conf = configuration_data()
 retry_conf.set('RETRY_BACKOFF_MAX_RETRIES', max_retries)
 retry_conf.set('RETRY_BACKOFF_DELAY_MS', delay_ms)
 
-configure_file(
-    output: 'retry_backoff_config.h',
-    configuration: retry_conf
-)
+configure_file(output: 'retry_backoff_config.h', configuration: retry_conf)
 
 add_project_arguments(
     '-include',
     join_paths(meson.current_build_dir(), 'retry_backoff_config.h'),
     language: ['c', 'cpp'],
 )
+
+# Build dot utilities (needed by deps below)
+subdir('dot')
+
+openssl_dep = dependency('openssl', required: true)
+
+dynamic_linker = []
+
+deps = [
+    CLI11_dep,
+    nlohmann_json,
+    sdbusplus,
+    sdeventplus,
+    phosphor_dbus_interfaces,
+    phosphor_logging,
+    openssl_dep,
+]
 
 if get_option('shmem').enabled() and not cx8_features
     nvidia_shmem = dependency('nvidia-tal', required: true)

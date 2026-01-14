@@ -20,15 +20,15 @@
 #include "common/types.hpp"
 #include "nsmd/nsmDevice.hpp"
 #include "nsmd/socket_handler.hpp"
-#include "requester/retry_backoff_utils.hpp"
 #include "requester/mctp_endpoint_prober.hpp"
+#include "requester/retry_backoff_utils.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus/match.hpp>
 
-#include <map>
 #include <filesystem>
 #include <initializer_list>
+#include <map>
 #include <optional>
 #include <vector>
 
@@ -91,6 +91,14 @@ class MctpDiscovery
                                      uint8_t deviceRole);
     nsm::DiscoveryEvents& discoveryEvents(eid_t eid);
     requester::Coroutine dumpPingInfoTask(eid_t eid);
+
+    static void logProberSummaries()
+    {
+        if (instance)
+        {
+            instance->prober.logAllSummaries();
+        }
+    }
 
   private:
     static MctpDiscovery* instance;

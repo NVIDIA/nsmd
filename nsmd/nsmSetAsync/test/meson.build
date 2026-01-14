@@ -26,6 +26,7 @@ dep_src_files = [
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../../requester/mctp_endpoint_discovery.cpp',
+    '../../../requester/mctp_endpoint_prober.cpp',
 ]
 
 dep_src_headers = [

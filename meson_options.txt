@@ -245,7 +245,7 @@ option(
     'retry-backoff',
     type: 'array',
     description: 'Constant-delay backoff as [maxRetries, delayMs]',
-    value: ['3', '300'] # defaults: 3 retries, 300ms delay
+    value: ['3', '2000'] # defaults: 3 retries, 2000ms delay keeping consistent with timeout
 )
 
 option(

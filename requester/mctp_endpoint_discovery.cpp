@@ -24,7 +24,6 @@
 #include "dBusAsyncUtils.hpp"
 #include "nsmd/sensorManager.hpp"
 #include "progressCounters.hpp"
-#include <functional>
 
 #include <systemd/sd-bus.h>
 
@@ -33,6 +32,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <string>

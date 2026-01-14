@@ -44,6 +44,7 @@ dep_src_files = [
     '../../../libnsm/firmware-utils.c',
     '../../../libnsm/diagnostics.c',
     '../../../libnsm/requester/mctp.c',
+    '../../../requester/mctp_endpoint_prober.cpp',
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmErrorInjection/nsmErrorInjection.cpp',
