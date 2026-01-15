@@ -86,9 +86,21 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @param bus D-Bus bus interface for communication
      * @param name Object name for the DOT object instance
      * @param uuid Device UUID associated with this DOT object
+     * @param blobPathName Path name for blob file storage (from EM config)
      */
     NsmDotObject(sdbusplus::bus::bus& bus, const std::string& name,
-                 const uuid_t& uuid);
+                 const uuid_t& uuid, const std::string& blobPathName);
+
+    /**
+     * @brief Update DOT object state during device rediscovery
+     *
+     * Called during device rediscovery to refresh the DOT blob from the device.
+     * If the blob checksum has changed, it will be updated in EMMC storage.
+     *
+     * @param nsmDevice Pointer to the NSM device
+     * @return Coroutine result code
+     */
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
     /**
      * @brief Install DOT CAK (Code Authentication Key)
@@ -512,6 +524,9 @@ class NsmDotObject : public NsmObject, public DotActionIntf
 
     /** Device UUID */
     uuid_t uuid;
+
+    /** Blob file path name (from EM config PathName) */
+    std::string blobPathName_;
 
   public:
     /** Pointer to DOT status sensor for manual triggering */

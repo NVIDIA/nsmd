@@ -23,11 +23,15 @@
 #include "dotErrorHandler.hpp"
 #include "globals.hpp"
 #include "nsmDevice.hpp"
+#include "nsmDotBlobUtils.hpp"
 #include "nsmDotUtils.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "sensorManager.hpp"
 
+#include <fcntl.h>
+#include <openssl/evp.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <phosphor-logging/lg2.hpp>
@@ -36,9 +40,10 @@
 #include <cerrno>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <format>
+#include <fstream>
 #include <memory>
-#include <sstream>
 #include <tuple>
 #include <vector>
 
@@ -59,15 +64,158 @@ constexpr uint8_t DOT_STATUS_VOLATILE = 1;
 constexpr uint8_t DOT_STATUS_LOCKED = 2;
 constexpr uint8_t DOT_STATUS_DISABLED = 3;
 
-NsmDotObject::NsmDotObject(sdbusplus::bus::bus& bus, const std::string& name,
-                           const uuid_t& uuid) :
-    NsmObject(name, "NSM_Dot"),
-    DotActionIntf(bus, (dotObjectBasePath / name).c_str()), uuid(uuid)
+static void updateDotBlobIfChanged(const std::string& pathName,
+                                   const std::vector<uint8_t>& newBlob)
 {
-    lg2::debug("Dot: create Unified object: {PATH}", "PATH",
-               dotObjectBasePath / name);
+    if (newBlob.size() != dot_blob_utils::DOT_BLOB_SIZE_BYTES)
+    {
+        lg2::warning(
+            "Dot: updateDotBlobIfChanged: unexpected blob size: pathName={PATH}, size={SIZE}",
+            "PATH", pathName, "SIZE", newBlob.size());
+        return;
+    }
+
+    std::string blobPath = dot_blob_utils::getBlobFilePath(pathName);
+    std::string newHash = dot_blob_utils::calculateSHA256(newBlob);
+
+    namespace fs = std::filesystem;
+    std::error_code ec;
+
+    bool needsUpdate = false;
+
+    if (fs::exists(blobPath, ec))
+    {
+        try
+        {
+            std::vector<uint8_t> storedBlob =
+                dot_blob_utils::readBlobFile(blobPath);
+            std::string storedHash =
+                dot_blob_utils::calculateSHA256(storedBlob);
+
+            if (storedHash != newHash)
+            {
+                lg2::info(
+                    "Dot: Blob hash changed: pathName={PATH}, stored={STORED}, new={NEW}",
+                    "PATH", pathName, "STORED", storedHash, "NEW", newHash);
+                needsUpdate = true;
+            }
+            else
+            {
+                lg2::debug(
+                    "Dot: Blob hash unchanged: pathName={PATH}, hash={HASH}",
+                    "PATH", pathName, "HASH", newHash);
+                return;
+            }
+        }
+        catch (const std::exception& e)
+        {
+            lg2::warning(
+                "Dot: Failed to read stored blob: pathName={PATH}, path={FILE}",
+                "PATH", pathName, "FILE", blobPath);
+            needsUpdate = true;
+        }
+    }
+    else
+    {
+        lg2::info("Dot: Blob does not exist, creating: pathName={PATH}", "PATH",
+                  pathName);
+        needsUpdate = true;
+    }
+
+    if (!needsUpdate)
+    {
+        return;
+    }
+
+    try
+    {
+        dot_blob_utils::ensureBlobDirectory(dot_blob_utils::DOT_BLOB_DIR);
+        dot_blob_utils::writeBlobAtomic(blobPath, newBlob);
+
+        lg2::info(
+            "Dot: Blob updated successfully: pathName={PATH}, size={SIZE}, hash={HASH}",
+            "PATH", pathName, "SIZE", newBlob.size(), "HASH", newHash);
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Dot: Failed to update blob: pathName={PATH}", "PATH",
+                   pathName);
+    }
+}
+
+NsmDotObject::NsmDotObject(sdbusplus::bus::bus& bus, const std::string& name,
+                           const uuid_t& uuid,
+                           const std::string& blobPathName) :
+    NsmObject(name, "NSM_Dot"),
+    DotActionIntf(bus, (dotObjectBasePath / name).c_str()), uuid(uuid),
+    blobPathName_(blobPathName)
+{
+    lg2::debug("Dot: create Unified object: {PATH}, blobPathName: {BLOB}",
+               "PATH", dotObjectBasePath / name, "BLOB", blobPathName_);
 
     DotActionIntf::dotState(DotActionIntf::DOTStates::Uninitialized);
+}
+
+requester::Coroutine NsmDotObject::update(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    if (!nsmDevice)
+    {
+        lg2::error("Dot: update called with null device");
+        co_return NSM_SW_ERROR;
+    }
+
+    auto eid = nsmDevice->getEid();
+    lg2::debug("Dot: update called during rediscovery: eid={EID}, uuid={UUID}",
+               "EID", eid, "UUID", uuid);
+
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_info_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_nsm_dot_get_info_req(0, requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "Dot: Failed to encode getInfo request during update: rc={RC}",
+            "RC", rc);
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto sendRc = co_await nsmDevice->sensorIO(eid, request, responseMsg,
+                                               responseLen, false);
+
+    if (sendRc != NSM_SW_SUCCESS)
+    {
+        lg2::debug("Dot: getInfo failed during update: eid={EID} rc={RC}",
+                   "EID", eid, "RC", sendRc);
+        co_return sendRc;
+    }
+
+    uint8_t cc = 0;
+    uint16_t reasonCode = 0;
+    uint16_t version = 0;
+    uint8_t fuseChangeState = 0;
+    uint8_t transfersRemaining = 0;
+    std::vector<uint8_t> dotBlob(dot_blob_utils::DOT_BLOB_SIZE_BYTES);
+
+    auto decodeRc = decode_nsm_dot_get_info_resp(
+        responseMsg.get(), responseLen, &cc, &reasonCode, &version,
+        &fuseChangeState, &transfersRemaining, dotBlob.data());
+
+    if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::debug(
+            "Dot: getInfo decode failed during update: eid={EID} decodeRc={RC} cc={CC}",
+            "EID", eid, "RC", decodeRc, "CC", cc);
+        co_return cc ? cc : decodeRc;
+    }
+
+    if (!dotBlob.empty())
+    {
+        updateDotBlobIfChanged(blobPathName_, dotBlob);
+    }
+
+    co_return cc ? cc : decodeRc;
 }
 
 void NsmDotObject::handleSendError(int sendRc, int eid,
@@ -594,7 +742,7 @@ requester::Coroutine
 
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
-    std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+    std::vector<uint8_t> dotBlob(dot_blob_utils::DOT_BLOB_SIZE_BYTES);
 
     lg2::debug("Dot: lock response received: eid={EID} len={LEN}", "EID", eid,
                "LEN", responseLen);
@@ -630,6 +778,9 @@ requester::Coroutine
     }
 
     lg2::info("Dot: Lock completed successfully: eid={EID}", "EID", eid);
+
+    updateDotBlobIfChanged(blobPathName_, dotBlob);
+
     valueIntf->value(dotBlob);
     statusIntf->status(AsyncOperationStatusType::Success);
     dotStatusSensor_->update(device).detach();
@@ -1074,7 +1225,7 @@ requester::Coroutine NsmDotObject::getInfoAsyncHandler(
     uint16_t version = 0;
     uint8_t fuseChangeState = 0;
     uint8_t transfersRemaining = 0;
-    std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+    std::vector<uint8_t> dotBlob(dot_blob_utils::DOT_BLOB_SIZE_BYTES);
 
     lg2::debug("Dot: getInfo decoding response: eid={EID} len={LEN}", "EID",
                eid, "LEN", responseLen);
@@ -1195,7 +1346,7 @@ requester::Coroutine NsmDotObject::cakRotateAsyncHandler(
 
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
-    std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+    std::vector<uint8_t> dotBlob(dot_blob_utils::DOT_BLOB_SIZE_BYTES);
 
     auto decodeRc = decode_nsm_dot_cak_rotate_resp(
         responseMsg.get(), responseLen, &cc, &reasonCode, dotBlob.data());
@@ -1228,6 +1379,9 @@ requester::Coroutine NsmDotObject::cakRotateAsyncHandler(
     }
 
     lg2::debug("Dot: CAK Rotate successful: eid={EID}", "EID", eid);
+
+    updateDotBlobIfChanged(blobPathName_, dotBlob);
+
     valueIntf->value(dotBlob);
     statusIntf->status(AsyncOperationStatusType::Success);
     co_return NSM_SW_SUCCESS;
@@ -1441,6 +1595,9 @@ requester::Coroutine NsmDotObject::disableAsyncHandler(
     }
 
     lg2::info("Dot: Disable completed successfully: eid={EID}", "EID", eid);
+
+    updateDotBlobIfChanged(blobPathName_, dotBlob);
+
     valueIntf->value(dotBlob);
     statusIntf->status(AsyncOperationStatusType::Success);
     co_return NSM_SW_SUCCESS;
@@ -1794,6 +1951,36 @@ static requester::Coroutine createNsmDot(SensorManager& manager,
         uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
     }
 
+    std::string blobPathName{};
+    auto chassisPath = std::string(chassisInventoryBasePath) + "/" +
+                       chassisName;
+    auto dotBlobPath = chassisPath + "/DOTBlob";
+
+    try
+    {
+        auto dotBlobProperties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, dotBlobPath.c_str(),
+            "xyz.openbmc_project.Configuration.NSM_DOTBlob");
+
+        if (dotBlobProperties.count("PathName"))
+        {
+            blobPathName =
+                std::get<std::string>(dotBlobProperties.at("PathName"));
+        }
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Dot: Could not fetch DOTBlob PathName: {ERROR}", "ERROR",
+                   e.what());
+    }
+
+    if (blobPathName.empty())
+    {
+        blobPathName = chassisName;
+        lg2::info("Dot: Using ChassisName as PathName fallback: {NAME}", "NAME",
+                  blobPathName);
+    }
+
     auto device = manager.getNsmDeviceFromStaticUUID(uuid);
     if (!device)
     {
@@ -1802,11 +1989,13 @@ static requester::Coroutine createNsmDot(SensorManager& manager,
         co_return NSM_SW_ERROR;
     }
 
-    auto object = std::make_shared<NsmDotObject>(bus, chassisName, uuid);
+    auto object = std::make_shared<NsmDotObject>(bus, chassisName, uuid,
+                                                 blobPathName);
     auto dotStatusSensor = std::make_shared<NsmDotStatusObject>(
         chassisName, "NSM_Dot_Status", object.get(), uuid);
     object->dotStatusSensor_ = dotStatusSensor.get();
     device->addStaticSensor(object);
+    device->addCapabilityRefreshSensor(object);
     device->addSensor(dotStatusSensor, PollingType::RoundRobin);
 
     lg2::debug(

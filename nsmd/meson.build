@@ -168,7 +168,11 @@ foreach d : valid_nsmd_subdirs
         elif d == 'nsmFwSwInventory'
             sources += ['nsmFwSwInventory/GPUSWInventory.cpp']
         elif d == 'nsmDot'
-            sources += ['nsmDot/nsmDot.cpp']
+            sources += [
+                'nsmDot/nsmDot.cpp',
+                'nsmDot/nsmDotBlob.cpp',
+                'nsmDot/nsmDotBlobUtils.cpp',
+            ]
         endif
     endif
 endforeach
