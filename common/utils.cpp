@@ -54,14 +54,30 @@ bool isPreferred(const std::tuple<MctpMedium, MctpBinding>& currentMctpInfo,
     auto currentBinding = std::get<1>(currentMctpInfo);
     auto newBinding = std::get<1>(newMctpInfo);
 
-    if (mediumPriority.at(currentMedium) == mediumPriority.at(newMedium))
+    // Helper lambda to safely get priority with default for unknown keys
+    constexpr int defaultPriority = INT_MIN;
+
+    auto getMediumPriority = [](const MctpMedium& medium) {
+        auto it = mediumPriority.find(medium);
+        return (it != mediumPriority.end()) ? it->second : defaultPriority;
+    };
+
+    auto getBindingPriority = [](const MctpBinding& binding) {
+        auto it = bindingPriority.find(binding);
+        return (it != bindingPriority.end()) ? it->second : defaultPriority;
+    };
+
+    int currentMediumPri = getMediumPriority(currentMedium);
+    int newMediumPri = getMediumPriority(newMedium);
+
+    if (currentMediumPri == newMediumPri)
     {
-        return bindingPriority.at(currentBinding) >=
-               bindingPriority.at(newBinding);
+        return getBindingPriority(currentBinding) >=
+               getBindingPriority(newBinding);
     }
     else
     {
-        return mediumPriority.at(currentMedium) >= mediumPriority.at(newMedium);
+        return currentMediumPri >= newMediumPri;
     }
 }
 
