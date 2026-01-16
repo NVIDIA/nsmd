@@ -496,3 +496,10 @@ option(
     description: 'Enable Network Adapter write protection sensor/object',
     value: 'disabled',
 )
+
+option(
+    'enable-association-discovery',
+    type: 'feature',
+    description: 'Enable support for MCTP Reactor association based discovery',
+    value: 'disabled'
+)

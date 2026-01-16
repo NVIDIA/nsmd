@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include "config.h"
+
 #include "common/types.hpp"
 #include "nsmd/nsmDevice.hpp"
 #include "nsmd/socket_handler.hpp"
@@ -31,7 +33,7 @@
 #include <map>
 #include <optional>
 #include <vector>
-
+// # define ENABLE_ASSOCIATION_DISCOVERY
 namespace mctp
 {
 
@@ -136,6 +138,9 @@ class MctpDiscovery
     std::map<std::string, std::coroutine_handle<>> deviceStateChangeTaskHandles;
     requester::Coroutine deviceStateChangeTask(const std::string path);
 
+    requester::Coroutine readMctpProperties(const std::string& objPath,
+                                            MctpInfos& mctpInfos);
+
     void discoverEndpoints(sdbusplus::message::message& msg);
     requester::Coroutine
         handleDiscoverEndpoints(sdbusplus::message::message& msg,
@@ -176,6 +181,8 @@ class MctpDiscovery
     const std::string mctpEndpointIntfName{"xyz.openbmc_project.MCTP.Endpoint"};
 
     const std::string mctpBindingIntfName{"xyz.openbmc_project.MCTP.Binding"};
+    const std::string associationIntfName{
+        "xyz.openbmc_project.Association.Definitions"};
 
     /** @brief UUID interface name */
     static constexpr std::string_view uuidEndpointIntfName{
@@ -244,11 +251,10 @@ class MctpDiscovery
                              bool active, MctpMedium mctpMedium,
                              MctpBinding mctpBinding);
     int mapMctpEIDForNsmDevice(std::shared_ptr<nsm::NsmDevice> nsmDevice);
-    void handleMctpStateTransition(const std::string objPath,
-                                   [[maybe_unused]] const bool state);
-    requester::Coroutine
-        findConfiguredAssociations(const std::string& objPath,
-                                   ConfiguredPath& configuredPath);
+    void handleMctpStateTransition(const std::string objPath);
+    requester::Coroutine findConfiguredAssociations(
+        [[maybe_unused]] const std::string& objPath,
+        [[maybe_unused]] ConfiguredPath& configuredPath);
 };
 
 } // namespace mctp

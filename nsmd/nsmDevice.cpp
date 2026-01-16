@@ -467,11 +467,22 @@ bool NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
                                            std::string& mctpBinding)
 {
     bool isPreferred = true;
-    if (this->uuid.size() > 0)
+    try
     {
-        isPreferred = utils::isPreferred(
-            std::make_tuple(this->mctpMedium, this->mctpBinding),
-            std::make_tuple(mctpMedium, mctpBinding));
+        if (this->uuid.size() > 0)
+        {
+            isPreferred = utils::isPreferred(
+                std::make_tuple(this->mctpMedium, this->mctpBinding),
+                std::make_tuple(mctpMedium, mctpBinding));
+        }
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error(
+            "NsmDevice::updateDiscoveryIdentifiers failed, eid={EID} uuid={UUID} mctpMedium={MCTP_MEDIUM} mctpBinding={MCTP_BINDING} error={ERROR}",
+            "EID", eid, "UUID", uuid, "MCTP_MEDIUM", mctpMedium, "MCTP_BINDING",
+            mctpBinding, "ERROR", e.what());
+        return false;
     }
 
     if (isPreferred)
