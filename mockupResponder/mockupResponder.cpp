@@ -1029,6 +1029,28 @@ std::optional<std::vector<uint8_t>>
                       NSM_GET_PROTECTION_OPTIONS,
                   }},
              }},
+            {NSM_DEV_ID_CPU,
+             {
+                 {0, {0, 1, 2, 9, 10}},
+                 {1, {}},
+                 {2, {}},
+                 {3, {0, 2, 3, 12, 97}},
+                 {4, {NSM_INSTALL_TOKEN, NSM_ERASE_TOKEN, NSM_QUERY_TOKEN}},
+                 {5, {}},
+                 {6,
+                  {NSM_FW_GET_EROT_STATE_INFORMATION,
+                   NSM_FW_IRREVERSABLE_CONFIGURATION,
+                   NSM_FW_QUERY_CODE_AUTH_KEY_PERM,
+                   NSM_FW_UPDATE_CODE_AUTH_KEY_PERM,
+                   NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
+                   NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER,
+                   NSM_FW_SET_ROT_PROPERTY, NSM_FW_IMAGE_COPY_CONTROL,
+                   NSM_FW_DOT_GET_INFO, NSM_FW_DOT_CAK_INSTALL, NSM_FW_DOT_LOCK,
+                   NSM_FW_DOT_UNLOCK, NSM_FW_DOT_CAK_ROTATE, NSM_FW_DOT_DISABLE,
+                   NSM_FW_DOT_OVERRIDE, NSM_FW_DOT_UNLOCK_CHALLENGE,
+                   NSM_FW_DOT_RECOVERY, NSM_FW_DOT_CAK_BYPASS,
+                   NSM_FW_DOT_GET_STATUS}},
+             }},
         };
 
     bitfield8_t commandCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};

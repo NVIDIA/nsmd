@@ -146,11 +146,12 @@ TEST(getDeviceNameFromDeviceType, ValidDeviceTypes)
     EXPECT_EQ(utils::getDeviceNameFromDeviceType(3), "BASEBOARD");
     EXPECT_EQ(utils::getDeviceNameFromDeviceType(4), "EROT");
     EXPECT_EQ(utils::getDeviceNameFromDeviceType(5), "MCTPBRIDGE");
+    EXPECT_EQ(utils::getDeviceNameFromDeviceType(6), "CPU");
 }
 
 TEST(getDeviceNameFromDeviceType, UnknownDeviceType)
 {
-    EXPECT_EQ(utils::getDeviceNameFromDeviceType(6), "NSM_DEV_ID_UNKNOWN");
+    EXPECT_EQ(utils::getDeviceNameFromDeviceType(7), "NSM_DEV_ID_UNKNOWN");
     EXPECT_EQ(utils::getDeviceNameFromDeviceType(255), "NSM_DEV_ID_UNKNOWN");
 }
 
@@ -162,11 +163,12 @@ TEST(getDeviceInstanceName, ValidInstances)
     EXPECT_EQ(utils::getDeviceInstanceName(3, 3), "BASEBOARD_3");
     EXPECT_EQ(utils::getDeviceInstanceName(4, 4), "EROT_4");
     EXPECT_EQ(utils::getDeviceInstanceName(5, 5), "MCTPBRIDGE_5");
+    EXPECT_EQ(utils::getDeviceInstanceName(6, 6), "CPU_6");
 }
 
 TEST(getDeviceInstanceName, UnknownTypeWithValidInstance)
 {
-    EXPECT_EQ(utils::getDeviceInstanceName(6, 0), "NSM_DEV_ID_UNKNOWN_0");
+    EXPECT_EQ(utils::getDeviceInstanceName(7, 0), "NSM_DEV_ID_UNKNOWN_0");
 }
 
 TEST(setBit, TestSettingBits)

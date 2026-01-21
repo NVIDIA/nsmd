@@ -428,6 +428,8 @@ std::string getDeviceNameFromDeviceType(const uint8_t deviceType)
             return "EROT";
         case 5:
             return "MCTPBRIDGE";
+        case 6:
+            return "CPU";
         default:
             return "NSM_DEV_ID_UNKNOWN";
     }

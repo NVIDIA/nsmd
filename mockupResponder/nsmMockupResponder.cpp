@@ -106,6 +106,10 @@ int main(int argc, char** argv)
                 {
                     deviceType = NSM_DEV_ID_MCTP_BRIDGE;
                 }
+                else if (boost::iequals(device, "CPU"))
+                {
+                    deviceType = NSM_DEV_ID_CPU;
+                }
                 else
                 {
                     optionUsage();

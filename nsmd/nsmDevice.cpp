@@ -815,6 +815,7 @@ requester::Coroutine NsmDevice::getFRU(nsm::InventoryProperties& properties,
              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
               BUILD_DATE}},
             {NSM_DEV_ID_MCTP_BRIDGE, {SERIAL_NUMBER}},
+            {NSM_DEV_ID_CPU, {}},
             {NSM_DEV_ID_UNKNOWN, {}}};
 
     // Fetch property IDs based on deviceType; fallback to an empty list if not

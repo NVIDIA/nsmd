@@ -357,6 +357,7 @@ typedef enum {
 	NSM_DEV_ID_BASEBOARD = 3,
 	NSM_DEV_ID_EROT = 4,
 	NSM_DEV_ID_MCTP_BRIDGE = 5,
+	NSM_DEV_ID_CPU = 6,
 	NSM_DEV_ID_UNKNOWN = 0xff,
 } NsmDeviceIdentification;
 

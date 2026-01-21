@@ -30,6 +30,9 @@ static std::string getTopologyObjPath(const std::string& deviceName,
         case NSM_DEV_ID_EROT:
             topologyObjPath += "EROT/";
             break;
+        case NSM_DEV_ID_CPU:
+            topologyObjPath += "CPU/";
+            break;
         default:
             lg2::error("Topology not defined for device type = {DTYPE}",
                        "DTYPE", deviceType);

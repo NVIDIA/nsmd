@@ -256,6 +256,9 @@ class QueryDeviceIdentification : public CommandInterface
             case NSM_DEV_ID_MCTP_BRIDGE:
                 result["Device Identification"] = "MCTP Bridge";
                 break;
+            case NSM_DEV_ID_CPU:
+                result["Device Identification"] = "CPU";
+                break;
             case NSM_DEV_ID_UNKNOWN:
                 result["Device Identification"] = "Unknown";
                 break;
