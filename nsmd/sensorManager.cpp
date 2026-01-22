@@ -575,7 +575,7 @@ requester::Coroutine
         // Update progress counters
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
         nsmDevice->progressCounters().increment(PollingType::Priority, rc);
-        if ((t1 - t0) > pollingTimeInUsec)
+        if ((t1 - t0) > pollingTimeInUsec && rc == NSM_SW_SUCCESS)
         {
             nsmDevice->progressCounters().increment(
                 ProgressCounterType::PriorityTimeExceeded, rc);
