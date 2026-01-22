@@ -3683,6 +3683,21 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         {
             createMNNVLTopology(nsmDevice, bus, name, type, inventoryObjPath);
         }
+        if (allCurrentIfaceProperties.count("GPUBasePowerLimitSupported") &&
+            std::get<bool>(
+                allCurrentIfaceProperties.at("GPUBasePowerLimitSupported")))
+        {
+            createGPUPowerLimit(nsmDevice, bus, name,
+                                "NSM_GPU_BASE_POWER_LIMIT", inventoryObjPath);
+        }
+        if (allCurrentIfaceProperties.count("GPUCopyCPUPowerLimitSupported") &&
+            std::get<bool>(
+                allCurrentIfaceProperties.at("GPUCopyCPUPowerLimitSupported")))
+        {
+            createGPUPowerLimit(nsmDevice, bus, name,
+                                "NSM_GPU_COPY_CPU_POWER_LIMIT",
+                                inventoryObjPath);
+        }
     }
     else if (type == "NSM_PCIe")
     {

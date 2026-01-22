@@ -2625,6 +2625,36 @@ int encode_get_module_power_limit_req(uint8_t instance, struct nsm_msg *msg)
 	return encode_get_power_limit_req(instance, MODULE, msg);
 }
 
+int encode_get_gpu_base_power_limit_req(uint8_t instance, struct nsm_msg *msg)
+{
+	return encode_get_power_limit_req(instance, GPU_BASE, msg);
+}
+
+int encode_get_cpu_limit_gpu_copy_power_limit_req(uint8_t instance,
+						  struct nsm_msg *msg)
+{
+	return encode_get_power_limit_req(instance, CPU_LIMIT_GPU_COPY, msg);
+}
+
+int encode_set_gpu_base_power_limit_req(uint8_t instance, uint8_t action,
+					uint8_t persistence,
+					uint32_t power_limit,
+					struct nsm_msg *msg)
+{
+	return encode_set_power_limit_req(instance, GPU_BASE, action,
+					  persistence, power_limit, msg);
+}
+
+int encode_set_cpu_limit_gpu_copy_power_limit_req(uint8_t instance,
+						  uint8_t action,
+						  uint8_t persistence,
+						  uint32_t power_limit,
+						  struct nsm_msg *msg)
+{
+	return encode_set_power_limit_req(instance, CPU_LIMIT_GPU_COPY, action,
+					  persistence, power_limit, msg);
+}
+
 int decode_get_power_limit_req(const struct nsm_msg *msg, size_t msg_len,
 			       uint32_t *id)
 {

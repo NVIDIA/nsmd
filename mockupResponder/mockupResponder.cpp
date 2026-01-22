@@ -1175,6 +1175,15 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
         case MAXIMUM_MEMORY_CLOCK_LIMIT:
             populateFrom(property, 1500);
             break;
+        case RATED_GPU_BASE_POWER_LIMIT:
+            populateFrom(property, 200000);
+            break;
+        case MINIMUM_GPU_BASE_POWER_LIMIT:
+            populateFrom(property, 20000);
+            break;
+        case MAXIMUM_GPU_BASE_POWER_LIMIT:
+            populateFrom(property, 300000);
+            break;
         case PCIERETIMER_0_EEPROM_VERSION:
         case PCIERETIMER_1_EEPROM_VERSION:
         case PCIERETIMER_2_EEPROM_VERSION:

@@ -4,6 +4,7 @@ dep_src_files = [
     '../nsmPowerSmoothing.cpp',
     '../nsmOemResetStatistics.cpp',
     '../nsmWorkloadPowerProfile.cpp',
+    '../nsmPowerLimit.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensorAggregator.cpp',
     '../../nsmSensor.cpp',

@@ -1108,6 +1108,9 @@ class GetInventoryInformation : public CommandInterface
             {MINIMUM_MODULE_POWER_LIMIT, sizeof(uint32_t)},
             {MAXIMUM_MODULE_POWER_LIMIT, sizeof(uint32_t)},
             {RATED_MODULE_POWER_LIMIT, sizeof(uint32_t)},
+            {RATED_GPU_BASE_POWER_LIMIT, sizeof(uint32_t)},
+            {MINIMUM_GPU_BASE_POWER_LIMIT, sizeof(uint32_t)},
+            {MAXIMUM_GPU_BASE_POWER_LIMIT, sizeof(uint32_t)},
             {DEFAULT_BOOST_CLOCKS, sizeof(uint32_t)},
             {DEFAULT_BASE_CLOCKS, sizeof(uint32_t)},
             {TRAY_SLOT_NUMBER, sizeof(uint32_t)},
@@ -1161,6 +1164,15 @@ class GetInventoryInformation : public CommandInterface
                 propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
                 break;
             case RATED_MODULE_POWER_LIMIT:
+            case RATED_GPU_BASE_POWER_LIMIT:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
+            case MINIMUM_GPU_BASE_POWER_LIMIT:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
+            case MAXIMUM_GPU_BASE_POWER_LIMIT:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
             case DEFAULT_BOOST_CLOCKS:
             case DEFAULT_BASE_CLOCKS:
             case TRAY_SLOT_NUMBER:
@@ -3998,6 +4010,21 @@ class SetPowerLimit : public CommandInterface
             rc = encode_set_module_power_limit_req(
                 instanceId, action, persistence, power_limit, request);
         }
+        else if (powerLimitId == GPU_BASE)
+        {
+            rc = encode_set_gpu_base_power_limit_req(
+                instanceId, action, persistence, power_limit, request);
+        }
+        else if (powerLimitId == CPU_LIMIT_GPU_COPY)
+        {
+            rc = encode_set_cpu_limit_gpu_copy_power_limit_req(
+                instanceId, action, persistence, power_limit, request);
+        }
+        else
+        {
+            rc = encode_set_power_limit_req(instanceId, powerLimitId, action,
+                                            persistence, power_limit, request);
+        }
         return {rc, requestMsg};
     }
 
@@ -4066,6 +4093,20 @@ class GetPowerLimit : public CommandInterface
         {
             rc = encode_get_module_power_limit_req(instanceId, request);
         }
+        else if (powerLimitId == GPU_BASE)
+        {
+            rc = encode_get_gpu_base_power_limit_req(instanceId, request);
+        }
+        else if (powerLimitId == CPU_LIMIT_GPU_COPY)
+        {
+            rc = encode_get_cpu_limit_gpu_copy_power_limit_req(instanceId,
+                                                               request);
+        }
+        else
+        {
+            rc = encode_get_power_limit_req(instanceId, powerLimitId, request);
+        }
+
         return {rc, requestMsg};
     }
 
