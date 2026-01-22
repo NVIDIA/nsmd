@@ -188,10 +188,10 @@ static void createPrettyName(std::shared_ptr<NsmDevice> device,
                              const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     std::string prettyName;
-    if (allCurrentIfaceProperties.count("Name"))
+    if (allCurrentIfaceProperties.count("PrettyNameForChassis"))
     {
-        prettyName =
-            std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        prettyName = std::get<std::string>(
+            allCurrentIfaceProperties.at("PrettyNameForChassis"));
     }
 
     auto chassisPrettyName = std::make_shared<NsmChassis<ItemIntf>>(name);
