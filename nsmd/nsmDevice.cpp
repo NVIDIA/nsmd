@@ -393,7 +393,7 @@ requester::Coroutine
     if (rc)
     {
         lg2::error("NsmDevice::SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID",
-                   eid, "RC", rc);
+                   eid, "RC", utils::nsmSwCodeToString(rc));
     }
     // coverity[missing_return]
     co_return rc;
@@ -422,7 +422,7 @@ requester::Coroutine
     if (rc && rc != NSM_SW_ERROR_TIMEOUT)
     {
         lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
-                   rc);
+                   utils::nsmSwCodeToString(rc));
     }
 
     co_return rc;
@@ -436,18 +436,9 @@ requester::Coroutine
     auto rc = co_await waitForNsmDeviceUpdate();
     if (rc != NSM_SW_SUCCESS)
     {
-        if (rc == NSM_SW_ERROR_TIMEOUT)
-        {
-            lg2::error(
-                "NsmDevice::postPatchIO NsmDevice update taking longer than expected for eid={EID}",
-                "EID", eid);
-        }
-        else
-        {
-            lg2::error(
-                "NsmDevice::postPatchIO unexpected arror while waiting for NsmDevice update for eid={EID}, rc={RC}",
-                "EID", eid, "RC", rc);
-        }
+        lg2::error(
+            "NsmDevice::postPatchIO unexpected error while waiting for NsmDevice update for eid={EID}, rc={RC}",
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         co_return rc;
     }
 
@@ -463,7 +454,7 @@ requester::Coroutine
     if (rc && rc != NSM_SW_ERROR_TIMEOUT)
     {
         lg2::error("NsmDevice::postPatchIO failed. eid={EID} rc={RC}", "EID",
-                   eid, "RC", rc);
+                   eid, "RC", utils::nsmSwCodeToString(rc));
     }
     progressCounters().increment(ProgressCounterType::PostPatch, rc);
     co_return rc;
@@ -534,7 +525,7 @@ requester::Coroutine NsmDevice::updateNsmDevice()
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("getSupportedNvidiaMessageType() failed, rc={RC} eid={EID}",
-                   "RC", rc, "EID", eid);
+                   "RC", utils::nsmSwCodeToString(rc), "EID", eid);
         discoverNsmDeviceSemaphore.release();
         // coverity[missing_return]
         co_return rc;
@@ -559,7 +550,8 @@ requester::Coroutine NsmDevice::updateNsmDevice()
         {
             lg2::error(
                 "getSupportedCommands() for message type={MT} return failed, rc={RC} eid={EID}",
-                "MT", messageType, "RC", rc, "EID", eid);
+                "MT", messageType, "RC", utils::nsmSwCodeToString(rc), "EID",
+                eid);
             commandCodesRetrieved[messageType] = false;
             continue;
         }
@@ -587,8 +579,8 @@ requester::Coroutine NsmDevice::updateNsmDevice()
     rc = co_await updateFruDeviceIntf();
     if (rc)
     {
-        lg2::error("updateFruDeviceIntf failed, rc={RC} eid={EID}", "RC", rc,
-                   "EID", eid);
+        lg2::error("updateFruDeviceIntf failed, rc={RC} eid={EID}", "RC",
+                   utils::nsmSwCodeToString(rc), "EID", eid);
     }
 
     discoverNsmDeviceSemaphore.release();
@@ -613,7 +605,7 @@ requester::Coroutine NsmDevice::getSupportedNvidiaMessageType(
     {
         lg2::error(
             "NsmDevice::getSupportedNvidiaMessageType failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -626,21 +618,23 @@ requester::Coroutine NsmDevice::getSupportedNvidiaMessageType(
     {
         lg2::error(
             "NsmDevice::getSupportedNvidiaMessageType SendRecvNsmMsg failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     bitfield8_t types[SUPPORTED_MSG_TYPE_DATA_SIZE];
     rc = decode_get_supported_nvidia_message_types_resp(
-        responseMsg.get(), responseLen, &cc, &reason_code, types);
+        responseMsg.get(), responseLen, &cc, &reasonCode, types);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         lg2::error(
             "NsmDevice::getSupportedNvidiaMessageType decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
-            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+            "EID", eid, "CC", utils::nsmCompletionCodeToString(cc),
+            "REASONCODE", utils::nsmReasonCodeToString(reasonCode), "RC",
+            utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -675,7 +669,7 @@ requester::Coroutine
     {
         lg2::error(
             "NsmDevice::getSupportedCommandCodes failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -688,21 +682,24 @@ requester::Coroutine
     {
         lg2::error(
             "NsmDevice::getSupportedCommandCodes SendRecvNsmMsg failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
+        // coverity[missing_return]
         co_return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     bitfield8_t supportedCommandCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE];
     rc = decode_get_supported_command_codes_resp(responseMsg.get(), responseLen,
-                                                 &cc, &reason_code,
+                                                 &cc, &reasonCode,
                                                  &supportedCommandCodes[0]);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         lg2::error(
             "NsmDevice::getSupportedCommandCodes decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
-            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+            "EID", eid, "CC", utils::nsmCompletionCodeToString(cc),
+            "REASONCODE", utils::nsmReasonCodeToString(reasonCode), "RC",
+            utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -729,8 +726,8 @@ requester::Coroutine NsmDevice::updateFruDeviceIntf()
         discoveryEvents().setValue(DiscoveryEventType::GetFru, rc);
         if (rc != NSM_SW_SUCCESS)
         {
-            lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC", rc,
-                       "EID", eid);
+            lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC",
+                       utils::nsmSwCodeToString(rc), "EID", eid);
         }
     }
 
@@ -833,7 +830,8 @@ requester::Coroutine NsmDevice::getFRU(nsm::InventoryProperties& properties,
         {
             lg2::error(
                 "NsmDevice::getFRU getInventoryInformation failed for propertyId={PID} eid={EID} rc={RC}",
-                "PID", propertyId, "EID", eid, "RC", rc);
+                "PID", propertyId, "EID", eid, "RC",
+                utils::nsmSwCodeToString(rc));
         }
     }
     // coverity[missing_return]
@@ -853,7 +851,7 @@ requester::Coroutine
     {
         lg2::error(
             "NsmDevice::getInventoryInformation encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -978,7 +976,7 @@ requester::Coroutine NsmDevice::refreshCommandMatrix()
         {
             lg2::error(
                 "Failed to get supported message types, rc={RC}, eid={EID}",
-                "RC", rc, "EID", eid);
+                "RC", utils::nsmSwCodeToString(rc), "EID", eid);
             co_return rc;
         }
 
@@ -1014,7 +1012,8 @@ requester::Coroutine NsmDevice::refreshCommandMatrix()
             {
                 lg2::error(
                     "Failed to get supported commands for message type={MT}, rc={RC}, eid={EID}",
-                    "MT", messageType, "RC", rc, "EID", eid);
+                    "MT", messageType, "RC", utils::nsmSwCodeToString(rc),
+                    "EID", eid);
                 commandCodesRetrieved[messageType] = false;
             }
         }
@@ -1023,7 +1022,7 @@ requester::Coroutine NsmDevice::refreshCommandMatrix()
     co_return NSM_SW_SUCCESS;
 }
 
-void NsmDevice::dumpNsmDeviceInfo()
+requester::Coroutine NsmDevice::dumpNsmDeviceInfoTask()
 {
     lg2::error(
         "###### NsmDevice::dumpNsmDeviceInfo: deviceType={DT}, deviceRole={ROLE}, static instanceNumber={INST} ######",
@@ -1038,6 +1037,9 @@ void NsmDevice::dumpNsmDeviceInfo()
         "Device Active: {DEVICE_ACTIVE}, Device Ready: {DEVICE_READY}, Discovery Pending: {DISCOVERY_PENDING}",
         "DEVICE_ACTIVE", isDeviceActive, "DEVICE_READY", isDeviceReady,
         "DISCOVERY_PENDING", discoveryPending);
+
+    co_await mctp::MctpDiscovery::getInstance().dumpPingInfoTask(eid);
+    co_await refreshCommandMatrix();
 
     for (size_t messageType = 0;
          messageType < messageTypesToCommandCodeMatrix.size(); messageType++)
@@ -1060,6 +1062,10 @@ void NsmDevice::dumpNsmDeviceInfo()
         "###### NsmDevice::dumpNsmDeviceInfo End for deviceType={DT}, deviceRole={ROLE}, static instanceNumber={INST} ######",
         "DT", getDeviceType(), "ROLE", getDeviceRole(), "INST",
         getInstanceNumber());
+}
+void NsmDevice::dumpNsmDeviceInfo()
+{
+    dumpNsmDeviceInfoTask().detach();
 }
 
 ProgressCounters& NsmDevice::progressCounters()

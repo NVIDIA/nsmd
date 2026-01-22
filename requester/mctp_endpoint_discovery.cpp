@@ -527,7 +527,7 @@ requester::Coroutine
     if (rc)
     {
         lg2::error("MctpDiscovery::SendRecvNsmMsg failed. eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc));
     }
     co_return rc;
 }
@@ -603,8 +603,8 @@ requester::Coroutine
         discoveryEvents(eid).setValue(nsm::DiscoveryEventType::Ping, rc);
         if (rc != NSM_SW_SUCCESS)
         {
-            lg2::error("NSM ping failed, rc={RC} eid={EID}", "RC", rc, "EID",
-                       eid);
+            lg2::error("NSM ping failed, rc={RC} eid={EID}", "RC",
+                       utils::nsmSwCodeToString(rc), "EID", eid);
             overallRC = rc;
             continue;
         }
@@ -623,7 +623,7 @@ requester::Coroutine
         {
             lg2::error(
                 "NSM getQueryDeviceIdentification failed, rc={RC} eid={EID}",
-                "RC", rc, "EID", eid);
+                "RC", utils::nsmSwCodeToString(rc), "EID", eid);
             overallRC = rc;
             continue;
         }
@@ -721,7 +721,8 @@ requester::Coroutine MctpDiscovery::ping(eid_t eid)
     auto rc = encode_ping_req(DEFAULT_INSTANCE_ID, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("ping failed. eid={EID} rc={RC}", "EID", eid, "RC", rc);
+        lg2::error("ping failed. eid={EID} rc={RC}", "EID", eid, "RC",
+                   utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -736,13 +737,15 @@ requester::Coroutine MctpDiscovery::ping(eid_t eid)
     }
 
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
-    rc = decode_ping_resp(respMsg.get(), respLen, &cc, &reason_code);
+    uint16_t reasonCode = ERR_NULL;
+    rc = decode_ping_resp(respMsg.get(), respLen, &cc, &reasonCode);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         lg2::error(
             "ping decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
-            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+            "EID", eid, "CC", utils::nsmCompletionCodeToString(cc),
+            "REASONCODE", utils::nsmReasonCodeToString(reasonCode), "RC",
+            utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -762,7 +765,7 @@ requester::Coroutine MctpDiscovery::getQueryDeviceIdentification(
     {
         lg2::error(
             "encode_nsm_query_device_identification_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -777,15 +780,17 @@ requester::Coroutine MctpDiscovery::getQueryDeviceIdentification(
     }
 
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     rc = decode_query_device_identification_resp(
-        responseMsg.get(), responseLen, &cc, &reason_code,
-        &deviceIdentification, &deviceInstance);
+        responseMsg.get(), responseLen, &cc, &reasonCode, &deviceIdentification,
+        &deviceInstance);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         lg2::error(
             "decode_query_device_identification_resp failed. eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
-            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+            "EID", eid, "CC", utils::nsmCompletionCodeToString(cc),
+            "REASONCODE", utils::nsmReasonCodeToString(reasonCode), "RC",
+            utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -1177,6 +1182,23 @@ void MctpDiscovery::handleMctpStateTransition(const std::string objPath,
             "MctpDiscovery::handleMctpStateTransition No NsmDevice found for Eid: {EID}",
             "EID", eid);
     }
+}
+
+requester::Coroutine MctpDiscovery::dumpPingInfoTask(eid_t eid)
+{
+    auto rc = co_await ping(eid);
+    if (rc == NSM_SW_SUCCESS)
+    {
+        lg2::error("Ping succeeded for Eid: {EID}", "EID", eid);
+    }
+    else
+    {
+        lg2::error("Ping failed for Eid: {EID} rc={RC}", "EID", eid, "RC",
+                   utils::nsmSwCodeToString(rc));
+    }
+
+    // coverity[missing_return]
+    co_return rc;
 }
 
 } // namespace mctp

@@ -786,6 +786,31 @@ void convertMacAddressToString(const uint8_t* macAddress,
  * @param guidString Reference to the string to store the converted GUID.
  */
 void convertGuid64ToString(uint64_t guid, std::string& guidString);
+
+/**
+ * @brief Convert NSM software error code to human-readable string
+ *
+ * @param rc Return code from nsm_sw_codes enum
+ * @return Human-readable string representation of the error code
+ */
+std::string nsmSwCodeToString(int rc);
+
+/**
+ * @brief Convert NSM completion code to human-readable string
+ *
+ * @param cc Completion code from nsm_completion_codes enum
+ * @return Human-readable string representation of the completion code
+ */
+std::string nsmCompletionCodeToString(uint8_t cc);
+
+/**
+ * @brief Convert NSM reason code to human-readable string
+ *
+ * @param reasonCode Reason code from nsm_reason_codes enum
+ * @return Human-readable string representation of the reason code
+ */
+std::string nsmReasonCodeToString(uint16_t reasonCode);
+
 /* @brief Async function to get base properties with single-flight pattern
  *
  * This function ensures that only one D-Bus call is made per object path +

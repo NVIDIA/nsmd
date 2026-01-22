@@ -21,6 +21,7 @@
 
 #include "requester/handler.hpp"
 #include "types.hpp"
+#include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -130,7 +131,8 @@ class NsmMessageHandler : public std::enable_shared_from_this<NsmMessageHandler>
         {
             lg2::error(
                 "NsmMessageHandler::SendRecvNsmMsg failed. eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", eid, "RC",
+                utils::nsmSwCodeToString(static_cast<nsm_sw_codes>(rc)));
         }
         // coverity[missing_return]
         co_return rc;

@@ -931,6 +931,112 @@ void convertGuid64ToString(uint64_t guid, std::string& guidString)
                              (guid >> 48) & 0xFFFF, (guid >> 32) & 0xFFFF,
                              (guid >> 16) & 0xFFFF, guid & 0xFFFF);
 }
+
+std::string nsmSwCodeToString(int rc)
+{
+    switch (rc)
+    {
+        case NSM_SW_SUCCESS:
+            return "NSM_SW_SUCCESS";
+        case NSM_SW_ERROR:
+            return "NSM_SW_ERROR";
+        case NSM_SW_ERROR_DATA:
+            return "NSM_SW_ERROR_DATA";
+        case NSM_SW_ERROR_LENGTH:
+            return "NSM_SW_ERROR_LENGTH";
+        case NSM_SW_ERROR_NULL:
+            return "NSM_SW_ERROR_NULL";
+        case NSM_SW_ERROR_COMMAND_FAIL:
+            return "NSM_SW_ERROR_COMMAND_FAIL";
+        case NSM_SW_ERROR_TIMEOUT:
+            return "NSM_SW_ERROR_TIMEOUT";
+        default:
+            return std::to_string(rc);
+    }
+}
+
+std::string nsmCompletionCodeToString(uint8_t cc)
+{
+    switch (cc)
+    {
+        case NSM_SUCCESS:
+            return "NSM_SUCCESS";
+        case NSM_ERROR:
+            return "NSM_ERROR";
+        case NSM_ERR_INVALID_DATA:
+            return "NSM_ERR_INVALID_DATA";
+        case NSM_ERR_INVALID_DATA_LENGTH:
+            return "NSM_ERR_INVALID_DATA_LENGTH";
+        case NSM_ERR_NOT_READY:
+            return "NSM_ERR_NOT_READY";
+        case NSM_ERR_UNSUPPORTED_COMMAND_CODE:
+            return "NSM_ERR_UNSUPPORTED_COMMAND_CODE";
+        case NSM_ERR_UNSUPPORTED_MSG_TYPE:
+            return "NSM_ERR_UNSUPPORTED_MSG_TYPE";
+        case NSM_ACCEPTED:
+            return "NSM_ACCEPTED";
+        case NSM_BUSY:
+            return "NSM_BUSY";
+        case NSM_ERR_BUS_ACCESS:
+            return "NSM_ERR_BUS_ACCESS";
+        case NSM_ERR_INVALID_STATE_FOR_COMMAND:
+            return "NSM_ERR_INVALID_STATE_FOR_COMMAND";
+        case NSM_ERR_INVALID_REQUEST_TYPE:
+            return "NSM_ERR_INVALID_REQUEST_TYPE";
+        default:
+            return std::to_string(cc);
+    }
+}
+
+std::string nsmReasonCodeToString(uint16_t reasonCode)
+{
+    switch (reasonCode)
+    {
+        case ERR_NULL:
+            return "ERR_NULL";
+        case ERR_INVALID_PCI:
+            return "ERR_INVALID_PCI";
+        case ERR_INVALID_RQD:
+            return "ERR_INVALID_RQD";
+        case ERR_TIMEOUT:
+            return "ERR_TIMEOUT";
+        case ERR_DOWNSTREAM_TIMEOUT:
+            return "ERR_DOWNSTREAM_TIMEOUT";
+        case ERR_I2C_NACK_FROM_DEV_ADDR:
+            return "ERR_I2C_NACK_FROM_DEV_ADDR";
+        case ERR_I2C_NACK_FROM_DEV_CMD_DATA:
+            return "ERR_I2C_NACK_FROM_DEV_CMD_DATA";
+        case ERR_I2C_NACK_FROM_DEV_ADDR_RS:
+            return "ERR_I2C_NACK_FROM_DEV_ADDR_RS";
+        case ERR_NVLINK_PORT_INVALID:
+            return "ERR_NVLINK_PORT_INVALID";
+        case ERR_NVLINK_PORT_DISABLED:
+            return "ERR_NVLINK_PORT_DISABLED";
+        case ERR_NOT_SUPPORTED:
+            return "ERR_NOT_SUPPORTED";
+        case ERR_PROPERTY_NOT_SUPPORTED:
+            return "ERR_PROPERTY_NOT_SUPPORTED";
+        case ERR_LIFESPAN_VOLATILE_NOT_SUPPORTED:
+            return "ERR_LIFESPAN_VOLATILE_NOT_SUPPORTED";
+        case ERR_LIFESPAN_PERSISTENT_NOT_SUPPORTED:
+            return "ERR_LIFESPAN_PERSISTENT_NOT_SUPPORTED";
+        case ERR_NO_BOOT_COMPLETE:
+            return "ERR_NO_BOOT_COMPLETE";
+        case ERR_UPDATE_IN_PROGRESS:
+            return "ERR_UPDATE_IN_PROGRESS";
+        case ERR_IMAGE_COPY_IN_PROGRESS:
+            return "ERR_IMAGE_COPY_IN_PROGRESS";
+        case ERR_IMAGE_COPY_COMPLETED:
+            return "ERR_IMAGE_COPY_COMPLETED";
+        case ERR_FLASH_WEAR_MITIGATION:
+            return "ERR_FLASH_WEAR_MITIGATION";
+        case ERR_INCOMPLETE_COMPONENT_SET:
+            return "ERR_INCOMPLETE_COMPONENT_SET";
+        default:
+            return std::to_string(reasonCode);
+    }
+}
+
 // Single-flight pattern implementation for single-threaded async execution
 // for EM configuration PDI properties
 requester::Coroutine coGetCachedBaseProperties(

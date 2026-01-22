@@ -86,6 +86,7 @@ class MctpDiscovery
         getNsmDeviceByIdentification(uint8_t deviceType, uint8_t instanceNumber,
                                      uint8_t deviceRole);
     nsm::DiscoveryEvents& discoveryEvents(eid_t eid);
+    requester::Coroutine dumpPingInfoTask(eid_t eid);
 
   private:
     static MctpDiscovery* instance;

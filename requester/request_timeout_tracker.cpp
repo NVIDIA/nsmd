@@ -88,11 +88,14 @@ void DeviceRequestTimeOutTracker::logTimeOutFailure() const
     lg2::error("******Start logTimeOutFailure: EID={EID}*****", "EID", eid);
     if (timeoutMessage.has_value())
     {
+        auto i = size() - 1;
         for (const auto& message : *this)
         {
+            const std::string nthRequest = i > 0 ? "n-" + std::to_string(i--)
+                                                 : "n";
             lg2::error(
-                "logTimeOutFailure: EID={EID}, Last(n) NSM request msg before timeout: {REQ} ",
-                "EID", eid, "REQ",
+                "logTimeOutFailure: EID={EID}, Last({N}) successful NSM request message before timeout: {REQ} ",
+                "EID", eid, "N", nthRequest, "REQ",
                 utils::convertMsgToString(true, message.requestMsg, message.tag,
                                           message.eid));
         }

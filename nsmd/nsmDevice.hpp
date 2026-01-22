@@ -582,6 +582,7 @@ class NsmDevice :
     void initMsgTypesSensor();
     requester::Coroutine markSensorsUnrefreshed();
     requester::Coroutine updateSensorsForOffline();
+    requester::Coroutine dumpNsmDeviceInfoTask();
 
     /**
      * @brief Adds dynamic sensor to NsmDevice.
