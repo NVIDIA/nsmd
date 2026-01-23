@@ -699,7 +699,7 @@ requester::Coroutine
     // Create NsmLeakDetection sensor with all interfaces
     auto leakDetectorInfoObject = std::make_shared<NsmLeakDetection>(
         name, type, bus, sensorIdMap, sensorNameMap, chassisPath);
-    device->addSensor(leakDetectorInfoObject, false);
+    device->addSensor(leakDetectorInfoObject, true);
 
     // Create NsmLeakDetectionThresholdsPatch for each sensor for runtime
     // threshold patching. Register async set operations on the sensor's voltage
