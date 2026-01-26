@@ -20,6 +20,7 @@
 
 #include <endian.h>
 
+#include <algorithm>
 #include <cstring>
 #include <format>
 #include <stdexcept>
