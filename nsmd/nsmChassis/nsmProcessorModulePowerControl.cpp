@@ -172,7 +172,7 @@ requester::Coroutine NsmProcessorModulePowerControl::updatePowerLimitOnModule(
         {
             lg2::error(
                 "updatePowerLimitOnModule postPatchIO failed for while setting power limit for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc));
             break;
         }
 

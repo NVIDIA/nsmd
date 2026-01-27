@@ -152,7 +152,7 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         {
             throw std::runtime_error(std::format(
                 "NsmRawCommandHandler::doSendLongRunningRequest: postPatchIO failed, rc={}",
-                rc));
+                utils::nsmSwCodeToString(rc)));
         }
         else
         {
@@ -162,7 +162,7 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
             {
                 throw std::runtime_error(std::format(
                     "NsmRawCommandHandler::doSendLongRunningRequest: decode_common_resp failed, rc={}",
-                    rc));
+                    utils::nsmSwCodeToString(rc)));
             }
             else if (cc == NSM_SUCCESS)
             {
@@ -311,9 +311,9 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         }
         else if (rc != NSM_SW_SUCCESS)
         {
-            throw std::runtime_error(
-                "NsmRawCommandHandler::doSendLongRunningRequest: postPatchIO failed, rc" +
-                std::to_string(rc));
+            throw std::runtime_error(std::format(
+                "NsmRawCommandHandler::doSendLongRunningRequest: postPatchIO failed, rc={}",
+                utils::nsmSwCodeToString(rc)));
         }
         else
         {
@@ -321,8 +321,9 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
                                            &reasonCode);
             if (rc != NSM_SW_SUCCESS)
             {
-                throw std::runtime_error("decode_common_resp failed, rc=" +
-                                         std::to_string(rc));
+                throw std::runtime_error(
+                    std::format("decode_common_resp failed, rc={}",
+                                utils::nsmSwCodeToString(rc)));
             }
         }
 

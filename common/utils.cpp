@@ -934,107 +934,155 @@ void convertGuid64ToString(uint64_t guid, std::string& guidString)
 
 std::string nsmSwCodeToString(int rc)
 {
+    std::string result;
     switch (rc)
     {
         case NSM_SW_SUCCESS:
-            return "NSM_SW_SUCCESS";
+            result = "NSM_SW_SUCCESS";
+            break;
         case NSM_SW_ERROR:
-            return "NSM_SW_ERROR";
+            result = "NSM_SW_ERROR";
+            break;
         case NSM_SW_ERROR_DATA:
-            return "NSM_SW_ERROR_DATA";
+            result = "NSM_SW_ERROR_DATA";
+            break;
         case NSM_SW_ERROR_LENGTH:
-            return "NSM_SW_ERROR_LENGTH";
+            result = "NSM_SW_ERROR_LENGTH";
+            break;
         case NSM_SW_ERROR_NULL:
-            return "NSM_SW_ERROR_NULL";
+            result = "NSM_SW_ERROR_NULL";
+            break;
         case NSM_SW_ERROR_COMMAND_FAIL:
-            return "NSM_SW_ERROR_COMMAND_FAIL";
+            result = "NSM_SW_ERROR_COMMAND_FAIL";
+            break;
         case NSM_SW_ERROR_TIMEOUT:
-            return "NSM_SW_ERROR_TIMEOUT";
+            result = "NSM_SW_ERROR_TIMEOUT";
+            break;
         default:
-            return std::to_string(rc);
+            result = "UNKNOWN";
+            break;
     }
+    return result + "(" + std::to_string(rc) + ")";
 }
 
 std::string nsmCompletionCodeToString(uint8_t cc)
 {
+    std::string result;
     switch (cc)
     {
         case NSM_SUCCESS:
-            return "NSM_SUCCESS";
+            result = "NSM_SUCCESS";
+            break;
         case NSM_ERROR:
-            return "NSM_ERROR";
+            result = "NSM_ERROR";
+            break;
         case NSM_ERR_INVALID_DATA:
-            return "NSM_ERR_INVALID_DATA";
+            result = "NSM_ERR_INVALID_DATA";
+            break;
         case NSM_ERR_INVALID_DATA_LENGTH:
-            return "NSM_ERR_INVALID_DATA_LENGTH";
+            result = "NSM_ERR_INVALID_DATA_LENGTH";
+            break;
         case NSM_ERR_NOT_READY:
-            return "NSM_ERR_NOT_READY";
+            result = "NSM_ERR_NOT_READY";
+            break;
         case NSM_ERR_UNSUPPORTED_COMMAND_CODE:
-            return "NSM_ERR_UNSUPPORTED_COMMAND_CODE";
+            result = "NSM_ERR_UNSUPPORTED_COMMAND_CODE";
+            break;
         case NSM_ERR_UNSUPPORTED_MSG_TYPE:
-            return "NSM_ERR_UNSUPPORTED_MSG_TYPE";
+            result = "NSM_ERR_UNSUPPORTED_MSG_TYPE";
+            break;
         case NSM_ACCEPTED:
-            return "NSM_ACCEPTED";
+            result = "NSM_ACCEPTED";
+            break;
         case NSM_BUSY:
-            return "NSM_BUSY";
+            result = "NSM_BUSY";
+            break;
         case NSM_ERR_BUS_ACCESS:
-            return "NSM_ERR_BUS_ACCESS";
+            result = "NSM_ERR_BUS_ACCESS";
+            break;
         case NSM_ERR_INVALID_STATE_FOR_COMMAND:
-            return "NSM_ERR_INVALID_STATE_FOR_COMMAND";
+            result = "NSM_ERR_INVALID_STATE_FOR_COMMAND";
+            break;
         case NSM_ERR_INVALID_REQUEST_TYPE:
-            return "NSM_ERR_INVALID_REQUEST_TYPE";
+            result = "NSM_ERR_INVALID_REQUEST_TYPE";
+            break;
         default:
-            return std::to_string(cc);
+            result = "UNKNOWN";
+            break;
     }
+    return result + "(" + std::to_string(cc) + ")";
 }
 
 std::string nsmReasonCodeToString(uint16_t reasonCode)
 {
+    std::string result;
     switch (reasonCode)
     {
         case ERR_NULL:
-            return "ERR_NULL";
+            result = "ERR_NULL";
+            break;
         case ERR_INVALID_PCI:
-            return "ERR_INVALID_PCI";
+            result = "ERR_INVALID_PCI";
+            break;
         case ERR_INVALID_RQD:
-            return "ERR_INVALID_RQD";
+            result = "ERR_INVALID_RQD";
+            break;
         case ERR_TIMEOUT:
-            return "ERR_TIMEOUT";
+            result = "ERR_TIMEOUT";
+            break;
         case ERR_DOWNSTREAM_TIMEOUT:
-            return "ERR_DOWNSTREAM_TIMEOUT";
+            result = "ERR_DOWNSTREAM_TIMEOUT";
+            break;
         case ERR_I2C_NACK_FROM_DEV_ADDR:
-            return "ERR_I2C_NACK_FROM_DEV_ADDR";
+            result = "ERR_I2C_NACK_FROM_DEV_ADDR";
+            break;
         case ERR_I2C_NACK_FROM_DEV_CMD_DATA:
-            return "ERR_I2C_NACK_FROM_DEV_CMD_DATA";
+            result = "ERR_I2C_NACK_FROM_DEV_CMD_DATA";
+            break;
         case ERR_I2C_NACK_FROM_DEV_ADDR_RS:
-            return "ERR_I2C_NACK_FROM_DEV_ADDR_RS";
+            result = "ERR_I2C_NACK_FROM_DEV_ADDR_RS";
+            break;
         case ERR_NVLINK_PORT_INVALID:
-            return "ERR_NVLINK_PORT_INVALID";
+            result = "ERR_NVLINK_PORT_INVALID";
+            break;
         case ERR_NVLINK_PORT_DISABLED:
-            return "ERR_NVLINK_PORT_DISABLED";
+            result = "ERR_NVLINK_PORT_DISABLED";
+            break;
         case ERR_NOT_SUPPORTED:
-            return "ERR_NOT_SUPPORTED";
+            result = "ERR_NOT_SUPPORTED";
+            break;
         case ERR_PROPERTY_NOT_SUPPORTED:
-            return "ERR_PROPERTY_NOT_SUPPORTED";
+            result = "ERR_PROPERTY_NOT_SUPPORTED";
+            break;
         case ERR_LIFESPAN_VOLATILE_NOT_SUPPORTED:
-            return "ERR_LIFESPAN_VOLATILE_NOT_SUPPORTED";
+            result = "ERR_LIFESPAN_VOLATILE_NOT_SUPPORTED";
+            break;
         case ERR_LIFESPAN_PERSISTENT_NOT_SUPPORTED:
-            return "ERR_LIFESPAN_PERSISTENT_NOT_SUPPORTED";
+            result = "ERR_LIFESPAN_PERSISTENT_NOT_SUPPORTED";
+            break;
         case ERR_NO_BOOT_COMPLETE:
-            return "ERR_NO_BOOT_COMPLETE";
+            result = "ERR_NO_BOOT_COMPLETE";
+            break;
         case ERR_UPDATE_IN_PROGRESS:
-            return "ERR_UPDATE_IN_PROGRESS";
+            result = "ERR_UPDATE_IN_PROGRESS";
+            break;
         case ERR_IMAGE_COPY_IN_PROGRESS:
-            return "ERR_IMAGE_COPY_IN_PROGRESS";
+            result = "ERR_IMAGE_COPY_IN_PROGRESS";
+            break;
         case ERR_IMAGE_COPY_COMPLETED:
-            return "ERR_IMAGE_COPY_COMPLETED";
+            result = "ERR_IMAGE_COPY_COMPLETED";
+            break;
         case ERR_FLASH_WEAR_MITIGATION:
-            return "ERR_FLASH_WEAR_MITIGATION";
+            result = "ERR_FLASH_WEAR_MITIGATION";
+            break;
         case ERR_INCOMPLETE_COMPONENT_SET:
-            return "ERR_INCOMPLETE_COMPONENT_SET";
+            result = "ERR_INCOMPLETE_COMPONENT_SET";
+            break;
         default:
-            return std::to_string(reasonCode);
+            result = "UNKNOWN";
+            break;
     }
+    return result + "(" + std::to_string(reasonCode) + ")";
 }
 
 // Single-flight pattern implementation for single-threaded async execution

@@ -466,7 +466,7 @@ requester::Coroutine NsmReconfigPermissions::setAllowPermission(
         lg2::error(
             "NsmSetReconfigSettings::setAllowPermission: postPatchIO failed."
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return rc;

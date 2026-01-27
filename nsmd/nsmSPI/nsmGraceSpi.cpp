@@ -212,7 +212,7 @@ requester::Coroutine
     {
         lg2::error(
             "NsmGraceSpi postPatchNsmCommand for Spi transaction failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", device->getEid());
+            "RC", utils::nsmSwCodeToString(rc), "EID", device->getEid());
         co_return rc;
     }
 
@@ -286,7 +286,7 @@ requester::Coroutine
     {
         lg2::error(
             "NsmGraceSpiObject postPatchNsmCommand for Spi transaction failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", device->getEid());
+            "RC", utils::nsmSwCodeToString(rc), "EID", device->getEid());
         co_return rc;
     }
 
@@ -359,7 +359,7 @@ requester::Coroutine NsmGraceSpiObject::executeSpiTransaction(
     {
         lg2::error(
             "NsmGraceSpiObject postPatchNsmCommand for Spi transaction failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", device->getEid());
+            "RC", utils::nsmSwCodeToString(rc), "EID", device->getEid());
         co_return rc;
     }
 
@@ -446,7 +446,7 @@ requester::Coroutine
     {
         lg2::error(
             "NsmGraceSpiObject postPatchNsmCommand for Spi Write Enable failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", device->getEid());
+            "RC", utils::nsmSwCodeToString(rc), "EID", device->getEid());
         co_return rc;
     }
 
@@ -578,7 +578,7 @@ requester::Coroutine
     {
         lg2::error(
             "NsmGraceSpiObject postPatchIO for set Spi operation failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", utils::nsmSwCodeToString(rc), "EID", eid);
         co_return rc;
     }
 
@@ -685,7 +685,7 @@ requester::Coroutine
     {
         lg2::error(
             "NsmSpiRead postPatchIO for set Spi operation failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", utils::nsmSwCodeToString(rc), "EID", eid);
         co_return rc;
     }
 
@@ -761,7 +761,7 @@ requester::Coroutine
         {
             lg2::error(
                 "NsmSpiRead postPatchNsmCommand for read Spi block failed with RC={RC}, eid={EID}",
-                "RC", rc, "EID", device->getEid());
+                "RC", utils::nsmSwCodeToString(rc), "EID", device->getEid());
             co_return rc;
         }
 

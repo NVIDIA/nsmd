@@ -346,7 +346,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenDirect(
         {
             lg2::error("DebugToken: installTokenDirect postPatchIO failed "
                        "rc={RC}, eid={EID}",
-                       "RC", static_cast<int>(sendRc), "EID", eid);
+                       "RC", utils::nsmSwCodeToString(sendRc), "EID", eid);
             debug_token::Error error(sendRc);
             errorCode = static_cast<uint16_t>(sendRc);
             errorMessage = std::string(error.to_string());
@@ -416,7 +416,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(
     {
         lg2::debug("DebugToken: queryToken postPatchIO "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", nsm_sw_codes(sendRc));
+                   "EID", eid, "RC", utils::nsmSwCodeToString(sendRc));
         // coverity[missing_return]
         co_return sendRc;
     }
@@ -588,7 +588,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::deviceCapabilitiesHandler(
     {
         lg2::debug("DebugToken: deviceCapabilitiesHandler postPatchIO: "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(sendRc));
         // coverity[missing_return]
         co_return sendRc;
     }
@@ -640,7 +640,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::deviceIdHandler(
     {
         lg2::debug("DebugToken: deviceIdHandler postPatchIO "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", nsm_sw_codes(sendRc));
+                   "EID", eid, "RC", utils::nsmSwCodeToString(sendRc));
         // coverity[missing_return]
         co_return sendRc;
     }

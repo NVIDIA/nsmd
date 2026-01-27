@@ -98,7 +98,7 @@ class OemPowerProfileIntf :
         {
             lg2::error(
                 "getProfileInfo postPatchIO failed for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc_);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
 
             co_return rc_;
         }
@@ -205,8 +205,8 @@ class OemPowerProfileIntf :
         {
             lg2::error(
                 "updateProfileInfoOnDevice postPatchIO failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
-                profileId, "VALUE", paramValue);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc_), "ID",
+                parameterId, "PROFILEID", profileId, "VALUE", paramValue);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
@@ -271,8 +271,9 @@ class OemPowerProfileIntf :
         {
             lg2::error(
                 "resetProfileInfoOnDevice postPatchIO failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}, Reqmsg= {MSG}",
-                "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
-                profileId, "VALUE", paramValue, "MSG", msg);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc_), "ID",
+                parameterId, "PROFILEID", profileId, "VALUE", paramValue, "MSG",
+                msg);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }

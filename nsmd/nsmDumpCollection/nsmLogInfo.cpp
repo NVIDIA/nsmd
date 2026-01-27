@@ -73,7 +73,7 @@ requester::Coroutine
     {
         lg2::error("NsmLogInfoObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         finish(AsyncOperationStatusType::InternalFailure, rc);
         // coverity[missing_return]
         co_return rc;

@@ -229,7 +229,7 @@ requester::Coroutine NsmDeviceProtectionOptions::setProtectionOptions(
         lg2::error(
             "NsmDeviceProtectionOptions::setProtectionOptions postPatchIO failed for"
             "eid={EID} rc={RC} responseBytes={RESPONSEBYTES}",
-            "EID", eid, "RC", rc_, "RESPONSEBYTES",
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_), "RESPONSEBYTES",
             utils::convertMsgToString(utils::Rx, responseVec, MCTP_TAG_NSM,
                                       eid));
         *status = AsyncOperationStatusType::WriteFailure;

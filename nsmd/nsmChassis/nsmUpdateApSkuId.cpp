@@ -196,7 +196,8 @@ requester::Coroutine updateApSkuIdHandler(
     {
         lg2::error(
             "updateApSkuIdHandler: postPatchIO error: eid={EID}, rc={RC}, skuId={SKUID}, NSM_Request={MSG}",
-            "EID", eid, "RC", rc, "SKUID", skuIdValue, "MSG", msg);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc), "SKUID", skuIdValue,
+            "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return rc;

@@ -80,7 +80,7 @@ requester::Coroutine
             lg2::error(
                 "NsmSetErrorInjection::setModeEnabled: postPatchIO failed."
                 "eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         }
         status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
@@ -175,7 +175,7 @@ requester::Coroutine
             lg2::error(
                 "NsmSetErrorInjectionEnabled::setEnabled: postPatchIO failed."
                 "eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         }
         status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
@@ -270,7 +270,7 @@ requester::Coroutine NsmSetErrorInjectionPayload::setPayload(
         lg2::error(
             "NsmSetErrorInjectionPayload::setPayload: postPatchIO failed."
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return rc;

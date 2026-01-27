@@ -274,7 +274,7 @@ requester::Coroutine NsmPCIePortConfigurationInfo::setPortConfiguration(
     {
         lg2::error(
             "postPatchIO failed for Port Configuration On Device for EID: {EID}: rc={RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

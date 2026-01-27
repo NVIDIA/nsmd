@@ -244,7 +244,7 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
     {
         lg2::error(
             "clearPCIeErrorCounter postPatchIO failed for for eid = {EID} rc = {RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;

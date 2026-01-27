@@ -153,7 +153,7 @@ requester::Coroutine
             lg2::error(
                 "NsmSetWriteProtected::setWriteProtected: postPatchIO failed."
                 "eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         }
         status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]

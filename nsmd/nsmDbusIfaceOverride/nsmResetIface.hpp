@@ -76,7 +76,7 @@ class NsmResetAsyncIntf : public ResetAsyncIntf, public StateChangeLogger
         {
             lg2::error("postPatchIO failed for gpuFundamentalReset"
                        "eid={EID} rc={RC}",
-                       "EID", eid, "RC", rc_);
+                       "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
             // coverity[missing_return]
             co_return rc_;
         }
@@ -193,7 +193,7 @@ class NsmNetworkDeviceResetAsyncIntf :
         {
             lg2::error(
                 "resetOnDevice postPatchIO failed for while setting power limit for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc_);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
             *status = AsyncOperationStatusType::WriteFailure;
             // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;

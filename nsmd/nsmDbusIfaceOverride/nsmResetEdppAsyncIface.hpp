@@ -74,7 +74,7 @@ class NsmResetEdppAsyncIntf :
             lg2::error(
                 "NsmResetEdppAsyncIntf::clearSetPoint postPatchIO failed for  "
                 "eid={EID} rc={RC}",
-                "EID", eid, "RC", rc_);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }

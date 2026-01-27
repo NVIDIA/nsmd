@@ -303,7 +303,7 @@ requester::Coroutine NsmDotObject::dotCAKInstallAsyncHandler(
 
     lg2::debug(
         "Dot: dotCAKInstall postPatchIO returned: eid={EID} rc={RC} responseLen={LEN}",
-        "EID", eid, "RC", sendRc, "LEN", responseLen);
+        "EID", eid, "RC", utils::nsmSwCodeToString(sendRc), "LEN", responseLen);
 
     if (sendRc != NSM_SW_SUCCESS)
     {
@@ -389,7 +389,7 @@ requester::Coroutine NsmDotObject::bypassAsyncHandler(
 
     lg2::debug(
         "Dot: bypass postPatchIO returned: eid={EID} rc={RC} responseLen={LEN}",
-        "EID", eid, "RC", sendRc, "LEN", responseLen);
+        "EID", eid, "RC", utils::nsmSwCodeToString(sendRc), "LEN", responseLen);
 
     if (sendRc != NSM_SW_SUCCESS)
     {
@@ -581,7 +581,7 @@ requester::Coroutine
 
     lg2::debug(
         "Dot: lock postPatchIO returned: eid={EID} rc={RC} responseLen={LEN}",
-        "EID", eid, "RC", sendRc, "LEN", responseLen);
+        "EID", eid, "RC", utils::nsmSwCodeToString(sendRc), "LEN", responseLen);
 
     if (sendRc != NSM_SW_SUCCESS)
     {
@@ -770,7 +770,8 @@ requester::Coroutine NsmDotObject::unlockChallengeAsyncHandler(
 
     lg2::debug("Dot: unlockChallenge postPatchIO returned: eid={EID} rc={RC} "
                "responseLen={LEN}",
-               "EID", eid, "RC", sendRc, "LEN", responseLen);
+               "EID", eid, "RC", utils::nsmSwCodeToString(sendRc), "LEN",
+               responseLen);
 
     if (sendRc != NSM_SW_SUCCESS)
     {
@@ -889,7 +890,7 @@ requester::Coroutine NsmDotObject::unlockAsyncHandler(
 
     lg2::debug(
         "Dot: unlock postPatchIO returned: eid={EID} rc={RC} responseLen={LEN}",
-        "EID", eid, "RC", sendRc, "LEN", responseLen);
+        "EID", eid, "RC", utils::nsmSwCodeToString(sendRc), "LEN", responseLen);
 
     if (sendRc != NSM_SW_SUCCESS)
     {
@@ -1057,7 +1058,7 @@ requester::Coroutine NsmDotObject::getInfoAsyncHandler(
 
     lg2::debug(
         "Dot: getInfo postPatchIO returned: eid={EID} rc={RC} responseLen={LEN}",
-        "EID", eid, "RC", sendRc, "LEN", responseLen);
+        "EID", eid, "RC", utils::nsmSwCodeToString(sendRc), "LEN", responseLen);
 
     if (sendRc != NSM_SW_SUCCESS)
     {
@@ -1181,7 +1182,7 @@ requester::Coroutine NsmDotObject::cakRotateAsyncHandler(
 
     lg2::debug(
         "Dot: cakRotate postPatchIO returned: eid={EID} rc={RC} responseLen={LEN}",
-        "EID", eid, "RC", sendRc, "LEN", responseLen);
+        "EID", eid, "RC", utils::nsmSwCodeToString(sendRc), "LEN", responseLen);
 
     if (sendRc != NSM_SW_SUCCESS)
     {

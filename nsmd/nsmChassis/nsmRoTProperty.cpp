@@ -223,7 +223,7 @@ requester::Coroutine InbandUpdatePolicyHandler::updateInbandUpdatePolicy(
     {
         LG2_ERROR(
             "updateInbandUpdatePolicy: postPatchIO failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
     }
     if (rc != NSM_SW_SUCCESS)
     {
@@ -241,7 +241,9 @@ requester::Coroutine InbandUpdatePolicyHandler::updateInbandUpdatePolicy(
     {
         LG2_ERROR(
             "updateInbandUpdatePolicy: decode_nsm_firmware_set_rot_property_resp failed. reasonCode={REASONCODE}, cc={CC}, rc={RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+            "REASONCODE", utils::nsmReasonCodeToString(reasonCode), "CC",
+            utils::nsmCompletionCodeToString(cc), "RC",
+            utils::nsmSwCodeToString(rc));
     }
     if ((rc != NSM_SW_SUCCESS) || (cc != NSM_SUCCESS))
     {
@@ -593,7 +595,7 @@ requester::Coroutine NsmImageCopy::imageCopyAsyncHandler(
     {
         lg2::error("postPatchIO failed for chassis {UUID}, eid={EID}, rc={RC}",
                    "UUID", std::string(uuid.begin(), uuid.end()), "EID", eid,
-                   "RC", rc);
+                   "RC", utils::nsmSwCodeToString(rc));
         reasonCode = static_cast<uint16_t>(rc);
         co_return rc;
     }

@@ -1538,7 +1538,7 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
         lg2::error(
             "NsmEDPpScalingFactor::patchSetPoint postPatchIO failed for while setting edpp setpoint "
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -3223,7 +3223,7 @@ requester::Coroutine NsmConfidentialCompute::patchCCMode(
     {
         lg2::error("NsmConfidentialCompute :: patchCCMode postPatchIO failed"
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc_);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
 
         *status = AsyncOperationStatusType::WriteFailure;
 
@@ -3312,7 +3312,7 @@ requester::Coroutine NsmConfidentialCompute::patchCCDevMode(
     {
         lg2::error("NsmConfidentialCompute :: patchCCDevMode postPatchIO failed"
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc_);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
 
         *status = AsyncOperationStatusType::WriteFailure;
 

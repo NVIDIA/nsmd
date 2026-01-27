@@ -686,7 +686,7 @@ requester::Coroutine NsmPowerSmoothingAction::requestActivatePresetProfile(
     {
         lg2::error(
             "requestActivatePresetProfile postPatchIO failed for for eid = {EID} rc = {RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -773,7 +773,7 @@ requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
     {
         lg2::error(
             "requestApplyAdminOverride postPatchIO failed for for eid = {EID} rc = {RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

@@ -129,7 +129,7 @@ class NsmMessageHandler : public std::enable_shared_from_this<NsmMessageHandler>
 
         if (rc)
         {
-            lg2::error(
+            lg2::debug(
                 "NsmMessageHandler::SendRecvNsmMsg failed. eid={EID} rc={RC}",
                 "EID", eid, "RC",
                 utils::nsmSwCodeToString(static_cast<nsm_sw_codes>(rc)));

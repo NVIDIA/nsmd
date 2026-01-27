@@ -66,7 +66,7 @@ requester::Coroutine
     {
         lg2::error(
             "requestEnablePresetProfile postPatchIO failed for for eid = {EID} rc = {RC}, msg={MSG}",
-            "EID", eid, "RC", rc_, "MSG", msg);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_), "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -183,7 +183,7 @@ requester::Coroutine
     {
         lg2::error(
             "requestDisablePresetProfile postPatchIO failed for for eid = {EID} rc = {RC}, msg={MSG}",
-            "EID", eid, "RC", rc_, "MSG", msg);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_), "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

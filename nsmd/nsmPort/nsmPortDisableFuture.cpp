@@ -110,7 +110,7 @@ requester::Coroutine NsmDevicePortDisableFuture::setDevicePortDisableFuture(
         lg2::error(
             "setDevicePortDisableFuture postPatchIO failed for while setting PortDisableFuture "
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;

@@ -294,6 +294,48 @@ Task<> NsmPort::queryPortStatus()
 
 **Important:** `shouldLog()` is a method inherited from `StateChangeLogger` via `NsmObject`. It must be called within a class method, not as a global function.
 
+#### Example 4: Using Human-Readable Translations (REQUIRED Pattern)
+
+**CRITICAL:** When you need to log human-readable translations of error codes using utility functions like `utils::nsmSwCodeToString()`, you **MUST** use the manual `if(shouldLog()) { LG2_LEVEL() }` pattern. You **CANNOT** use `LG2_LEVEL_FLT` in this case.
+
+**Why?** The `shouldLog()` function only accepts specific types (`bool`, `nsm_reason_codes`, `nsm_sw_codes`, `nsm_completion_codes`) and does **NOT** accept `std::string` or string conversions.
+
+```cpp
+// CORRECT: Manual shouldLog() with LG2_ERROR for human-readable output
+Task<> NsmDevice::processResponse()
+{
+    nsm_sw_codes rc = performOperation();
+    
+    // Check state with raw enum values (supported types)
+    if (shouldLog("processResponse", rc))
+    {
+        // Now we can use string conversion utilities in the log message
+        LG2_ERROR(
+            "processResponse failure | rc: {RC}, readable: {RC_STR}",
+            "RC", rc,
+            "RC_STR", utils::nsmSwCodeToString(rc)  // String translation
+        );
+    }
+}
+```
+
+```cpp
+// WRONG: This will NOT compile - LG2_ERROR_FLT doesn't accept string conversions
+Task<> NsmDevice::processResponse()
+{
+    nsm_sw_codes rc = performOperation();
+    
+    // ❌ ERROR: This won't work - utils::nsmSwCodeToString() returns std::string
+    LG2_ERROR_FLT(
+        "processResponse failure | rc: {RC}, readable: {RC_STR}",
+        "RC", rc,
+        "RC_STR", utils::nsmSwCodeToString(rc)  // ❌ String not supported!
+    );
+}
+```
+
+**Summary:** Use `if(shouldLog()) { LG2_LEVEL() }` when you need string translations or other non-supported types in your log messages.
+
 ### Choosing the Right Logging Macro
 
 The framework provides several macro levels:
@@ -303,15 +345,22 @@ The framework provides several macro levels:
    - Includes file name, line number
    - Includes object name and device ID if used in `NsmObject`
    - **Use this by default in polling loops and frequently executed code paths**
+   - **Limitation:** Cannot use with string translations (e.g., `utils::nsmSwCodeToString()`)
 
-2. **`LG2_<LEVEL>`** - Standard logging without flood prevention
+2. **`if(shouldLog()) { LG2_<LEVEL>() }`** - Manual flood prevention with flexibility
+   - Use when you need string translations like `utils::nsmSwCodeToString()`
+   - Use when you need to log non-supported types (strings, converted values, etc.)
+   - Provides same flood prevention as `LG2_<LEVEL>_FLT`
+   - Includes file name, line number, object name, and device ID
+
+3. **`LG2_<LEVEL>`** - Standard logging without flood prevention
    - Includes file name, line number
    - Includes object name and device ID if used in `NsmObject`
    - Use only for one-time operations or when you explicitly want every occurrence logged
 
 Available levels: `EMERGENCY`, `ALERT`, `CRITICAL`, `ERROR`, `WARNING`, `NOTICE`, `INFO`, `DEBUG`
 
-**Recommendation:** Always use `LG2_<LEVEL>_FLT` macros in production code unless you have a specific reason not to. This prevents log flooding and improves system performance.
+**Recommendation:** Always use `LG2_<LEVEL>_FLT` macros by default. Use the manual `if(shouldLog())` pattern only when you need string translations or other non-supported types in your log messages.
 
 ### Success State Logging
 
@@ -327,11 +376,12 @@ This helps you track when issues are resolved without manual success logging.
 
 1. **Prefer `LG2_<LEVEL>_FLT` macros** - Always use these by default instead of manual `shouldLog()` calls
 2. **Only use in `NsmObject` derived classes** - Never use `shouldLog()` as a global function; it's a method inherited from `StateChangeLogger` via `NsmObject`
-3. **Use descriptive message text** - The message text is used as the logger name for state tracking
-4. **Pass all relevant state** - Include all error codes/flags that should trigger state change logging
-5. **Consistent argument order** - Keep the same argument order in `LG2_LEVEL_FLT` calls for the same log message
-6. **Use in polling loops** - Especially important for high-frequency operations (priority sensors, round-robin polling)
-7. **Check merge request template** - The project requires use of flood-prevention logging (`shouldLog` API) for throttled logs
+3. **Use manual pattern for string translations** - When you need human-readable translations (e.g., `utils::nsmSwCodeToString()`), you MUST use `if(shouldLog()) { LG2_LEVEL() }` pattern instead of `LG2_LEVEL_FLT`
+4. **Use descriptive message text** - The message text is used as the logger name for state tracking
+5. **Pass all relevant state** - Include all error codes/flags that should trigger state change logging
+6. **Consistent argument order** - Keep the same argument order in `LG2_LEVEL_FLT` calls for the same log message
+7. **Use in polling loops** - Especially important for high-frequency operations (priority sensors, round-robin polling)
+8. **Check merge request template** - The project requires use of flood-prevention logging (`shouldLog` API) for throttled logs
 
 ### Implementation Details
 

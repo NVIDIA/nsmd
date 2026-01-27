@@ -84,7 +84,7 @@ requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
     {
         lg2::error(
             "clearReqClockLimit postPatchIO failed for for eid = {EID} rc = {RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return rc;
@@ -284,7 +284,7 @@ requester::Coroutine NsmChassisClockControl::setRangeClockLimits(
         lg2::error(
             "NsmChassisClockControl::setRangeClockLimits postPatchIO failed for while setting requested speed limit "
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return rc;

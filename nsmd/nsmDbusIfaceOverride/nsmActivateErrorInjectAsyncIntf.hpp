@@ -73,7 +73,7 @@ class NsmActivateErrorInjectionPayloadIntf :
             lg2::error(
                 "NsmActivateErrorInjectionPayload::activatePayload: postPatchIO failed."
                 "eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc));
             statusInterface->status(AsyncOperationStatusType::WriteFailure);
             // coverity[missing_return]
             co_return rc;

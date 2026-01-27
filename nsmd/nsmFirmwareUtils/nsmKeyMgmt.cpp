@@ -93,7 +93,8 @@ requester::Coroutine
     {
         lg2::error("KeyMgmt - revokeKeys - "
                    "postPatchNsmCommand: eid={EID} rc={RC}",
-                   "EID", nsmDevice->getEid(), "RC", sendRc);
+                   "EID", nsmDevice->getEid(), "RC",
+                   utils::nsmSwCodeToString(sendRc));
         errorCode(getErrorCode(NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, sendRc));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]

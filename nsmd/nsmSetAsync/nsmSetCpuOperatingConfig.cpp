@@ -55,7 +55,7 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
     {
         lg2::error("getMinGraphicsClockLimit: postPatchIO failed. "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return rc;
     }
@@ -111,7 +111,7 @@ requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
     {
         lg2::error("getMaxGraphicsClockLimit: postPatchIO failed. "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         // coverity[missing_return]
         co_return rc;
     }
@@ -221,7 +221,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
         lg2::error(
             "setClockLimitOnDevice postPatchIO failed for while setting clock limits "
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
 
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]

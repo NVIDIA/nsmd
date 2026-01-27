@@ -589,7 +589,7 @@ requester::Coroutine
     {
         lg2::debug("DebugToken: queryDeviceId postPatchIO: "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(sendRc));
         // coverity[missing_return]
         co_return sendRc;
     }

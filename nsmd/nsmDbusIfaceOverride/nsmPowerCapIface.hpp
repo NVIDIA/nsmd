@@ -69,7 +69,7 @@ class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
         {
             lg2::error("postPatchIO failed. "
                        "eid={EID} rc={RC}",
-                       "EID", eid, "RC", rc);
+                       "EID", eid, "RC", utils::nsmSwCodeToString(rc));
             // coverity[missing_return]
             co_return rc;
         }
@@ -132,7 +132,7 @@ class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
         {
             LG2_ERROR(
                 "setPowerCapOnDevice postPatchIO failed, eid = {EID}, rc = {RC}",
-                "EID", eid, "RC", rc);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         }
         if (rc)
         {

@@ -205,7 +205,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
         lg2::error(
             "setL1PowerDevice postPatchIO failed for while setting PowerMode "
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -493,7 +493,7 @@ requester::Coroutine NsmSwitchIsolationMode::setSwitchIsolationMode(
         lg2::error(
             "NsmSwitchIsolationMode::setSwitchIsolationMode postPatchIO failed for"
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -611,7 +611,7 @@ requester::Coroutine NsmSwitchL1PredictionMode::setL1PredictionMode(
         lg2::error(
             "NsmSwitchL1PredictionMode::setL1PredictionMode postPatchIO failed for"
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

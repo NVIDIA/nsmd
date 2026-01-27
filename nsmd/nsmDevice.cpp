@@ -1062,6 +1062,9 @@ requester::Coroutine NsmDevice::dumpNsmDeviceInfoTask()
         "###### NsmDevice::dumpNsmDeviceInfo End for deviceType={DT}, deviceRole={ROLE}, static instanceNumber={INST} ######",
         "DT", getDeviceType(), "ROLE", getDeviceRole(), "INST",
         getInstanceNumber());
+
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
 }
 void NsmDevice::dumpNsmDeviceInfo()
 {

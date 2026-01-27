@@ -103,9 +103,14 @@ class NsmClearPowerCapAsyncIntf :
             responseMsg.get(), responseLen, &cc, &dataSize, &reasonCode,
             &requestedPersistentLimit, &requestedOneshotLimit, &enforcedLimit);
 
-        LG2_ERROR_FLT(
-            "decode_get_power_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (shouldLog("decode_get_power_limit_resp", reasonCode, cc, rc))
+        {
+            LG2_ERROR(
+                "decode_get_power_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+                "REASONCODE", utils::nsmReasonCodeToString(reasonCode), "CC",
+                utils::nsmCompletionCodeToString(cc), "RC",
+                utils::nsmSwCodeToString(rc));
+        }
         if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             // check if device returned invalid power limit, report invalid
@@ -148,7 +153,7 @@ class NsmClearPowerCapAsyncIntf :
         {
             lg2::error(
                 "clearPowerCapOnDevice postPatchIO failed for while setting power limit for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc));
             *status = AsyncOperationStatusType::WriteFailure;
             // coverity[missing_return]
             co_return rc;

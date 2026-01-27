@@ -78,7 +78,7 @@ requester::Coroutine setEgmModeOnDevice(bool egmMode,
         lg2::error(
             "setEgmModeOnDevice postPatchIO failed for while setting EgmMode "
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;

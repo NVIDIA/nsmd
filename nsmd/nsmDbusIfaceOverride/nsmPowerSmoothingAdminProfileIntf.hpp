@@ -92,7 +92,7 @@ class OemAdminProfileIntf :
         {
             lg2::error(
                 "getAdminProfileFromDevice postPatchIO failed for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc_);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
             // coverity[missing_return]
             co_return rc_;
         }
@@ -196,8 +196,8 @@ class OemAdminProfileIntf :
         {
             lg2::error(
                 "overrideAdminProfileParam postPatchIO failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
-                "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue,
-                "MSG", msg);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc_), "ID",
+                parameterId, "VAL", paramValue, "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
             // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -267,8 +267,8 @@ class OemAdminProfileIntf :
         {
             lg2::error(
                 "resetAdminProfileParam postPatchIO failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
-                "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue,
-                "MSG", msg);
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc_), "ID",
+                parameterId, "VAL", paramValue, "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
             // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;

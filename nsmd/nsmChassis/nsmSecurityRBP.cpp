@@ -101,7 +101,7 @@ requester::Coroutine SecurityConfiguration::securityCfgAsyncHandler(
     {
         lg2::error(
             "securityCfgAsyncHandler: postPatchIO error : eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
         co_return rc;
@@ -306,7 +306,7 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
     {
         lg2::error("minSecVersionAsyncHandler: postPatchIO error :"
                    " eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         errorCode(getErrorCode(NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER, rc));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]

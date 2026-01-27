@@ -113,7 +113,7 @@ requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
     {
         lg2::error("NsmEraseTraceObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         operationStatus = EraseOperationStatus::InternalFailure;
         eraseTraceStatus(result);
         co_return rc;
@@ -186,7 +186,7 @@ requester::Coroutine
     {
         lg2::error("NsmEraseDebugInfoObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         operationStatus = EraseOperationStatus::InternalFailure;
         eraseDebugInfoStatus(result);
         co_return rc;
