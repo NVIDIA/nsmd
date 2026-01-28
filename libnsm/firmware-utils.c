@@ -288,7 +288,14 @@ int decode_nsm_query_get_erot_state_parameters_req(
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*fw_req = request->fq_req;
+	// Convert multi-byte fields from little-endian wire format to host byte
+	// order
+	fw_req->component_classification =
+	    le16toh(request->fq_req.component_classification);
+	fw_req->component_identifier =
+	    le16toh(request->fq_req.component_identifier);
+	fw_req->component_classification_index =
+	    request->fq_req.component_classification_index;
 
 	return NSM_SW_SUCCESS;
 }
@@ -316,8 +323,14 @@ int encode_nsm_query_get_erot_state_parameters_req(
 	request->hdr.command = NSM_FW_GET_EROT_STATE_INFORMATION;
 	request->hdr.data_size =
 	    htole16(sizeof(struct nsm_firmware_erot_state_info_req));
-	memcpy(&request->fq_req, fw_req,
-	       sizeof(struct nsm_firmware_erot_state_info_req));
+
+	// Convert multi-byte fields to little-endian for wire format
+	request->fq_req.component_classification =
+	    htole16(fw_req->component_classification);
+	request->fq_req.component_identifier =
+	    htole16(fw_req->component_identifier);
+	request->fq_req.component_classification_index =
+	    fw_req->component_classification_index;
 
 	return NSM_SW_SUCCESS;
 }
@@ -1743,8 +1756,18 @@ int encode_nsm_firmware_set_rot_property_req(
 	request->hdr.command = NSM_FW_SET_ROT_PROPERTY;
 	request->hdr.data_size =
 	    sizeof(struct nsm_firmware_set_rot_property_req);
-	memcpy(&request->rot_property_req, fw_req,
-	       sizeof(struct nsm_firmware_set_rot_property_req));
+
+	// Convert multi-byte fields to little-endian for wire format
+	request->rot_property_req.component_classification =
+	    htole16(fw_req->component_classification);
+	request->rot_property_req.component_identifier =
+	    htole16(fw_req->component_identifier);
+	request->rot_property_req.component_classification_index =
+	    fw_req->component_classification_index;
+	request->rot_property_req.property = fw_req->property;
+	request->rot_property_req.argument_length = fw_req->argument_length;
+	memcpy(request->rot_property_req.argument_data, fw_req->argument_data,
+	       sizeof(fw_req->argument_data));
 
 	// Convert AP SKU ID to little-endian if this is an AP SKU ID property
 	if (request->rot_property_req.property == NSM_ROT_PROPERTY_AP_SKU_ID) {

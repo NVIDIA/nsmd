@@ -165,6 +165,13 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 allCurrentIfaceProperties.at("ImageCopyEnabled"));
         }
 
+        bool inbandUpdatePolicyEnabled = false;
+        if (allCurrentIfaceProperties.count("InbandUpdatePolicyEnabled"))
+        {
+            inbandUpdatePolicyEnabled = std::get<bool>(
+                allCurrentIfaceProperties.at("InbandUpdatePolicyEnabled"));
+        }
+
         auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
         if (!device)
@@ -356,13 +363,30 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 }
             }
 
-            if (inbandUpdatePolicy == nullptr)
+            if (inbandUpdatePolicy == nullptr && inbandUpdatePolicyEnabled)
             {
+                auto inventoryPath = std::string(chassisInventoryBasePath) +
+                                     "/" + name;
+
                 inbandUpdatePolicy =
                     std::make_shared<NsmInbandUpdatePolicyObject>(
-                        bus, name, uuid, classification, identifier,
+                        bus, name, classification, identifier,
                         static_cast<uint8_t>(index));
                 device->addSensor(inbandUpdatePolicy, false);
+
+                // Register async set handler for InbandUpdatePolicy property
+                // with Async.Set support
+                nsm::AsyncSetOperationHandler inbandUpdatePolicyHandler =
+                    std::bind(&nsm::updateInbandUpdatePolicyHandler,
+                              std::placeholders::_1, std::placeholders::_2,
+                              std::placeholders::_3, classification, identifier,
+                              index);
+                AsyncOperationManager::getInstance()
+                    ->getDispatcher(inventoryPath)
+                    ->addAsyncSetOperation(
+                        "com.nvidia.InbandUpdatePolicy", "InbandUpdatePolicy",
+                        AsyncSetOperationInfo{inbandUpdatePolicyHandler,
+                                              inbandUpdatePolicy, device});
             }
 
             if (imageCopyObject == nullptr and imageCopyEnabled)

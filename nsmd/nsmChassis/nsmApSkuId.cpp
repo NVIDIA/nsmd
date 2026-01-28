@@ -57,9 +57,9 @@ std::optional<std::vector<uint8_t>>
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_firmware_get_erot_state_info_req));
     struct ::nsm_firmware_erot_state_info_req erot_req = {};
-    erot_req.component_classification = htole16(classification);
+    erot_req.component_classification = classification;
     erot_req.component_classification_index = index;
-    erot_req.component_identifier = htole16(identifier);
+    erot_req.component_identifier = identifier;
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_nsm_query_get_erot_state_parameters_req(
         instanceId, &erot_req, requestMsg);

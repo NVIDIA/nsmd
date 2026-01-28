@@ -47,10 +47,9 @@ class NsmInbandUpdatePolicy :
 {
   public:
     NsmInbandUpdatePolicy(sdbusplus::bus::bus& bus, const std::string& objPath,
-                          const uuid_t& uuidIn, uint16_t classificationIn,
-                          uint16_t identifierIn, uint8_t indexIn,
-                          NsmSensor& nsmSensor) :
-        InbandUpdatePolicyIntf(bus, objPath.c_str()), uuid(uuidIn),
+                          uint16_t classificationIn, uint16_t identifierIn,
+                          uint8_t indexIn, NsmSensor& nsmSensor) :
+        InbandUpdatePolicyIntf(bus, objPath.c_str()),
         classification(classificationIn), identifier(identifierIn),
         index(indexIn), nsmSensor(nsmSensor)
     {}
@@ -59,14 +58,8 @@ class NsmInbandUpdatePolicy :
 
     void updateProperties(
         const struct ::nsm_firmware_erot_state_info_resp& erot_info);
-    void updatePolicy(bool state) override;
 
   private:
-    requester::Coroutine
-        policyAsyncHandler(std::shared_ptr<Request> request,
-                           std::shared_ptr<AsyncStatusIntf> statusIntf,
-                           std::shared_ptr<AsyncValueIntf> valueIntf);
-    uuid_t uuid;
     uint16_t classification;
     uint16_t identifier;
     uint8_t index;
@@ -84,14 +77,13 @@ class NsmInbandUpdatePolicyObject : public NsmSensor
   private:
     std::string getPath(const std::string& chassisName)
     {
-        using namespace std::string_literals;
         return std::string(chassisInventoryBasePath) + "/" + chassisName;
     }
 
   public:
     NsmInbandUpdatePolicyObject(sdbusplus::bus::bus& bus,
                                 const std::string& chassisName,
-                                const uuid_t& uuid, uint16_t classificationIn,
+                                uint16_t classificationIn,
                                 uint16_t identifierIn, uint8_t indexIn);
 
     NsmInbandUpdatePolicyObject() = delete;
@@ -109,6 +101,35 @@ class NsmInbandUpdatePolicyObject : public NsmSensor
     uint16_t identifier;
     uint8_t index;
 };
+
+/**
+ * @brief Handler class for async Inband Update Policy operation
+ * This class is used to handle writes to the InbandUpdatePolicy property
+ * on the InbandUpdatePolicy D-Bus interface. It inherits from StateChangeLogger
+ * to enable state-aware logging.
+ */
+class InbandUpdatePolicyHandler : public StateChangeLogger
+{
+  public:
+    InbandUpdatePolicyHandler() = default;
+    virtual ~InbandUpdatePolicyHandler() = default;
+
+    requester::Coroutine updateInbandUpdatePolicy(
+        const AsyncSetOperationValueType& value,
+        AsyncOperationStatusType* status, std::shared_ptr<NsmDevice> device,
+        uint16_t classification, uint16_t identifier, uint8_t index);
+};
+
+/**
+ * @brief Standalone wrapper for async Inband Update Policy operation
+ * This function is registered with addAsyncSetOperation to handle
+ * writes to the InbandUpdatePolicy property on the InbandUpdatePolicy D-Bus
+ * interface.
+ */
+requester::Coroutine updateInbandUpdatePolicyHandler(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint16_t classification,
+    uint16_t identifier, uint8_t index);
 
 // Structure to hold component information for image copy
 struct ComponentInfo

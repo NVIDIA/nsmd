@@ -65,148 +65,38 @@ static sdbusplus::common::com::nvidia::ImageCopy::ErrorCode
     }
 }
 
-void NsmInbandUpdatePolicy::updatePolicy(bool state)
-{
-    const auto [objPath, statusIntf, valueIntf] =
-        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
-    if (objPath.empty())
-    {
-        throw Common::Error::Unavailable();
-    }
-    auto request = std::make_shared<Request>(
-        sizeof(nsm_msg_hdr) +
-        sizeof(nsm_firmware_set_rot_property_req_command));
-    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
-    struct ::nsm_firmware_set_rot_property_req nsm_req;
-
-    nsm_req.component_classification = htole16(classification);
-    nsm_req.component_classification_index = index;
-    nsm_req.component_identifier = htole16(identifier);
-    // Property 1: In-band Update Policy + Lifespan
-    nsm_req.property = NSM_ROT_PROPERTY_INBAND_UPDATE_POLICY;
-
-    if (state)
-    {
-        nsm_req.argument_data[0] = NSM_ROT_INBAND_UPDATE_POLICY_ENABLE;
-    }
-    else
-    {
-        nsm_req.argument_data[0] = NSM_ROT_INBAND_UPDATE_POLICY_DISABLE;
-    }
-
-    nsm_req.argument_data[1] = NSM_ROT_INBAND_UPDATE_POLICY_LIFESPAN_PERSISTENT;
-
-    nsm_req.argument_length = ARGUMENT_DATA_LENGTH;
-
-    auto rc = encode_nsm_firmware_set_rot_property_req(0, &nsm_req, requestMsg);
-
-    if (rc == NSM_SW_SUCCESS)
-    {
-        // reset the error code before sending the request
-        errorCode(std::make_tuple(NSM_SW_SUCCESS, ""));
-        policyAsyncHandler(request, statusIntf, valueIntf).detach();
-        return;
-    }
-    lg2::error("encode_nsm_firmware_set_rot_property_req failed: rc={RC}", "RC",
-               rc);
-
-    auto error = getErrorCode(NSM_FW_SET_ROT_PROPERTY, rc);
-    valueIntf->value(error);
-    errorCode(error);
-
-    if (rc == NSM_ERR_INVALID_DATA)
-    {
-        statusIntf->status(AsyncOperationStatusType::WriteFailure);
-        throw Common::Error::InvalidArgument();
-    }
-    statusIntf->status(AsyncOperationStatusType::InternalFailure);
-    throw Common::Error::InternalFailure();
-}
-
-requester::Coroutine NsmInbandUpdatePolicy::policyAsyncHandler(
-    std::shared_ptr<Request> request,
-    std::shared_ptr<AsyncStatusIntf> statusIntf,
-    std::shared_ptr<AsyncValueIntf> valueIntf)
-{
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = device->getEid();
-    std::shared_ptr<const nsm_msg> responseMsg;
-    size_t responseLen = 0;
-    uint8_t cc = 0;
-    uint16_t reasonCode = 0;
-    auto rc = co_await device->postPatchIO(eid, *request, responseMsg,
-                                           responseLen);
-
-    if (rc != NSM_SW_SUCCESS)
-    {
-        lg2::error("policyAsyncHandler: postPatchNsmCommand error :"
-                   " eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
-        auto error = getErrorCode(NSM_FW_SET_ROT_PROPERTY, rc);
-        valueIntf->value(error);
-        errorCode(error);
-        statusIntf->status(AsyncOperationStatusType::InternalFailure);
-        co_return rc;
-    }
-
-    rc = decode_nsm_firmware_set_rot_property_resp(
-        responseMsg.get(), responseLen, &cc, &reasonCode);
-
-    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
-    {
-        lg2::error(
-            "decode_nsm_firmware_set_rot_property_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-
-        auto error = getErrorCode(NSM_FW_SET_ROT_PROPERTY, cc, reasonCode);
-        valueIntf->value(error);
-        errorCode(error);
-        statusIntf->status(AsyncOperationStatusType::InternalFailure);
-        co_return NSM_SW_ERROR;
-    }
-
-    rc = co_await nsmSensor.update(device);
-    statusIntf->status(rc == NSM_SW_SUCCESS
-                           ? AsyncOperationStatusType::Success
-                           : AsyncOperationStatusType::InternalFailure);
-    co_return rc;
-}
-
 void NsmInbandUpdatePolicy::updateProperties(
     const struct ::nsm_firmware_erot_state_info_resp& erot_info)
 {
     using InbandPolicyState =
         sdbusplus::common::com::nvidia::InbandUpdatePolicy::InbandPolicyState;
 
-    InbandPolicyState policyState = InbandPolicyState::NotApplicable;
     switch (erot_info.fq_resp_hdr.inband_update_policy)
     {
         case NSM_ROT_INBAND_UPDATE_POLICY_ENABLE:
-            policyState = InbandPolicyState::Enabled;
+            inbandUpdatePolicy(InbandPolicyState::Enabled);
             break;
         case NSM_ROT_INBAND_UPDATE_POLICY_DISABLE:
-            policyState = InbandPolicyState::Disabled;
+            inbandUpdatePolicy(InbandPolicyState::Disabled);
             break;
         default:
-            policyState = InbandPolicyState::NotApplicable;
+            lg2::error(
+                "Invalid inband_update_policy value: {VALUE}, InbandUpdatePolicy property not updated",
+                "VALUE", erot_info.fq_resp_hdr.inband_update_policy);
             break;
     }
-
-    inbandUpdatePolicy(policyState);
 }
 
 NsmInbandUpdatePolicyObject::NsmInbandUpdatePolicyObject(
     sdbusplus::bus::bus& bus, const std::string& chassisName,
-    const uuid_t& uuid, uint16_t classificationIn, uint16_t identifierIn,
-    uint8_t indexIn) :
+    uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn) :
     NsmSensor(chassisName, "NSM_ChassisRoT"), objectPath(getPath(chassisName)),
     classification(classificationIn), identifier(identifierIn), index(indexIn)
 {
     lg2::info("NsmInbandUpdatePolicy: create object: {PATH}", "PATH",
               objectPath.c_str());
     nsmInbandUpdatePolicy = std::make_unique<NsmInbandUpdatePolicy>(
-        bus, objectPath, uuid, classification, identifier, index, *this);
+        bus, objectPath, classification, identifier, index, *this);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -215,9 +105,9 @@ std::optional<std::vector<uint8_t>>
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_firmware_get_erot_state_info_req));
     struct ::nsm_firmware_erot_state_info_req erot_req = {};
-    erot_req.component_classification = htole16(classification);
+    erot_req.component_classification = classification;
     erot_req.component_classification_index = index;
-    erot_req.component_identifier = htole16(identifier);
+    erot_req.component_identifier = identifier;
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_nsm_query_get_erot_state_parameters_req(
         instanceId, &erot_req, requestMsg);
@@ -242,18 +132,135 @@ uint8_t NsmInbandUpdatePolicyObject::handleResponseMsg(
         responseMsg, responseLen, &cc, &reason_code, &erot_info);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        auto error = getErrorCode(NSM_FW_SET_ROT_PROPERTY, cc, reason_code);
-        nsmInbandUpdatePolicy->errorCode(error);
         lg2::error(
             "Response message error: rc={RC}, cc={CC}, reasonCode={REASONCODE}",
             "RC", rc, "CC", (int)cc, "REASONCODE", (int)reason_code);
         free(erot_info.slot_info);
-        return cc;
+        return cc ? cc : rc;
     }
 
     nsmInbandUpdatePolicy->updateProperties(erot_info);
     free(erot_info.slot_info);
     return cc ? cc : rc;
+}
+
+requester::Coroutine InbandUpdatePolicyHandler::updateInbandUpdatePolicy(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint16_t classification,
+    uint16_t identifier, uint8_t index)
+{
+    using InbandPolicyState =
+        sdbusplus::common::com::nvidia::InbandUpdatePolicy::InbandPolicyState;
+
+    const auto* policyString = std::get_if<std::string>(&value);
+    if (policyString == nullptr)
+    {
+        LG2_ERROR("updateInbandUpdatePolicy: invalid value type");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    auto policyStateOpt = sdbusplus::common::com::nvidia::InbandUpdatePolicy::
+        convertStringToInbandPolicyState(*policyString);
+    if (!policyStateOpt.has_value())
+    {
+        LG2_ERROR("updateInbandUpdatePolicy: invalid policy string: {POLICY}",
+                  "POLICY", *policyString);
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    auto policyState = policyStateOpt.value();
+    uint8_t policyValue;
+    if (policyState == InbandPolicyState::Enabled)
+    {
+        policyValue = NSM_ROT_INBAND_UPDATE_POLICY_ENABLE;
+    }
+    else if (policyState == InbandPolicyState::Disabled)
+    {
+        policyValue = NSM_ROT_INBAND_UPDATE_POLICY_DISABLE;
+    }
+    else
+    {
+        LG2_ERROR("updateInbandUpdatePolicy: unsupported policy state");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    auto eid = device->getEid();
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_firmware_set_rot_property_req_command));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+    struct ::nsm_firmware_set_rot_property_req nsm_req = {};
+
+    nsm_req.component_classification = classification;
+    nsm_req.component_classification_index = index;
+    nsm_req.component_identifier = identifier;
+    nsm_req.property = NSM_ROT_PROPERTY_INBAND_UPDATE_POLICY;
+    nsm_req.argument_data[0] = policyValue;
+    nsm_req.argument_data[1] = NSM_ROT_INBAND_UPDATE_POLICY_LIFESPAN_PERSISTENT;
+    nsm_req.argument_length = 2;
+
+    auto rc = encode_nsm_firmware_set_rot_property_req(0, &nsm_req, requestMsg);
+    if (shouldLog("encode_nsm_firmware_set_rot_property_req", uint16_t(0),
+                  uint8_t(0), rc))
+    {
+        LG2_ERROR(
+            "updateInbandUpdatePolicy: encode_nsm_firmware_set_rot_property_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+    }
+    if (rc != NSM_SW_SUCCESS)
+    {
+        *status = AsyncOperationStatusType::InternalFailure;
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
+
+    if (shouldLog("postPatchIO", uint16_t(0), uint8_t(0), rc))
+    {
+        LG2_ERROR(
+            "updateInbandUpdatePolicy: postPatchIO failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+    }
+    if (rc != NSM_SW_SUCCESS)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return rc;
+    }
+
+    uint8_t cc = 0;
+    uint16_t reasonCode = 0;
+    rc = decode_nsm_firmware_set_rot_property_resp(
+        responseMsg.get(), responseLen, &cc, &reasonCode);
+
+    if (shouldLog("decode_nsm_firmware_set_rot_property_resp", reasonCode, cc,
+                  rc))
+    {
+        LG2_ERROR(
+            "updateInbandUpdatePolicy: decode_nsm_firmware_set_rot_property_resp failed. reasonCode={REASONCODE}, cc={CC}, rc={RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    }
+    if ((rc != NSM_SW_SUCCESS) || (cc != NSM_SUCCESS))
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return cc ? cc : rc;
+    }
+
+    *status = AsyncOperationStatusType::Success;
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine updateInbandUpdatePolicyHandler(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint16_t classification,
+    uint16_t identifier, uint8_t index)
+{
+    InbandUpdatePolicyHandler handler;
+    co_return co_await handler.updateInbandUpdatePolicy(
+        value, status, device, classification, identifier, index);
 }
 
 void NsmImageCopy::setImageCopyResult(std::shared_ptr<AsyncValueIntf> valueIntf,
