@@ -163,6 +163,183 @@ EOL
 chmod +x .git/hooks/pre-commit
 ```
 
+## Logging API
+
+The NSM daemon provides a logging framework with flood prevention capabilities to avoid overwhelming the log system with repetitive messages. This is particularly useful when errors occur repeatedly during polling operations.
+
+### Overview
+
+The logging framework provides two main mechanisms:
+
+1. **`LG2_LEVEL_FLT` macros** - **PREFERRED** - Convenient logging macros with built-in flood prevention
+2. **`shouldLog()` API** - Lower-level API for manual state change tracking (used by `LG2_LEVEL_FLT` internally)
+
+**Important:** Always prefer `LG2_LEVEL_FLT` macros over manual `shouldLog()` calls unless you have a specific reason to use the lower-level API.
+
+### When to Use Flood-Prevention Logging
+
+Use `LG2_LEVEL_FLT` macros when:
+
+- Logging errors in polling loops that execute frequently
+- Logging errors in operations that may fail repeatedly
+- You want to log when a state changes (error occurs or clears)
+- You need to reduce log noise while maintaining visibility into state changes
+
+### Class Inheritance and Usage Context
+
+**CRITICAL:** The `shouldLog()` API is available only in classes that inherit from `NsmObject`, which inherits from `StateChangeLogger`:
+
+```cpp
+class StateChangeLogger {
+    // Provides shouldLog() method
+};
+
+class NsmObject : virtual public StateChangeLogger {
+    // Inherits shouldLog() method
+};
+
+class YourClass : public NsmObject {
+    // Your class has access to shouldLog() via inheritance
+};
+```
+
+**DO NOT** use global `shouldLog()` functions. Always use the inherited method within your class implementation. This ensures proper state tracking per object instance.
+
+### Basic Usage Examples
+
+#### Example 1: Using LG2_ERROR_FLT Macro (PREFERRED)
+
+```cpp
+// In a method of a class inheriting from NsmObject
+Task<> NsmPort::queryPortStatus()
+{
+    nsm_sw_codes rc = decode_query_port_status_resp(responseMsg.get(), responseLen, 
+                                                     &cc, &reasonCode, &dataSize, 
+                                                     &portState, &portStatus);
+
+    // PREFERRED: Use LG2_ERROR_FLT macro - automatically handles shouldLog()
+    // The odd-indexed arguments (values in key-value pairs) are tracked for state changes
+    LG2_ERROR_FLT(
+        "decode_query_port_status_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode,  // logged and tracked
+        "CC", cc,                   // logged and tracked
+        "RC", rc                    // logged and tracked
+    );
+    
+    // ... rest of implementation
+}
+```
+
+**How it works:**
+- First call with error codes: logs the error
+- Subsequent calls with same error codes: silently skips logging (flood prevention)
+- Call with different error codes: logs the new error
+- Call with success codes: logs a success message with cleared codes and removes the logger
+
+**Note:** When using `LG2_LEVEL_FLT` macros, the framework automatically extracts odd-indexed arguments (values in key-value pairs) for state change tracking. **Only the following types are supported for state tracking:**
+- `bool`
+- `nsm_reason_codes`
+- `nsm_sw_codes`
+- `nsm_completion_codes`
+
+Other types (like `int`, `uint8_t`, `uint16_t`, `std::string`) can be used in log messages but will NOT be tracked for state changes.
+
+#### Example 2: Using LG2_ERROR_FLT with Boolean Flag
+
+```cpp
+// In a method of NsmEventConfig class
+bool NsmEventConfig::validateEventIds()
+{
+    bool isNotSupported = !isEventIdSupported(eventId);
+    
+    // Create a descriptive logger message for state tracking
+    const auto loggerMsg = std::format("Validation of Event ID {} for Message Type {}", 
+                                       eventId, messageType);
+    
+    // Use LG2_ERROR_FLT - only 'isNotSupported' (bool) is tracked for state changes
+    // Note: eventId, messageType, eid are NOT tracked (not supported types)
+    LG2_ERROR_FLT(
+        "Event ID {ID} for Message Type {MSG_TYPE} is not supported, EID: {EID}",
+        "ID", eventId,              // logged but NOT tracked (int type)
+        "MSG_TYPE", messageType,     // logged but NOT tracked (enum/int type)
+        "EID", eid,                  // logged but NOT tracked (eid_t type)
+        "NOTSUPPORTED", isNotSupported  // logged AND tracked (bool type)
+    );
+}
+```
+
+**Important:** Only values of supported types (`bool`, `nsm_reason_codes`, `nsm_sw_codes`, `nsm_completion_codes`) are tracked for state changes. Other argument values are logged but ignored for flood prevention logic.
+
+#### Example 3: Manual shouldLog() Usage (Advanced, Less Common)
+
+Only use manual `shouldLog()` when you need explicit control over when to log:
+
+```cpp
+// In a method of a class inheriting from NsmObject
+Task<> NsmPort::queryPortStatus()
+{
+    nsm_sw_codes rc = decode_query_port_status_resp(responseMsg.get(), responseLen, 
+                                                     &cc, &reasonCode, &dataSize, 
+                                                     &portState, &portStatus);
+
+    // Manual check with shouldLog() - only use if you need conditional logging logic
+    if (shouldLog("decode_query_port_status_resp", reasonCode, cc, rc))
+    {
+        LG2_ERROR(
+            "decode_query_port_status_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    }
+}
+```
+
+**Important:** `shouldLog()` is a method inherited from `StateChangeLogger` via `NsmObject`. It must be called within a class method, not as a global function.
+
+### Choosing the Right Logging Macro
+
+The framework provides several macro levels:
+
+1. **`LG2_<LEVEL>_FLT`** - **PREFERRED** - Logging with flood prevention
+   - Automatically calls `shouldLog()` with odd-indexed arguments
+   - Includes file name, line number
+   - Includes object name and device ID if used in `NsmObject`
+   - **Use this by default in polling loops and frequently executed code paths**
+
+2. **`LG2_<LEVEL>`** - Standard logging without flood prevention
+   - Includes file name, line number
+   - Includes object name and device ID if used in `NsmObject`
+   - Use only for one-time operations or when you explicitly want every occurrence logged
+
+Available levels: `EMERGENCY`, `ALERT`, `CRITICAL`, `ERROR`, `WARNING`, `NOTICE`, `INFO`, `DEBUG`
+
+**Recommendation:** Always use `LG2_<LEVEL>_FLT` macros in production code unless you have a specific reason not to. This prevents log flooding and improves system performance.
+
+### Success State Logging
+
+When all tracked arguments return to success state, the framework automatically logs a success message:
+
+```
+{FUNCNAME} SUCCESSFUL | Cleared Codes : ReasonCodes=[ERR_TIMEOUT, ERR_NOT_SUPPORTED], ResultCodes=[NSM_SW_ERROR]
+```
+
+This helps you track when issues are resolved without manual success logging.
+
+### Best Practices
+
+1. **Prefer `LG2_<LEVEL>_FLT` macros** - Always use these by default instead of manual `shouldLog()` calls
+2. **Only use in `NsmObject` derived classes** - Never use `shouldLog()` as a global function; it's a method inherited from `StateChangeLogger` via `NsmObject`
+3. **Use descriptive message text** - The message text is used as the logger name for state tracking
+4. **Pass all relevant state** - Include all error codes/flags that should trigger state change logging
+5. **Consistent argument order** - Keep the same argument order in `LG2_LEVEL_FLT` calls for the same log message
+6. **Use in polling loops** - Especially important for high-frequency operations (priority sensors, round-robin polling)
+7. **Check merge request template** - The project requires use of flood-prevention logging (`shouldLog` API) for throttled logs
+
+### Implementation Details
+
+- Logger state is stored per logger name in a map
+- State tracking uses a `Bitfield256` for enum types to track multiple error codes
+- Logger entries are automatically removed when all states return to success
+- Argument count and types must remain consistent for each logger name
+
 ## Progress Counters
 
 The NSM daemon tracks various sensor polling operations using progress counters. These counters are stored in a memory-mapped file descriptor (memfd) and can be accessed via D-Bus for duming, monitoring and debugging purposes.
