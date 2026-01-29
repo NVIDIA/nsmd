@@ -133,6 +133,31 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
         }
     }
 
+    // add primary_temperature_sensor association for primary temperature sensor
+    if (info.type == "NSM_Temp" && info.sensorId == 0 &&
+        !info.chassis_association.empty())
+    {
+        bool hasPrimaryTempAssoc = false;
+        for (const auto& assoc : info.associations)
+        {
+            if (assoc.backward == "primary_temperature_sensor")
+            {
+                hasPrimaryTempAssoc = true;
+                break;
+            }
+        }
+        if (!hasPrimaryTempAssoc)
+        {
+            utils::Association primaryTempAssoc;
+            primaryTempAssoc.forward = "chassis";
+            primaryTempAssoc.backward = "primary_temperature_sensor";
+            primaryTempAssoc.absolutePath = info.chassis_association;
+            info.associations.push_back(primaryTempAssoc);
+            lg2::info("Added primary_temperature_sensor association for {NAME}",
+                      "NAME", info.name);
+        }
+    }
+
     if (info.chassis_association.empty())
     {
         lg2::error(

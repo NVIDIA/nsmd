@@ -720,6 +720,13 @@ Discovery event counters use signed 8-bit integers (`int8_t`) to represent three
 This three-state model allows distinguishing between operations that haven't run yet versus operations that ran but failed.
 
 
+## Primary Temperature Sensor
+
+For `NSM_Temp` sensors, `SensorId = 0` is considered the primary temperature sensor.
+
+As per NSM Spec (Get Temperature Reading command):
+> SensorId 0 = Device temperature averaged across all device sensors
+
 ## Artifacts
 
 Successful build should generate three binary artifacts.
