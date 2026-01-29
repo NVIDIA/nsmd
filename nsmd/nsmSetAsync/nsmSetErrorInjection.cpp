@@ -201,56 +201,85 @@ requester::Coroutine
 NsmSetErrorInjectionPayload::NsmSetErrorInjectionPayload(
     const std::string& name, SensorManager& manager,
     const Interfaces<ErrorInjectionPayloadIntf>& interfaces,
-    std::shared_ptr<NsmActivateErrorInjectionPayloadIntf> activateIntf) :
+    std::shared_ptr<NsmActivateErrorInjectionPayloadIntf> activateIntf,
+    uint16_t errorInjectionType, uint16_t errorInjectionSubtype) :
     NsmInterfaceContainer<ErrorInjectionPayloadIntf>(interfaces),
     NsmObject(name, "NSM_ErrorInjectionPayload"), manager(manager),
-    activateIntf(activateIntf)
+    activateIntf(activateIntf), errorInjectionType(errorInjectionType),
+    errorInjectionSubtype(errorInjectionSubtype)
 {}
 
 requester::Coroutine NsmSetErrorInjectionPayload::setErrorInjectionPayload(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    uint32_t faultBitMap;
-    uint32_t errorInjectionId;
-    const std::vector<std::tuple<std::string, uint32_t>>* payloadValue =
-        std::get_if<std::vector<std::tuple<std::string, uint32_t>>>(&value);
+    std::vector<uint8_t> faultPayload;
+    const auto* payloadValue = std::get_if<std::vector<
+        std::tuple<std::string, std::variant<bool, uint32_t, double,
+                                             std::vector<uint8_t>>>>>(&value);
 
-    if (payloadValue == nullptr)
+    if (!payloadValue)
     {
+        lg2::error(
+            "setErrorInjectionPayload: Failed to get payload values - invalid type");
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    for (auto val : *payloadValue)
+    if (payloadValue->empty())
     {
-        if (std::get<0>(val) == "FaultBitMap")
+        lg2::error("setErrorInjectionPayload: Empty payload values list");
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    for (const auto& [key, val] : *payloadValue)
+    {
+        if (key == "FaultBitMap")
         {
-            faultBitMap = std::get<1>(val);
+            const auto* faultBitMapValue =
+                std::get_if<std::vector<uint8_t>>(&val);
+            if (!faultBitMapValue)
+            {
+                lg2::error(
+                    "setErrorInjectionPayload: Invalid type for FaultBitMap");
+                throw sdbusplus::error::xyz::openbmc_project::common::
+                    InvalidArgument{};
+            }
+            faultPayload = *faultBitMapValue;
         }
-        else if (std::get<0>(val) == "errorInjectionId")
+        else
         {
-            errorInjectionId = std::get<1>(val);
+            lg2::error("setErrorInjectionPayload: Unrecognized key {KEY}",
+                       "KEY", key);
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
         }
     }
-    // coverity[missing_return]
-    co_return co_await setPayload(faultBitMap, errorInjectionId, *status,
-                                  device);
+    co_return co_await setPayload(faultPayload, *status, device);
 }
 
-requester::Coroutine NsmSetErrorInjectionPayload::setPayload(
-    uint32_t faultBitMap, uint32_t errorInjectionId,
-    AsyncOperationStatusType& status, std::shared_ptr<NsmDevice> device)
+requester::Coroutine
+    NsmSetErrorInjectionPayload::setPayload(std::vector<uint8_t> faultBitMap,
+                                            AsyncOperationStatusType& status,
+                                            std::shared_ptr<NsmDevice> device)
 {
-    Request request(sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_set_error_injection_payload_req));
-
     auto eid = manager.getEid(device);
+    if (errorInjectionType == EI_DEVICE_ERRORS)
+    {
+        // Insert 2 bytes at front for subtype
+        faultBitMap.insert(faultBitMap.begin(), 2, 0);
+        *reinterpret_cast<uint16_t*>(faultBitMap.data()) =
+            errorInjectionSubtype;
+    }
+
+    size_t requestSize = sizeof(nsm_msg_hdr) +
+                         sizeof(nsm_set_error_injection_payload_req) -
+                         sizeof(uint8_t) + faultBitMap.size();
+    Request request(requestSize);
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    struct nsm_error_injection_payload data = {0, 0, 0};
-    data.offset = 0;
-    data.error_injection_id = errorInjectionId;
-    data.fault_reason_bit_map = faultBitMap;
-    auto rc = encode_set_error_injection_payload_req(0, &data, requestPtr);
+
+    auto rc = encode_set_error_injection_payload_req(
+        0, faultBitMap.data(), faultBitMap.size(), errorInjectionType,
+        errorInjectionSubtype, requestPtr);
 
     if (rc != NSM_SW_SUCCESS)
     {

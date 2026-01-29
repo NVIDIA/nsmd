@@ -12,6 +12,44 @@
 namespace nsm
 {
 
+/**
+ * @brief Convert D-Bus ErrorInjectionCapability Type to NSM protocol bit
+ * position
+ *
+ * The D-Bus Type enum has more values than the NSM protocol bits because
+ * FatalErrors, PortRecoveryErrors, USBBridgeEmulationErrors, and
+ * LeakDetectionErrors all map to the same EI_DEVICE_ERRORS bit (bit 4) with
+ * different subtypes.
+ *
+ * @param type D-Bus ErrorInjectionCapability Type
+ * @return NSM protocol bit position for the error injection type
+ */
+static uint8_t
+    getErrorInjectionBitPosition(ErrorInjectionCapabilityIntf::Type type)
+{
+    switch (type)
+    {
+        case ErrorInjectionCapabilityIntf::Type::MemoryErrors:
+            return EI_MEMORY_ERRORS;
+        case ErrorInjectionCapabilityIntf::Type::PCIeErrors:
+            return EI_PCI_ERRORS;
+        case ErrorInjectionCapabilityIntf::Type::NVLinkErrors:
+            return EI_NVLINK_ERRORS;
+        case ErrorInjectionCapabilityIntf::Type::ThermalErrors:
+            return EI_THERMAL_ERRORS;
+        case ErrorInjectionCapabilityIntf::Type::FatalErrors:
+        case ErrorInjectionCapabilityIntf::Type::PortRecoveryErrors:
+        case ErrorInjectionCapabilityIntf::Type::USBBridgeEmulationErrors:
+        case ErrorInjectionCapabilityIntf::Type::LeakDetectionErrors:
+            return EI_DEVICE_ERRORS;
+        case ErrorInjectionCapabilityIntf::Type::GPIOSpoofingErrors:
+            return EI_GPIO_SPOOFING;
+        case ErrorInjectionCapabilityIntf::Type::Unknown:
+        default:
+            return 0;
+    }
+}
+
 NsmErrorInjection::NsmErrorInjection(
     const NsmInterfaceProvider<ErrorInjectionIntf>& provider) :
     NsmSensor(provider), NsmInterfaceContainer<ErrorInjectionIntf>(provider)
@@ -107,7 +145,8 @@ uint8_t NsmErrorInjectionSupported::handleResponseMsg(
     {
         invoke([data](auto& pdi) {
             auto type = pdi.type();
-            pdi.supported(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
+            auto bitPos = getErrorInjectionBitPosition(type);
+            pdi.supported(data.mask[bitPos / 8] & (1 << (bitPos % 8)));
         });
     }
 
@@ -149,7 +188,8 @@ uint8_t NsmErrorInjectionEnabled::handleResponseMsg(
     {
         invoke([data](auto& pdi) {
             auto type = pdi.type();
-            pdi.enabled(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
+            auto bitPos = getErrorInjectionBitPosition(type);
+            pdi.enabled(data.mask[bitPos / 8] & (1 << (bitPos % 8)));
         });
     }
 
@@ -158,10 +198,11 @@ uint8_t NsmErrorInjectionEnabled::handleResponseMsg(
 
 NsmErrorInjectionPayload::NsmErrorInjectionPayload(
     const NsmInterfaceProvider<ErrorInjectionPayloadIntf>& provider,
-    uint32_t errorInjectionId) :
+    uint16_t errorInjectionType, uint16_t errorInjectionSubtype) :
     NsmSensor(provider),
     NsmInterfaceContainer<ErrorInjectionPayloadIntf>(provider),
-    errorInjectionId(errorInjectionId)
+    errorInjectionType(errorInjectionType),
+    errorInjectionSubtype(errorInjectionSubtype)
 {}
 
 std::optional<Request>
@@ -171,7 +212,7 @@ std::optional<Request>
                     sizeof(nsm_get_error_injection_payload_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_get_error_injection_payload_req(
-        instanceNumber, errorInjectionId, requestPtr);
+        instanceNumber, errorInjectionType, errorInjectionSubtype, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -187,18 +228,28 @@ uint8_t NsmErrorInjectionPayload::handleResponseMsg(
 {
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
-    nsm_error_injection_payload data;
-    auto rc = decode_get_error_injection_payload_resp(responseMsg, responseLen,
-                                                      &cc, &reasonCode, &data);
+    std::vector<uint8_t> data(responseLen, 0);
+    size_t dataSize = 0;
+    auto rc = decode_get_error_injection_payload_resp(
+        responseMsg, responseLen, errorInjectionType, errorInjectionSubtype,
+        &cc, &reasonCode, data.data(), &dataSize);
 
     LG2_ERROR_FLT(
         "decode_get_error_injection_payload_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
-        invoke([data](auto& pdi) {
-            pdi.payload(static_cast<uint64_t>(data.fault_reason_bit_map));
-        });
+        if (errorInjectionType == EI_DEVICE_ERRORS &&
+            dataSize > sizeof(uint16_t))
+        {
+            if (data.size() >= dataSize)
+            {
+                data.erase(data.begin(), data.begin() + sizeof(uint16_t));
+                dataSize -= sizeof(uint16_t);
+            }
+        }
+        data.resize(dataSize);
+        invoke([data](auto& pdi) { pdi.payload(data); });
     }
 
     return cc ? cc : rc;

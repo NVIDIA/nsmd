@@ -676,7 +676,7 @@ class MockupResponder
                  nsm_reconfiguration_permissions_v1>
             prcKnobs;
         nsm_error_injection_mode_v1 errorInjectionMode;
-        nsm_error_injection_payload errorInjectionPayload;
+        std::vector<uint8_t> errorInjectionPayload;
         uint8_t l1_prediction_mode;
         std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
         uint8_t migMode;

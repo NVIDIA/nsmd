@@ -249,7 +249,8 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerModePatch(
     auto powerModePatchData = getPowerModeData();
 
     const auto* patchRequestedValues = std::get_if<std::vector<
-        std::tuple<std::string, std::variant<bool, uint32_t, double>>>>(&value);
+        std::tuple<std::string, std::variant<bool, uint32_t, double,
+                                             std::vector<uint8_t>>>>>(&value);
     if (!patchRequestedValues)
     {
         lg2::error(

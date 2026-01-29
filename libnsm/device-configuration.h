@@ -18,6 +18,7 @@
 #ifndef DEVICE_CONFIGURATION_H
 #define DEVICE_CONFIGURATION_H
 
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -59,7 +60,15 @@ enum error_injection_type {
 	EI_PCI_ERRORS = 1,
 	EI_NVLINK_ERRORS = 2,
 	EI_THERMAL_ERRORS = 3,
-	EI_FATAL_ERRORS = 4,
+	EI_DEVICE_ERRORS = 4,
+	EI_GPIO_SPOOFING = 5
+};
+
+enum error_injection_device_errorsubtype {
+	EI_DEVICE_ERRORS_SUBTYPE_FATAL = 0,
+	EI_DEVICE_ERRORS_SUBTYPE_PORT_RECOVERY = 1,
+	EI_DEVICE_ERRORS_SUBTYPE_USB_EMULATION = 2,
+	EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT = 3
 };
 
 enum fpga_diagnostics_settings_data_index {
@@ -199,6 +208,15 @@ struct nsm_set_error_injection_types_mask_req {
     */
 } __attribute__((packed));
 
+/** @struct nsm_error_injection_id
+ *
+ * Structure representing Error Injection id.
+ */
+struct nsm_error_injection_id {
+	uint32_t error_injection_type : 16;
+	uint32_t error_injection_subtype : 16;
+} __attribute__((packed));
+
 /** @struct nsm_get_error_injection_types_mask_resp
  *
  * Structure representing Get Supported Error Injection Types v1 and Get
@@ -215,14 +233,56 @@ struct nsm_get_error_injection_types_mask_resp {
 	*/
 } __attribute__((packed));
 
-/** @struct nsm_error_injection_payload
+/** @struct nsm_error_injection_fatal_payload
  *
- * Structure representing Error Injection payload data.
+ * Structure representing Error Injection fatal payload data.
  */
-struct nsm_error_injection_payload {
-	uint32_t offset;
-	uint32_t error_injection_id;
-	uint32_t fault_reason_bit_map;
+struct nsm_error_injection_fatal_payload {
+	uint16_t error_injection_subtype;
+	uint32_t payload_bitmap;
+} __attribute__((packed));
+
+/** @struct nsm_error_injection_usb_emu_payload
+ *
+ * Structure representing Error Injection USB emulation payload data.
+ */
+struct nsm_error_injection_usb_emu_payload {
+	uint16_t error_injection_subtype;
+	uint8_t payload;
+	uint8_t bus_number;
+	uint8_t error;
+	uint8_t address;
+} __attribute__((packed));
+
+/** @struct nsm_error_injection_port_recovery_payload
+ *
+ * Structure representing Error Injection port recovery payload data.
+ */
+struct nsm_error_injection_port_recovery_payload {
+	uint16_t error_injection_subtype;
+	uint8_t l1_payload;
+	uint8_t l2_payload;
+	uint8_t l3_payload;
+	uint8_t reserved;
+} __attribute__((packed));
+
+/** @struct nsm_error_injection_leak_payload
+ *
+ * Structure representing Error Injection leak payload data.
+ */
+struct nsm_error_injection_leak_payload {
+	uint16_t error_injection_subtype;
+	uint16_t number_of_sensors;
+	uint16_t sensors_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_error_injection_gpio_spoofing_payload
+ *
+ * Structure representing Error Injection GPIO spoofing payload data.
+ */
+struct nsm_error_injection_gpio_spoofing_payload {
+	uint16_t count_of_gpio;
+	uint16_t gpio_data[1];
 } __attribute__((packed));
 
 /** @struct nsm_set_error_injection_payload_req
@@ -231,7 +291,9 @@ struct nsm_error_injection_payload {
  */
 struct nsm_set_error_injection_payload_req {
 	struct nsm_common_req_v2 hdr;
-	struct nsm_error_injection_payload data;
+	uint32_t offset;
+	uint16_t error_injection_type;
+	uint8_t fault_payload[1];
 } __attribute__((packed));
 
 /** @struct nsm_get_error_injection_payload_req
@@ -249,7 +311,18 @@ struct nsm_get_error_injection_payload_req {
  */
 struct nsm_get_error_injection_payload_resp {
 	struct nsm_common_resp hdr;
-	struct nsm_error_injection_payload data;
+	uint32_t offset;
+	uint16_t error_injection_type;
+	uint8_t fault_payload[1];
+} __attribute__((packed));
+
+/** @struct nsm_activate_error_injection_payload_req
+ *
+ * Structure representing Activate Error Injection payload request.
+ */
+struct nsm_activate_error_injection_payload_req {
+	struct nsm_common_req_v2 hdr;
+	uint32_t error_injection_id;
 } __attribute__((packed));
 
 /** @struct nsm_get_fpga_diagnostics_settings_req
@@ -759,20 +832,26 @@ int decode_get_error_injection_mode_v1_resp(
 /** @brief Encode Activate Error Injection Payload request message
  *
  *  @param[in] instance_id - NSM instance ID
+ *  @param[in] error_injection_type - Error injection type
+ *  @param[in] error_injection_subtype - Error injection subtype
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_activate_error_injection_payload_req(uint8_t instance_id,
-						struct nsm_msg *msg);
+int encode_activate_error_injection_payload_req(
+    uint8_t instance_id, uint16_t error_injection_type,
+    uint16_t error_injection_subtype, struct nsm_msg *msg);
 
 /** @brief Decode Activate  Error Injection Payload request message
  *
  *  @param[in] msg    - request message
  *  @param[in] msg_len - Length of request message
+ *  @param[out] error_injection_type - pointer to error injection type
+ *  @param[out] error_injection_subtype - pointer to error injection subtype
  *  @return nsm_completion_codes
  */
-int decode_activate_error_injection_payload_req(const struct nsm_msg *msg,
-						size_t msg_len);
+int decode_activate_error_injection_payload_req(
+    const struct nsm_msg *msg, size_t msg_len, uint16_t *error_injection_type,
+    uint16_t *error_injection_subtype);
 
 /** @brief Encode Activate Error Injection Payload response message
  *
@@ -802,70 +881,96 @@ int decode_activate_error_injection_payload_resp(const struct nsm_msg *msg,
 /** @brief Encode a Get Error Injection Payload request message
  *
  *  @param[in] instance_id - NSM instance ID
+ *  @param[in] error_injection_type - Error injection type
+ *  @param[in] error_injection_subtype - Error injection subtype
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
 int encode_get_error_injection_payload_req(uint8_t instance_id,
-					   uint32_t error_injection_id,
+					   uint16_t error_injection_type,
+					   uint16_t error_injection_subtype,
 					   struct nsm_msg *msg);
 
 /** @brief Decode a Get Error Injection Payload request message
  *
  *  @param[in] msg    - request message
  *  @param[in] msg_len - Length of request message
+ *  @param[out] error_injection_type - pointer to error injection type
+ *  @param[out] error_injection_subtype - pointer to error injection subtype
  *  @return nsm_completion_codes
  */
 int decode_get_error_injection_payload_req(const struct nsm_msg *msg,
 					   size_t msg_len,
-					   uint32_t *error_injection_id);
+					   uint16_t *error_injection_type,
+					   uint16_t *error_injection_subtype);
 
 /** @brief Encode a Get Error Injection Payload response message
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
  *  @param[in] reason_code - NSM reason code
- *  @param[in] data - pointer to error injection mode data
+ *  @param[in] error_injection_type - Error injection type
+ *  @param[in] error_injection_subtype - Error injection subtype
+ *  @param[in] data - pointer to error injection payload data array
+ *  @param[in] data_size - size of the data array
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
 int encode_get_error_injection_payload_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
-    const struct nsm_error_injection_payload *data, struct nsm_msg *msg);
+    uint16_t error_injection_type, uint16_t error_injection_subtype,
+    const uint8_t *data, size_t data_size, struct nsm_msg *msg);
 
 /** @brief Decode a Get Error Injection Payload response message
  *
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
+ *  @param[in] error_injection_type - Error injection type
+ *  @param[in] error_injection_subtype - Error injection subtype
  *  @param[out] cc - pointer to response message completion code
  *  @param[out] reason_code - pointer to NSM reason code
- *  @param[out] data  - pointer to error injection mode data
+ *  @param[out] data  - pointer to error injection payload data array
+ *  @param[out] data_size - pointer to receive the size of decoded data
  *  @return nsm_completion_codes
  */
-int decode_get_error_injection_payload_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code, struct nsm_error_injection_payload *data);
+int decode_get_error_injection_payload_resp(const struct nsm_msg *msg,
+					    size_t msg_len,
+					    uint16_t error_injection_type,
+					    uint16_t error_injection_subtype,
+					    uint8_t *cc, uint16_t *reason_code,
+					    uint8_t *data, size_t *data_size);
 
 /** @brief Encode a Set Current Error Injection payload request message
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] data - pointer to error injection payload data
+ *  @param[in] data_size - size of the data array
+ *  @param[in] error_injection_type - error injection type
+ *  @param[in] error_injection_subtype - error injection subtype
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_set_error_injection_payload_req(
-    uint8_t instance_id, const struct nsm_error_injection_payload *data,
-    struct nsm_msg *msg);
+int encode_set_error_injection_payload_req(uint8_t instance_id,
+					   const uint8_t *data,
+					   size_t data_size,
+					   uint16_t error_injection_type,
+					   uint16_t error_injection_subtype,
+					   struct nsm_msg *msg);
 
 /** @brief Decode a Set Current Error Injection payload
  *
  *  @param[in] msg    - request message
  *  @param[in] msg_len - Length of request message
+ *  @param[out] error_injection_type - pointer to error injection type
+ *  @param[out] error_injection_subtype - pointer to error injection subtype
  *  @param[out] data  - pointer to error injection payload data
  *  @return nsm_completion_codes
  */
-int decode_set_error_injection_payload_req(
-    const struct nsm_msg *msg, size_t msg_len,
-    struct nsm_error_injection_payload *data);
+int decode_set_error_injection_payload_req(const struct nsm_msg *msg,
+					   size_t msg_len,
+					   uint16_t *error_injection_type,
+					   uint16_t *error_injection_subtype,
+					   uint8_t *data, size_t *data_size);
 
 /** @brief Encode a Set Current Error Injection payload response message
  *

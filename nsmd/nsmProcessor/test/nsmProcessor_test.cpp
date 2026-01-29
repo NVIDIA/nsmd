@@ -1903,22 +1903,29 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     EXPECT_EQ(8, gpu->staticSensors.size());
     EXPECT_EQ(3, gpu->roundRobinSensors.size());
 
-    auto capabilitiesCount =
-        size_t(ErrorInjectionCapabilityIntf::Type::Unknown) - 1;
+    // capabilitiesCount is the number of interfaces actually created.
+    // createNsmErrorInjectionSensors skips 5 types (FatalErrors,
+    // PortRecoveryErrors, USBBridgeEmulationErrors, LeakDetectionErrors,
+    // GPIOSpoofingErrors), so only 4 interfaces are created: MemoryErrors,
+    // PCIeErrors, NVLinkErrors, ThermalErrors
+    auto capabilitiesCount = size_t(4);
 
     // Total 10 RR sensor for type = NSM_Processor are added.
     // 8 are added as part of createNsmProcessorSensor() and 2 are added as part
     // of createNsmErrorInjectionSensors()
-    // Total 18 device sensor for type = NSM_Processor are added.
+    // Total device sensors for type = NSM_Processor:
     // 10 are added as part of createNsmProcessorSensor() (NOTE:
     // NVIDIA_RESET_METRICS & ENABLE_SYSTEM_GUID are disabled during this test
-    // run) and 8 are added as part of createNsmErrorInjectionSensors()
+    // run) and capabilitiesCount + 5 are added as part of
+    // createNsmErrorInjectionSensors() (setErrorInjection,
+    // errorInjectionSensor, errorInjectionSupported, errorInjectionEnabled,
+    // plus one setErrorInjectionEnabled per capability interface)
     EXPECT_EQ(15 + capabilitiesCount, gpu->deviceSensors.size());
 
     int si = 10;
 
-    auto expectedInterfaces = int(ErrorInjectionCapabilityIntf::Type::Unknown) -
-                              1;
+    // expectedInterfaces is the actual number of interfaces created (4, not 8)
+    auto expectedInterfaces = int(4);
     auto setErrorInjection =
         dynamic_pointer_cast<NsmSetErrorInjection>(gpu->deviceSensors[si++]);
     EXPECT_NE(nullptr, setErrorInjection);

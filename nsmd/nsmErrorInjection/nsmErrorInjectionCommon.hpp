@@ -55,9 +55,14 @@ inline void createNsmErrorInjectionSensors(SensorManager& manager,
         auto name = ErrorInjectionCapabilityIntf::convertTypeToString(type);
         name = name.substr(name.find_last_of('.') + 1);
         auto path = objPath / "ErrorInjection" / name;
-        if (type == ErrorInjectionCapabilityIntf::Type::FatalErrors)
+        if (type == ErrorInjectionCapabilityIntf::Type::FatalErrors ||
+            type == ErrorInjectionCapabilityIntf::Type::PortRecoveryErrors ||
+            type ==
+                ErrorInjectionCapabilityIntf::Type::USBBridgeEmulationErrors ||
+            type == ErrorInjectionCapabilityIntf::Type::LeakDetectionErrors ||
+            type == ErrorInjectionCapabilityIntf::Type::GPIOSpoofingErrors)
         {
-            // Fatal Errors are not supported
+            // These error types are handled separately
             continue;
         }
         auto interface = std::make_shared<ErrorInjectionCapabilityIntf>(
@@ -98,31 +103,79 @@ inline void createNsmErrorInjectionSensors(SensorManager& manager,
     return;
 }
 
-inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
-                                              std::shared_ptr<NsmDevice> device,
-                                              const path& objPath)
+inline bool
+    getErrorInjectionTypeAndSubtype(ErrorInjectionCapabilityIntf::Type type,
+                                    uint16_t* errorInjectionType,
+                                    uint16_t* errorInjectionSubtype)
 {
-    auto setErrorInjection = std::make_shared<NsmSetErrorInjection>(manager,
-                                                                    objPath);
-    auto errorInjectionSensor =
-        std::make_shared<NsmErrorInjection>(*setErrorInjection);
-    device->addDeviceSensors(setErrorInjection);
-    device->addSensor(errorInjectionSensor, ERROR_INJECTION_PRIORITY);
+    if (errorInjectionType == nullptr || errorInjectionSubtype == nullptr)
+    {
+        return false;
+    }
 
-    auto& errorInjectionDispatcher =
-        *AsyncOperationManager::getInstance()->getDispatcher(
-            (objPath / "ErrorInjection"));
-    errorInjectionDispatcher.addAsyncSetOperation(
-        "com.nvidia.ErrorInjection.ErrorInjection", "ErrorInjectionModeEnabled",
-        AsyncSetOperationInfo{
-            std::bind_front(&NsmSetErrorInjection::errorInjectionModeEnabled,
-                            setErrorInjection.get()),
-            errorInjectionSensor, device});
+    switch (type)
+    {
+        case ErrorInjectionCapabilityIntf::Type::MemoryErrors:
+            *errorInjectionType = EI_MEMORY_ERRORS;
+            *errorInjectionSubtype = 0;
+            break;
+        case ErrorInjectionCapabilityIntf::Type::PCIeErrors:
+            *errorInjectionType = EI_PCI_ERRORS;
+            *errorInjectionSubtype = 0;
+            break;
+        case ErrorInjectionCapabilityIntf::Type::NVLinkErrors:
+            *errorInjectionType = EI_NVLINK_ERRORS;
+            *errorInjectionSubtype = 0;
+            break;
+        case ErrorInjectionCapabilityIntf::Type::ThermalErrors:
+            *errorInjectionType = EI_THERMAL_ERRORS;
+            *errorInjectionSubtype = 0;
+            break;
+        case ErrorInjectionCapabilityIntf::Type::FatalErrors:
+            *errorInjectionType = EI_DEVICE_ERRORS;
+            *errorInjectionSubtype = EI_DEVICE_ERRORS_SUBTYPE_FATAL;
+            break;
+        case ErrorInjectionCapabilityIntf::Type::PortRecoveryErrors:
+            *errorInjectionType = EI_DEVICE_ERRORS;
+            *errorInjectionSubtype = EI_DEVICE_ERRORS_SUBTYPE_PORT_RECOVERY;
+            break;
+        case ErrorInjectionCapabilityIntf::Type::USBBridgeEmulationErrors:
+            *errorInjectionType = EI_DEVICE_ERRORS;
+            *errorInjectionSubtype = EI_DEVICE_ERRORS_SUBTYPE_USB_EMULATION;
+            break;
+        case ErrorInjectionCapabilityIntf::Type::LeakDetectionErrors:
+            *errorInjectionType = EI_DEVICE_ERRORS;
+            *errorInjectionSubtype = EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT;
+            break;
+        case ErrorInjectionCapabilityIntf::Type::GPIOSpoofingErrors:
+            *errorInjectionType = EI_GPIO_SPOOFING;
+            *errorInjectionSubtype = 0;
+            break;
+        case ErrorInjectionCapabilityIntf::Type::Unknown:
+        default:
+            return false;
+    }
+    return true;
+}
 
+inline void createErrorInjectionSensorsForType(
+    SensorManager& manager, std::shared_ptr<NsmDevice> device,
+    const path& objPath, ErrorInjectionCapabilityIntf::Type type)
+{
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     Interfaces<ErrorInjectionPayloadIntf> payloadInterfaces;
 
-    auto type = ErrorInjectionCapabilityIntf::Type::FatalErrors;
+    uint16_t errorInjectionType;
+    uint16_t errorInjectionSubtype;
+    if (!getErrorInjectionTypeAndSubtype(type, &errorInjectionType,
+                                         &errorInjectionSubtype))
+    {
+        lg2::error(
+            "createErrorInjectionSensorsForType: Unsupported ErrorInjectionCapability type. Cannot map to type/subtype and create sensor. type={TYPE}",
+            "TYPE", static_cast<int>(type));
+        return;
+    }
+
     auto name = ErrorInjectionCapabilityIntf::convertTypeToString(type);
     name = name.substr(name.find_last_of('.') + 1);
     auto path = objPath / "ErrorInjection" / name;
@@ -150,14 +203,14 @@ inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
         "ErrorInjectionPayload", "NSM_ErrorInjectionPayload",
         payloadInterfaces);
     auto errorInjectionPayload = std::make_shared<NsmErrorInjectionPayload>(
-        payloadProvider,
-        (uint32_t)ErrorInjectionCapabilityIntf::Type::FatalErrors);
+        payloadProvider, errorInjectionType, errorInjectionSubtype);
     device->addSensor(errorInjectionPayload, ERROR_INJECTION_PRIORITY);
 
     auto pathStr = path.string();
     auto errorType = pathStr.substr(pathStr.find_last_of('/') + 1);
     auto activateIntf = std::make_shared<NsmActivateErrorInjectionPayloadIntf>(
-        utils::DBusHandler::getBus(), path.string().c_str(), device);
+        utils::DBusHandler::getBus(), path.string().c_str(), errorInjectionType,
+        errorInjectionSubtype, device);
     // Set Error Injection Enabled
     auto setErrorInjectionEnabled =
         std::make_shared<NsmSetErrorInjectionEnabled>(name, interface->type(),
@@ -174,7 +227,8 @@ inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
     // Set Error Injection Payload
     auto setErrorInjectionPayloadSensor =
         std::make_shared<NsmSetErrorInjectionPayload>(
-            errorType, manager, payloadInterfaces, activateIntf);
+            errorType, manager, payloadInterfaces, activateIntf,
+            errorInjectionType, errorInjectionSubtype);
     auto& asyncDispatcherPayload =
         *AsyncOperationManager::getInstance()->getDispatcher(pathStr);
     asyncDispatcherPayload.addAsyncSetOperation(
@@ -185,6 +239,56 @@ inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
                 setErrorInjectionPayloadSensor.get()),
             errorInjectionPayload, device});
     device->addSetSensor(setErrorInjectionPayloadSensor);
+    return;
+}
+
+inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
+                                              std::shared_ptr<NsmDevice> device,
+                                              const path& objPath)
+{
+    auto setErrorInjection = std::make_shared<NsmSetErrorInjection>(manager,
+                                                                    objPath);
+    auto errorInjectionSensor =
+        std::make_shared<NsmErrorInjection>(*setErrorInjection);
+    device->addDeviceSensors(setErrorInjection);
+    device->addSensor(errorInjectionSensor, ERROR_INJECTION_PRIORITY);
+
+    auto& errorInjectionDispatcher =
+        *AsyncOperationManager::getInstance()->getDispatcher(
+            (objPath / "ErrorInjection"));
+    errorInjectionDispatcher.addAsyncSetOperation(
+        "com.nvidia.ErrorInjection.ErrorInjection", "ErrorInjectionModeEnabled",
+        AsyncSetOperationInfo{
+            std::bind_front(&NsmSetErrorInjection::errorInjectionModeEnabled,
+                            setErrorInjection.get()),
+            errorInjectionSensor, device});
+
+    auto deviceRole = device->getDeviceRole();
+
+    // Applicable for all device roles
+    createErrorInjectionSensorsForType(
+        manager, device, objPath,
+        ErrorInjectionCapabilityIntf::Type::FatalErrors);
+    createErrorInjectionSensorsForType(
+        manager, device, objPath,
+        ErrorInjectionCapabilityIntf::Type::PortRecoveryErrors);
+    createErrorInjectionSensorsForType(
+        manager, device, objPath,
+        ErrorInjectionCapabilityIntf::Type::GPIOSpoofingErrors);
+
+    if (deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA ||
+        deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_CX_SMA)
+    {
+        createErrorInjectionSensorsForType(
+            manager, device, objPath,
+            ErrorInjectionCapabilityIntf::Type::LeakDetectionErrors);
+    }
+    if (deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA)
+    {
+        createErrorInjectionSensorsForType(
+            manager, device, objPath,
+            ErrorInjectionCapabilityIntf::Type::USBBridgeEmulationErrors);
+    }
     return;
 }
 

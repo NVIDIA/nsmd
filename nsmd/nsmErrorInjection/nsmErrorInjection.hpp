@@ -69,7 +69,7 @@ class NsmErrorInjectionPayload :
   public:
     NsmErrorInjectionPayload(
         const NsmInterfaceProvider<ErrorInjectionPayloadIntf>& provider,
-        uint32_t errorInjectionId);
+        uint16_t errorInjectionType, uint16_t errorInjectionSubtype);
     NsmErrorInjectionPayload() = delete;
     std::optional<Request> genRequestMsg(eid_t eid,
                                          uint8_t instanceId) override;
@@ -77,7 +77,8 @@ class NsmErrorInjectionPayload :
                               size_t responseLen) override;
 
   private:
-    uint32_t errorInjectionId;
+    uint16_t errorInjectionType;
+    uint16_t errorInjectionSubtype;
 };
 
 } // namespace nsm

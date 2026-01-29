@@ -135,11 +135,344 @@ int decode_get_protection_options_resp(const struct nsm_msg *msg,
 	return rc;
 }
 
-int encode_set_error_injection_payload_req(
-    uint8_t instance_id, const struct nsm_error_injection_payload *data,
-    struct nsm_msg *msg)
+static int encode_fatal_error_injection_payload(const uint8_t *data,
+						size_t data_size,
+						uint8_t *fault_payload)
 {
-	if (msg == NULL) {
+	if (data_size != sizeof(struct nsm_error_injection_fatal_payload)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_error_injection_fatal_payload *in_payload =
+	    (struct nsm_error_injection_fatal_payload *)data;
+	struct nsm_error_injection_fatal_payload *out_payload =
+	    (struct nsm_error_injection_fatal_payload *)fault_payload;
+
+	out_payload->error_injection_subtype =
+	    htole16(in_payload->error_injection_subtype);
+	if (out_payload->error_injection_subtype !=
+	    EI_DEVICE_ERRORS_SUBTYPE_FATAL) {
+		return NSM_SW_ERROR_DATA;
+	}
+	out_payload->payload_bitmap = htole32(in_payload->payload_bitmap);
+
+	return NSM_SW_SUCCESS;
+}
+
+static int encode_port_recovery_error_injection_payload(const uint8_t *data,
+							size_t data_size,
+							uint8_t *fault_payload)
+{
+	if (data_size !=
+	    sizeof(struct nsm_error_injection_port_recovery_payload)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_error_injection_port_recovery_payload *in_payload =
+	    (struct nsm_error_injection_port_recovery_payload *)data;
+	struct nsm_error_injection_port_recovery_payload *out_payload =
+	    (struct nsm_error_injection_port_recovery_payload *)fault_payload;
+
+	out_payload->error_injection_subtype =
+	    htole16(in_payload->error_injection_subtype);
+	if (out_payload->error_injection_subtype !=
+	    EI_DEVICE_ERRORS_SUBTYPE_PORT_RECOVERY) {
+		return NSM_SW_ERROR_DATA;
+	}
+	out_payload->l1_payload = in_payload->l1_payload;
+	out_payload->l2_payload = in_payload->l2_payload;
+	out_payload->l3_payload = in_payload->l3_payload;
+	out_payload->reserved = in_payload->reserved;
+
+	return NSM_SW_SUCCESS;
+}
+
+static int encode_usb_emulation_error_injection_payload(const uint8_t *data,
+							size_t data_size,
+							uint8_t *fault_payload)
+{
+	if (data_size != sizeof(struct nsm_error_injection_usb_emu_payload)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_error_injection_usb_emu_payload *in_payload =
+	    (struct nsm_error_injection_usb_emu_payload *)data;
+	struct nsm_error_injection_usb_emu_payload *out_payload =
+	    (struct nsm_error_injection_usb_emu_payload *)fault_payload;
+
+	out_payload->error_injection_subtype =
+	    htole16(in_payload->error_injection_subtype);
+	if (out_payload->error_injection_subtype !=
+	    EI_DEVICE_ERRORS_SUBTYPE_USB_EMULATION) {
+		return NSM_SW_ERROR_DATA;
+	}
+	out_payload->payload = in_payload->payload;
+	out_payload->bus_number = in_payload->bus_number;
+	out_payload->error = in_payload->error;
+	out_payload->address = in_payload->address;
+
+	return NSM_SW_SUCCESS;
+}
+
+static int encode_leak_detect_error_injection_payload(const uint8_t *data,
+						      size_t data_size,
+						      uint8_t *fault_payload)
+{
+	// min check for size when number of sensors is 0
+	if (data_size < (sizeof(struct nsm_error_injection_leak_payload) -
+			 sizeof(uint16_t))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_error_injection_leak_payload *in_payload =
+	    (struct nsm_error_injection_leak_payload *)data;
+	struct nsm_error_injection_leak_payload *out_payload =
+	    (struct nsm_error_injection_leak_payload *)fault_payload;
+
+	out_payload->error_injection_subtype =
+	    htole16(in_payload->error_injection_subtype);
+	if (out_payload->error_injection_subtype !=
+	    EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT) {
+		return NSM_SW_ERROR_DATA;
+	}
+	out_payload->number_of_sensors = htole16(in_payload->number_of_sensors);
+
+	if (data_size !=
+	    (sizeof(struct nsm_error_injection_leak_payload) -
+	     sizeof(uint16_t) +
+	     (in_payload->number_of_sensors * 2 * sizeof(uint16_t)))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	for (uint16_t i = 0; i < in_payload->number_of_sensors; i++) {
+		out_payload->sensors_data[i * 2] =
+		    htole16(in_payload->sensors_data[i * 2]);
+		out_payload->sensors_data[i * 2 + 1] =
+		    htole16(in_payload->sensors_data[i * 2 + 1]);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+static int decode_fatal_error_injection_payload(uint8_t *data,
+						size_t *data_size,
+						const uint8_t *fault_payload,
+						size_t payload_size)
+{
+	if (data == NULL || data_size == NULL || fault_payload == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (payload_size != sizeof(struct nsm_error_injection_fatal_payload)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_error_injection_fatal_payload *out_payload =
+	    (struct nsm_error_injection_fatal_payload *)data;
+	const struct nsm_error_injection_fatal_payload *in_payload =
+	    (const struct nsm_error_injection_fatal_payload *)fault_payload;
+
+	out_payload->error_injection_subtype =
+	    le16toh(in_payload->error_injection_subtype);
+	if (out_payload->error_injection_subtype !=
+	    EI_DEVICE_ERRORS_SUBTYPE_FATAL) {
+		return NSM_SW_ERROR_DATA;
+	}
+	out_payload->payload_bitmap = le32toh(in_payload->payload_bitmap);
+
+	*data_size = sizeof(struct nsm_error_injection_fatal_payload);
+	return NSM_SW_SUCCESS;
+}
+
+static int
+decode_port_recovery_error_injection_payload(uint8_t *data, size_t *data_size,
+					     const uint8_t *fault_payload,
+					     size_t payload_size)
+{
+	if (data == NULL || data_size == NULL || fault_payload == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (payload_size !=
+	    sizeof(struct nsm_error_injection_port_recovery_payload)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_error_injection_port_recovery_payload *out_payload =
+	    (struct nsm_error_injection_port_recovery_payload *)data;
+	const struct nsm_error_injection_port_recovery_payload *in_payload =
+	    (const struct nsm_error_injection_port_recovery_payload *)
+		fault_payload;
+
+	out_payload->error_injection_subtype =
+	    le16toh(in_payload->error_injection_subtype);
+	if (out_payload->error_injection_subtype !=
+	    EI_DEVICE_ERRORS_SUBTYPE_PORT_RECOVERY) {
+		return NSM_SW_ERROR_DATA;
+	}
+	out_payload->l1_payload = in_payload->l1_payload;
+	out_payload->l2_payload = in_payload->l2_payload;
+	out_payload->l3_payload = in_payload->l3_payload;
+	out_payload->reserved = in_payload->reserved;
+
+	*data_size = sizeof(struct nsm_error_injection_port_recovery_payload);
+	return NSM_SW_SUCCESS;
+}
+
+static int
+decode_usb_emulation_error_injection_payload(uint8_t *data, size_t *data_size,
+					     const uint8_t *fault_payload,
+					     size_t payload_size)
+{
+	if (data == NULL || data_size == NULL || fault_payload == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (payload_size !=
+	    sizeof(struct nsm_error_injection_usb_emu_payload)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_error_injection_usb_emu_payload *out_payload =
+	    (struct nsm_error_injection_usb_emu_payload *)data;
+	const struct nsm_error_injection_usb_emu_payload *in_payload =
+	    (const struct nsm_error_injection_usb_emu_payload *)fault_payload;
+
+	out_payload->error_injection_subtype =
+	    le16toh(in_payload->error_injection_subtype);
+	if (out_payload->error_injection_subtype !=
+	    EI_DEVICE_ERRORS_SUBTYPE_USB_EMULATION) {
+		return NSM_SW_ERROR_DATA;
+	}
+	out_payload->payload = in_payload->payload;
+	out_payload->bus_number = in_payload->bus_number;
+	out_payload->error = in_payload->error;
+	out_payload->address = in_payload->address;
+
+	*data_size = sizeof(struct nsm_error_injection_usb_emu_payload);
+	return NSM_SW_SUCCESS;
+}
+
+static int
+decode_leak_detect_error_injection_payload(uint8_t *data, size_t *data_size,
+					   const uint8_t *fault_payload,
+					   size_t payload_size)
+{
+	if (data == NULL || data_size == NULL || fault_payload == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	// min size is with zero sensors
+	if (payload_size < (sizeof(struct nsm_error_injection_leak_payload) -
+			    sizeof(uint16_t))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_error_injection_leak_payload *out_payload =
+	    (struct nsm_error_injection_leak_payload *)data;
+	const struct nsm_error_injection_leak_payload *in_payload =
+	    (const struct nsm_error_injection_leak_payload *)fault_payload;
+
+	out_payload->error_injection_subtype =
+	    le16toh(in_payload->error_injection_subtype);
+	if (out_payload->error_injection_subtype !=
+	    EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT) {
+		return NSM_SW_ERROR_DATA;
+	}
+	out_payload->number_of_sensors = le16toh(in_payload->number_of_sensors);
+
+	size_t expected_payload_size =
+	    sizeof(struct nsm_error_injection_leak_payload) - sizeof(uint16_t) +
+	    (in_payload->number_of_sensors * 2 * sizeof(uint16_t));
+
+	if (payload_size != expected_payload_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	for (uint16_t i = 0; i < in_payload->number_of_sensors; i++) {
+		out_payload->sensors_data[i * 2] =
+		    le16toh(in_payload->sensors_data[i * 2]); // sensor_id
+		out_payload->sensors_data[i * 2 + 1] = le16toh(
+		    in_payload->sensors_data[i * 2 + 1]); // sensor_value
+	}
+
+	*data_size = expected_payload_size;
+	return NSM_SW_SUCCESS;
+}
+
+static int
+decode_gpio_spoofing_error_injection_payload(uint8_t *data, size_t *data_size,
+					     const uint8_t *fault_payload,
+					     size_t payload_size)
+{
+	if (data == NULL || data_size == NULL || fault_payload == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	// min size is with zero gpio
+	if (payload_size <
+	    (sizeof(struct nsm_error_injection_gpio_spoofing_payload) -
+	     sizeof(uint16_t))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_error_injection_gpio_spoofing_payload *out_payload =
+	    (struct nsm_error_injection_gpio_spoofing_payload *)data;
+	const struct nsm_error_injection_gpio_spoofing_payload *in_payload =
+	    (const struct nsm_error_injection_gpio_spoofing_payload *)
+		fault_payload;
+
+	out_payload->count_of_gpio = le16toh(in_payload->count_of_gpio);
+
+	size_t expected_payload_size =
+	    sizeof(struct nsm_error_injection_gpio_spoofing_payload) -
+	    sizeof(uint16_t) + (in_payload->count_of_gpio * sizeof(uint16_t));
+
+	if (payload_size != expected_payload_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	for (uint16_t i = 0; i < in_payload->count_of_gpio; i++) {
+		out_payload->gpio_data[i] = le16toh(in_payload->gpio_data[i]);
+	}
+
+	*data_size = expected_payload_size;
+	return NSM_SW_SUCCESS;
+}
+
+static int encode_gpio_spoofing_error_injection_payload(const uint8_t *data,
+							size_t data_size,
+							uint8_t *fault_payload)
+{
+	// min check for size when number of gpio is 0
+	if (data_size <
+	    (sizeof(struct nsm_error_injection_gpio_spoofing_payload) -
+	     sizeof(uint16_t))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_error_injection_gpio_spoofing_payload *in_payload =
+	    (struct nsm_error_injection_gpio_spoofing_payload *)data;
+	struct nsm_error_injection_gpio_spoofing_payload *out_payload =
+	    (struct nsm_error_injection_gpio_spoofing_payload *)fault_payload;
+
+	out_payload->count_of_gpio = htole16(in_payload->count_of_gpio);
+	if (data_size !=
+	    (sizeof(struct nsm_error_injection_gpio_spoofing_payload) -
+	     sizeof(uint16_t) +
+	     (in_payload->count_of_gpio * sizeof(uint16_t)))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	for (uint16_t i = 0; i < in_payload->count_of_gpio; i++) {
+		out_payload->gpio_data[i] = htole16(in_payload->gpio_data[i]);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_error_injection_payload_req(uint8_t instance_id,
+					   const uint8_t *data,
+					   size_t data_size,
+					   uint16_t error_injection_type,
+					   uint16_t error_injection_subtype,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 	struct nsm_header_info header = {NSM_REQUEST, instance_id,
@@ -151,25 +484,50 @@ int encode_set_error_injection_payload_req(
 	struct nsm_set_error_injection_payload_req *request =
 	    (struct nsm_set_error_injection_payload_req *)msg->payload;
 	request->hdr.command = NSM_SET_ERROR_INJECTION_PAYLOAD;
-	request->hdr.data_size =
-	    htole16(sizeof(struct nsm_error_injection_payload));
-	if (data == NULL) {
-		return NSM_SW_ERROR_NULL;
+	request->hdr.data_size = htole16(data_size + sizeof(request->offset) +
+					 sizeof(request->error_injection_type));
+	request->offset = 0;
+	request->error_injection_type = htole16(error_injection_type);
+
+	if (error_injection_type == EI_DEVICE_ERRORS) {
+		if (error_injection_subtype == EI_DEVICE_ERRORS_SUBTYPE_FATAL) {
+			return encode_fatal_error_injection_payload(
+			    data, data_size, request->fault_payload);
+		} else if (error_injection_subtype ==
+			   EI_DEVICE_ERRORS_SUBTYPE_PORT_RECOVERY) {
+			return encode_port_recovery_error_injection_payload(
+			    data, data_size, request->fault_payload);
+		} else if (error_injection_subtype ==
+			   EI_DEVICE_ERRORS_SUBTYPE_USB_EMULATION) {
+			return encode_usb_emulation_error_injection_payload(
+			    data, data_size, request->fault_payload);
+		} else if (error_injection_subtype ==
+			   EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT) {
+			return encode_leak_detect_error_injection_payload(
+			    data, data_size, request->fault_payload);
+		} else {
+			return NSM_SW_ERROR_DATA;
+		}
+	} else if (error_injection_type == EI_GPIO_SPOOFING) {
+		return encode_gpio_spoofing_error_injection_payload(
+		    data, data_size, request->fault_payload);
+	} else {
+		return NSM_SW_ERROR_DATA;
 	}
-	request->data.error_injection_id = htole32(data->error_injection_id);
-	request->data.offset = htole32(data->offset);
-	request->data.fault_reason_bit_map =
-	    htole32(data->fault_reason_bit_map);
 	return rc;
 }
 
-int decode_set_error_injection_payload_req(
-    const struct nsm_msg *msg, size_t msg_len,
-    struct nsm_error_injection_payload *data)
+int decode_set_error_injection_payload_req(const struct nsm_msg *msg,
+					   size_t msg_len,
+					   uint16_t *error_injection_type,
+					   uint16_t *error_injection_subtype,
+					   uint8_t *data, size_t *data_size)
 {
 	int rc = decode_common_req(msg, msg_len);
 	if (rc == NSM_SW_SUCCESS) {
-		if (data == NULL) {
+		if (data == NULL || data_size == NULL ||
+		    error_injection_type == NULL ||
+		    error_injection_subtype == NULL) {
 			return NSM_SW_ERROR_NULL;
 		}
 		if (msg_len <
@@ -177,18 +535,53 @@ int decode_set_error_injection_payload_req(
 			sizeof(struct nsm_set_error_injection_payload_req)) {
 			return NSM_SW_ERROR_LENGTH;
 		}
+
 		struct nsm_set_error_injection_payload_req *req =
 		    (struct nsm_set_error_injection_payload_req *)msg->payload;
 
-		if (req->hdr.data_size !=
-		    sizeof(struct nsm_error_injection_payload)) {
-			return NSM_SW_ERROR_LENGTH;
+		*error_injection_type = le16toh(req->error_injection_type);
+		uint16_t resp_data_size = le16toh(req->hdr.data_size);
+		uint16_t fault_payload_size =
+		    resp_data_size -
+		    (sizeof(struct nsm_set_error_injection_payload_req) -
+		     sizeof(uint8_t));
+
+		if (*error_injection_type == EI_DEVICE_ERRORS) {
+			uint16_t subtype;
+			memcpy(&subtype, req->fault_payload, sizeof(subtype));
+			*error_injection_subtype = le16toh(subtype);
+
+			if (*error_injection_subtype ==
+			    EI_DEVICE_ERRORS_SUBTYPE_FATAL) {
+				return decode_fatal_error_injection_payload(
+				    data, data_size, req->fault_payload,
+				    fault_payload_size);
+			} else if (*error_injection_subtype ==
+				   EI_DEVICE_ERRORS_SUBTYPE_PORT_RECOVERY) {
+				return decode_port_recovery_error_injection_payload(
+				    data, data_size, req->fault_payload,
+				    fault_payload_size);
+			} else if (*error_injection_subtype ==
+				   EI_DEVICE_ERRORS_SUBTYPE_USB_EMULATION) {
+				return decode_usb_emulation_error_injection_payload(
+				    data, data_size, req->fault_payload,
+				    fault_payload_size);
+			} else if (*error_injection_subtype ==
+				   EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT) {
+				return decode_leak_detect_error_injection_payload(
+				    data, data_size, req->fault_payload,
+				    fault_payload_size);
+			} else {
+				return NSM_SW_ERROR;
+			}
+		} else if (*error_injection_type == EI_GPIO_SPOOFING) {
+			*error_injection_subtype = 0;
+			return decode_gpio_spoofing_error_injection_payload(
+			    data, data_size, req->fault_payload,
+			    fault_payload_size);
+		} else {
+			return NSM_SW_ERROR;
 		}
-		data->error_injection_id =
-		    le32toh(req->data.error_injection_id);
-		data->offset = le32toh(req->data.offset);
-		data->fault_reason_bit_map =
-		    le32toh(req->data.fault_reason_bit_map);
 	}
 	return rc;
 }
@@ -215,7 +608,8 @@ int decode_set_error_injection_payload_resp(const struct nsm_msg *msg,
 }
 
 int encode_get_error_injection_payload_req(uint8_t instance_id,
-					   uint32_t error_injection_id,
+					   uint16_t error_injection_type,
+					   uint16_t error_injection_subtype,
 					   struct nsm_msg *msg)
 {
 	if (msg == NULL) {
@@ -227,24 +621,41 @@ int encode_get_error_injection_payload_req(uint8_t instance_id,
 	if (rc != NSM_SW_SUCCESS) {
 		return rc;
 	}
+	if (error_injection_type > EI_GPIO_SPOOFING) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (error_injection_type == EI_DEVICE_ERRORS) {
+		if (error_injection_subtype >
+		    EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT) {
+			return NSM_SW_ERROR_DATA;
+		}
+	}
+
 	struct nsm_get_error_injection_payload_req *request =
 	    (struct nsm_get_error_injection_payload_req *)msg->payload;
 	request->hdr.command = NSM_GET_ERROR_INJECTION_PAYLOAD;
 	request->hdr.data_size = htole16(sizeof(uint32_t));
-	request->error_injection_id = htole32(error_injection_id);
+	uint32_t id_val;
+	struct nsm_error_injection_id *id_ptr =
+	    (struct nsm_error_injection_id *)&id_val;
+	id_ptr->error_injection_type = error_injection_type;
+	id_ptr->error_injection_subtype = error_injection_subtype;
+	request->error_injection_id = htole32(id_val);
 	return rc;
 }
 
 int decode_get_error_injection_payload_req(const struct nsm_msg *msg,
 					   size_t msg_len,
-					   uint32_t *error_injection_id)
+					   uint16_t *error_injection_type,
+					   uint16_t *error_injection_subtype)
 {
 	int rc = decode_common_req(msg, msg_len);
 	if (rc == NSM_SW_SUCCESS) {
-		if (error_injection_id == NULL) {
+		if (error_injection_type == NULL ||
+		    error_injection_subtype == NULL) {
 			return NSM_SW_ERROR_NULL;
 		}
-		if (msg_len <
+		if (msg_len !=
 		    sizeof(struct nsm_msg_hdr) +
 			sizeof(struct nsm_get_error_injection_payload_req)) {
 			return NSM_SW_ERROR_LENGTH;
@@ -254,14 +665,19 @@ int decode_get_error_injection_payload_req(const struct nsm_msg *msg,
 		if (req->hdr.data_size != sizeof(uint32_t)) {
 			return NSM_SW_ERROR_LENGTH;
 		}
-		*error_injection_id = le32toh(req->error_injection_id);
+		uint32_t error_injection_id = le32toh(req->error_injection_id);
+		struct nsm_error_injection_id *id =
+		    (struct nsm_error_injection_id *)&error_injection_id;
+		*error_injection_type = id->error_injection_type;
+		*error_injection_subtype = id->error_injection_subtype;
 	}
 	return rc;
 }
 
 int encode_get_error_injection_payload_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
-    const struct nsm_error_injection_payload *data, struct nsm_msg *msg)
+    uint16_t error_injection_type, uint16_t error_injection_subtype,
+    const uint8_t *data, size_t data_size, struct nsm_msg *msg)
 {
 	int rc = encode_common_resp(instance_id, cc, reason_code,
 				    NSM_TYPE_DEVICE_CONFIGURATION,
@@ -272,48 +688,112 @@ int encode_get_error_injection_payload_resp(
 		}
 		struct nsm_get_error_injection_payload_resp *resp =
 		    (struct nsm_get_error_injection_payload_resp *)msg->payload;
-		resp->hdr.data_size =
-		    htole16(sizeof(struct nsm_error_injection_payload));
-		resp->data.error_injection_id =
-		    htole32(data->error_injection_id);
-		resp->data.offset = htole32(data->offset);
-		resp->data.fault_reason_bit_map =
-		    htole32(data->fault_reason_bit_map);
+		resp->offset = 0;
+		resp->error_injection_type = htole16(error_injection_type);
+
+		if (error_injection_type == EI_DEVICE_ERRORS) {
+			if (error_injection_subtype ==
+			    EI_DEVICE_ERRORS_SUBTYPE_FATAL) {
+				return encode_fatal_error_injection_payload(
+				    data, data_size, resp->fault_payload);
+			} else if (error_injection_subtype ==
+				   EI_DEVICE_ERRORS_SUBTYPE_PORT_RECOVERY) {
+				return encode_port_recovery_error_injection_payload(
+				    data, data_size, resp->fault_payload);
+			} else if (error_injection_subtype ==
+				   EI_DEVICE_ERRORS_SUBTYPE_USB_EMULATION) {
+				return encode_usb_emulation_error_injection_payload(
+				    data, data_size, resp->fault_payload);
+			} else if (error_injection_subtype ==
+				   EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT) {
+				return encode_leak_detect_error_injection_payload(
+				    data, data_size, resp->fault_payload);
+			} else {
+				return NSM_SW_ERROR_DATA;
+			}
+		} else if (error_injection_type == EI_GPIO_SPOOFING) {
+			return encode_gpio_spoofing_error_injection_payload(
+			    data, data_size, resp->fault_payload);
+		} else {
+			return NSM_SW_ERROR_DATA;
+		}
 	}
 	return rc;
 }
 
-int decode_get_error_injection_payload_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code, struct nsm_error_injection_payload *data)
+int decode_get_error_injection_payload_resp(const struct nsm_msg *msg,
+					    size_t msg_len,
+					    uint16_t error_injection_type,
+					    uint16_t error_injection_subtype,
+					    uint8_t *cc, uint16_t *reason_code,
+					    uint8_t *data, size_t *data_size)
 {
-	uint16_t data_size = 0;
-	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	uint16_t resp_data_size = 0;
+	int rc =
+	    decode_common_resp(msg, msg_len, cc, &resp_data_size, reason_code);
 	if (rc == NSM_SW_SUCCESS && *cc == NSM_SUCCESS) {
-		if (data == NULL) {
-			return NSM_SW_ERROR_NULL;
-		}
+
 		if (msg_len <
 		    sizeof(struct nsm_msg_hdr) +
 			sizeof(struct nsm_get_error_injection_payload_resp)) {
 			return NSM_SW_ERROR_LENGTH;
 		}
-		if (data_size != sizeof(struct nsm_error_injection_payload)) {
-			return NSM_SW_ERROR_LENGTH;
-		}
+
 		struct nsm_get_error_injection_payload_resp *resp =
 		    (struct nsm_get_error_injection_payload_resp *)msg->payload;
-		data->error_injection_id =
-		    le32toh(resp->data.error_injection_id);
-		data->offset = le32toh(resp->data.offset);
-		data->fault_reason_bit_map =
-		    le32toh(resp->data.fault_reason_bit_map);
+		struct nsm_get_error_injection_payload_resp *out_payload =
+		    (struct nsm_get_error_injection_payload_resp *)data;
+
+		out_payload->error_injection_type =
+		    le16toh(resp->error_injection_type);
+
+		if (out_payload->error_injection_type != error_injection_type) {
+			return NSM_SW_ERROR_DATA;
+		}
+
+		uint16_t fault_payload_size =
+		    msg_len -
+		    (sizeof(struct nsm_msg_hdr) +
+		     sizeof(struct nsm_get_error_injection_payload_resp) -
+		     sizeof(uint8_t));
+		if (error_injection_type == EI_DEVICE_ERRORS) {
+			if (error_injection_subtype ==
+			    EI_DEVICE_ERRORS_SUBTYPE_FATAL) {
+				return decode_fatal_error_injection_payload(
+				    data, data_size, resp->fault_payload,
+				    fault_payload_size);
+			} else if (error_injection_subtype ==
+				   EI_DEVICE_ERRORS_SUBTYPE_PORT_RECOVERY) {
+				return decode_port_recovery_error_injection_payload(
+				    data, data_size, resp->fault_payload,
+				    fault_payload_size);
+			} else if (error_injection_subtype ==
+				   EI_DEVICE_ERRORS_SUBTYPE_USB_EMULATION) {
+				return decode_usb_emulation_error_injection_payload(
+				    data, data_size, resp->fault_payload,
+				    fault_payload_size);
+			} else if (error_injection_subtype ==
+				   EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT) {
+				return decode_leak_detect_error_injection_payload(
+				    data, data_size, resp->fault_payload,
+				    fault_payload_size);
+			} else {
+				return NSM_SW_ERROR;
+			}
+		} else if (error_injection_type == EI_GPIO_SPOOFING) {
+			return decode_gpio_spoofing_error_injection_payload(
+			    data, data_size, resp->fault_payload,
+			    fault_payload_size);
+		} else {
+			return NSM_SW_ERROR;
+		}
 	}
 	return rc;
 }
 
-int encode_activate_error_injection_payload_req(uint8_t instance_id,
-						struct nsm_msg *msg)
+int encode_activate_error_injection_payload_req(
+    uint8_t instance_id, uint16_t error_injection_type,
+    uint16_t error_injection_subtype, struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -324,17 +804,58 @@ int encode_activate_error_injection_payload_req(uint8_t instance_id,
 	if (rc != NSM_SW_SUCCESS) {
 		return rc;
 	}
-	struct nsm_common_req_v2 *request =
-	    (struct nsm_common_req_v2 *)msg->payload;
-	request->command = NSM_ACTIVATE_ERROR_INJECTION;
-	request->data_size = 0;
+	if (error_injection_type > EI_GPIO_SPOOFING) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (error_injection_type == EI_DEVICE_ERRORS) {
+		if (error_injection_subtype >
+		    EI_DEVICE_ERRORS_SUBTYPE_LEAK_DETECT) {
+			return NSM_SW_ERROR_DATA;
+		}
+	}
+
+	struct nsm_activate_error_injection_payload_req *request =
+	    (struct nsm_activate_error_injection_payload_req *)msg->payload;
+	request->hdr.command = NSM_ACTIVATE_ERROR_INJECTION;
+	request->hdr.data_size = htole16(sizeof(struct nsm_error_injection_id));
+	uint32_t id_val;
+	struct nsm_error_injection_id *id_ptr =
+	    (struct nsm_error_injection_id *)&id_val;
+	id_ptr->error_injection_type = error_injection_type;
+	id_ptr->error_injection_subtype = error_injection_subtype;
+	request->error_injection_id = htole32(id_val);
 	return rc;
 }
 
-int decode_activate_error_injection_payload_req(const struct nsm_msg *msg,
-						size_t msg_len)
+int decode_activate_error_injection_payload_req(
+    const struct nsm_msg *msg, size_t msg_len, uint16_t *error_injection_type,
+    uint16_t *error_injection_subtype)
 {
-	return decode_common_req(msg, msg_len);
+	int rc = decode_common_req(msg, msg_len);
+	if (rc == NSM_SW_SUCCESS) {
+		if (error_injection_type == NULL ||
+		    error_injection_subtype == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len !=
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(
+			    struct nsm_activate_error_injection_payload_req)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_activate_error_injection_payload_req *req =
+		    (struct nsm_activate_error_injection_payload_req *)
+			msg->payload;
+		if (req->hdr.data_size != sizeof(uint32_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		uint32_t error_injection_id = le32toh(req->error_injection_id);
+		struct nsm_error_injection_id *id =
+		    (struct nsm_error_injection_id *)&error_injection_id;
+		*error_injection_type = id->error_injection_type;
+		*error_injection_subtype = id->error_injection_subtype;
+	}
+	return rc;
 }
 
 int encode_activate_error_injection_payload_resp(uint8_t instance_id,

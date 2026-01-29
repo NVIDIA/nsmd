@@ -83,8 +83,9 @@ class NsmSetErrorInjectionPayload :
   private:
     SensorManager& manager;
     std::shared_ptr<NsmActivateErrorInjectionPayloadIntf> activateIntf;
-    requester::Coroutine setPayload(uint32_t faultBitMap,
-                                    uint32_t errorInjectionId,
+    uint16_t errorInjectionType;
+    uint16_t errorInjectionSubtype;
+    requester::Coroutine setPayload(std::vector<uint8_t> faultBitMap,
                                     AsyncOperationStatusType& status,
                                     std::shared_ptr<NsmDevice> device);
 
@@ -93,7 +94,8 @@ class NsmSetErrorInjectionPayload :
     NsmSetErrorInjectionPayload(
         const std::string& name, SensorManager& manager,
         const Interfaces<ErrorInjectionPayloadIntf>& interfaces,
-        std::shared_ptr<NsmActivateErrorInjectionPayloadIntf> activateIntf);
+        std::shared_ptr<NsmActivateErrorInjectionPayloadIntf> activateIntf,
+        uint16_t errorInjectionType, uint16_t errorInjectionSubtype);
 
     requester::Coroutine
         setErrorInjectionPayload(const AsyncSetOperationValueType& value,

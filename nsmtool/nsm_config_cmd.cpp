@@ -223,10 +223,12 @@ class GetSupportedErrorInjectionTypesV1 : public CommandInterface
             bool((data.mask[0] >> EI_PCI_ERRORS) & 0x01);
         result["Link error injection supported"] =
             bool((data.mask[0] >> EI_NVLINK_ERRORS) & 0x01);
-        result["Device thermal error injection supported"] =
+        result["Thermal error injection supported"] =
             bool((data.mask[0] >> EI_THERMAL_ERRORS) & 0x01);
-        result["Fatal error injection supported"] =
-            bool((data.mask[0] >> EI_FATAL_ERRORS) & 0x01);
+        result["Device error injection supported"] =
+            bool((data.mask[0] >> EI_DEVICE_ERRORS) & 0x01);
+        result["GPIO spoofing error injection supported"] =
+            bool((data.mask[0] >> EI_GPIO_SPOOFING) & 0x01);
         nsmtool::helper::DisplayInJson(result);
     }
 };
@@ -248,21 +250,43 @@ class SetErrorInjectionPayload : public CommandInterface
                                       CLI::App* app) :
         CommandInterface(type, name, app)
     {
-        app->add_option("-d,--data", rawData, "raw data")
+        app->add_option("-t,--errorInjectionType", errorInjectionType,
+                        "Error Injection Type [Options: \n"
+                        "  0x00: Memory Errors\n"
+                        "  0x01: PCIe Errors\n"
+                        "  0x02: Nvlink Errors\n"
+                        "  0x03: Thermal Errors\n"
+                        "  0x04: Device Errors\n"
+                        "  0x05: GPIO Spoofing]");
+        app->add_option("-s,--errorInjectionSubtype", errorInjectionSubtype,
+                        "Error Injection Subtype [For Device errors Options: \n"
+                        "  0x00: Fatal Error (if not applicable, use 0x00)\n"
+                        "  0x01: Port Recovery Error\n"
+                        "  0x02: USB Emulation Error\n"
+                        "  0x03: Leak Detect Error]");
+        app->add_option(
+               "-d,--data", rawData,
+               "Data for payload after error injection type and subtype")
             ->required()
             ->expected(-3);
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
+        if (errorInjectionType == EI_DEVICE_ERRORS)
+        {
+            rawData.insert(rawData.begin(), 2, 0);
+            *reinterpret_cast<uint16_t*>(rawData.data()) =
+                errorInjectionSubtype;
+        }
+
         std::vector<uint8_t> requestMsg(
-            sizeof(nsm_msg_hdr) + sizeof(nsm_set_error_injection_payload_req));
+            sizeof(nsm_msg_hdr) + sizeof(nsm_set_error_injection_payload_req) -
+            sizeof(uint8_t) + rawData.size());
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
-        nsm_error_injection_payload data;
-        memcpy(&data, rawData.data(),
-               sizeof(struct nsm_error_injection_payload));
-        auto rc = encode_set_error_injection_payload_req(instanceId, &data,
-                                                         request);
+        auto rc = encode_set_error_injection_payload_req(
+            instanceId, rawData.data(), rawData.size(), errorInjectionType,
+            errorInjectionSubtype, request);
         return {rc, requestMsg};
     }
 
@@ -291,6 +315,8 @@ class SetErrorInjectionPayload : public CommandInterface
 
   private:
     std::vector<uint8_t> rawData;
+    uint16_t errorInjectionType;
+    uint16_t errorInjectionSubtype;
 };
 
 class GetErrorInjectionPayload : public CommandInterface
@@ -310,8 +336,20 @@ class GetErrorInjectionPayload : public CommandInterface
                                       CLI::App* app) :
         CommandInterface(type, name, app)
     {
-        app->add_option("-i,--errorInjectionId", errorInjectionId,
-                        "Error Injection ID");
+        app->add_option("-t,--errorInjectionType", errorInjectionType,
+                        "Error Injection Type [Options: \n"
+                        "  0x00: Memory Errors\n"
+                        "  0x01: PCIe Errors\n"
+                        "  0x02: Nvlink Errors\n"
+                        "  0x03: Thermal Errors\n"
+                        "  0x04: Device Errors\n"
+                        "  0x05: GPIO Spoofing]");
+        app->add_option("-s,--errorInjectionSubtype", errorInjectionSubtype,
+                        "Error Injection Subtype [For Device errors Options: \n"
+                        "  0x00: Fatal Error (if not applicable, use 0x00)\n"
+                        "  0x01: Port Recovery Error\n"
+                        "  0x02: USB Emulation Error\n"
+                        "  0x03: Leak Detect Error]");
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
@@ -320,7 +358,7 @@ class GetErrorInjectionPayload : public CommandInterface
             sizeof(nsm_msg_hdr) + sizeof(nsm_get_error_injection_payload_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
         auto rc = encode_get_error_injection_payload_req(
-            instanceId, errorInjectionId, request);
+            instanceId, errorInjectionType, errorInjectionSubtype, request);
         return {rc, requestMsg};
     }
 
@@ -328,10 +366,13 @@ class GetErrorInjectionPayload : public CommandInterface
     {
         uint8_t cc = NSM_ERROR;
         uint16_t reason_code = ERR_NULL;
-        nsm_error_injection_payload data;
+        // Allocate buffer large enough for sensors data
+        std::vector<uint8_t> data(payloadLength, 0);
+        size_t dataSize = 0;
 
         auto rc = decode_get_error_injection_payload_resp(
-            responsePtr, payloadLength, &cc, &reason_code, &data);
+            responsePtr, payloadLength, errorInjectionType,
+            errorInjectionSubtype, &cc, &reason_code, data.data(), &dataSize);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
@@ -342,19 +383,30 @@ class GetErrorInjectionPayload : public CommandInterface
 
             return;
         }
-        uint32_t temp_offset = data.offset;
-        uint32_t temp_error_injection_id = data.error_injection_id;
-        uint32_t temp_fault_reason_bit_map = data.fault_reason_bit_map;
         ordered_json result;
+        // resize sensorsData as per datasize
+        data.resize(dataSize);
         result["Completion Code"] = cc;
-        result["Offset"] = temp_offset;
-        result["Error Injection ID"] = temp_error_injection_id;
-        result["Fault Reason Bit Map"] = temp_fault_reason_bit_map;
+        result["Error Injection Type"] = errorInjectionType;
+        result["Error Injection Subtype"] = errorInjectionSubtype;
+
+        // For device errors (type 4), skip first 2 bytes which represent
+        // the error injection subtype already displayed above
+        if (errorInjectionType == EI_DEVICE_ERRORS && data.size() >= 2)
+        {
+            std::vector<uint8_t> faultPayload(data.begin() + 2, data.end());
+            result["Fault payload"] = faultPayload;
+        }
+        else
+        {
+            result["Fault payload"] = data;
+        }
         nsmtool::helper::DisplayInJson(result);
     }
 
   private:
-    uint32_t errorInjectionId;
+    uint16_t errorInjectionType;
+    uint16_t errorInjectionSubtype;
 };
 
 class ActivateErrorInjectionPayload : public CommandInterface
@@ -375,15 +427,31 @@ class ActivateErrorInjectionPayload : public CommandInterface
     explicit ActivateErrorInjectionPayload(const char* type, const char* name,
                                            CLI::App* app) :
         CommandInterface(type, name, app)
-    {}
+    {
+        app->add_option("-t,--errorInjectionType", errorInjectionType,
+                        "Error Injection Type [Options: \n"
+                        "  0x00: Memory Errors\n"
+                        "  0x01: PCIe Errors\n"
+                        "  0x02: Nvlink Errors\n"
+                        "  0x03: Thermal Errors\n"
+                        "  0x04: Device Errors\n"
+                        "  0x05: GPIO Spoofing]");
+        app->add_option("-s,--errorInjectionSubtype", errorInjectionSubtype,
+                        "Error Injection Subtype [For Device errors Options: \n"
+                        "  0x00: Fatal Error (if not applicable, use 0x00)\n"
+                        "  0x01: Port Recovery Error\n"
+                        "  0x02: USB Emulation Error\n"
+                        "  0x03: Leak Detect Error]");
+    }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
-        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
-                                        sizeof(nsm_common_req_v2));
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_activate_error_injection_payload_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
-        auto rc = encode_activate_error_injection_payload_req(instanceId,
-                                                              request);
+        auto rc = encode_activate_error_injection_payload_req(
+            instanceId, errorInjectionType, errorInjectionSubtype, request);
         return {rc, requestMsg};
     }
 
@@ -407,8 +475,14 @@ class ActivateErrorInjectionPayload : public CommandInterface
 
         ordered_json result;
         result["Completion Code"] = cc;
+        result["Error Injection Type"] = errorInjectionType;
+        result["Error Injection Subtype"] = errorInjectionSubtype;
         nsmtool::helper::DisplayInJson(result);
     }
+
+  private:
+    uint16_t errorInjectionType;
+    uint16_t errorInjectionSubtype;
 };
 
 class SetCurrentErrorInjectionTypesV1 : public CommandInterface
@@ -539,10 +613,12 @@ class GetCurrentErrorInjectionTypesV1 : public CommandInterface
             bool((data.mask[0] >> EI_PCI_ERRORS) & 0x01);
         result["Link error injection enabled"] =
             bool((data.mask[0] >> EI_NVLINK_ERRORS) & 0x01);
-        result["Device thermal error injection enabled"] =
+        result["Thermal error injection enabled"] =
             bool((data.mask[0] >> EI_THERMAL_ERRORS) & 0x01);
-        result["Fatal error injection enabled"] =
-            bool((data.mask[0] >> EI_FATAL_ERRORS) & 0x01);
+        result["Device error injection enabled"] =
+            bool((data.mask[0] >> EI_DEVICE_ERRORS) & 0x01);
+        result["GPIO spoofing error injection enabled"] =
+            bool((data.mask[0] >> EI_GPIO_SPOOFING) & 0x01);
         nsmtool::helper::DisplayInJson(result);
     }
 };

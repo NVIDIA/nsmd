@@ -42,17 +42,25 @@ class NsmActivateErrorInjectionPayloadIntf :
   public:
     NsmActivateErrorInjectionPayloadIntf(sdbusplus::bus::bus& bus,
                                          const char* path,
+                                         uint16_t errorInjectionType,
+                                         uint16_t errorInjectionSubtype,
                                          std::shared_ptr<NsmDevice> device) :
-        ActivateErrorInjectionPayloadIntf(bus, path), device(device)
+        ActivateErrorInjectionPayloadIntf(bus, path), device(device),
+        errorInjectionType(errorInjectionType),
+        errorInjectionSubtype(errorInjectionSubtype)
     {}
 
     requester::Coroutine doActivateErrorInjectionPayload(
         std::shared_ptr<AsyncStatusIntf> statusInterface)
     {
         auto eid = device->getEid();
-        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req_v2));
+        size_t requestSize = sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_activate_error_injection_payload_req);
+
+        Request request(requestSize);
         auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-        auto rc = encode_activate_error_injection_payload_req(0, requestPtr);
+        auto rc = encode_activate_error_injection_payload_req(
+            0, errorInjectionType, errorInjectionSubtype, requestPtr);
 
         if (rc != NSM_SW_SUCCESS)
         {
@@ -120,6 +128,8 @@ class NsmActivateErrorInjectionPayloadIntf :
 
   private:
     std::shared_ptr<NsmDevice> device;
+    uint16_t errorInjectionType;
+    uint16_t errorInjectionSubtype;
 };
 
 } // namespace nsm
