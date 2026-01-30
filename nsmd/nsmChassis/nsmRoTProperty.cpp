@@ -633,4 +633,223 @@ NsmImageCopyObject::NsmImageCopyObject(sdbusplus::bus::bus& bus,
     nsmImageCopy = std::make_unique<NsmImageCopy>(bus, objectPath, uuid, *this);
 }
 
+NsmImageCopyPolicy::NsmImageCopyPolicy(sdbusplus::bus::bus& bus,
+                                       const std::string& objPath,
+                                       NsmSensor& nsmSensor) :
+    ImageCopyPolicyIntf(bus, objPath.c_str()), nsmSensor(nsmSensor)
+{}
+
+void NsmImageCopyPolicy::updateProperties(
+    const struct ::nsm_firmware_erot_state_info_resp& erot_info)
+{
+    using ImageCopyPolicyState =
+        sdbusplus::common::com::nvidia::ImageCopyPolicy::ImageCopyPolicyState;
+
+    bool invalidValue = false;
+    switch (erot_info.fq_resp_hdr.background_copy_policy)
+    {
+        case NSM_ROT_REDUNDANCY_POLICY_MANUAL_BACKGROUND_COPY:
+            imageCopyPolicy(ImageCopyPolicyState::Manual);
+            break;
+        case NSM_ROT_REDUNDANCY_POLICY_AUTOMATIC_BACKGROUND_COPY:
+            imageCopyPolicy(ImageCopyPolicyState::Automatic);
+            break;
+        default:
+            invalidValue = true;
+            break;
+    }
+
+    if (shouldLog("Invalid background_copy_policy", invalidValue) &&
+        invalidValue)
+    {
+        LG2_ERROR(
+            "Invalid background_copy_policy value: {VALUE}, ImageCopyPolicy property not updated",
+            "VALUE", erot_info.fq_resp_hdr.background_copy_policy);
+    }
+}
+
+NsmImageCopyPolicyObject::NsmImageCopyPolicyObject(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn) :
+    NsmSensor(name, type), objectPath(getPath(name)),
+    classification(classificationIn), identifier(identifierIn), index(indexIn)
+{
+    lg2::info("NsmImageCopyPolicyObject: create object: {PATH}", "PATH",
+              objectPath.c_str());
+    imageCopyPolicyObject =
+        std::make_unique<NsmImageCopyPolicy>(bus, objectPath, *this);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmImageCopyPolicyObject::genRequestMsg(__attribute__((unused)) eid_t eid,
+                                            uint8_t instanceId)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_firmware_get_erot_state_info_req));
+    struct ::nsm_firmware_erot_state_info_req erot_req = {};
+    erot_req.component_classification = classification;
+    erot_req.component_classification_index = index;
+    erot_req.component_identifier = identifier;
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_nsm_query_get_erot_state_parameters_req(
+        instanceId, &erot_req, requestMsg);
+    if (rc)
+    {
+        std::string msg = utils::requestMsgToHexString(request);
+        lg2::error(
+            "encode_nsm_query_get_erot_state_parameters_req failed: eid={EID}, rc={RC}, NSM_Request={MSG}",
+            "EID", eid, "RC", rc, "MSG", msg);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmImageCopyPolicyObject::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    nsm_firmware_erot_state_info_resp erot_info = {};
+
+    auto rc = decode_nsm_query_get_erot_state_parameters_resp(
+        responseMsg, responseLen, &cc, &reason_code, &erot_info);
+
+    if (shouldLog("decode_nsm_query_get_erot_state_parameters_resp",
+                  reason_code, cc, rc))
+    {
+        LG2_ERROR(
+            "decode_nsm_query_get_erot_state_parameters_resp failed: rc={RC}, cc={CC}, reasonCode={REASONCODE}",
+            "RC", rc, "CC", (int)cc, "REASONCODE", (int)reason_code);
+    }
+
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        free(erot_info.slot_info);
+        return cc ? cc : rc;
+    }
+
+    imageCopyPolicyObject->updateProperties(erot_info);
+    free(erot_info.slot_info);
+    return cc ? cc : rc;
+}
+
+requester::Coroutine ImageCopyPolicyHandler::updateImageCopyPolicy(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint16_t classification,
+    uint16_t identifier, uint8_t index)
+{
+    using ImageCopyPolicyState =
+        sdbusplus::common::com::nvidia::ImageCopyPolicy::ImageCopyPolicyState;
+
+    const auto* policyString = std::get_if<std::string>(&value);
+    if (policyString == nullptr)
+    {
+        LG2_ERROR("updateImageCopyPolicy: invalid value type");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    auto policyStateOpt = sdbusplus::common::com::nvidia::ImageCopyPolicy::
+        convertStringToImageCopyPolicyState(*policyString);
+    if (!policyStateOpt.has_value())
+    {
+        LG2_ERROR("updateImageCopyPolicy: invalid policy string: {POLICY}",
+                  "POLICY", *policyString);
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    auto policyState = policyStateOpt.value();
+    uint8_t policyValue;
+    if (policyState == ImageCopyPolicyState::Manual)
+    {
+        policyValue = NSM_ROT_REDUNDANCY_POLICY_MANUAL_BACKGROUND_COPY;
+    }
+    else if (policyState == ImageCopyPolicyState::Automatic)
+    {
+        policyValue = NSM_ROT_REDUNDANCY_POLICY_AUTOMATIC_BACKGROUND_COPY;
+    }
+    else
+    {
+        LG2_ERROR("updateImageCopyPolicy: unsupported policy state");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    auto eid = device->getEid();
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_firmware_set_rot_property_req_command));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+    struct ::nsm_firmware_set_rot_property_req nsm_req = {};
+
+    nsm_req.component_classification = htole16(classification);
+    nsm_req.component_classification_index = index;
+    nsm_req.component_identifier = htole16(identifier);
+    nsm_req.property = NSM_ROT_PROPERTY_REDUNDANCY_POLICY;
+    nsm_req.argument_data[0] = policyValue;
+    nsm_req.argument_data[1] = NSM_ROT_REDUNDANCY_POLICY_LIFESPAN_PERSISTENT;
+    nsm_req.argument_length = 2;
+
+    auto rc = encode_nsm_firmware_set_rot_property_req(0, &nsm_req, requestMsg);
+    if (shouldLog("encode_nsm_firmware_set_rot_property_req", uint16_t(0),
+                  uint8_t(0), rc))
+    {
+        LG2_ERROR(
+            "updateImageCopyPolicy: encode_nsm_firmware_set_rot_property_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+    }
+    if (rc != NSM_SW_SUCCESS)
+    {
+        *status = AsyncOperationStatusType::InternalFailure;
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
+
+    if (shouldLog("postPatchIO", uint16_t(0), uint8_t(0), rc))
+    {
+        LG2_ERROR(
+            "updateImageCopyPolicy: postPatchIO failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+    }
+    if (rc != NSM_SW_SUCCESS)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return rc;
+    }
+
+    uint8_t cc = 0;
+    uint16_t reasonCode = 0;
+    rc = decode_nsm_firmware_set_rot_property_resp(
+        responseMsg.get(), responseLen, &cc, &reasonCode);
+
+    if (shouldLog("decode_nsm_firmware_set_rot_property_resp", reasonCode, cc,
+                  rc))
+    {
+        LG2_ERROR(
+            "updateImageCopyPolicy: decode_nsm_firmware_set_rot_property_resp failed. reasonCode={REASONCODE}, cc={CC}, rc={RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    }
+    if ((rc != NSM_SW_SUCCESS) || (cc != NSM_SUCCESS))
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return cc ? cc : rc;
+    }
+
+    *status = AsyncOperationStatusType::Success;
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine updateImageCopyPolicyHandler(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint16_t classification,
+    uint16_t identifier, uint8_t index)
+{
+    ImageCopyPolicyHandler handler;
+    co_return co_await handler.updateImageCopyPolicy(
+        value, status, device, classification, identifier, index);
+}
+
 } // namespace nsm

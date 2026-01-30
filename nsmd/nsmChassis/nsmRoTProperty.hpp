@@ -24,6 +24,7 @@
 #include "utils.hpp"
 
 #include <com/nvidia/ImageCopy/server.hpp>
+#include <com/nvidia/ImageCopyPolicy/server.hpp>
 #include <com/nvidia/InbandUpdatePolicy/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/timer.hpp>
@@ -40,6 +41,8 @@ using namespace sdbusplus::server;
 using InbandUpdatePolicyIntf =
     object_t<sdbusplus::server::com::nvidia::InbandUpdatePolicy>;
 using ImageCopyIntf = object_t<sdbusplus::server::com::nvidia::ImageCopy>;
+using ImageCopyPolicyIntf =
+    object_t<sdbusplus::server::com::nvidia::ImageCopyPolicy>;
 
 class NsmInbandUpdatePolicy :
     public InbandUpdatePolicyIntf,
@@ -190,7 +193,6 @@ class NsmImageCopyObject : public NsmObject
   private:
     std::string getPath(const std::string& chassisName)
     {
-        using namespace std::string_literals;
         return std::string(chassisInventoryBasePath) + "/" + chassisName;
     }
 
@@ -203,5 +205,93 @@ class NsmImageCopyObject : public NsmObject
     std::string objectPath;
     std::unique_ptr<NsmImageCopy> nsmImageCopy;
 };
+
+/**
+ * @brief D-Bus interface class for RoT Image Copy Policy
+ *
+ * This class exposes the ImageCopyPolicy D-Bus interface for managing the
+ * background copy policy (Manual or Automatic) on Root of Trust (RoT) devices.
+ * It reads and updates the redundancy policy state from eROT firmware
+ * state information responses.
+ */
+class NsmImageCopyPolicy : public ImageCopyPolicyIntf, public StateChangeLogger
+{
+  public:
+    NsmImageCopyPolicy(sdbusplus::bus::bus& bus, const std::string& objPath,
+                       NsmSensor& nsmSensor);
+
+    virtual ~NsmImageCopyPolicy() = default;
+
+    void updateProperties(
+        const struct ::nsm_firmware_erot_state_info_resp& erot_info);
+
+  private:
+    NsmSensor& nsmSensor;
+};
+
+/**
+ * @brief NSM Sensor object class for RoT Image Copy Policy
+ *
+ * This class inherits from NsmSensor and manages the polling and communication
+ * with eROT devices to retrieve and update the image copy policy state.
+ * It generates NSM request messages to query eROT state parameters and
+ * handles response messages to update the associated NsmImageCopyPolicy
+ * D-Bus interface.
+ */
+class NsmImageCopyPolicyObject : public NsmSensor
+{
+  private:
+    std::string getPath(const std::string& chassisName)
+    {
+        return std::string(chassisInventoryBasePath) + "/" + chassisName;
+    }
+
+  public:
+    NsmImageCopyPolicyObject(sdbusplus::bus::bus& bus, const std::string& name,
+                             const std::string& type, uint16_t classificationIn,
+                             uint16_t identifierIn, uint8_t indexIn);
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+
+    uint8_t handleResponseMsg(const nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::string objectPath;
+    std::unique_ptr<NsmImageCopyPolicy> imageCopyPolicyObject;
+    uint16_t classification;
+    uint16_t identifier;
+    uint8_t index;
+};
+
+/**
+ * @brief Handler class for async Image Copy Policy operation
+ * This class is used to handle writes to the ImageCopyPolicy property
+ * on the ImageCopyPolicy D-Bus interface. It inherits from StateChangeLogger
+ * to enable state-aware logging.
+ */
+class ImageCopyPolicyHandler : public StateChangeLogger
+{
+  public:
+    ImageCopyPolicyHandler() = default;
+    virtual ~ImageCopyPolicyHandler() = default;
+
+    requester::Coroutine updateImageCopyPolicy(
+        const AsyncSetOperationValueType& value,
+        AsyncOperationStatusType* status, std::shared_ptr<NsmDevice> device,
+        uint16_t classification, uint16_t identifier, uint8_t index);
+};
+
+/**
+ * @brief Standalone wrapper for async Image Copy Policy operation
+ * This function is registered with addAsyncSetOperation to handle
+ * writes to the ImageCopyPolicy property on the ImageCopyPolicy D-Bus
+ * interface.
+ */
+requester::Coroutine updateImageCopyPolicyHandler(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint16_t classification,
+    uint16_t identifier, uint8_t index);
 
 } // namespace nsm

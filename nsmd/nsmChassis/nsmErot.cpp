@@ -234,6 +234,13 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 allCurrentIfaceProperties.at("InbandUpdatePolicyEnabled"));
         }
 
+        bool imageCopyPolicyEnabled = false;
+        if (allCurrentIfaceProperties.count("ImageCopyPolicyEnabled"))
+        {
+            imageCopyPolicyEnabled = std::get<bool>(
+                allCurrentIfaceProperties.at("ImageCopyPolicyEnabled"));
+        }
+
         auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
         if (!device)
@@ -260,6 +267,8 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
         std::shared_ptr<NsmKeyMgmt> ecKeyMgmt = nullptr;
         std::shared_ptr<NsmMinSecVersionObject> ecMinSecVersion = nullptr;
         std::shared_ptr<NsmInbandUpdatePolicyObject> inbandUpdatePolicy =
+            nullptr;
+        std::shared_ptr<NsmImageCopyPolicyObject> imageCopyPolicySensor =
             nullptr;
         std::shared_ptr<NsmImageCopyObject> imageCopyObject = nullptr;
 
@@ -365,6 +374,37 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                             apProgressIntfMap[slot.chassisName]);
                     device->addSensor(apMinSecVersionMap[slot.chassisName],
                                       PollingType::RoundRobin);
+                }
+
+                if (imageCopyPolicySensor == nullptr && imageCopyPolicyEnabled)
+                {
+                    auto inventoryPath = std::string(chassisInventoryBasePath) +
+                                         "/" + name;
+
+                    imageCopyPolicySensor =
+                        std::make_shared<NsmImageCopyPolicyObject>(
+                            bus, name, type, slot.classification,
+                            slot.identifier, static_cast<uint8_t>(slot.index));
+                    device->addSensor(imageCopyPolicySensor,
+                                      PollingType::RoundRobin);
+
+                    // Register async set handler for ImageCopyPolicy property
+                    nsm::AsyncSetOperationHandler imageCopyPolicyHandler =
+                        std::bind(&nsm::updateImageCopyPolicyHandler,
+                                  std::placeholders::_1, std::placeholders::_2,
+                                  std::placeholders::_3, slot.classification,
+                                  slot.identifier,
+                                  static_cast<uint8_t>(slot.index));
+                    AsyncOperationManager::getInstance()
+                        ->getDispatcher(inventoryPath)
+                        ->addAsyncSetOperation(
+                            "com.nvidia.ImageCopyPolicy", "ImageCopyPolicy",
+                            AsyncSetOperationInfo{imageCopyPolicyHandler,
+                                                  imageCopyPolicySensor,
+                                                  device});
+                    lg2::info(
+                        "ImageCopyPolicy interface created successfully for chassis:{CHASSIS}",
+                        "CHASSIS", name);
                 }
             }
             else // EC
