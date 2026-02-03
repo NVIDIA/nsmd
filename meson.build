@@ -303,9 +303,6 @@ add_project_arguments(
     language: ['c', 'cpp'],
 )
 
-# Build dot utilities (needed by deps below)
-subdir('dot')
-
 openssl_dep = dependency('openssl', required: true)
 
 dynamic_linker = []
@@ -328,6 +325,9 @@ endif
 systemd = dependency('systemd')
 systemd_system_unit_dir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
 
+# Build libnsm static library first (used by nsmtool, mockupResponder)
+subdir('libnsm')
+
 subdir('services')
 subdir('nsmtool')
 subdir('nsmd')
@@ -342,11 +342,5 @@ if get_option('tests').enabled()
     subdir('libnsm/test')
     subdir('mockupResponder/test')
     subdir('nsmtool/test')
-    subdir('nsmd/test')
+    subdir('dot/test')
 endif
-
-install_subdir(
-    'libnsm/instance-db',
-    install_mode: 'r--r--r--',
-    install_dir: get_option('datadir') / meson.project_name(),
-)

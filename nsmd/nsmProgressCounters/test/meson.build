@@ -1,67 +1,12 @@
-dep_src_files = [
-    '../counterProducer.cpp',
-    '../progressCounters.cpp',
-    '../../nsmDevice.cpp',
-    '../../nsmObjectFactory.cpp',
-    '../../sensorManager.cpp',
-    '../../nsmSensor.cpp',
-    '../../nsmEvent.cpp',
-    '../../nsmEvent/nsmLongRunningEventHandler.cpp',
-    '../../../common/utils.cpp',
-    '../../../common/test/mockDBusHandler.cpp',
-    '../../../libnsm/base.c',
-    '../../../libnsm/platform-environmental.c',
-    '../../../libnsm/requester/mctp.c',
-    '../../../requester/request_timeout_tracker.cpp',
-    '../../../requester/mctp_endpoint_prober.cpp',
-    '../../nsmFwSwInventory/GPUSWInventory.cpp',
-    '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
-    '../../../requester/mctp_endpoint_discovery.cpp',
-]
-
-if get_option('shmem').enabled()
-    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
-endif
-
-dep_src_headers = [
-    '.',
-    '..',
-    '../../',
-    '../../nsmEvent',
-    '../../nsmCommon',
-    '../../test/',
-    '../../nsmDbusIfaceOverride',
-    '../../nsmProgressCounters',
-    '../../../',
-    '../../../common',
-    '../../../libnsm',
-]
-
-test_src = declare_dependency(
-    sources: dep_src_files,
-    include_directories: dep_src_headers,
-)
+# nsmProgressCounters tests now use nsmd_test
+# nsmProgressCounters subdir is ALWAYS compiled into nsmd_test (core functionality)
+# No additional sources needed - everything is already in nsmd_test
 
 tests = [
     'counterProducer_test',
     'progressCounters_test',
     'discoveryEvents_test',
 ]
-
-tests_deps = [
-    test_src,
-    CLI11_dep,
-    nlohmann_json,
-    sdbusplus,
-    sdeventplus,
-    phosphor_logging,
-    gtest,
-    gmock,
-]
-
-if get_option('shmem').enabled()
-    tests_deps += nvidia_shmem
-endif
 
 foreach t : tests
     test(
@@ -70,8 +15,8 @@ foreach t : tests
             t.underscorify(),
             t + '.cpp',
             implicit_include_directories: false,
+            include_directories: ['.', '..'],
             link_args: dynamic_linker,
-            build_rpath: '',
             dependencies: tests_deps,
         ),
         workdir: meson.current_source_dir(),

@@ -227,24 +227,14 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
     propertyMap["LinkStatus"] =
         std::get<std::string>(get(basic, "LinkStatus").second);
 
-    auto initialDevice = 0;
-    auto initialRoundRobin = 0;
-    auto initialPriority = 0;
-    if (devices.size() > 0)
-    {
-        initialDevice = devices.back()->deviceSensors.size();
-        initialRoundRobin = devices.back()->roundRobinSensors.size();
-        initialPriority = devices.back()->prioritySensors.size();
-    }
-
     createNsmPCIePort(mockManager, basicIntfName, objPath);
     auto cx7 = std::dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
 
-    EXPECT_EQ(initialPriority + 0, cx7->prioritySensors.size());
-    EXPECT_EQ(initialRoundRobin + 4, cx7->roundRobinSensors.size());
-    EXPECT_EQ(initialDevice + 8, cx7->deviceSensors.size());
+    EXPECT_EQ(0, cx7->prioritySensors.size());
+    EXPECT_EQ(5, cx7->roundRobinSensors.size());
+    EXPECT_EQ(9, cx7->deviceSensors.size());
 
-    auto sensors = initialRoundRobin;
+    auto sensors = 1; // Skip msgTypes sensor added by initMsgTypesSensor()
     auto associationsObject =
         dynamic_pointer_cast<NsmPCIePort<AssociationDefinitionsInft>>(
             cx7->deviceSensors[sensors++]);
@@ -297,7 +287,7 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
     EXPECT_CALL(*cx7, sensorIO)
         .Times(cx7->roundRobinSensors.size())
         .WillRepeatedly(mockSensorIO(NSM_SUCCESS));
-    for (size_t i = initialRoundRobin; i < cx7->roundRobinSensors.size(); i++)
+    for (size_t i = 0; i < cx7->roundRobinSensors.size(); i++)
     {
         cx7->roundRobinSensors[i]->update(cx7).detach();
     }

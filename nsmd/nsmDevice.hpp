@@ -215,9 +215,7 @@ class NsmDevice :
         }
         discoveryPending = false;
         isDeviceActive = false;
-#ifndef MOCK_DBUS_ASYNC_UTILS
         initMsgTypesSensor();
-#endif
     }
 
     uuid_t deviceUuid;

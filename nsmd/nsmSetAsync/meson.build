@@ -43,6 +43,3 @@ endif
 
 nsmd_headers += ['.', '..', 'nsmSetAsync']
 
-if get_option('tests').enabled()
-    subdir('test')
-endif

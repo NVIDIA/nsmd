@@ -130,7 +130,7 @@ TEST_F(NsmFirmwareInventoryTest, badTestNoDevideFound)
 
 TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 {
-    auto sensors = 0;
+    auto sensors = 1; // Skip msgTypes sensor added by initMsgTypesSensor()
     auto& map = utils::MockDbusAsync::getServiceMap();
     auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
     propertyMap.clear();
@@ -212,7 +212,7 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 
     EXPECT_EQ(1, writeProtectedSensor->sensors.size());
     EXPECT_EQ(3, fpga->staticSensors.size());
-    EXPECT_EQ(1, fpga->roundRobinSensors.size());
+    EXPECT_EQ(2, fpga->roundRobinSensors.size());
     EXPECT_EQ(0, fpga->prioritySensors.size());
     EXPECT_EQ(sensors, fpga->deviceSensors.size());
 }
@@ -247,7 +247,7 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateCpuSensors)
     EXPECT_EQ(0, fpga->staticSensors.size());
     EXPECT_EQ(0, fpga->prioritySensors.size());
     EXPECT_EQ(2, fpga->deviceSensors.size());
-    auto sensors = 0;
+    auto sensors = 0; // Sensors were cleared, msgTypes not re-added
     auto cpuSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
         fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, cpuSettings);

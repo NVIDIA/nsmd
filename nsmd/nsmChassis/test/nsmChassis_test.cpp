@@ -157,7 +157,7 @@ TEST_F(NsmChassisTest, badTestCreateDeviceSensors)
     EXPECT_EQ(1, devices.size());
     gpu = dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
     gpu->deviceType = NSM_DEV_ID_GPU;
-    EXPECT_EQ(0, devices.back()->deviceSensors.size());
+    EXPECT_EQ(1, devices.back()->deviceSensors.size());
 }
 TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
 {
@@ -308,18 +308,18 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
     EXPECT_EQ(2, devices.size());
     fpga = dynamic_pointer_cast<MockNsmDeviceBase>(devices[1]);
     EXPECT_EQ(3, fpga->staticSensors.size());
-    EXPECT_EQ(0, fpga->roundRobinSensors.size());
-    EXPECT_EQ(3, fpga->deviceSensors.size());
+    EXPECT_EQ(1, fpga->roundRobinSensors.size());
+    EXPECT_EQ(4, fpga->deviceSensors.size());
     // Second call: NSM_Chassis_Attributes
     propertyMap["Type"] = std::get<std::string>(get(fpgaAsset, "Type").second);
     nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
                             objPath);
     EXPECT_EQ(2, devices.size());
     EXPECT_EQ(5, fpga->staticSensors.size());
-    EXPECT_EQ(0, fpga->roundRobinSensors.size());
-    EXPECT_EQ(6, fpga->deviceSensors.size());
+    EXPECT_EQ(1, fpga->roundRobinSensors.size());
+    EXPECT_EQ(7, fpga->deviceSensors.size());
 
-    auto sensors = 0;
+    auto sensors = 1; // Skip msgTypes sensor added by initMsgTypesSensor()
 
     auto chassisUuid = dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
         fpga->deviceSensors[sensors++]);

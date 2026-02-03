@@ -25,6 +25,44 @@
 namespace utils
 {
 
+struct MockDbusAsync
+{
+    struct DbusPropsMap :
+        std::map<std::string, std::map<DbusProp, PropertyValue>>
+    {
+        void push(const std::string& objPath,
+                  const std::pair<DbusProp, PropertyValue>& property)
+        {
+            (*this)[objPath][property.first] = property.second;
+        }
+    };
+
+    /** @brief Get the values reference for gtest. */
+    static auto& getValues()
+    {
+        static DbusPropsMap values{};
+        return values;
+    }
+
+    static auto& getServiceMap()
+    {
+        static MapperServiceMap map{};
+        return map;
+    }
+
+    static auto& getPropertyMap()
+    {
+        static dbus::PropertyMap propertyMap{};
+        return propertyMap;
+    }
+
+    static auto& getLogEventSuccess()
+    {
+        static bool logEventSuccess = true; // Default to success for tests
+        return logEventSuccess;
+    }
+};
+
 class MockDBusHandler : public IDBusHandler
 {
     MockDBusHandler() = default;

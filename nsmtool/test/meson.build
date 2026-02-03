@@ -1,27 +1,12 @@
-dep_src_files = [
+# nsmtool tests now use nsmd_test
+# Only nsmtool-specific sources need to be compiled here
+
+nsmtool_test_sources = [
     '../cmd_helper.cpp',
     '../nsm_discovery_cmd.cpp',
     '../nsm_telemetry_cmd.cpp',
-    '../../common/utils.cpp',
-    '../../common/test/mockDBusHandler.cpp',
-    '../../libnsm/base.c',
-    '../../libnsm/device-capability-discovery.c',
-    '../../libnsm/firmware-utils.c',
-    '../../libnsm/platform-environmental.c',
-    '../../libnsm/powersmoothing-powerprofile-api-v2.c',
-    '../../libnsm/device-configuration.c',
-    '../../libnsm/diagnostics.c',
-    '../../libnsm/pci-links.c',
-    '../../libnsm/network-ports.c',
     '../../libnsm/requester/mctp.c',
 ]
-
-dep_src_headers = ['.', '..', '../../', '../../common', '../../libnsm']
-
-test_src = declare_dependency(
-    sources: dep_src_files,
-    include_directories: dep_src_headers,
-)
 
 tests = ['cmd_helper_test']
 
@@ -30,19 +15,11 @@ foreach t : tests
         t,
         executable(
             t.underscorify(),
-            t + '.cpp',
+            [t + '.cpp', nsmtool_test_sources],
             implicit_include_directories: false,
+            include_directories: ['.', '..'],
             link_args: dynamic_linker,
-            build_rpath: '',
-            dependencies: [
-                test_src,
-                CLI11_dep,
-                nlohmann_json,
-                sdbusplus,
-                phosphor_logging,
-                gtest,
-                gmock,
-            ],
+            dependencies: tests_deps,
         ),
         workdir: meson.current_source_dir(),
     )

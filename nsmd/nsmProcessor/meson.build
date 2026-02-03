@@ -12,6 +12,3 @@ sources += [
 
 nsmd_headers += ['.', '..', 'nsmProcessor']
 
-if get_option('tests').enabled()
-    subdir('test')
-endif

@@ -118,7 +118,3 @@ if include_all_chassis or include_chassis_list.contains('irot-responder')
 endif
 
 nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride', 'nsmFirmwareUtils']
-
-if get_option('tests').enabled()
-    subdir('test')
-endif

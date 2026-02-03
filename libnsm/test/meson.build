@@ -1,23 +1,7 @@
-dep_src_files = [
-    'common-tests.cpp',
-    '../base.c',
-    '../debug-token.c',
-    '../device-capability-discovery.c',
-    '../device-configuration.c',
-    '../diagnostics.c',
-    '../firmware-utils.c',
-    '../platform-environmental.c',
-    '../powersmoothing-powerprofile-api-v2.c',
-    '../network-ports.c',
-    '../pci-links.c',
-]
+# libnsm tests now use nsmd_test
+# common-tests.cpp contains shared test utilities specific to libnsm tests
 
-dep_src_headers = ['.', '..', '../../common']
-
-test_src = declare_dependency(
-    sources: dep_src_files,
-    include_directories: dep_src_headers,
-)
+test_common_sources = ['common-tests.cpp']
 
 tests = [
     'libnsm_base_test',
@@ -31,27 +15,17 @@ tests = [
     'libnsm_pci_links_test',
 ]
 
-libnsm_headers = ['.', '..', '../../common']
-
 foreach t : tests
     test(
         t,
         executable(
             t.underscorify(),
-            t + '.cpp',
+            [t + '.cpp', test_common_sources],
             implicit_include_directories: false,
+            include_directories: ['.', '..'],
             link_args: dynamic_linker,
             build_rpath: '',
-            dependencies: [
-                test_src,
-                gtest,
-                gmock,
-                CLI11_dep,
-                nlohmann_json,
-                sdbusplus,
-                sdeventplus,
-                phosphor_logging,
-            ],
+            dependencies: tests_deps,
         ),
         workdir: meson.current_source_dir(),
     )

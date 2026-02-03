@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "dBusAsyncUtils.hpp"
 #include "utils.hpp"
 
 namespace utils
@@ -179,6 +180,247 @@ GetAssociatedObjectsResponse
     GetAssociatedObjectsResponse response;
     reply.read(response);
     return response;
+}
+
+// Single-flight pattern implementation for single-threaded async execution
+// for EM configuration PDI properties
+requester::Coroutine
+    coGetCachedBaseProperties(const std::string& objPath,
+                              const std::string& baseInterface,
+                              dbus::PropertyMap& cachedProperties)
+{
+    static std::unordered_map<
+        std::string, std::unordered_map<std::string, dbus::PropertyMap>>
+        basePropertiesCache;
+
+    static std::unordered_map<
+        std::string,
+        std::unordered_map<std::string, std::shared_future<dbus::PropertyMap>>>
+        pendingRequests;
+
+    // Check if already cached
+    auto objPathIt = basePropertiesCache.find(objPath);
+    if (objPathIt != basePropertiesCache.end())
+    {
+        auto interfaceIt = objPathIt->second.find(baseInterface);
+        if (interfaceIt != objPathIt->second.end())
+        {
+            // "Cache hit: Using cached base properties for
+            // {OBJPATH}:{INTERFACE}", "OBJPATH", objPath, "INTERFACE",
+            // baseInterface);
+            cachedProperties = interfaceIt->second;
+            co_return NSM_SUCCESS;
+        }
+    }
+
+    // Check if request is already pending
+    auto pendingObjIt = pendingRequests.find(objPath);
+    if (pendingObjIt != pendingRequests.end())
+    {
+        auto pendingInterfaceIt = pendingObjIt->second.find(baseInterface);
+        if (pendingInterfaceIt != pendingObjIt->second.end())
+        {
+            //     "Request pending: Waiting for ongoing request for
+            //     {OBJPATH}:{INTERFACE}", "OBJPATH", objPath, "INTERFACE",
+            //     baseInterface);
+
+            try
+            {
+                dbus::PropertyMap result = pendingInterfaceIt->second.get();
+                cachedProperties = result;
+                co_return NSM_SUCCESS;
+            }
+            catch (...)
+            {
+                // If the future threw an exception, we'll try making our own
+                // request Continue to the request creation logic below
+            }
+        }
+    }
+
+    // Create a promise for this request
+    std::promise<dbus::PropertyMap> promise;
+    std::shared_future<dbus::PropertyMap> future = promise.get_future().share();
+
+    // Store the pending request
+    pendingRequests[objPath][baseInterface] = future;
+
+    // "Cache miss: First retrieval for {OBJPATH}:{INTERFACE}",
+    // "OBJPATH", objPath, "INTERFACE", baseInterface);
+
+    try
+    {
+        // Make the actual D-Bus call
+        dbus::PropertyMap properties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, objPath, baseInterface);
+
+        // Cache the result and clean up pending request
+        basePropertiesCache[objPath][baseInterface] = properties;
+
+        // Remove from pending requests
+        auto pendingObjIt = pendingRequests.find(objPath);
+        if (pendingObjIt != pendingRequests.end())
+        {
+            pendingObjIt->second.erase(baseInterface);
+            if (pendingObjIt->second.empty())
+            {
+                pendingRequests.erase(objPath);
+            }
+        }
+
+        // Set the promise result
+        promise.set_value(properties);
+
+        cachedProperties = properties;
+        co_return NSM_SUCCESS;
+    }
+    catch (const std::exception& e)
+    {
+        // Clean up pending request on error
+        auto pendingObjIt = pendingRequests.find(objPath);
+        if (pendingObjIt != pendingRequests.end())
+        {
+            pendingObjIt->second.erase(baseInterface);
+            if (pendingObjIt->second.empty())
+            {
+                pendingRequests.erase(objPath);
+            }
+        }
+
+        // Set the promise exception
+        promise.set_exception(std::current_exception());
+
+        lg2::error(
+            "Failed to fetch base properties for {OBJPATH}:{INTERFACE}:{ERROR}",
+            "OBJPATH", objPath, "INTERFACE", baseInterface, "ERROR", e.what());
+
+        co_return NSM_SW_ERROR;
+    }
+}
+
+bool coGetDbusPropertyBase::await_ready() noexcept
+{
+    return false;
+}
+
+bool coGetDbusPropertyBase::await_suspend(
+    std::coroutine_handle<> handle) noexcept
+{
+    auto& asioConnection = utils::DBusHandler::getAsioConnection();
+
+    asioConnection->async_method_call(
+        [resumeHandle = handle, this](boost::system::error_code ec,
+                                      PropertyValue value) {
+        if (ec)
+        {
+            lg2::error(
+                "error while DbusProperties.Get for intf={INTERFACE}, prop={PROPERTY} and path={OBJECT_PATH}. {ERROR_MESSAGE} ",
+                "INTERFACE", interface, "PROPERTY", property, "OBJECT_PATH",
+                objectPath, "ERROR_MESSAGE", ec.message());
+            resetRetValue();
+        }
+        else
+        {
+            // can throw std::bad_variant_access
+            setRetValue(value);
+        }
+        resumeHandle();
+    },
+        service.c_str(), objectPath.c_str(), "org.freedesktop.DBus.Properties",
+        "Get", interface.c_str(), property.c_str());
+
+    return true;
+}
+
+bool coGetServiceMap::await_ready() noexcept
+{
+    return false;
+}
+
+bool coGetServiceMap::await_suspend(std::coroutine_handle<> handle) noexcept
+{
+    auto& asioConnection = utils::DBusHandler::getAsioConnection();
+
+    asioConnection->async_method_call(
+        [resumeHandle = handle, &ret = ret, this](boost::system::error_code ec,
+                                                  MapperServiceMap value) {
+        if (ec)
+        {
+            lg2::error(
+                "error while xyz.openbmc_project.ObjectMapperGetObject for path={OBJECT_PATH}. {ERROR_MESSAGE} ",
+                "OBJECT_PATH", objectPath, "ERROR_MESSAGE", ec.message());
+        }
+        else
+        {
+            ret = value;
+        }
+        resumeHandle();
+    },
+        mapperService, mapperPath, mapperInterface, "GetObject",
+        objectPath.c_str(), ifaceList);
+
+    return true;
+}
+
+bool coGetAllDbusProperty::await_ready() noexcept
+{
+    return false;
+}
+
+bool coGetAllDbusProperty::await_suspend(
+    std::coroutine_handle<> handle) noexcept
+{
+    auto& asioConnection = utils::DBusHandler::getAsioConnection();
+
+    asioConnection->async_method_call(
+        [resumeHandle = handle, &ret = ret, this](boost::system::error_code ec,
+                                                  dbus::PropertyMap value) {
+        if (ec)
+        {
+            lg2::error(
+                "error while coGetAllDbusProperty.GetAll for service={SERVICE}, path={OBJECT_PATH}, interface={IFACE}. {ERROR_MESSAGE} ",
+                "SERVICE", service, "OBJECT_PATH", objectPath, "IFACE",
+                interface, "ERROR_MESSAGE", ec.message());
+        }
+        else
+        {
+            // can throw std::bad_variant_access
+            ret = value;
+        }
+        resumeHandle();
+    },
+        service.c_str(), objectPath.c_str(), "org.freedesktop.DBus.Properties",
+        "GetAll", interface);
+
+    return true;
+}
+
+bool coLogEvent::await_ready() noexcept
+{
+    return false;
+}
+
+bool coLogEvent::await_suspend(std::coroutine_handle<> handle) noexcept
+{
+    auto& asioConnection = utils::DBusHandler::getAsioConnection();
+    auto severity =
+        sdbusplus::xyz::openbmc_project::Logging::server::convertForMessage(
+            level);
+
+    asioConnection->async_method_call(
+        [resumeHandle = handle, &success = success,
+         messageId = messageId](boost::system::error_code ec) {
+        success = !ec;
+        if (ec)
+        {
+            lg2::error("coLogEvent failed: {ERROR}. MessageId={MSG}", "ERROR",
+                       ec.message(), "MSG", messageId);
+        }
+        resumeHandle();
+    },
+        service.c_str(), "/xyz/openbmc_project/logging",
+        "xyz.openbmc_project.Logging.Create", "Create", messageId, level, data);
+    return true;
 }
 
 } // namespace utils

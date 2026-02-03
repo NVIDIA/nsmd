@@ -1,11 +1,4 @@
-dep_src_files = ['../tlv_decoder.cpp', '../tlv_encoder.cpp']
-
-dep_src_headers = ['../..']
-
-test_src = declare_dependency(
-    sources: dep_src_files,
-    include_directories: dep_src_headers,
-)
+# debug-token tests now use nsmd_test
 
 tests = ['debugTokenTLV_test']
 
@@ -16,9 +9,10 @@ foreach t : tests
             t.underscorify(),
             t + '.cpp',
             implicit_include_directories: false,
+            include_directories: ['.', '..'],
             link_args: dynamic_linker,
             build_rpath: '',
-            dependencies: [test_src, CLI11_dep, gtest, gmock],
+            dependencies: tests_deps,
         ),
         workdir: meson.current_source_dir(),
     )

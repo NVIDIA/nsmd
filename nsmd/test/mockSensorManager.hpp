@@ -70,7 +70,8 @@ class MockMctpDiscovery
                               uint8_t instanceNumber, std::string remapPropName,
                               std::vector<std::string>& remapPropValue)
     {
-        uint16_t staticInstanceAndRole = (deviceRole >> 8) | instanceNumber;
+        uint16_t staticInstanceAndRole = ((uint16_t)deviceRole << 8) |
+                                         instanceNumber;
 
         if (deviceMap.find(deviceType) != deviceMap.end())
         {
@@ -116,7 +117,8 @@ class MockMctpDiscovery
                                      uint8_t deviceRole)
     {
         std::shared_ptr<NsmDevice> ret{};
-        uint16_t staticInstanceAndRole = (deviceRole << 8) | instanceNumber;
+        uint16_t staticInstanceAndRole = ((uint16_t)deviceRole << 8) |
+                                         instanceNumber;
         if (deviceMap.find(deviceType) != deviceMap.end())
         {
             if (deviceMap[deviceType].find(staticInstanceAndRole) !=

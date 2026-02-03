@@ -41,6 +41,3 @@ endif
 
 nsmd_headers += ['.', '..', 'nsmEvent']
 
-if get_option('tests').enabled()
-    subdir('test')
-endif

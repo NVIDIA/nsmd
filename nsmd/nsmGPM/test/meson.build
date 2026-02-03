@@ -1,71 +1,20 @@
-dep_src_files = [
-    '../nsmGpmOem.cpp',
-    '../../nsmDevice.cpp',
-    '../../nsmObjectFactory.cpp',
-    '../../nsmSensorAggregator.cpp',
-    '../../nsmSensor.cpp',
-    '../../sensorManager.cpp',
-    '../../nsmEvent.cpp',
-    '../../nsmProgressCounters/progressCounters.cpp',
-    '../../nsmProgressCounters/counterProducer.cpp',
-    '../../nsmEvent/nsmLongRunningEventHandler.cpp',
-    '../../../common/utils.cpp',
-    '../../../common/test/mockDBusHandler.cpp',
-    '../../../libnsm/base.c',
-    '../../../libnsm/platform-environmental.c',
-    '../../../libnsm/requester/mctp.c',
-    '../../../requester/request_timeout_tracker.cpp',
-    '../../nsmFwSwInventory/GPUSWInventory.cpp',
-    '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
-    '../../../requester/mctp_endpoint_discovery.cpp',
-    '../../../requester/mctp_endpoint_prober.cpp',
-]
+# nsmGPM tests now use nsmd_test
+# nsmGPM is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
+# All sources already compiled into nsmd_test, no need to recompile
 
-if get_option('shmem').enabled()
-    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
-endif
+tests = ['nsmGpmOem_test']
 
-dep_src_headers = [
-    '.',
-    '..',
-    '../../',
-    '../../nsmEvent',
-    '../../test/',
-    '../../nsmDbusIfaceOverride',
-    '../../nsmProgressCounters',
-    '../../../',
-    '../../../common',
-    '../../../libnsm',
-]
-
-test_src = declare_dependency(
-    sources: dep_src_files,
-    include_directories: dep_src_headers,
-)
-
-tests_files = ['nsmGpmOem_test.cpp']
-tests_deps = [
-    test_src,
-    CLI11_dep,
-    nlohmann_json,
-    sdbusplus,
-    sdeventplus,
-    phosphor_logging,
-    gtest,
-    gmock,
-]
-if get_option('shmem').enabled()
-    tests_deps += dependency('nvidia-tal', required: true)
-endif
-test(
-    'nsmGpmOem_test',
-    executable(
-        'nsmGpmOem_test',
-        tests_files,
-        implicit_include_directories: false,
-        link_args: dynamic_linker,
-        build_rpath: '',
-        dependencies: tests_deps,
-    ),
-    workdir: meson.current_source_dir(),
-)
+foreach t : tests
+    test(
+        t,
+        executable(
+            t.underscorify(),
+            t + '.cpp',
+            implicit_include_directories: false,
+            include_directories: ['.', '..'],
+            link_args: dynamic_linker,
+            dependencies: tests_deps,
+        ),
+        workdir: meson.current_source_dir(),
+    )
+endforeach

@@ -1,11 +1,4 @@
-dep_src_files = ['../utils.cpp', '../dBusHandler.cpp']
-
-dep_src_headers = ['.', '..', '../../', '../../common', '../../libnsm']
-
-test_src = declare_dependency(
-    sources: dep_src_files,
-    include_directories: dep_src_headers,
-)
+# common tests now use nsmd_test
 
 tests = ['common_utils_test']
 
@@ -16,9 +9,10 @@ foreach t : tests
             t.underscorify(),
             t + '.cpp',
             implicit_include_directories: false,
+            include_directories: ['.', '..'],
             link_args: dynamic_linker,
             build_rpath: '',
-            dependencies: [test_src, sdbusplus, phosphor_logging, gtest, gmock],
+            dependencies: tests_deps,
         ),
         workdir: meson.current_source_dir(),
     )

@@ -1,10 +1,11 @@
-# nsmDot sources are added in the parent meson.build file
-# This subdirectory meson.build is kept for consistency with other subdirectories
+
+sources += [
+    'nsmDot/nsmDot.cpp',
+    'nsmDot/nsmDotBlob.cpp',
+    'nsmDot/nsmDotBlobUtils.cpp',
+]
 
 nsmd_headers += ['.', '..']
 
-if get_option('tests').enabled()
-    subdir('test')
-endif
 
 

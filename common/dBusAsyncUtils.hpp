@@ -32,7 +32,39 @@ const std::string entityManagerServiceStr = "xyz.openbmc_project.EntityManager";
 
 // Forward declaration for logging level type
 using Level = sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
-#ifndef MOCK_DBUS_ASYNC_UTILS
+
+struct coGetDbusPropertyBase
+{
+    const std::string service;
+    const std::string objectPath;
+    const std::string interface;
+    const std::string property;
+
+    virtual void setRetValue(const PropertyValue& value) = 0;
+    virtual void resetRetValue() = 0;
+
+    /** @brief Returning false to make await_suspend() to be called.
+     */
+    bool await_ready() noexcept;
+
+    /** @brief Called by co_await operator before suspending coroutine. The
+     * method will send out NSM request message, register a call back function
+     * for the event when D-Bus method done.
+     */
+    bool await_suspend(std::coroutine_handle<> handle) noexcept;
+
+    /** @brief Constructor of awaitable object to initialize necessary member
+     * variables.
+     */
+    coGetDbusPropertyBase(const std::string& objectPath,
+                          const std::string& property,
+                          const std::string& interface,
+                          const std::string& service = entityManagerService) :
+        service(service), objectPath(objectPath), interface(interface),
+        property(property)
+    {}
+};
+
 /** @struct coGetDbusProperty
  *
  * An awaitable object needed by co_await operator to get D-Bus Property value
@@ -45,55 +77,20 @@ using Level = sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
  * @tparam type - property data type
  */
 template <typename type>
-struct coGetDbusProperty
+struct coGetDbusProperty : public coGetDbusPropertyBase
 {
-    const std::string service;
-    const std::string& objectPath;
-    const std::string& interface;
-    const std::string& property;
-
     /** @brief For keeping the return value.
      */
     type ret;
 
-    /** @brief Returning false to make await_suspend() to be called.
-     */
-    bool await_ready() noexcept
+    void setRetValue(const PropertyValue& value) override final
     {
-        return false;
+        ret = std::get<type>(value);
     }
 
-    /** @brief Called by co_await operator before suspending coroutine. The
-     * method will send out NSM request message, register a call back function
-     * for the event when D-Bus method done.
-     */
-    bool await_suspend(std::coroutine_handle<> handle)
+    void resetRetValue() override final
     {
-        auto& asioConnection = utils::DBusHandler::getAsioConnection();
-
-        asioConnection->async_method_call(
-            [resumeHandle = handle, &ret = ret,
-             this](boost::system::error_code ec, PropertyValue value) {
-            if (ec)
-            {
-                lg2::error(
-                    "error while DbusProperties.Get for intf={INTERFACE}, prop={PROPERTY} and path={OBJECT_PATH}. {ERROR_MESSAGE} ",
-                    "INTERFACE", interface, "PROPERTY", property, "OBJECT_PATH",
-                    objectPath, "ERROR_MESSAGE", ec.message());
-                ret = type();
-            }
-            else
-            {
-                // can throw std::bad_variant_access
-                ret = std::get<type>(value);
-            }
-            resumeHandle();
-        },
-            service.c_str(), objectPath.c_str(),
-            "org.freedesktop.DBus.Properties", "Get", interface.c_str(),
-            property.c_str());
-
-        return true;
+        ret = type();
     }
 
     /** @brief Called by co_await operator to get return value when awaitable
@@ -104,15 +101,7 @@ struct coGetDbusProperty
         return ret;
     }
 
-    /** @brief Constructor of awaitable object to initialize necessary member
-     * variables.
-     */
-    coGetDbusProperty(const std::string& objectPath, // GCOV_EXCL_LINE
-                      const std::string& property, const std::string& interface,
-                      const std::string service = entityManagerService) :
-        service(service), objectPath(objectPath), interface(interface),
-        property(property), ret{}
-    {} // GCOV_EXCL_LINE
+    using coGetDbusPropertyBase::coGetDbusPropertyBase;
 };
 
 /** @struct coGetServiceMap
@@ -125,8 +114,8 @@ struct coGetDbusProperty
  */
 struct coGetServiceMap
 {
-    const std::string& objectPath;
-    const dbus::Interfaces& ifaceList;
+    const std::string objectPath;
+    const dbus::Interfaces ifaceList;
 
     /** @brief For keeping the return value.
      */
@@ -134,39 +123,13 @@ struct coGetServiceMap
 
     /** @brief Returning false to make await_suspend() to be called.
      */
-    bool await_ready() noexcept
-    {
-        return false;
-    }
+    bool await_ready() noexcept;
 
     /** @brief Called by co_await operator before suspending coroutine. The
      * method will send out NSM request message, register a call back function
      * for the event when D-Bus method done.
      */
-    bool await_suspend(std::coroutine_handle<> handle) noexcept
-    {
-        auto& asioConnection = utils::DBusHandler::getAsioConnection();
-
-        asioConnection->async_method_call(
-            [resumeHandle = handle, &ret = ret,
-             this](boost::system::error_code ec, MapperServiceMap value) {
-            if (ec)
-            {
-                lg2::error(
-                    "error while xyz.openbmc_project.ObjectMapperGetObject for path={OBJECT_PATH}. {ERROR_MESSAGE} ",
-                    "OBJECT_PATH", objectPath, "ERROR_MESSAGE", ec.message());
-            }
-            else
-            {
-                ret = value;
-            }
-            resumeHandle();
-        },
-            mapperService, mapperPath, mapperInterface, "GetObject",
-            objectPath.c_str(), ifaceList);
-
-        return true;
-    }
+    bool await_suspend(std::coroutine_handle<> handle) noexcept;
 
     /** @brief Called by co_await operator to get return value when awaitable
      * object completed.
@@ -184,125 +147,6 @@ struct coGetServiceMap
         objectPath(objectPath), ifaceList(ifaceList)
     {}
 };
-
-#else
-
-struct MockDbusAsync
-{
-    struct DbusPropsMap :
-        std::map<std::string, std::map<DbusProp, PropertyValue>>
-    {
-        void push(const std::string& objPath,
-                  const std::pair<DbusProp, PropertyValue>& property)
-        {
-            (*this)[objPath][property.first] = property.second;
-        }
-    };
-
-    /** @brief Get the values reference for gtest. */
-    static auto& getValues()
-    {
-        static DbusPropsMap values{};
-        return values;
-    }
-
-    static auto& getServiceMap()
-    {
-        static MapperServiceMap map{};
-        return map;
-    }
-
-    static auto& getPropertyMap()
-    {
-        static dbus::PropertyMap propertyMap{};
-        return propertyMap;
-    }
-
-    static auto& getLogEventSuccess()
-    {
-        static bool logEventSuccess = true; // Default to success for tests
-        return logEventSuccess;
-    }
-};
-
-template <typename type>
-struct coGetDbusProperty
-{
-    const std::string service;
-    const std::string& objectPath;
-    const std::string& interface;
-    const std::string& property;
-
-    type ret;
-
-    bool await_ready()
-    {
-        auto& values = MockDbusAsync::getValues();
-        auto it = values[objectPath].find(property);
-        if (it == values[objectPath].end())
-        {
-            throw std::out_of_range(std::format(
-                "error while DbusProperties.Get for intf={}, prop={} and path={}.",
-                interface, property, objectPath));
-        }
-        else
-        {
-            // can throw std::bad_variant_access
-            ret = std::get<type>(it->second);
-        }
-
-        return true;
-    }
-
-    bool await_suspend([[maybe_unused]] std::coroutine_handle<> handle) noexcept
-    {
-        return true;
-    }
-
-    type await_resume() const noexcept
-    {
-        return ret;
-    }
-
-    coGetDbusProperty(const std::string& objectPath, // GCOV_EXCL_LINE
-                      const std::string& property, const std::string& interface,
-                      const std::string service = entityManagerService) :
-        service(service), objectPath(objectPath), interface(interface),
-        property(property), ret{}
-    {} // GCOV_EXCL_LINE
-};
-
-struct coGetServiceMap
-{
-    const std::string& objectPath;
-    const dbus::Interfaces& ifaceList;
-
-    MapperServiceMap ret;
-
-    bool await_ready() noexcept
-    {
-        auto& value = utils::MockDbusAsync::getServiceMap();
-        ret = value;
-
-        return true;
-    }
-
-    bool await_suspend([[maybe_unused]] std::coroutine_handle<> handle) noexcept
-    {
-        return true;
-    }
-
-    MapperServiceMap await_resume() const noexcept
-    {
-        return ret;
-    }
-
-    coGetServiceMap(const std::string& objectPath,
-                    const dbus::Interfaces& ifaceList) :
-        objectPath(objectPath), ifaceList(ifaceList)
-    {}
-};
-#endif
 
 struct coGetAllDbusProperty
 {
@@ -316,51 +160,13 @@ struct coGetAllDbusProperty
 
     /** @brief Returning false to make await_suspend() to be called.
      */
-    bool await_ready() noexcept
-    {
-#ifndef MOCK_DBUS_ASYNC_UTILS
-        return false;
-#else
-        auto& value = utils::MockDbusAsync::getPropertyMap();
-        ret = value;
-        return true;
-#endif
-    }
+    bool await_ready() noexcept;
 
     /** @brief Called by co_await operator before suspending coroutine. The
      * method will send out NSM request message, register a call back function
      * for the event when D-Bus method done.
      */
-    bool await_suspend([[maybe_unused]] std::coroutine_handle<> handle)
-    {
-#ifndef MOCK_DBUS_ASYNC_UTILS
-        auto& asioConnection = utils::DBusHandler::getAsioConnection();
-
-        asioConnection->async_method_call(
-            [resumeHandle = handle, &ret = ret,
-             this](boost::system::error_code ec, dbus::PropertyMap value) {
-            if (ec)
-            {
-                lg2::error(
-                    "error while coGetAllDbusProperty.GetAll for service={SERVICE}, path={OBJECT_PATH}, interface={IFACE}. {ERROR_MESSAGE} ",
-                    "SERVICE", service, "OBJECT_PATH", objectPath, "IFACE",
-                    interface, "ERROR_MESSAGE", ec.message());
-            }
-            else
-            {
-                // can throw std::bad_variant_access
-                ret = value;
-            }
-            resumeHandle();
-        },
-            service.c_str(), objectPath.c_str(),
-            "org.freedesktop.DBus.Properties", "GetAll", interface);
-
-        return true;
-#else
-        return true;
-#endif
-    }
+    bool await_suspend(std::coroutine_handle<> handle) noexcept;
 
     /** @brief Called by co_await operator to get return value when awaitable
      * object completed.
@@ -396,45 +202,11 @@ struct coLogEvent
 
     /** @brief Returning false to make await_suspend() to be called.
      */
-    bool await_ready() noexcept
-    {
-#ifndef MOCK_DBUS_ASYNC_UTILS
-        return false;
-#else
-        success = utils::MockDbusAsync::getLogEventSuccess();
-        return true;
-#endif
-    }
+    bool await_ready() noexcept;
 
     /** @brief Called by co_await operator before suspending coroutine.
      */
-    bool await_suspend([[maybe_unused]] std::coroutine_handle<> handle)
-    {
-#ifndef MOCK_DBUS_ASYNC_UTILS
-        auto& asioConnection = utils::DBusHandler::getAsioConnection();
-        auto severity =
-            sdbusplus::xyz::openbmc_project::Logging::server::convertForMessage(
-                level);
-
-        asioConnection->async_method_call(
-            [resumeHandle = handle, &success = success,
-             messageId = messageId](boost::system::error_code ec) {
-            success = !ec;
-            if (ec)
-            {
-                lg2::error("coLogEvent failed: {ERROR}. MessageId={MSG}",
-                           "ERROR", ec.message(), "MSG", messageId);
-            }
-            resumeHandle();
-        },
-            service.c_str(), "/xyz/openbmc_project/logging",
-            "xyz.openbmc_project.Logging.Create", "Create", messageId, level,
-            data);
-        return true;
-#else
-        return true;
-#endif
-    }
+    bool await_suspend(std::coroutine_handle<> handle) noexcept;
 
     /** @brief Called by co_await operator to get return value when awaitable
      * object completed.

@@ -5,25 +5,29 @@
 ### Install dependencies
 
 ```bash
-sudo apt install build-essential gcc-13 g++-13 python3-dev nlohmann-json3-dev
+sudo apt update && sudo apt install build-essential g++-14 gcc-14 libdbus-1-dev libssl-dev nlohmann-json3-dev pkg-config python3-dev sccache valgrind
 pip install --user meson ninja
 ```
 
 #### Install Boost
 
-> sudo apt install libboost1.83-all-dev # for Ubuntu 22.04
-
-or
-> sudo apt install libboost1.84-all-dev # for Ubuntu 24.04
-
-or if it not installed, download and install it from source.
+```bash
+sudo apt install libboost1.84-all-dev
+```
+or 
+```bash
+sudo apt install libboost1.83-all-dev
+```
+or download and install it from source.
 
 ```bash
 wget https://downloads.sourceforge.net/project/boost/boost/1.84.0/boost_1_84_0.tar.gz
 tar -xzf boost_1_84_0.tar.gz
 cd boost_1_84_0
 ./bootstrap.sh --prefix=/usr/local
-./b2 install
+sudo ./b2 -j$(nproc) install
+ls /usr/local/lib | grep boost
+grep BOOST_LIB_VERSION /usr/local/include/boost/version.hpp
 ```
 
 #### Copy libmctp header for local development
@@ -33,6 +37,11 @@ cd boost_1_84_0
 ### Configure and build with Meson
 
 ```bash
+export CC="sccache gcc"
+export CXX="sccache g++"
+export SCCACHE_DIR="$HOME/.cache/sccache"
+export SCCACHE_CACHE_SIZE=10G
+
 # Configure Meson build with debug options and compiler flags (copied from openbmc-build-scripts repo)
 meson setup --reconfigure -Db_sanitize=address,undefined -Db_lundef=true -Dwerror=true -Dwarning_level=3 -Db_colorout=never -Ddebug=true -Doptimization=g -Dcpp_args="-DBOOST_USE_VALGRIND -Wno-error=invalid-constexpr -Wno-invalid-constexpr -Werror=uninitialized -Wno-error=maybe-uninitialized -Werror=strict-aliasing" builddir
 # Build all targets
@@ -121,21 +130,21 @@ meson test -C builddir nsmChassis_test --gdb
 5. Press F5 to start debugging the test
 
 
-## Installing clang-format-19 for CI Usage
+## Installing clang-format-20 for CI Usage
 
-To ensure code consistency and formatting standards in the CI pipeline, `clang-format-19` needs to be installed. Follow the steps below to install `clang-format-19` on your system:
+To ensure code consistency and formatting standards in the CI pipeline, `clang-format-20` needs to be installed. Follow the steps below to install `clang-format-20` on your system:
 
 ```bash
 # Update the package list
 sudo apt update
 
-# Install clang-format-19
-sudo apt install clang-format-19
+# Install clang-format-20
+sudo apt install clang-format-20
 ```
 
-This will install `clang-format-19` on your system, enabling it for use in the CI pipeline.
+This will install `clang-format-20` on your system, enabling it for use in the CI pipeline.
 
-### Using clang-format-19 for all changed files before commit
+### Using clang-format-20 for all changed files before commit
 
 To automatically format your code before each commit, create a pre-commit hook with the following steps:
 ```
@@ -147,7 +156,7 @@ files=$(git diff --cached --name-only --diff-filter=ACMR | grep ".*\.[ch]\(pp\)\
 
 if [ -n "$files" ]; then
     # Format the files
-    clang-format-19 -i $files
+    clang-format-20 -i $files
     
     # Add the formatted files back to staging
     git add $files

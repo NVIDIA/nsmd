@@ -106,10 +106,10 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
     baseboard = dynamic_pointer_cast<MockNsmDeviceBase>(devices[0]);
     EXPECT_EQ(0, baseboard->prioritySensors.size());
     EXPECT_EQ(1, baseboard->staticSensors.size());
-    EXPECT_EQ(1, baseboard->roundRobinSensors.size());
-    EXPECT_EQ(2, baseboard->deviceSensors.size());
+    EXPECT_EQ(2, baseboard->roundRobinSensors.size());
+    EXPECT_EQ(3, baseboard->deviceSensors.size());
 
-    auto sensors = 0;
+    auto sensors = 1; // Skip msgTypes sensor added by initMsgTypesSensor()
     auto sensor = dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
         baseboard->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, sensor);

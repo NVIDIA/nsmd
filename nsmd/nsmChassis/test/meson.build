@@ -1,88 +1,6 @@
-dep_src_files = [
-    '../nsmChassis.cpp',
-    '../nsmChassisAssembly.cpp',
-    '../nsmChassisPCIeDevice.cpp',
-    '../nsmChassisPCIeSlot.cpp',
-    '../nsmClockOutputEnableState.cpp',
-    '../nsmPowerSupplyStatus.cpp',
-    '../nsmGpuPresenceAndPowerStatus.cpp',
-    '../nsmPCIeFunction.cpp',
-    '../nsmPCIeLTSSMState.cpp',
-    '../nsmWriteProtectedJumper.cpp',
-    '../nsmAERError.cpp',
-    '../../nsmGPIO/nsmGPIOState.cpp',
-    '../../nsmPort/nsmRetimerPort.cpp',
-    '../../nsmPort/nsmPortConfigurationInfo.cpp',
-    '../../nsmSensorAggregator.cpp',
-    '../../nsmCommon/nsmCommon.cpp',
-    '../../nsmCommon/nsmPcieGroup.cpp',
-    '../../nsmLongRunning/nsmLongRunningSensor.cpp',
-    '../../nsmSensors/nsmInventoryProperty.cpp',
-    '../../nsmSensors/nsmPCIeLinkSpeed.cpp',
-    '../../nsmDbusIfaceOverride/nsmApSkuIdIntf.cpp',
-    '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
-    '../../nsmDumpCollection/nsmDebugInfo.cpp',
-    '../../nsmDevice.cpp',
-    '../../nsmSensor.cpp',
-    '../../nsmObjectFactory.cpp',
-    '../../sensorManager.cpp',
-    '../../nsmEvent.cpp',
-    '../../socket_handler.cpp',
-    '../../nsmProgressCounters/progressCounters.cpp',
-    '../../nsmProgressCounters/counterProducer.cpp',
-    '../../nsmEvent/nsmLongRunningEventHandler.cpp',
-    '../../nsmEvent/nsmLongRunningEvent.cpp',
-    '../../nsmEvent/nsmGPIOStateChangeEvent.cpp',
-    '../../nsmSetAsync/asyncOperationManager.cpp',
-    '../../../common/utils.cpp',
-    '../../../common/test/mockDBusHandler.cpp',
-    '../../../libnsm/base.c',
-    '../../../libnsm/platform-environmental.c',
-    '../../../libnsm/pci-links.c',
-    '../../../libnsm/device-configuration.c',
-    '../../../libnsm/device-capability-discovery.c',
-    '../../../libnsm/firmware-utils.c',
-    '../../../libnsm/diagnostics.c',
-    '../../../libnsm/requester/mctp.c',
-    '../../../requester/mctp_endpoint_prober.cpp',
-    '../../../requester/request_timeout_tracker.cpp',
-    '../../nsmFwSwInventory/GPUSWInventory.cpp',
-    '../../nsmErrorInjection/nsmErrorInjection.cpp',
-    '../../nsmSetAsync/nsmSetErrorInjection.cpp',
-    '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
-    '../../nsmProcessor/nsmOemResetStatistics.cpp',
-    '../../../requester/mctp_endpoint_discovery.cpp',
-]
-
-if get_option('shmem').enabled()
-    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
-endif
-
-dep_src_headers = [
-    '.',
-    '..',
-    '../../',
-    '../../nsmEvent',
-    '../../nsmCommon',
-    '../../nsmSensors',
-    '../../nsmPort',
-    '../../nsmSetAsync',
-    '../../nsmLongRunning',
-    '../../nsmDbusIfaceOverride',
-    '../../nsmDumpCollection',
-    '../../nsmSetAsync',
-    '../../nsmRawCommand',
-    '../../nsmProcessor',
-    '../../nsmProgressCounters',
-    '../../../',
-    '../../../common',
-    '../../../libnsm',
-]
-
-test_src = declare_dependency(
-    sources: dep_src_files,
-    include_directories: dep_src_headers,
-)
+# nsmChassis tests now use nsmd_test
+# nsmChassis is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
+# All sources already compiled into nsmd_test, no need to recompile
 
 tests = [
     'nsmChassis_test',
@@ -91,20 +9,6 @@ tests = [
     'nsmChassisPCIeSlot_test',
 ]
 
-tests_deps = [
-    test_src,
-    CLI11_dep,
-    nlohmann_json,
-    sdbusplus,
-    sdeventplus,
-    phosphor_logging,
-    gtest,
-    gmock,
-]
-
-if get_option('shmem').enabled()
-    tests_deps += dependency('nvidia-tal', required: true)
-endif
 
 foreach t : tests
     test(
@@ -113,10 +17,9 @@ foreach t : tests
             t.underscorify(),
             t + '.cpp',
             implicit_include_directories: false,
+            include_directories: ['.', '..'],
             link_args: dynamic_linker,
-            build_rpath: '',
             dependencies: tests_deps,
-            cpp_args: '-DMOCK_DBUS_ASYNC_UTILS',
         ),
         workdir: meson.current_source_dir(),
     )

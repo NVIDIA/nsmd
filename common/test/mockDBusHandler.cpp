@@ -17,7 +17,7 @@
 
 #include "mockDBusHandler.hpp"
 
-#include <stdexcept>
+#include "dBusAsyncUtils.hpp"
 
 namespace utils
 {
@@ -37,6 +37,80 @@ const PropertyValuesCollection::value_type
         throw std::out_of_range("Property " + name +
                                 " not found in collection");
     return *it;
+}
+
+// Single-flight pattern implementation for single-threaded async execution
+// for EM configuration PDI properties
+requester::Coroutine
+    coGetCachedBaseProperties(const std::string& /*objPath*/,
+                              const std::string& /*baseInterface*/,
+                              dbus::PropertyMap& cachedProperties)
+{
+    // In test mode, just copy the current propertyMap
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    cachedProperties = propertyMap;
+    co_return NSM_SUCCESS;
+}
+
+bool coGetDbusPropertyBase::await_ready() noexcept
+{
+    auto& values = MockDbusAsync::getValues();
+    auto it = values[objectPath].find(property);
+    if (it == values[objectPath].end())
+    {
+        lg2::error(
+            "error while DbusProperties.Get for intf={INTERFACE}, prop={PROPERTY} and path={OBJECT_PATH}.",
+            "INTERFACE", interface, "PROPERTY", property, "OBJECT_PATH",
+            objectPath);
+        return false;
+    }
+
+    setRetValue(it->second);
+    return true;
+}
+
+bool coGetDbusPropertyBase::await_suspend(
+    std::coroutine_handle<> /*handle*/) noexcept
+{
+    return true;
+}
+
+bool coGetServiceMap::await_ready() noexcept
+{
+    auto& value = utils::MockDbusAsync::getServiceMap();
+    ret = value;
+
+    return true;
+}
+
+bool coGetServiceMap::await_suspend(std::coroutine_handle<> /*handle*/) noexcept
+{
+    return true;
+}
+
+bool coGetAllDbusProperty::await_ready() noexcept
+{
+    auto& value = utils::MockDbusAsync::getPropertyMap();
+    ret = value;
+
+    return true;
+}
+
+bool coGetAllDbusProperty::await_suspend(
+    std::coroutine_handle<> /*handle*/) noexcept
+{
+    return true;
+}
+
+bool coLogEvent::await_ready() noexcept
+{
+    success = utils::MockDbusAsync::getLogEventSuccess();
+    return true;
+}
+
+bool coLogEvent::await_suspend(std::coroutine_handle<> /*handle*/) noexcept
+{
+    return true;
 }
 
 } // namespace utils

@@ -1795,8 +1795,8 @@ TEST_F(NsmProcessorTest, badTestTypeError)
     EXPECT_EQ(1, devices.size());
     gpu = std::dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
     EXPECT_EQ(0, gpu->prioritySensors.size());
-    EXPECT_EQ(0, gpu->roundRobinSensors.size());
-    EXPECT_EQ(0, gpu->deviceSensors.size());
+    EXPECT_EQ(1, gpu->roundRobinSensors.size());
+    EXPECT_EQ(1, gpu->deviceSensors.size());
 }
 
 TEST_F(NsmProcessorTest, badTestNoDevideFound)

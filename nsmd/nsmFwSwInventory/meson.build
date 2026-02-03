@@ -7,6 +7,3 @@ sources += [
 
 nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride', 'nsmCommon']
 
-if get_option('tests').enabled()
-    subdir('test')
-endif

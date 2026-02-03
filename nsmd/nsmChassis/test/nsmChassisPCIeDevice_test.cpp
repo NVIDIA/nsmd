@@ -151,9 +151,9 @@ TEST_F(NsmChassisPCIeDeviceTest, badTestCreateDeviceSensors)
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(1, devices.size());
     gpu = dynamic_pointer_cast<MockNsmDeviceBase>(devices[0]);
-    EXPECT_EQ(0, gpu->deviceSensors.size());
+    EXPECT_EQ(1, gpu->deviceSensors.size());
     EXPECT_EQ(0, gpu->prioritySensors.size());
-    EXPECT_EQ(0, gpu->roundRobinSensors.size());
+    EXPECT_EQ(1, gpu->roundRobinSensors.size());
 }
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 {

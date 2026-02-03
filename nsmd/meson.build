@@ -1,12 +1,10 @@
 sources = [
     '../common/utils.cpp',
-    '../common/dBusHandler.cpp',
     '../debug-token/tlv_decoder.cpp',
     '../debug-token/tlv_encoder.cpp',
     '../dot/nsmDotUtils.cpp',
     '../dot/dotErrorHandler.cpp',
     '../libnsm/base.c',
-    '../libnsm/requester/mctp.c',
     '../requester/mctp_endpoint_prober.cpp',
     '../requester/mctp_endpoint_discovery.cpp',
     '../requester/request_timeout_tracker.cpp',
@@ -14,7 +12,6 @@ sources = [
     'socket_handler.cpp',
     'nsmDevice.cpp',
     'nsmObjectFactory.cpp',
-    'nsmd.cpp',
     'nsmSensorAggregator.cpp',
     'nsmSensor.cpp',
     'eventTypeHandlers.cpp',
@@ -52,44 +49,17 @@ foreach name : libnsm_include
     endif
 endforeach
 
-if libnsm_all or libnsm_include.contains('debug-token')
-    sources += ['../libnsm/debug-token.c']
-endif
-if libnsm_all or libnsm_include.contains('firmware-utils')
-    sources += ['../libnsm/firmware-utils.c']
-endif
-if libnsm_all or libnsm_include.contains('network-ports')
-    sources += ['../libnsm/network-ports.c']
-endif
-if libnsm_all or libnsm_include.contains('device-capability-discovery')
-    sources += ['../libnsm/device-capability-discovery.c']
-endif
-if libnsm_all or libnsm_include.contains('device-configuration')
-    sources += ['../libnsm/device-configuration.c']
-endif
-if libnsm_all or libnsm_include.contains('diagnostics')
-    sources += ['../libnsm/diagnostics.c']
-endif
+foreach module : valid_libnsm
+    if libnsm_all or libnsm_include.contains(module)
+        sources += ['../libnsm/' + module + '.c']
+    endif
+endforeach
+
 if libnsm_all or libnsm_include.contains('platform-environmental')
-    sources += ['../libnsm/platform-environmental.c']
     sources += ['../libnsm/powersmoothing-powerprofile-api-v2.c']
 endif
-if libnsm_all or libnsm_include.contains('pci-links')
-    sources += ['../libnsm/pci-links.c']
-endif
-if libnsm_all or libnsm_include.contains('network-ports')
-    sources += ['../libnsm/network-ports.c']
-endif
 
-nsmd_headers = [
-    '.',
-    '..',
-    '../libnsm',
-    '../requester',
-    '../common',
-    '../dot',
-    'nsmDbusIfaceOverride',
-]
+nsmd_headers = ['.', '..', '../libnsm', '../requester', '../common', '../dot']
 
 # Subdirectories ALWAYS compiled (core functionality)
 subdir('nsmRawCommand')
@@ -149,11 +119,16 @@ foreach name : nsmd_subdirs_include
     endif
 endforeach
 
+# Helper function to check if subdir should be skipped due to disabled features
+subdir_should_skip = {
+    'nsmDebugToken': not debug_token_enabled,
+    'nsmDot': not dot_enabled,
+    'nsmDumpCollection': not get_option('enable-debug-info').enabled(),
+}
+
 # Process subdirs: included if nsmd-subdirs-all=true OR in nsmd-subdirs-include
 foreach d : valid_nsmd_subdirs
-    if (d == 'nsmDebugToken' and not debug_token_enabled) or (d == 'nsmDot' and not dot_enabled) or (d == 'nsmDumpCollection' and not get_option(
-            'enable-debug-info',
-        ).enabled())
+    if subdir_should_skip.get(d, false)
         if nsmd_subdirs_include.contains(d)
             warning(
                 d + ' requested but required feature option is disabled; skipping',
@@ -163,17 +138,6 @@ foreach d : valid_nsmd_subdirs
     endif
     if nsmd_subdirs_all or nsmd_subdirs_include.contains(d)
         subdir(d)
-        if d == 'nsmNumericSensor'
-            sources += ['nsmNumericSensor/nsmNumericSensorComposite.cpp']
-        elif d == 'nsmFwSwInventory'
-            sources += ['nsmFwSwInventory/GPUSWInventory.cpp']
-        elif d == 'nsmDot'
-            sources += [
-                'nsmDot/nsmDot.cpp',
-                'nsmDot/nsmDotBlob.cpp',
-                'nsmDot/nsmDotBlobUtils.cpp',
-            ]
-        endif
     endif
 endforeach
 
@@ -183,12 +147,28 @@ if get_option('tracing').enabled()
     nsmd_headers += ['../tracepoints']
 endif
 
-executable(
-    'nsmd',
+nsmd_base = static_library(
+    'nsmd_base',
     sources,
     implicit_include_directories: false,
     include_directories: include_directories(nsmd_headers),
     dependencies: deps,
+)
+
+nsmd_prod = static_library(
+    'nsmd_prod',
+    'nsmd.cpp',
+    '../common/dBusHandler.cpp',
+    implicit_include_directories: false,
+    include_directories: include_directories(nsmd_headers),
+    dependencies: deps,
+)
+
+# Build nsmd binary
+executable(
+    'nsmd',
+    link_whole: nsmd_base,
+    link_with: nsmd_prod,
     install: true,
     install_dir: get_option('bindir'),
 )
@@ -214,4 +194,41 @@ if get_option('shmem').enabled() and not get_option('cx8-features')
         install: true,
         install_dir: get_option('bindir'),
     )
+endif
+
+# Tests
+if get_option('tests').enabled()
+
+    tests_include_dirs = [nsmd_headers, '../common/test', 'test']
+
+    nsmd_test = static_library(
+        'nsmd_test',
+        '../common/test/mockDBusHandler.cpp',
+        implicit_include_directories: false,
+        include_directories: include_directories(tests_include_dirs),
+        dependencies: [deps, gmock],
+    )
+
+    tests_deps = declare_dependency(
+        link_with: [nsmd_base, nsmd_test],
+        include_directories: include_directories(tests_include_dirs),
+        dependencies: [deps, gtest, gmock],
+    )
+
+    subdir('test')
+    subdir('nsmRawCommand/test')
+    subdir('nsmEvent/test')
+    subdir('nsmSetAsync/test')
+    subdir('nsmCommon/test')
+    subdir('nsmProgressCounters/test')
+
+    # Conditional test subdirs (same logic as subdir processing above)
+    foreach d : valid_nsmd_subdirs
+        if subdir_should_skip.get(d, false)
+            continue
+        endif
+        if nsmd_subdirs_all or nsmd_subdirs_include.contains(d)
+            subdir(d + '/test')
+        endif
+    endforeach
 endif

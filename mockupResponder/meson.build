@@ -5,16 +5,6 @@ sources = [
     'firmwareUtils.cpp',
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',
-    '../libnsm/base.c',
-    '../libnsm/debug-token.c',
-    '../libnsm/device-capability-discovery.c',
-    '../libnsm/device-configuration.c',
-    '../libnsm/diagnostics.c',
-    '../libnsm/firmware-utils.c',
-    '../libnsm/platform-environmental.c',
-    '../libnsm/powersmoothing-powerprofile-api-v2.c',
-    '../libnsm/pci-links.c',
-    '../libnsm/network-ports.c',
 ]
 
 nsmMockupResponder_headers = ['.', '..', '../libnsm', '../common']
@@ -31,6 +21,7 @@ executable(
         sdeventplus,
         phosphor_dbus_interfaces,
         phosphor_logging,
+        libnsm_dep,
     ],
     install: true,
     install_dir: get_option('bindir'),

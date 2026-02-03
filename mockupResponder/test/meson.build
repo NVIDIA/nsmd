@@ -1,28 +1,11 @@
-dep_src_files = [
+# mockupResponder tests now use nsmd_test
+# Only mockupResponder-specific sources need to be compiled here
+
+mockup_test_sources = [
     '../debugToken.cpp',
     '../mockupResponder.cpp',
     '../firmwareUtils.cpp',
-    '../../common/utils.cpp',
-    '../../common/test/mockDBusHandler.cpp',
-    '../../libnsm/base.c',
-    '../../libnsm/debug-token.c',
-    '../../libnsm/network-ports.c',
-    '../../libnsm/device-capability-discovery.c',
-    '../../libnsm/device-configuration.c',
-    '../../libnsm/diagnostics.c',
-    '../../libnsm/platform-environmental.c',
-    '../../libnsm/powersmoothing-powerprofile-api-v2.c',
-    '../../libnsm/pci-links.c',
-    '../../libnsm/requester/mctp.c',
-    '../../libnsm/firmware-utils.c',
 ]
-
-dep_src_headers = ['.', '..', '../../', '../../common', '../../libnsm']
-
-test_src = declare_dependency(
-    sources: dep_src_files,
-    include_directories: dep_src_headers,
-)
 
 tests = ['mockupResponder_test']
 
@@ -31,20 +14,12 @@ foreach t : tests
         t,
         executable(
             t.underscorify(),
-            t + '.cpp',
+            [t + '.cpp', mockup_test_sources],
             implicit_include_directories: false,
+            include_directories: ['.', '..'],
             link_args: dynamic_linker,
             build_rpath: '',
-            dependencies: [
-                test_src,
-                CLI11_dep,
-                nlohmann_json,
-                sdbusplus,
-                sdeventplus,
-                phosphor_logging,
-                gtest,
-                gmock,
-            ],
+            dependencies: tests_deps,
         ),
         workdir: meson.current_source_dir(),
     )
