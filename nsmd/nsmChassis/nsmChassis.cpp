@@ -164,6 +164,24 @@ static void
     device->addStaticSensor(chassisLocationCode);
 }
 
+static void
+    createLocationContext(std::shared_ptr<NsmDevice> device,
+                          const std::string& name,
+                          const dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    std::string locationContext;
+    if (allCurrentIfaceProperties.count("LocationContext"))
+    {
+        locationContext = std::get<std::string>(
+            allCurrentIfaceProperties.at("LocationContext"));
+    }
+
+    auto chassisLocationContext =
+        std::make_shared<NsmChassis<LocationContextIntf>>(name);
+    chassisLocationContext->invoke(pdiMethod(locationContext), locationContext);
+    device->addStaticSensor(chassisLocationContext);
+}
+
 static void createPowerLimit(std::shared_ptr<NsmDevice> device,
                              const std::string& name,
                              const dbus::PropertyMap& allCurrentIfaceProperties)
@@ -314,6 +332,10 @@ static void
     if (allCurrentIfaceProperties.count("LocationCode"))
     {
         createLocationCode(device, name, allCurrentIfaceProperties);
+    }
+    if (allCurrentIfaceProperties.count("LocationContext"))
+    {
+        createLocationContext(device, name, allCurrentIfaceProperties);
     }
     if (allCurrentIfaceProperties.count("ChassisType"))
     {
