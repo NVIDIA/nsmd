@@ -171,9 +171,9 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
     co_return NSM_SUCCESS;
 }
 
-static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
-                                                const std::string& interface,
-                                                const std::string& objPath)
+requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
+                                         const std::string& interface,
+                                         const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
 

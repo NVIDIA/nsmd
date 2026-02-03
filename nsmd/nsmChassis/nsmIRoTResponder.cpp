@@ -244,9 +244,9 @@ static void createIRoTResponderFieldReplaceable(
     device->addStaticSensor(replaceableObject);
 }
 
-static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath)
+requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
+                                            const std::string& interface,
+                                            const std::string& objPath)
 {
     std::string baseType = "NSM_ChassisIRoTResponder";
     std::string baseInterface = "xyz.openbmc_project.Configuration." + baseType;

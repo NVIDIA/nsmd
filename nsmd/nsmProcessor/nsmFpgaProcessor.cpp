@@ -46,10 +46,9 @@ NsmFpgaProcessor::NsmFpgaProcessor(
     healthIntf->health(HealthIntf::convertHealthTypeFromString(health));
 }
 
-static requester::Coroutine
-    createNsmFpgaProcessorSensor(SensorManager& manager,
-                                 const std::string& interface,
-                                 const std::string& objPath)
+requester::Coroutine createNsmFpgaProcessorSensor(SensorManager& manager,
+                                                  const std::string& interface,
+                                                  const std::string& objPath)
 {
     try
     {

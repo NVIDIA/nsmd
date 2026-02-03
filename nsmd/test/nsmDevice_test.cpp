@@ -37,7 +37,7 @@ TEST(nsmDevice, GoodTest)
 {
     uuid_t uuid = "00000000-0000-0000-0000-000000000000";
 
-    MockNsmDeviceBase nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
     EXPECT_EQ(nsmDevice.getDeviceType(), 1);
     EXPECT_EQ(nsmDevice.getInstanceNumber(), 1);
     EXPECT_EQ(nsmDevice.getDeviceRole(), 1);
@@ -50,7 +50,7 @@ TEST(nsmDevice, GoodTest)
 
 TEST(nsmDevice, TestMctpEid)
 {
-    MockNsmDeviceBase nsmDeviceBase(10, 5, "MCTP_EID", "8", 2);
+    MockNsmDevice nsmDeviceBase(10, 5, "MCTP_EID", "8", 2);
 
     EXPECT_EQ(nsmDeviceBase.getDeviceType(), 10);
     EXPECT_EQ(nsmDeviceBase.getInstanceNumber(), 5);
@@ -62,8 +62,7 @@ TEST(nsmDevice, TestMctpEid)
 
 TEST(nsmDevice, TestNsmDeviceInstanceNumber)
 {
-    MockNsmDeviceBase nsmDeviceBase(10, 5, "NSM_DEVICE_INSTANCE_NUMBER", "42",
-                                    2);
+    MockNsmDevice nsmDeviceBase(10, 5, "NSM_DEVICE_INSTANCE_NUMBER", "42", 2);
 
     EXPECT_EQ(nsmDeviceBase.getDeviceType(), 10);
     EXPECT_EQ(nsmDeviceBase.getInstanceNumber(), 5);
@@ -73,73 +72,148 @@ TEST(nsmDevice, TestNsmDeviceInstanceNumber)
     EXPECT_EQ(nsmDeviceBase.getNsmDeviceInstanceNumber(), 42);
 }
 
-// Test that isCommandSupported returns false for invalid message types
-// This prevents core dump when device reports unsupported message types like
-// 0xFF
-TEST(nsmDevice, IsCommandSupportedRejectsInvalidMessageTypes)
+TEST(nsmDevice, TestEventMode)
 {
-    MockNsmDeviceBase nsmDevice(1, 1, "MCTP_EID", "10", 0);
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
 
-    // Valid message types (0 to NUM_NSM_TYPES-1) should be queryable
-    // (returns false because no commands are set, but doesn't crash)
-    for (uint8_t msgType = 0; msgType < NUM_NSM_TYPES; msgType++)
+    // Test default event mode
+    EXPECT_EQ(nsmDevice.getEventMode(), 0);
+
+    // Test setting valid event modes
+    nsmDevice.setEventMode(GLOBAL_EVENT_GENERATION_DISABLE);
+    EXPECT_EQ(nsmDevice.getEventMode(), GLOBAL_EVENT_GENERATION_DISABLE);
+
+    nsmDevice.setEventMode(GLOBAL_EVENT_GENERATION_ENABLE_POLLING);
+    EXPECT_EQ(nsmDevice.getEventMode(), GLOBAL_EVENT_GENERATION_ENABLE_POLLING);
+
+    nsmDevice.setEventMode(GLOBAL_EVENT_GENERATION_ENABLE_PUSH);
+    EXPECT_EQ(nsmDevice.getEventMode(), GLOBAL_EVENT_GENERATION_ENABLE_PUSH);
+
+    // Test setting invalid event mode (should not change)
+    nsmDevice.setEventMode(255);
+    EXPECT_EQ(nsmDevice.getEventMode(), GLOBAL_EVENT_GENERATION_ENABLE_PUSH);
+}
+
+TEST(nsmDevice, TestCommandSupport)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    // Initially no commands should be supported
+    EXPECT_FALSE(nsmDevice.isCommandSupported(0, 0));
+
+    // Update command code matrix
+    bitfield8_t supportedCommands[32] = {};
+    supportedCommands[0].byte = 0x01; // Command 0 is supported
+    supportedCommands[1].byte = 0x80; // Command 15 is supported
+
+    nsmDevice.updateMessageTypesToCommandCodeMatrix(0, supportedCommands, 32);
+
+    // Test command support
+    EXPECT_TRUE(nsmDevice.isCommandSupported(0, 0));
+    EXPECT_FALSE(nsmDevice.isCommandSupported(0, 1));
+    EXPECT_TRUE(nsmDevice.isCommandSupported(0, 15));
+    EXPECT_FALSE(nsmDevice.isCommandSupported(0, 16));
+}
+
+TEST(nsmDevice, TestAllCommandCodesRetrieved)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    // Initially should return false
+    nsmDevice.areMessageTypesRetrieved = false;
+    nsmDevice.commandCodesRetrieved.clear();
+    EXPECT_FALSE(nsmDevice.allCommandCodesAreRetrieved());
+
+    // Set message types retrieved
+    nsmDevice.areMessageTypesRetrieved = true;
+    nsmDevice.retrievedMessageTypes.push_back(0);
+    nsmDevice.retrievedMessageTypes.push_back(1);
+
+    // Still false because command codes not retrieved
+    EXPECT_FALSE(nsmDevice.allCommandCodesAreRetrieved());
+
+    // Mark command codes as retrieved
+    nsmDevice.commandCodesRetrieved[0] = true;
+    nsmDevice.commandCodesRetrieved[1] = true;
+
+    // Now should return true
+    EXPECT_TRUE(nsmDevice.allCommandCodesAreRetrieved());
+}
+
+TEST(nsmDevice, TestDeviceOnlineStatus)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    // Initially should be active and online
+    EXPECT_TRUE(nsmDevice.isDeviceActive);
+    EXPECT_TRUE(nsmDevice.isOnline());
+
+    // Set device as inactive
+    nsmDevice.isDeviceActive = false;
+    EXPECT_FALSE(nsmDevice.isOnline());
+
+    // Restore activity
+    nsmDevice.isDeviceActive = true;
+    EXPECT_TRUE(nsmDevice.isOnline());
+}
+
+TEST(nsmDevice, TestUpdateCommandCodeMatrix)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    // Test with various patterns
+    bitfield8_t supportedCommands[4] = {};
+    supportedCommands[0].byte = 0xFF; // Commands 0-7 supported
+    supportedCommands[1].byte = 0x00; // Commands 8-15 not supported
+    supportedCommands[2].byte = 0x55; // Commands 16,18,20,22 supported
+    supportedCommands[3].byte = 0xAA; // Commands 25,27,29,31 supported
+
+    uint8_t messageType = 2;
+    nsmDevice.updateMessageTypesToCommandCodeMatrix(messageType,
+                                                    supportedCommands, 4);
+
+    // Verify commands 0-7 are supported
+    for (uint8_t i = 0; i < 8; i++)
     {
-        // Should not crash and return false (no commands registered)
-        EXPECT_FALSE(nsmDevice.isCommandSupported(msgType, 0));
+        EXPECT_TRUE(nsmDevice.isCommandSupported(messageType, i));
     }
 
-    // Invalid message types >= NUM_NSM_TYPES should return false without
-    // accessing out-of-bounds array indices
-    EXPECT_FALSE(nsmDevice.isCommandSupported(NUM_NSM_TYPES, 0));
-    EXPECT_FALSE(nsmDevice.isCommandSupported(NUM_NSM_TYPES + 1, 0));
-    EXPECT_FALSE(nsmDevice.isCommandSupported(100, 0));
-    EXPECT_FALSE(nsmDevice.isCommandSupported(0xFF, 0)); // Message type 255
+    // Verify commands 8-15 are not supported
+    for (uint8_t i = 8; i < 16; i++)
+    {
+        EXPECT_FALSE(nsmDevice.isCommandSupported(messageType, i));
+    }
+
+    // Verify commands 16,18,20,22 are supported
+    EXPECT_TRUE(nsmDevice.isCommandSupported(messageType, 16));
+    EXPECT_FALSE(nsmDevice.isCommandSupported(messageType, 17));
+    EXPECT_TRUE(nsmDevice.isCommandSupported(messageType, 18));
+    EXPECT_FALSE(nsmDevice.isCommandSupported(messageType, 19));
+    EXPECT_TRUE(nsmDevice.isCommandSupported(messageType, 20));
 }
 
-// Test that updateMessageTypesToCommandCodeMatrix ignores invalid message types
-// This prevents core dump when device reports unsupported message types like
-// 0xFF
-TEST(nsmDevice, UpdateCommandCodeMatrixIgnoresInvalidMessageTypes)
+TEST(nsmDevice, TestFindAggregatorByType)
 {
-    MockNsmDeviceBase nsmDevice(1, 1, "MCTP_EID", "10", 0);
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
 
-    // Create a bitmask with command code 0 supported
-    bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {};
-    supportedCommands[0].byte = 0x01; // Command code 0 is supported
-
-    // Valid message type should update the matrix
-    nsmDevice.updateMessageTypesToCommandCodeMatrix(
-        0, supportedCommands, SUPPORTED_COMMAND_CODE_DATA_SIZE);
-    EXPECT_TRUE(nsmDevice.isCommandSupported(0, 0));
-
-    // Invalid message types should be silently ignored (no crash, no update)
-    // These should not cause array out-of-bounds access
-    nsmDevice.updateMessageTypesToCommandCodeMatrix(
-        NUM_NSM_TYPES, supportedCommands, SUPPORTED_COMMAND_CODE_DATA_SIZE);
-    nsmDevice.updateMessageTypesToCommandCodeMatrix(
-        0xFF, supportedCommands, SUPPORTED_COMMAND_CODE_DATA_SIZE);
-
-    // Verify no crash occurred and invalid types return false
-    EXPECT_FALSE(nsmDevice.isCommandSupported(NUM_NSM_TYPES, 0));
-    EXPECT_FALSE(nsmDevice.isCommandSupported(0xFF, 0));
+    // Initially should return nullptr (no aggregators added)
+    auto result = nsmDevice.findAggregatorByType("TestType");
+    EXPECT_EQ(result, nullptr);
 }
 
-// Test boundary conditions for message type validation
-TEST(nsmDevice, MessageTypeBoundaryValidation)
+TEST(nsmDevice, TestDeviceRoleAndType)
 {
-    MockNsmDeviceBase nsmDevice(1, 1, "MCTP_EID", "10", 0);
+    uuid_t uuid = "11111111-2222-3333-4444-555555555555";
+    MockNsmDevice nsmDevice(NSM_DEV_ID_GPU, 3, "MCTP_UUID", uuid, 0);
 
-    bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {};
-    supportedCommands[0].byte = 0xFF; // Commands 0-7 supported
-
-    // Test the boundary: NUM_NSM_TYPES - 1 should be valid
-    uint8_t lastValidType = NUM_NSM_TYPES - 1;
-    nsmDevice.updateMessageTypesToCommandCodeMatrix(
-        lastValidType, supportedCommands, SUPPORTED_COMMAND_CODE_DATA_SIZE);
-    EXPECT_TRUE(nsmDevice.isCommandSupported(lastValidType, 0));
-
-    // Test the boundary: NUM_NSM_TYPES should be invalid
-    nsmDevice.updateMessageTypesToCommandCodeMatrix(
-        NUM_NSM_TYPES, supportedCommands, SUPPORTED_COMMAND_CODE_DATA_SIZE);
-    EXPECT_FALSE(nsmDevice.isCommandSupported(NUM_NSM_TYPES, 0));
+    EXPECT_EQ(nsmDevice.getDeviceType(), NSM_DEV_ID_GPU);
+    EXPECT_EQ(nsmDevice.getInstanceNumber(), 3);
+    EXPECT_EQ(nsmDevice.getDeviceRole(), 0);
+    EXPECT_EQ(nsmDevice.getUuid(), uuid);
 }

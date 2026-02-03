@@ -67,10 +67,9 @@ NsmFpgaPortState::NsmFpgaPortState(sdbusplus::bus::bus& bus,
         PortStateIntf::convertLinkStatusTypeFromString(linkStatus));
 }
 
-static requester::Coroutine
-    createNsmFpgaPortSensor(SensorManager& manager,
-                            const std::string& interface,
-                            const std::string& objPath)
+requester::Coroutine createNsmFpgaPortSensor(SensorManager& manager,
+                                             const std::string& interface,
+                                             const std::string& objPath)
 {
     try
     {

@@ -34,10 +34,12 @@ namespace nsm
 requester::Coroutine nsmFirmwareInventoryCreateSensors(SensorManager&,
                                                        const std::string&,
                                                        const std::string&);
-NsmDeviceTable devices;
 } // namespace nsm
 
-struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
+struct NsmFirmwareInventoryTest :
+    public testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
 {
     const std::string basicIntfName =
         "xyz.openbmc_project.Configuration.NSM_WriteProtect";
@@ -46,13 +48,22 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
 
     const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
-    NiceMock<MockSensorManager> mockManager{devices};
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> fpga;
+    NsmFirmwareInventoryTest() : SensorManagerTest(devices)
+    {
+        fpga = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(fpgaUuid));
+        EXPECT_EQ(1, devices.size());
+        EXPECT_NE(fpga, nullptr);
+        EXPECT_EQ(NSM_DEV_ID_BASEBOARD, fpga->getDeviceType());
+    }
 
-    const PropertyValuesCollection error = {
+    dbus::PropertyMap error = {
         {"Type", "NSM_FirmwreInventory"},
         {"UUID", "a3b0bdf6-8661-4d8e-8268-0e59415f2076"},
     };
-    const PropertyValuesCollection retimer = {
+    dbus::PropertyMap retimer = {
         {"Name", name},
         {"Type", "NSM_WriteProtect"},
         {"UUID", fpgaUuid},
@@ -61,11 +72,11 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
          uint64_t(diagnostics_enable_disable_wp_data_index::RETIMER_EEPROM_3)},
         {"InstanceNumber", uint64_t(2)},
     };
-    const PropertyValuesCollection retimerAsset = {
+    dbus::PropertyMap retimerAsset = {
         {"Type", "NSM_Asset"},
         {"Manufacturer", "NVIDIA"},
     };
-    const PropertyValuesCollection retimerAssociations[2] = {
+    dbus::PropertyMap retimerAssociations[2] = {
         {
             {"Forward", "inventory"},
             {"Backward", "activation"},
@@ -78,17 +89,17 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
             {"AbsolutePath", "/xyz/openbmc_project/software"},
         },
     };
-    const PropertyValuesCollection retimerVersion = {
+    dbus::PropertyMap retimerVersion = {
         {"Type", "NSM_FirmwareVersion"},
     };
-    const PropertyValuesCollection gpu = {
+    dbus::PropertyMap gpu = {
         {"Name", "HGX_FW_GPU_SXM_2"},
         {"Type", "NSM_WriteProtect"},
         {"UUID", fpgaUuid},
         {"DataIndex",
          uint64_t(diagnostics_enable_disable_wp_data_index::GPU_SPI_FLASH_2)},
     };
-    const PropertyValuesCollection cpu = {
+    dbus::PropertyMap cpu = {
         {"Name", "HGX_FW_CPU_0"},
         {"Type", "NSM_WriteProtect"},
         {"UUID", fpgaUuid},
@@ -110,61 +121,64 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
 
 TEST_F(NsmFirmwareInventoryTest, badTestNoDevideFound)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
 
     // Set up base properties with INVALID UUID that doesn't match any device
     const uuid_t invalidUuid =
         "a3b0bdf6-8661-4d8e-8268-0e59415f2076"; // From error collection
-    propertyMap["Name"] = std::get<std::string>(get(retimer, "Name").second);
+    propertyMap["Name"] = retimer["Name"];
     propertyMap["UUID"] = invalidUuid;          // Invalid UUID as uuid_t type
 
     // Set up interface-specific properties
-    propertyMap["Type"] = std::get<std::string>(get(retimer, "Type").second);
-    propertyMap["DataIndex"] =
-        std::get<uint64_t>(get(retimer, "DataIndex").second);
+    propertyMap["Type"] = retimer["Type"];
+    propertyMap["DataIndex"] = retimer["DataIndex"];
 
-    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, devices.size());
+    EXPECT_THROW_COROUTINE(
+        nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath),
+        std::runtime_error);
 }
 
 TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 {
     auto sensors = 1; // Skip msgTypes sensor added by initMsgTypesSensor()
-    auto& map = utils::MockDbusAsync::getServiceMap();
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["Name"] = std::get<std::string>(get(retimer, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(retimer, "UUID").second);
+    basePropertyMap["Name"] = retimer["Name"];
+    basePropertyMap["UUID"] = retimer["UUID"];
 
     // Set up interface-specific properties for NSM_Asset
-    propertyMap["Type"] =
-        std::get<std::string>(get(retimerAsset, "Type").second);
-    propertyMap["Manufacturer"] =
-        std::get<std::string>(get(retimerAsset, "Manufacturer").second);
+    auto& propertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Asset");
+    propertyMap["Type"] = retimerAsset["Type"];
+    propertyMap["Manufacturer"] = retimerAsset["Manufacturer"];
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName + ".Asset",
                                       objPath);
-    auto fpga = devices.back();
     auto retimerAsset =
         dynamic_pointer_cast<NsmFirmwareInventory<NsmAssetIntf>>(
             fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerAsset);
-    EXPECT_EQ(get<std::string>(retimer, "Manufacturer"),
+    EXPECT_EQ(std::get<std::string>(retimer["Manufacturer"]),
               retimerAsset->invoke(pdiMethod(manufacturer)));
 
-    map = serviceMap;
+    utils::MockDbusAsync::serviceMap() = serviceMap;
     // Update properties for NSM_WriteProtect
-    propertyMap["Type"] = std::get<std::string>(get(retimer, "Type").second);
-    propertyMap["DataIndex"] =
-        std::get<uint64_t>(get(retimer, "DataIndex").second);
-    propertyMap["Forward"] =
-        std::get<std::string>(get(retimerAssociations[0], "Forward").second);
-    propertyMap["Backward"] =
-        std::get<std::string>(get(retimerAssociations[0], "Backward").second);
-    propertyMap["AbsolutePath"] = std::get<std::string>(
-        get(retimerAssociations[0], "AbsolutePath").second);
+    auto& propertyMapWP = utils::MockDbusAsync::propertyMap(objPath,
+                                                            basicIntfName);
+    propertyMapWP["Name"] = retimer["Name"];
+    propertyMapWP["UUID"] = retimer["UUID"];
+    propertyMapWP["Type"] = retimer["Type"];
+    propertyMapWP["DataIndex"] = retimer["DataIndex"];
+
+    auto& propertyMapAssociation0 = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".Associations0");
+    propertyMapAssociation0 = retimerAssociations[0];
+    auto& propertyMapAssociation1 = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".Associations1");
+    propertyMapAssociation1 = retimerAssociations[1];
+
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
 
     auto retimerAssociation =
@@ -176,7 +190,8 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     auto retimerSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
         fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerSettings);
-    EXPECT_EQ(get<uint64_t>(retimer, "DataIndex"), retimerSettings->dataIndex);
+    EXPECT_EQ(std::get<uint64_t>(retimer["DataIndex"]),
+              retimerSettings->dataIndex);
 
     auto writeProtectedSensor = dynamic_pointer_cast<NsmWriteProtectedControl>(
         fpga->deviceSensors[sensors++]);
@@ -184,10 +199,10 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     EXPECT_TRUE(writeProtectedSensor->sensors.empty());
 
     // Update properties for NSM_FirmwareVersion
-    propertyMap["Type"] =
-        std::get<std::string>(get(retimerVersion, "Type").second);
-    propertyMap["InstanceNumber"] =
-        std::get<uint64_t>(get(retimer, "InstanceNumber").second);
+    auto& propertyMapFW = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".FirmwareVersion");
+    propertyMapFW["Type"] = retimerVersion["Type"];
+    propertyMapFW["InstanceNumber"] = retimer["InstanceNumber"];
     nsmFirmwareInventoryCreateSensors(
         mockManager, basicIntfName + ".FirmwareVersion", objPath);
 
@@ -195,20 +210,23 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
         fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, version);
     EXPECT_EQ(PCIERETIMER_0_EEPROM_VERSION +
-                  get<uint64_t>(retimer, "InstanceNumber"),
+                  std::get<uint64_t>(retimer["InstanceNumber"]),
               version->property);
 
-    map = emtpyServiceMap;
+    utils::MockDbusAsync::serviceMap() = emtpyServiceMap;
     // Update properties for GPU NSM_WriteProtect
-    propertyMap["Name"] = std::get<std::string>(get(gpu, "Name").second);
-    propertyMap["Type"] = std::get<std::string>(get(gpu, "Type").second);
-    propertyMap["DataIndex"] = std::get<uint64_t>(get(gpu, "DataIndex").second);
+    auto& propertyMapGPU = utils::MockDbusAsync::propertyMap(objPath,
+                                                             basicIntfName);
+    propertyMapGPU["Name"] = gpu["Name"];
+    propertyMapGPU["UUID"] = retimer["UUID"];
+    propertyMapGPU["Type"] = gpu["Type"];
+    propertyMapGPU["DataIndex"] = gpu["DataIndex"];
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
 
     auto gpuSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
         fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, gpuSettings);
-    EXPECT_EQ(get<uint64_t>(gpu, "DataIndex"), gpuSettings->dataIndex);
+    EXPECT_EQ(std::get<uint64_t>(gpu["DataIndex"]), gpuSettings->dataIndex);
 
     EXPECT_EQ(1, writeProtectedSensor->sensors.size());
     EXPECT_EQ(3, fpga->staticSensors.size());
@@ -219,39 +237,28 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 
 TEST_F(NsmFirmwareInventoryTest, goodTestCreateCpuSensors)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["Name"] = std::get<std::string>(get(cpu, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(cpu, "UUID").second);
+    propertyMap["Name"] = cpu["Name"];
+    propertyMap["UUID"] = cpu["UUID"];
 
     // Set up interface-specific properties for NSM_WriteProtect
-    propertyMap["Type"] = std::get<std::string>(get(cpu, "Type").second);
-    propertyMap["DataIndex"] = std::get<uint64_t>(get(cpu, "DataIndex").second);
+    propertyMap["Type"] = cpu["Type"];
+    propertyMap["DataIndex"] = cpu["DataIndex"];
 
-    EXPECT_EQ(1, devices.size());
-    if (devices.size() > 0)
-    {
-        devices.back()->staticSensors.clear();
-        devices.back()->roundRobinSensors.clear();
-        devices.back()->prioritySensors.clear();
-        devices.back()->deviceSensors.clear();
-    }
-    EXPECT_EQ(1, devices.size());
-    utils::MockDbusAsync::getServiceMap() = emtpyServiceMap;
+    utils::MockDbusAsync::serviceMap() = emtpyServiceMap;
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(1, devices.size());
-    auto fpga = devices.back();
-    EXPECT_EQ(1, fpga->roundRobinSensors.size());
+    EXPECT_EQ(2, fpga->roundRobinSensors.size()); // msgTypes + 1 other
     EXPECT_EQ(0, fpga->staticSensors.size());
     EXPECT_EQ(0, fpga->prioritySensors.size());
-    EXPECT_EQ(2, fpga->deviceSensors.size());
-    auto sensors = 0; // Sensors were cleared, msgTypes not re-added
+    EXPECT_EQ(3, fpga->deviceSensors.size()); // msgTypes + 2 others
+    auto sensors = 1;                         // Skip msgTypes sensor at index 0
     auto cpuSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
         fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, cpuSettings);
-    EXPECT_EQ(get<uint64_t>(cpu, "DataIndex"), cpuSettings->dataIndex);
+    EXPECT_EQ(std::get<uint64_t>(cpu["DataIndex"]), cpuSettings->dataIndex);
 
     auto cpuWriteProtectedSensor =
         dynamic_pointer_cast<NsmWriteProtectedControl>(

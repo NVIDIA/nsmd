@@ -700,6 +700,15 @@ uint8_t NsmGPMPerInstance::handleResponseMsg(const nsm_msg* responseMsg,
             continue;
         }
 
+        if (!valid || tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
+        {
+            lg2::debug(
+                "responseHandler: skipping sample with invalid tag or valid bit. "
+                "Tag={TAG}, Valid={VALID}, sensor={NAME}",
+                "TAG", tag, "VALID", valid, "NAME", getName());
+            continue;
+        }
+
         if (tag >= metrics.size())
         {
             metrics.resize(tag + 1, std::numeric_limits<double>::quiet_NaN());

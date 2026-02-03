@@ -2,7 +2,15 @@
 # nsmPort is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
 # All sources already compiled into nsmd_test, no need to recompile
 
-tests = ['nsmPort_test']
+tests = [
+    'nsmPort_test',
+    'nsmEndpoint_test',
+    'nsmFpgaPort_test',
+    'nsmGpuPciePort_test',
+    'nsmZone_test',
+    'nsmNetworkAddressAggregator_test',
+    'nsmEthPortTelemetryAggregator_test',
+]
 
 foreach t : tests
     test(

@@ -723,8 +723,8 @@ TEST(nsmProcessorRevision, BadHandleResp)
 TEST(nsmProcessorThrottleDuration, GoodGenReq)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
@@ -745,8 +745,8 @@ TEST(nsmProcessorThrottleDuration, GoodGenReq)
 TEST(nsmProcessorThrottleDuration, GoodHandleResp)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
@@ -782,8 +782,8 @@ TEST(nsmProcessorThrottleDuration, GoodHandleResp)
 TEST(nsmProcessorThrottleDuration, BadHandleResp)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
@@ -1221,8 +1221,8 @@ TEST(nsmCurrentPowerSmoothingProfile, BadHandleResp)
 TEST(nsmPowerSmoothingV2, GoodGenReq)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1261,8 +1261,8 @@ TEST(nsmPowerSmoothingV2, GoodHandleResp)
                        response_data.end());
 
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1300,8 +1300,8 @@ TEST(nsmPowerSmoothingV2, BadHandleResp)
                        response_data.end());
 
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1323,8 +1323,8 @@ TEST(nsmPowerSmoothingV2, BadHandleResp)
 TEST(nsmPowerSmoothingAdminOverrideV2, GoodGenReq)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1364,8 +1364,8 @@ TEST(nsmPowerSmoothingAdminOverrideV2, GoodHandleResp)
                        response_data.end());
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1401,8 +1401,8 @@ TEST(nsmPowerSmoothingAdminOverrideV2, BadHandleResp)
                        response_data.end());
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1426,8 +1426,8 @@ TEST(nsmPowerSmoothingAdminOverrideV2, BadHandleResp)
 TEST(nsmPowerProfileCollectionV2, GoodGenReq)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1464,8 +1464,8 @@ TEST(nsmPowerProfileCollectionV2, GoodHandleResp)
                        response_data.end());
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1498,8 +1498,8 @@ TEST(nsmPowerProfileCollectionV2, BadHandleResp)
     responseMsg.insert(responseMsg.end(), response_data.begin(),
                        response_data.end());
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1518,8 +1518,8 @@ TEST(nsmPowerProfileCollectionV2, BadHandleResp)
 TEST(nsmCurrentPowerSmoothingProfileV2, GoodGenReq)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1569,8 +1569,8 @@ TEST(nsmCurrentPowerSmoothingProfileV2, GoodHandleResp)
                        response_data.end());
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1618,8 +1618,8 @@ TEST(nsmCurrentPowerSmoothingProfileV2, BadHandleResp)
                        response_data.end());
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
-        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
     bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     supportedCommands[20].bits.bit7 = 1;
     supportedCommands[21].bits.bit0 = 1;
@@ -1662,8 +1662,6 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
 requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
                                              const std::string& interface,
                                              const std::string& objPath);
-NsmDeviceTable devices;
-std::shared_ptr<MockNsmDeviceBase> gpu;
 }; // namespace nsm
 
 struct NsmProcessorTest :
@@ -1691,20 +1689,25 @@ struct NsmProcessorTest :
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
     const uuid_t badUuid = "092b3ec1-e468-f145-8686-409009062aa8";
 
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+
     NsmProcessorTest() : SensorManagerTest(devices)
     {
-        if (gpu)
-        {
-            gpu->deviceSensors.clear();
-            gpu->prioritySensors.clear();
-            gpu->roundRobinSensors.clear();
-            gpu->longRunningSensors.clear();
-            gpu->staticSensors.clear();
-        }
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        EXPECT_EQ(1, devices.size());
+        EXPECT_NE(gpu, nullptr);
+        EXPECT_EQ(NSM_DEV_ID_GPU, gpu->getDeviceType());
         AsyncOperationManager::getInstance()->dispatchers.clear();
     }
 
-    const PropertyValuesCollection error = {
+    ~NsmProcessorTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+
+    dbus::PropertyMap error = {
         {"Type", "NSM_processor"},
         {"UUID", badUuid},
         {"UnknownFeature",
@@ -1716,7 +1719,7 @@ struct NsmProcessorTest :
              "InSystemTestt",
          }},
     };
-    const PropertyValuesCollection basic = {
+    dbus::PropertyMap basic = {
         {"Name", name},
         {"Type", "NSM_Processor"},
         {"UUID", gpuUuid},
@@ -1724,7 +1727,7 @@ struct NsmProcessorTest :
         {"InventoryObjPath", objPath},
         {"Priority", false},
     };
-    const PropertyValuesCollection prcKnobs = {
+    dbus::PropertyMap prcKnobs = {
         {"Type", "NSM_ReconfigPermissions"},
         {"Features", // features are not propertly sorted and some are
                      // duplicated
@@ -1754,23 +1757,23 @@ struct NsmProcessorTest :
              "PowerSmoothingPrivilegeLevel1",
          }},
     };
-    const PropertyValuesCollection memory = {
+    dbus::PropertyMap memory = {
         {"Name", memoryName},
         {"Type", "NSM_MemCapacityUtil"},
         {"UUID", gpuUuid},
         {"InventoryObjPath", memoryObjPath},
     };
-    const PropertyValuesCollection memoryAttributes = {
+    dbus::PropertyMap memoryAttributes = {
         {"Type", "NSM_Memory_Attributes"},
     };
-    const PropertyValuesCollection asset = {
+    dbus::PropertyMap asset = {
         {"Name", name},
         {"Type", "NSM_Asset"},
         {"UUID", gpuUuid},
         {"Manufacturer", "NVIDIA"},
         {"InventoryObjPath", objPath},
     };
-    const PropertyValuesCollection chassisAsset = {
+    dbus::PropertyMap chassisAsset = {
         {"Name", chassisName},
         {"Type", "NSM_Chassis_Attributes"},
         {"UUID", gpuUuid},
@@ -1780,20 +1783,17 @@ struct NsmProcessorTest :
 
 TEST_F(NsmProcessorTest, badTestTypeError)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
 
     // Set up interface-specific properties with invalid type
-    propertyMap["Type"] = std::get<std::string>(get(error, "Type").second);
-    propertyMap["InventoryObjPath"] =
-        std::get<std::string>(get(basic, "InventoryObjPath").second);
+    propertyMap["Type"] = error["Type"];
+    propertyMap["InventoryObjPath"] = basic["InventoryObjPath"];
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(1, devices.size());
-    gpu = std::dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
     EXPECT_EQ(0, gpu->prioritySensors.size());
     EXPECT_EQ(1, gpu->roundRobinSensors.size());
     EXPECT_EQ(1, gpu->deviceSensors.size());
@@ -1801,48 +1801,42 @@ TEST_F(NsmProcessorTest, badTestTypeError)
 
 TEST_F(NsmProcessorTest, badTestNoDevideFound)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
 
     // Set up base properties with INVALID UUID that doesn't match any device
-    const uuid_t invalidUuid =
-        "a3b0bdf6-8661-4d8e-8268-0e59415f2076"; // From error collection
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = invalidUuid;          // Invalid UUID as uuid_t type
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = error["UUID"]; // Invalid UUID as uuid_t type
 
     // Set up interface-specific properties
-    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
-    propertyMap["InventoryObjPath"] =
-        std::get<std::string>(get(basic, "InventoryObjPath").second);
-    createNsmProcessorSensor(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(1, devices.size());
-    EXPECT_EQ(0, gpu->prioritySensors.size());
-    EXPECT_EQ(0, gpu->roundRobinSensors.size());
-    EXPECT_EQ(0, gpu->deviceSensors.size());
+    propertyMap["Type"] = basic["Type"];
+    propertyMap["InventoryObjPath"] = basic["InventoryObjPath"];
+    EXPECT_THROW_COROUTINE(
+        createNsmProcessorSensor(mockManager, basicIntfName, objPath),
+        std::runtime_error);
 }
 TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+    basePropertyMap["Name"] = basic["Name"];
+    basePropertyMap["UUID"] = basic["UUID"];
 
     // Set up interface-specific properties for ReconfigPermissions
-    propertyMap["Type"] = std::get<std::string>(get(prcKnobs, "Type").second);
-    propertyMap["InventoryObjPath"] =
-        std::get<std::string>(get(basic, "InventoryObjPath").second);
-    propertyMap["Features"] =
-        std::get<std::vector<std::string>>(get(prcKnobs, "Features").second);
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ReconfigPermissions");
+    propertyMap["Type"] = prcKnobs["Type"];
+    propertyMap["InventoryObjPath"] = basic["InventoryObjPath"];
+    propertyMap["Features"] = prcKnobs["Features"];
 
     createNsmProcessorSensor(mockManager,
                              basicIntfName + ".ReconfigPermissions", objPath);
 
-    const size_t expectedSensorsCount = 22;
+    const size_t expectedSensorsCount = 23;
     EXPECT_EQ(0, gpu->prioritySensors.size());
-    EXPECT_EQ(22, gpu->roundRobinSensors.size());
-    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(expectedSensorsCount, gpu->roundRobinSensors.size());
     EXPECT_EQ(expectedSensorsCount, gpu->deviceSensors.size());
 
     nsm_reconfiguration_permissions_v1 data = {0, 1, 1, 0, 0, 1, 1};
@@ -1854,12 +1848,12 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
         instanceId, NSM_SUCCESS, ERR_NULL, &data, msg);
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
-    testing::Mock::AllowLeak(gpu.get());
     EXPECT_CALL(*gpu, sensorIO)
-        .Times(expectedSensorsCount)
+        .Times(expectedSensorsCount - 1)
         .WillRepeatedly(mockSensorIO(response));
 
-    for (size_t i = 0; i < expectedSensorsCount; i++)
+    // Skip the first sensor (new sensor added at index 0)
+    for (size_t i = 1; i < expectedSensorsCount; i++)
     {
         auto reconfigPermissions =
             dynamic_pointer_cast<NsmReconfigPermissions>(gpu->deviceSensors[i]);
@@ -1867,7 +1861,7 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 
         // Test if added permissions are sorted and unique
         EXPECT_EQ(
-            reconfiguration_permissions_v1_index(i),
+            reconfiguration_permissions_v1_index(i - 1),
             NsmReconfigPermissions::getIndex(reconfigPermissions->feature));
         reconfigPermissions->update(gpu).detach();
         EXPECT_EQ(data.host_oneshot,
@@ -1884,24 +1878,22 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 
 TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
 
     // Set up interface-specific properties for NSM_Processor
-    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
-    propertyMap["InventoryObjPath"] =
-        std::get<std::string>(get(basic, "InventoryObjPath").second);
-    propertyMap["DEVICE_UUID"] =
-        std::get<uuid_t>(get(basic, "DEVICE_UUID").second);
+    propertyMap["Type"] = basic["Type"];
+    propertyMap["InventoryObjPath"] = basic["InventoryObjPath"];
+    propertyMap["DEVICE_UUID"] = basic["DEVICE_UUID"];
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
     EXPECT_EQ(1, devices.size());
     EXPECT_EQ(0, gpu->prioritySensors.size());
     EXPECT_EQ(8, gpu->staticSensors.size());
-    EXPECT_EQ(3, gpu->roundRobinSensors.size());
+    EXPECT_EQ(4, gpu->roundRobinSensors.size()); // +1 for msgTypes sensor
 
     // capabilitiesCount is the number of interfaces actually created.
     // createNsmErrorInjectionSensors skips 5 types (FatalErrors,
@@ -1916,13 +1908,11 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     // Total device sensors for type = NSM_Processor:
     // 10 are added as part of createNsmProcessorSensor() (NOTE:
     // NVIDIA_RESET_METRICS & ENABLE_SYSTEM_GUID are disabled during this test
-    // run) and capabilitiesCount + 5 are added as part of
-    // createNsmErrorInjectionSensors() (setErrorInjection,
-    // errorInjectionSensor, errorInjectionSupported, errorInjectionEnabled,
-    // plus one setErrorInjectionEnabled per capability interface)
-    EXPECT_EQ(15 + capabilitiesCount, gpu->deviceSensors.size());
+    // run) and 8 are added as part of createNsmErrorInjectionSensors()
+    // +1 for msgTypes sensor added at index 0
+    EXPECT_EQ(16 + capabilitiesCount, gpu->deviceSensors.size());
 
-    int si = 10;
+    int si = 11; // Start after msgTypes sensor at index 0
 
     // expectedInterfaces is the actual number of interfaces created (4, not 8)
     auto expectedInterfaces = int(4);
@@ -2054,18 +2044,19 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
 
 TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+    basePropertyMap["Name"] = basic["Name"];
+    basePropertyMap["UUID"] = basic["UUID"];
+    basePropertyMap["InventoryObjPath"] = basic["InventoryObjPath"];
 
     // Set up interface-specific properties for ProcessorAttributes
     // (MemCapacityUtil is now handled here)
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ProcessorAttributes");
     propertyMap["Type"] = "NSM_Processor_Attributes";
-    propertyMap["InventoryObjPath"] =
-        std::get<std::string>(get(basic, "InventoryObjPath").second);
     propertyMap["MemCapacityUtilSupported"] = true;
     propertyMap["CpuOperatingConfigSupported"] = false;
     propertyMap["EDPpScalingFactorSupported"] = false;
@@ -2080,8 +2071,8 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
                              basicIntfName + ".ProcessorAttributes", objPath);
     EXPECT_EQ(1, devices.size());
     EXPECT_EQ(3, gpu->staticSensors.size()); // 3 Asset sensors
-    EXPECT_EQ(4,
-              gpu->deviceSensors.size()); // 3 Asset + 1 MemCapacityUtil sensors
+    EXPECT_EQ(5, // 3 Asset + 1 MemCapacityUtil sensors + 1 msgTypes sensor
+              gpu->deviceSensors.size());
     EXPECT_EQ(1, gpu->longRunningSensors.size());
 
     // Find the MemoryCapacityUtil sensor among the created sensors
@@ -2098,13 +2089,17 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     EXPECT_NE(nullptr, memoryCapacityUtilSensor);
     EXPECT_EQ(1, memoryCapacityUtilSensor->interfaces.size());
 
+    auto& memoryBasePropertyMap =
+        utils::MockDbusAsync::propertyMap(memoryObjPath, memoryBasicIntfName);
+    // Set up base properties for memory
+    memoryBasePropertyMap["Name"] = memory["Name"];
+    memoryBasePropertyMap["UUID"] = memory["UUID"];
+    memoryBasePropertyMap["InventoryObjPath"] = memory["InventoryObjPath"];
+
+    auto& memoryPropertyMap = utils::MockDbusAsync::propertyMap(
+        memoryObjPath, memoryBasicIntfName + ".MemoryAttributes");
     // Set up properties for second memory sensor
-    propertyMap["Name"] = std::get<std::string>(get(memory, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(memory, "UUID").second);
-    propertyMap["Type"] =
-        std::get<std::string>(get(memoryAttributes, "Type").second);
-    propertyMap["InventoryObjPath"] =
-        std::get<std::string>(get(memory, "InventoryObjPath").second);
+    memoryPropertyMap["Type"] = memoryAttributes["Type"];
     createNsmMemorySensor(
         mockManager, memoryBasicIntfName + ".MemoryAttributes", memoryObjPath);
 
@@ -2128,17 +2123,19 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     // Check if the sensor interface is moved as expected
     EXPECT_EQ(2, foundMemCapacityUtilSensor->interfaces.size());
 }
+
 TEST_F(NsmProcessorTest, goodCreateModelAndSerialNumberWithoutDuplicate)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
 
-    propertyMap["Name"] = std::get<std::string>(get(asset, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(asset, "UUID").second);
+    basePropertyMap["Name"] = asset["Name"];
+    basePropertyMap["UUID"] = asset["UUID"];
+    basePropertyMap["InventoryObjPath"] = asset["InventoryObjPath"];
 
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ProcessorAttributes");
     propertyMap["Type"] = "NSM_Processor_Attributes";
-    propertyMap["InventoryObjPath"] =
-        std::get<std::string>(get(asset, "InventoryObjPath").second);
     propertyMap["MemCapacityUtilSupported"] = false;
     propertyMap["CpuOperatingConfigSupported"] = false;
     propertyMap["EDPpScalingFactorSupported"] = false;
@@ -2154,8 +2151,8 @@ TEST_F(NsmProcessorTest, goodCreateModelAndSerialNumberWithoutDuplicate)
     EXPECT_EQ(1, devices.size());
     // When all features are disabled, only 3 Asset sensors are created (all
     // static)
-    EXPECT_EQ(3, gpu->deviceSensors
-                     .size()); // 3 Asset sensors in deviceSensors (superset)
+    EXPECT_EQ(4, // 3 Asset sensors + 1 msgTypes sensor
+              gpu->deviceSensors.size());
     EXPECT_EQ(3, gpu->staticSensors.size());      // 3 Asset sensors (static)
     EXPECT_EQ(0, gpu->longRunningSensors.size()); // No long-running sensors
     auto devicePartNumberSensor =
@@ -2176,33 +2173,36 @@ TEST_F(NsmProcessorTest, goodCreateModelAndSerialNumberWithoutDuplicate)
     EXPECT_EQ(SERIAL_NUMBER, serialNumberSensor->property);
     EXPECT_EQ(MARKETING_NAME, modelSensor->property);
 
+    // Set up base properties for chassis
+    auto& chassisBasePropertyMap =
+        utils::MockDbusAsync::propertyMap(chassisObjPath, chassisBasicIntfName);
+    chassisBasePropertyMap["Name"] = chassisAsset["Name"];
+    chassisBasePropertyMap["UUID"] = chassisAsset["UUID"];
+
     // Set up properties for chassis asset
-    propertyMap["Name"] =
-        std::get<std::string>(get(chassisAsset, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(chassisAsset, "UUID").second);
-    propertyMap["Type"] =
-        std::get<std::string>(get(chassisAsset, "Type").second);
-    propertyMap["InventoryObjPath"] =
-        std::get<std::string>(get(chassisAsset, "InventoryObjPath").second);
-    propertyMap["AssetInformationAvailable"] = true;
+    auto& chassisPropertyMap = utils::MockDbusAsync::propertyMap(
+        chassisObjPath, chassisBasicIntfName + ".ChassisAttributes");
+    chassisPropertyMap["Type"] = chassisAsset["Type"];
+    chassisPropertyMap["InventoryObjPath"] = chassisAsset["InventoryObjPath"];
+    chassisPropertyMap["AssetInformationAvailable"] = true;
     nsmChassisCreateSensors(mockManager,
                             chassisBasicIntfName + ".ChassisAttributes",
                             chassisObjPath);
 
-    // Chassis creates 3 asset sensors + 1 SKU sensor + 1 health sensor, but
-    // SERIAL_NUMBER and MARKETING_NAME merge with processor sensors. Final
-    // result:
+    // Chassis creates 3 asset sensors + 1 SKU sensor + 1 health sensor + 1
+    // msgTypes sensor, but SERIAL_NUMBER and MARKETING_NAME merge with
+    // processor sensors. Final result:
     // - DEVICE_PART_NUMBER (processor only)
     // - FRU_PART_NUMBER (chassis only)
     // - SERIAL_NUMBER (merged: processor + chassis interfaces)
     // - MARKETING_NAME (merged: processor + chassis interfaces)
     // - SKU (chassis only)
     // - Health (chassis only)
-    // Total: 6 sensors
-    EXPECT_EQ(6, gpu->deviceSensors.size());
+    // Total: 7 sensors
+    EXPECT_EQ(7, gpu->deviceSensors.size());
     auto partNumberSensor =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-            gpu->deviceSensors[3]); // New FRU_PART_NUMBER sensor
+            gpu->deviceSensors[4]); // New FRU_PART_NUMBER sensor
     EXPECT_NE(nullptr, partNumberSensor);
     EXPECT_EQ(1, partNumberSensor->interfaces.size());
     EXPECT_EQ(FRU_PART_NUMBER, partNumberSensor->property);
@@ -2300,28 +2300,3 @@ TEST(nsmTotalNvLinks, BadHandleResp)
     rc = sensor.handleResponseMsg(response, msg_len - 1);
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
-
-// Also add this at the end of the file to clean up after all tests
-class NsmProcessorTestEnvironment : public ::testing::Environment
-{
-  public:
-    void TearDown() override
-    {
-        // Final cleanup after all tests
-        if (nsm::gpu)
-        {
-            // Verify any remaining expectations
-            ::testing::Mock::VerifyAndClearExpectations(nsm::gpu.get());
-        }
-        nsm::gpu.reset();
-        nsm::devices.clear();
-    }
-};
-
-// Register the environment
-static bool registerEnvironment()
-{
-    ::testing::AddGlobalTestEnvironment(new NsmProcessorTestEnvironment);
-    return true;
-}
-static bool environmentRegistered = registerEnvironment();

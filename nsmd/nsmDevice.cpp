@@ -53,65 +53,6 @@ std::shared_ptr<NsmNumericAggregator>
     return aggregator;
 }
 
-int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
-                    uint8_t& deviceRole)
-{
-    int n1 = -1;
-    int n2 = -1;
-
-    std::sscanf(uuid.c_str(), "STATIC:%d:%d", &n1, &n2);
-
-    if (n1 < 0 || n1 > 0xffff)
-    {
-        return -1;
-    }
-    if (n2 < 0 || n2 > 0xff)
-    {
-        return -2;
-    }
-
-    utils::getDeviceTypeAndRole(n1, &deviceType, &deviceRole);
-    instanceNumber = n2;
-    return 0;
-}
-
-std::shared_ptr<NsmDevice>
-    findNsmDeviceByIdentification(NsmDeviceTable& nsmDevices,
-                                  uint8_t deviceType, uint8_t instanceNumber,
-                                  uint8_t deviceRole)
-{
-    std::shared_ptr<NsmDevice> ret{};
-
-    for (auto nsmDevice : nsmDevices)
-    {
-        if (nsmDevice->getDeviceType() == deviceType &&
-            nsmDevice->getInstanceNumber() == instanceNumber &&
-            nsmDevice->getDeviceRole() == deviceRole)
-        {
-            ret = nsmDevice;
-            break;
-        }
-    }
-    return ret;
-}
-
-std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
-                                               const uuid_t& uuid)
-{
-    std::shared_ptr<NsmDevice> ret{};
-
-    for (auto nsmDevice : nsmDevices)
-    {
-        if ((nsmDevice->getUuid()).substr(0, UUID_LEN) ==
-            uuid.substr(0, UUID_LEN))
-        {
-            ret = nsmDevice;
-            break;
-        }
-    }
-    return ret;
-}
-
 void NsmDevice::setEventMode(uint8_t mode)
 {
     if (mode > GLOBAL_EVENT_GENERATION_ENABLE_PUSH)

@@ -348,9 +348,9 @@ std::shared_ptr<NsmPcieGroup>
     return (it != clearCoutnerSensorMap.end()) ? it->second : nullptr;
 }
 
-static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath)
+requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
+                                            const std::string& interface,
+                                            const std::string& objPath)
 {
     try
     {

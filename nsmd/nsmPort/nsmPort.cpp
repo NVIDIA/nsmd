@@ -1695,10 +1695,10 @@ void NsmGetPortECCCounters::updateMetricOnSharedMemory()
 #endif
 }
 
-static requester::Coroutine createNsmPortSensor(SensorManager& manager,
-                                                const std::string& interface,
-                                                const std::string& objPath,
-                                                bool enableNetworkPortAddresses)
+requester::Coroutine createNsmPortSensor(SensorManager& manager,
+                                         const std::string& interface,
+                                         const std::string& objPath,
+                                         bool enableNetworkPortAddresses)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(

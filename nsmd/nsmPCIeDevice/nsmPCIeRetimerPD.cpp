@@ -263,8 +263,8 @@ bool NsmPCIeDeviceGetClockOutput::getRetimerClockState(uint32_t clockBuffer)
     }
 }
 
-static requester::Coroutine
-    CreatePCIeRetimerChassisPCIeDevice(SensorManager& manager,
+requester::Coroutine
+    createPCIeRetimerChassisPCIeDevice(SensorManager& manager,
                                        const std::string& interface,
                                        const std::string& objPath)
 {
@@ -353,7 +353,7 @@ static requester::Coroutine
 }
 
 REGISTER_NSM_CREATION_FUNCTION(
-    CreatePCIeRetimerChassisPCIeDevice,
+    createPCIeRetimerChassisPCIeDevice,
     "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_PCIeDevices")
 
 } // namespace nsm

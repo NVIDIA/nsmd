@@ -2,7 +2,13 @@
 # nsmProcessor is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
 # All sources already compiled into nsmd_test, no need to recompile
 
-tests = ['nsmProcessor_test', 'nsmPowerLimit_test']
+tests = [
+    'nsmProcessor_test',
+    'nsmPowerLimit_test',
+    'nsmWorkloadPowerProfile_test',
+    'nsmFpgaProcessor_test',
+    'nsmReset_test',
+]
 
 foreach t : tests
     test(

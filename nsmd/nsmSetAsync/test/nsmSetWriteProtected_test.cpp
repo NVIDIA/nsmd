@@ -30,12 +30,17 @@ using namespace ::testing;
 struct NsmSetWriteProtectedTest : public testing::Test, public SensorManagerTest
 {
     const uuid_t fpgaUuid = "992b3ec1-e464-f145-8686-409009062aa8";
-    std::shared_ptr<MockNsmDeviceBase> fpga =
-        std::make_shared<MockNsmDeviceBase>(0, 0, "MCTP_UUID", fpgaUuid, 0);
+    std::shared_ptr<MockNsmDevice> fpga =
+        std::make_shared<MockNsmDevice>(0, 0, "MCTP_UUID", fpgaUuid, 0);
     NsmDeviceTable devices{{fpga}};
 
     std::unique_ptr<NsmSetWriteProtected> writeProtectedIntf;
     NsmSetWriteProtectedTest() : SensorManagerTest(devices) {}
+
+    ~NsmSetWriteProtectedTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
 
     void init(const diagnostics_enable_disable_wp_data_index dataIndex)
     {
@@ -74,7 +79,7 @@ struct NsmSetWriteProtectedTest : public testing::Test, public SensorManagerTest
         lastResponse = resp;
         value = NsmSetWriteProtected::getValue(data(),
                                                writeProtectedIntf->dataIndex);
-        return value && result.await_resume() == NSM_SW_SUCCESS &&
+        return value && result.data() == NSM_SW_SUCCESS &&
                status == AsyncOperationStatusType::Success;
     }
 };

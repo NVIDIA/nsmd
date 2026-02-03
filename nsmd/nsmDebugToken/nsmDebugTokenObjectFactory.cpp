@@ -36,9 +36,9 @@
 namespace nsm
 {
 
-static requester::Coroutine createNsmDebugToken(SensorManager& manager,
-                                                const std::string& interface,
-                                                const std::string& objPath)
+requester::Coroutine createNsmDebugToken(SensorManager& manager,
+                                         const std::string& interface,
+                                         const std::string& objPath)
 {
     DebugTokenAggregationManager::getInstance();
 

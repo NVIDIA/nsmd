@@ -24,9 +24,9 @@ NsmZone::NsmZone(sdbusplus::bus::bus& bus, const std::string& name,
     zoneIntf->routingEnabled(bool(true));
 }
 
-static requester::Coroutine createNsmZones(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath)
+requester::Coroutine createNsmZones(SensorManager& manager,
+                                    const std::string& interface,
+                                    const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(

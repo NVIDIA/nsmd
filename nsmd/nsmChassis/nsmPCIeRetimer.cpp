@@ -72,10 +72,9 @@ NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
         "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"));
 }
 
-static requester::Coroutine
-    CreatePCIeRetimerChassis(SensorManager& manager,
-                             const std::string& interface,
-                             const std::string& objPath)
+requester::Coroutine createPCIeRetimerChassis(SensorManager& manager,
+                                              const std::string& interface,
+                                              const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
@@ -118,7 +117,7 @@ static requester::Coroutine
 }
 
 REGISTER_NSM_CREATION_FUNCTION(
-    CreatePCIeRetimerChassis,
+    createPCIeRetimerChassis,
     "xyz.openbmc_project.Configuration.NSM_PCIeRetimer")
 
 } // namespace nsm

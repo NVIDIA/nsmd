@@ -205,9 +205,9 @@ sdbusplus::message::object_path
     return objectPath;
 }
 
-static requester::Coroutine CreateControlGpuPower(SensorManager& manager,
-                                                  const std::string& interface,
-                                                  const std::string& objPath)
+requester::Coroutine createControlGpuPower(SensorManager& manager,
+                                           const std::string& interface,
+                                           const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
@@ -272,6 +272,6 @@ static requester::Coroutine CreateControlGpuPower(SensorManager& manager,
 }
 
 REGISTER_NSM_CREATION_FUNCTION(
-    CreateControlGpuPower,
+    createControlGpuPower,
     "xyz.openbmc_project.Configuration.NSM_ControlTotalGPUPower")
 } // namespace nsm

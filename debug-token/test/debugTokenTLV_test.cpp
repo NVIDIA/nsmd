@@ -860,13 +860,24 @@ TEST_F(TlvEncoderStructureTest, EncodeSizeOverflow)
     tlv_encoder::Structure structure;
     structure.setVersion(1, 0);
 
+    // To trigger overflow, we need total size > uint32_t max (4,294,967,295
+    // bytes) With max item size (65535 bytes) + header (4 bytes) = 65539 bytes
+    // per item Strategy: Add items that sum just over uint32_t::max
+    // uint32_t::max / 65539 ≈ 65535.5, so we need 65536 items
+    // But we can optimize by only testing the overflow detection, not actually
+    // allocating all the memory. We'll add items until we're certain to
+    // overflow.
+
     std::vector<uint8_t> largeValue(std::numeric_limits<uint16_t>::max(), 0x42);
+    // Add items 0 through 65535 (total 65536 items)
+    // This should trigger overflow: 65536 * 65539 = 4,295,294,464 >
+    // 4,294,967,295
     for (size_t i = 0; i <= std::numeric_limits<uint16_t>::max(); ++i)
     {
         structure.add(static_cast<uint16_t>(i), largeValue);
     }
 
-    EXPECT_THROW({ structure.encode(); }, std::runtime_error);
+    EXPECT_THROW(structure.encode(), std::overflow_error);
 }
 
 // ============================================================================

@@ -31,7 +31,6 @@
 #include <unistd.h>
 #include <unistd.h> // for write and lseek
 
-#include <boost/asio.hpp>
 #include <nlohmann/json.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/server.hpp>
@@ -294,12 +293,7 @@ class DBusHandler : public IDBusHandler
     }
 
     /** @brief Get the asio connection. */
-    static auto& getAsioConnection()
-    {
-        static boost::asio::io_context io;
-        static auto conn = std::make_shared<sdbusplus::asio::connection>(io);
-        return conn;
-    }
+    static std::shared_ptr<sdbusplus::asio::connection>& getAsioConnection();
 
     /** @brief Get the DBusHandler instance. */
     static DBusHandler& instance()
@@ -826,35 +820,6 @@ requester::Coroutine
     coGetCachedBaseProperties(const std::string& objPath,
                               const std::string& baseInterface,
                               dbus::PropertyMap& cachedProperties);
-
-/**
- * @brief Get cached base properties if available
- *
- * This function checks if the base interface properties are already cached
- * for the given object path and interface combination.
- *
- * @param objPath D-Bus object path
- * @param baseInterface D-Bus interface name
- * @param cachedProperties Output parameter to store cached properties
- * @return true if properties were found in cache, false otherwise
- */
-bool getCachedBaseProperties(const std::string& objPath,
-                             const std::string& baseInterface,
-                             dbus::PropertyMap& cachedProperties);
-
-/**
- * @brief Store base properties in cache
- *
- * This function stores the base interface properties in the cache
- * for the given object path and interface combination.
- *
- * @param objPath D-Bus object path
- * @param baseInterface D-Bus interface name
- * @param properties Properties to cache
- */
-void setCachedBaseProperties(const std::string& objPath,
-                             const std::string& baseInterface,
-                             const dbus::PropertyMap& properties);
 
 int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
                     uint8_t& deviceRole, std::string& remapPropName,

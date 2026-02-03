@@ -156,9 +156,9 @@ requester::Coroutine
     co_return cc ? cc : rc;
 }
 
-static requester::Coroutine createNsmEventSetting(SensorManager& manager,
-                                                  const std::string& interface,
-                                                  const std::string& objPath)
+requester::Coroutine createNsmEventSetting(SensorManager& manager,
+                                           const std::string& interface,
+                                           const std::string& objPath)
 {
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
         utils::entityManagerServiceStr, objPath.c_str(),

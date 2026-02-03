@@ -27,6 +27,13 @@ using namespace ::testing;
 
 #include "nsmMemory.hpp"
 
+namespace nsm
+{
+requester::Coroutine createNsmMemorySensor(SensorManager& manager,
+                                           const std::string& interface,
+                                           const std::string& objPath);
+} // namespace nsm
+
 using namespace nsm;
 
 auto bus = sdbusplus::bus::new_default();
@@ -465,4 +472,187 @@ TEST(nsmMemCapacity, BadHandleResponse)
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(response, 0);
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+struct NsmMemorySensorTestFixture :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_Memory";
+    const std::string objPath = "/xyz/openbmc_project/inventory/system/memory";
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:90";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+
+    NsmMemorySensorTestFixture() : SensorManagerTest(devices)
+    {
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    ~NsmMemorySensorTestFixture()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+TEST_F(NsmMemorySensorTestFixture, goodTestCreateMemorySensor)
+{
+    dbus::PropertyMap properties = {
+        {"Name", std::string("Memory_Test")},
+        {"UUID", gpuUuid},
+        {"MemoryType", std::string("HBM")},
+        {"Count", uint64_t(8)},
+    };
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap = properties;
+
+    createNsmMemorySensor(mockManager, basicIntfName, objPath);
+
+    // Should create multiple sensors (RowRemapState, RowRemappingCounts, etc.)
+    EXPECT_GE(gpu->deviceSensors.size(), 1);
+}
+
+TEST_F(NsmMemorySensorTestFixture, badTestMissingUUID)
+{
+    dbus::PropertyMap properties = {
+        {"Name", std::string("Memory_NoUUID")},
+        {"MemoryType", std::string("HBM")},
+        {"Count", uint64_t(8)},
+    };
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath + "_nouuid",
+                                                          basicIntfName);
+    propertyMap = properties;
+
+    EXPECT_THROW_COROUTINE(
+        createNsmMemorySensor(mockManager, basicIntfName, objPath + "_nouuid"),
+        std::runtime_error);
+}
+
+TEST_F(NsmMemorySensorTestFixture, testRowRemapStateUpdate)
+{
+    auto rowRemapIntf =
+        std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
+    NsmRowRemapState sensor(sensorName, sensorType, rowRemapIntf,
+                            inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_row_remap_state_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    bitfield8_t flags;
+    flags.byte = 0x0F; // Set some flags
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_row_remap_state_resp(0, NSM_SUCCESS, reason_code,
+                                                 &flags, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(responseMsg, Response{}));
+
+    sensor.update(gpu);
+}
+
+TEST_F(NsmMemorySensorTestFixture, testRowRemappingCountsUpdate)
+{
+    auto rowRemapIntf =
+        std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
+    NsmRowRemappingCounts sensor(sensorName, sensorType, rowRemapIntf,
+                                 inventoryObjPath);
+
+    std::vector<uint8_t> data(sizeof(nsm_row_remap_availability));
+    auto remapData = reinterpret_cast<nsm_row_remap_availability*>(data.data());
+    remapData->no_remapping = 1;
+    remapData->low_remapping = 2;
+    remapData->partial_remapping = 3;
+    remapData->high_remapping = 4;
+    remapData->max_remapping = 10;
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t rc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, ERR_NULL, data.size(), data.data(), response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(responseMsg, Response{}));
+
+    sensor.update(gpu);
+}
+
+TEST_F(NsmMemorySensorTestFixture, testMemCapacityUpdate)
+{
+    std::shared_ptr<DimmIntf> dimmIntf =
+        std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
+    NsmMemCapacity sensor(sensorName, sensorType, dimmIntf);
+
+    // Capacity in bytes (16 GB = 16 * 1024 * 1024 * 1024)
+    uint64_t capacity = 17179869184ULL;
+    std::vector<uint8_t> data(sizeof(uint64_t));
+    memcpy(data.data(), &capacity, sizeof(uint64_t));
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t rc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, ERR_NULL, data.size(), data.data(), response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(responseMsg, Response{}));
+
+    sensor.update(gpu);
+}
+
+TEST_F(NsmMemorySensorTestFixture, badTestRowRemapStateError)
+{
+    auto rowRemapIntf =
+        std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
+    NsmRowRemapState sensor(sensorName, sensorType, rowRemapIntf,
+                            inventoryObjPath);
+
+    // Error response with reason code
+    Response badResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + sizeof(uint16_t), 0);
+    auto badMsg = reinterpret_cast<nsm_msg*>(badResp.data());
+    auto rc = encode_reason_code(NSM_ERROR, 0x1234,
+                                 NSM_GET_ROW_REMAP_STATE_FLAGS, badMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(badResp, Response{}));
+
+    sensor.update(gpu);
+}
+
+TEST_F(NsmMemorySensorTestFixture,
+       testCreateMemorySensorWithMultipleMemoryDevices)
+{
+    for (size_t i = 0; i < 4; i++)
+    {
+        std::string testPath = objPath + "_" + std::to_string(i);
+
+        dbus::PropertyMap properties = {
+            {"Name", std::string("Memory_") + std::to_string(i)},
+            {"UUID", gpuUuid},
+            {"MemoryType", std::string("HBM")},
+            {"Count", uint64_t(8)},
+        };
+
+        auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
+                                                              basicIntfName);
+        propertyMap = properties;
+
+        createNsmMemorySensor(mockManager, basicIntfName, testPath);
+    }
+
+    // Should have created memory sensors (actual number depends on
+    // configuration)
+    EXPECT_GE(gpu->deviceSensors.size(), 1);
 }

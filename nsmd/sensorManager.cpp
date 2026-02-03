@@ -21,7 +21,6 @@
 
 #include "libnsm/device-capability-discovery.h"
 #include "libnsm/platform-environmental.h"
-#include "libnsm/requester/mctp.h"
 
 #include "common/sleep.hpp"
 #include "nsmObject.hpp"

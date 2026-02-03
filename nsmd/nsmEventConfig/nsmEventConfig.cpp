@@ -290,9 +290,9 @@ bool NsmGetEventConfig::validateEventIds(
     return !anyOfEventIdNotSupported;
 }
 
-static requester::Coroutine createNsmEventConfig(SensorManager& manager,
-                                                 const std::string& interface,
-                                                 const std::string& objPath)
+requester::Coroutine createNsmEventConfig(SensorManager& manager,
+                                          const std::string& interface,
+                                          const std::string& objPath)
 {
     std::string baseInterface =
         "xyz.openbmc_project.Configuration.NSM_EventConfig";

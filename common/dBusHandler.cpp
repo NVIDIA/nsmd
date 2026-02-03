@@ -18,6 +18,8 @@
 #include "dBusAsyncUtils.hpp"
 #include "utils.hpp"
 
+#include <boost/asio.hpp>
+
 namespace utils
 {
 
@@ -182,6 +184,13 @@ GetAssociatedObjectsResponse
     return response;
 }
 
+std::shared_ptr<sdbusplus::asio::connection>& DBusHandler::getAsioConnection()
+{
+    static boost::asio::io_context io;
+    static auto conn = std::make_shared<sdbusplus::asio::connection>(io);
+    return conn;
+}
+
 // Single-flight pattern implementation for single-threaded async execution
 // for EM configuration PDI properties
 requester::Coroutine
@@ -310,7 +319,7 @@ bool coGetDbusPropertyBase::await_suspend(
 
     asioConnection->async_method_call(
         [resumeHandle = handle, this](boost::system::error_code ec,
-                                      PropertyValue value) {
+                                      const PropertyValue& value) {
         if (ec)
         {
             lg2::error(
@@ -321,7 +330,6 @@ bool coGetDbusPropertyBase::await_suspend(
         }
         else
         {
-            // can throw std::bad_variant_access
             setRetValue(value);
         }
         resumeHandle();
@@ -342,8 +350,8 @@ bool coGetServiceMap::await_suspend(std::coroutine_handle<> handle) noexcept
     auto& asioConnection = utils::DBusHandler::getAsioConnection();
 
     asioConnection->async_method_call(
-        [resumeHandle = handle, &ret = ret, this](boost::system::error_code ec,
-                                                  MapperServiceMap value) {
+        [resumeHandle = handle, this](boost::system::error_code ec,
+                                      const MapperServiceMap& value) {
         if (ec)
         {
             lg2::error(
@@ -352,7 +360,7 @@ bool coGetServiceMap::await_suspend(std::coroutine_handle<> handle) noexcept
         }
         else
         {
-            ret = value;
+            static_cast<MapperServiceMap&>(*this) = value;
         }
         resumeHandle();
     },
@@ -373,8 +381,8 @@ bool coGetAllDbusProperty::await_suspend(
     auto& asioConnection = utils::DBusHandler::getAsioConnection();
 
     asioConnection->async_method_call(
-        [resumeHandle = handle, &ret = ret, this](boost::system::error_code ec,
-                                                  dbus::PropertyMap value) {
+        [resumeHandle = handle, this](boost::system::error_code ec,
+                                      const dbus::PropertyMap& value) {
         if (ec)
         {
             lg2::error(
@@ -384,8 +392,7 @@ bool coGetAllDbusProperty::await_suspend(
         }
         else
         {
-            // can throw std::bad_variant_access
-            ret = value;
+            static_cast<dbus::PropertyMap&>(*this) = value;
         }
         resumeHandle();
     },
@@ -422,5 +429,16 @@ bool coLogEvent::await_suspend(std::coroutine_handle<> handle) noexcept
         "xyz.openbmc_project.Logging.Create", "Create", messageId, level, data);
     return true;
 }
+
+coGetServiceMap::coGetServiceMap(const std::string& objectPath,
+                                 const dbus::Interfaces& ifaceList) :
+    MapperServiceMap(), objectPath(objectPath), ifaceList(ifaceList)
+{}
+coGetAllDbusProperty::coGetAllDbusProperty(const std::string& service,
+                                           const std::string& objectPath,
+                                           const std::string& interface) :
+    dbus::PropertyMap(), service(service), objectPath(objectPath),
+    interface(interface)
+{}
 
 } // namespace utils

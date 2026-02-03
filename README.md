@@ -57,6 +57,14 @@ meson test -C builddir
 meson test -C builddir nsmChassis_test
 ```
 
+### Generate coverage report
+```bash
+meson setup --reconfigure -Db_coverage=true -Db_sanitize=address,undefined -Db_lundef=true -Dwerror=true -Dwarning_level=3 -Db_colorout=never -Ddebug=true -Doptimization=g -Dcpp_args="-DBOOST_USE_VALGRIND -Wno-error=invalid-constexpr -Wno-invalid-constexpr -Werror=uninitialized -Wno-error=maybe-uninitialized -Werror=strict-aliasing" builddir/coverage
+# Build all targets
+meson test -t 10 -C builddir/coverage
+ninja -C builddir/coverage coverage
+```
+
 ### Troubleshooting Build Issues
 
 #### sdbusplus Version Mismatch

@@ -37,9 +37,9 @@ NsmEndpoint::NsmEndpoint(sdbusplus::bus::bus& bus, const std::string& name,
     associationDefIntf->associations(associations_list);
 }
 
-static requester::Coroutine createNsmEndpoints(SensorManager& manager,
-                                               const std::string& interface,
-                                               const std::string& objPath)
+requester::Coroutine createNsmEndpoints(SensorManager& manager,
+                                        const std::string& interface,
+                                        const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(

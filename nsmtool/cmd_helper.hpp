@@ -81,50 +81,6 @@ static inline std::string bytesToHexString(const uint8_t* data, size_t len)
     return ss.str();
 }
 
-/** @brief Convert hexadecimal string into a byte array.
- *
- *  @param[in]  str - hexadecimal string to be converted
- *
- *  @return - Byte array representation of the input string.
- */
-static inline std::vector<uint8_t> hexStringToBytes(const std::string& str)
-{
-    if (str.empty())
-    {
-        return std::vector<uint8_t>();
-    }
-    size_t start = 0;
-    if (str.length() >= 2 && str.substr(0, 2) == "0x")
-    {
-        start = 2;
-    }
-    if (str.find_first_not_of("0123456789abcdefABCDEF", start) !=
-        std::string::npos)
-    {
-        std::cerr << "String contains invalid characters: " << str << std::endl;
-        return std::vector<uint8_t>();
-    }
-    if (str.length() % 2 != 0)
-    {
-        std::cerr << "String length is not even: " << str << std::endl;
-        return std::vector<uint8_t>();
-    }
-    std::vector<uint8_t> result;
-    for (size_t i = start; i < str.length(); i += 2)
-    {
-        try
-        {
-            result.push_back(std::stoi(str.substr(i, 2), nullptr, 16) & 0xFF);
-        }
-        catch (const std::exception&)
-        {
-            std::cerr << "Invalid hex value in string: " << str << std::endl;
-            return std::vector<uint8_t>();
-        }
-    }
-    return result;
-}
-
 /** @brief Display in JSON format.
  *
  *  @param[in]  data - data to print in json

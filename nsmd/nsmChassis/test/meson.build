@@ -3,10 +3,26 @@
 # All sources already compiled into nsmd_test, no need to recompile
 
 tests = [
+    'nsmAERError_test',
     'nsmChassis_test',
     'nsmChassisAssembly_test',
+    'nsmChassisLED_test',
     'nsmChassisPCIeDevice_test',
     'nsmChassisPCIeSlot_test',
+    'nsmErot_test',
+    'nsmGpuClockControl_test',
+    'nsmIRoTResponder_test',
+    'nsmLeakDetection_test',
+    'nsmNVSwitchAndNVMgmtNICChassis_test',
+    'nsmNVSwitchAndNVMgmtNICChassisAssembly_test',
+    'nsmNVSwitchChassis_test',
+    'nsmPCIeRetimer_test',
+    'nsmPowerControl_test',
+    'nsmPowerSubSystem_test',
+    'nsmProcessorModulePowerControl_test',
+    'nsmRoTProperty_test',
+    'nsmSecurityRBP_test',
+    'nsmUpdateApSkuId_test',
 ]
 
 

@@ -2,7 +2,12 @@
 # nsmFwSwInventory is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
 # All sources already compiled into nsmd_test, no need to recompile
 
-tests = ['NVLinkManagementNICSWInventory_test', 'nsmFirmwareInventory_test']
+tests = [
+    'NVLinkManagementNICSWInventory_test',
+    'nsmFirmwareInventory_test',
+    'GPUSWInventory_test',
+    'nsmWriteProtectedControl_test',
+]
 
 foreach t : tests
     test(

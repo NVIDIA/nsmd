@@ -121,6 +121,7 @@ class NsmDevice :
     NsmDevice() = default;
 
   public:
+    virtual ~NsmDevice() = default;
     /**
      * @brief Constructor for NsmDevice
      *
@@ -373,13 +374,13 @@ class NsmDevice :
         addSensorBase(sensor, pollingType);
     }
 
-    requester::Coroutine updateNsmDevice();
+    virtual requester::Coroutine updateNsmDevice();
     bool updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
                                     uint8_t deviceInstanceNumber,
                                     std::string& associatedPath,
                                     std::string& mctpMedium,
                                     std::string& mctpBinding);
-    requester::Coroutine refreshCapabilitySensor();
+    virtual requester::Coroutine refreshCapabilitySensor();
     requester::Coroutine refreshCommandMatrix();
 
     eid_t getEid()
@@ -652,16 +653,5 @@ class NsmDevice :
     ProgressCounters& progressCounters();
     DiscoveryEvents& discoveryEvents();
 };
-
-std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
-                                               const uuid_t& uuid);
-
-std::shared_ptr<NsmDevice>
-    findNsmDeviceByIdentification(NsmDeviceTable& nsmDevices,
-                                  uint8_t deviceType, uint8_t instanceNumber,
-                                  uint8_t deviceRole);
-
-int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
-                    uint8_t& deviceRole);
 
 } // namespace nsm

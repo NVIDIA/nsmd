@@ -43,9 +43,9 @@ NsmReset::NsmReset(sdbusplus::bus::bus& bus, const std::string& name,
                              processor::Reset::ResetTypes::ForceRestart);
 }
 
-static requester::Coroutine createNsmResetSensor(SensorManager& manager,
-                                                 const std::string& interface,
-                                                 const std::string& objPath)
+requester::Coroutine createNsmResetSensor(SensorManager& manager,
+                                          const std::string& interface,
+                                          const std::string& objPath)
 {
     try
     {

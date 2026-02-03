@@ -132,10 +132,9 @@ requester::Coroutine
     co_return rc;
 }
 
-static requester::Coroutine
-    createNsmChassisLEDSensor(SensorManager& manager,
-                              const std::string& interface,
-                              const std::string& objPath)
+requester::Coroutine createNsmChassisLEDSensor(SensorManager& manager,
+                                               const std::string& interface,
+                                               const std::string& objPath)
 {
     try
     {

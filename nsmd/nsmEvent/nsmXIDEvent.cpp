@@ -133,9 +133,9 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
     return NSM_SW_SUCCESS;
 }
 
-static requester::Coroutine createNsmXIDEvent(SensorManager& manager,
-                                              const std::string& interface,
-                                              const std::string& objPath)
+requester::Coroutine createNsmXIDEvent(SensorManager& manager,
+                                       const std::string& interface,
+                                       const std::string& objPath)
 {
     NsmEventInfo info{};
 

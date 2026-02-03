@@ -109,7 +109,7 @@ requester::Coroutine NsmGPUSWInventoryDriverVersionAndStatus::update(
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     enum8 driverState = 0;
-    std::string driverVersion("", MAX_VERSION_STRING_SIZE);
+    std::string driverVersion(MAX_VERSION_STRING_SIZE, '\0');
 
     rc = decode_get_driver_info_resp(responseMsg.get(), responseLen, &cc,
                                      &reasonCode, &driverState,
@@ -140,9 +140,9 @@ requester::Coroutine NsmGPUSWInventoryDriverVersionAndStatus::update(
     co_return cc ? cc : rc;
 }
 
-static requester::Coroutine createGPUDriverSensor(SensorManager& manager,
-                                                  const std::string& interface,
-                                                  const std::string& objPath)
+requester::Coroutine createGPUDriverSensor(SensorManager& manager,
+                                           const std::string& interface,
+                                           const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(

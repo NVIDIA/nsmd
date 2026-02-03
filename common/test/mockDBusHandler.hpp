@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "types.hpp"
 #include "utils.hpp"
 
 #include <gmock/gmock.h>
@@ -27,40 +28,43 @@ namespace utils
 
 struct MockDbusAsync
 {
-    struct DbusPropsMap :
-        std::map<std::string, std::map<DbusProp, PropertyValue>>
-    {
-        void push(const std::string& objPath,
-                  const std::pair<DbusProp, PropertyValue>& property)
-        {
-            (*this)[objPath][property.first] = property.second;
-        }
-    };
-
     /** @brief Get the values reference for gtest. */
-    static auto& getValues()
-    {
-        static DbusPropsMap values{};
-        return values;
-    }
+    static dbus::ObjectValueTree& dbus();
 
-    static auto& getServiceMap()
-    {
-        static MapperServiceMap map{};
-        return map;
-    }
+    /** @brief Get the service map reference for gtest. */
+    static MapperServiceMap& serviceMap();
 
-    static auto& getPropertyMap()
-    {
-        static dbus::PropertyMap propertyMap{};
-        return propertyMap;
-    }
+    /** @brief Creates empty property map reference for gtest for a given object
+     * path.
+     *
+     * @param objPath - The D-Bus object path
+     * @param interface - The D-Bus interface
+     *
+     * @return The property map reference for the given object path
+     */
+    static dbus::PropertyMap& propertyMap(const dbus::ObjectPath& objPath,
+                                          const dbus::Interface& interface);
 
-    static auto& getLogEventSuccess()
-    {
-        static bool logEventSuccess = true; // Default to success for tests
-        return logEventSuccess;
-    }
+    /** @brief Find a property map in the mock DBus data structure
+     *
+     * @param[in] objPath - The D-Bus object path
+     * @param[in] interface - The D-Bus interface
+     * @return Pointer to the property map if found, nullptr otherwise
+     */
+    static const dbus::PropertyMap*
+        findPropertyMap(const std::string& objPath,
+                        const std::string& interface);
+
+    /** @brief Find a property value in the mock DBus data structure
+     *
+     * @param[in] objPath - The D-Bus object path
+     * @param[in] interface - The D-Bus interface
+     * @param[in] property - The property name
+     * @return Pointer to the property value if found, nullptr otherwise
+     */
+    static const dbus::Value* findProperty(const std::string& objPath,
+                                           const std::string& interface,
+                                           const std::string& property);
 };
 
 class MockDBusHandler : public IDBusHandler
@@ -74,11 +78,12 @@ class MockDBusHandler : public IDBusHandler
         return mockDBusHandler;
     }
 
-    MOCK_METHOD(std::string, getService,
-                (const char* path, const char* interface), (const, override));
-    MOCK_METHOD(MapperServiceMap, getServiceMap,
-                (const char* path, const dbus::Interfaces& ifaceList),
-                (const, override));
+    std::string getService(const char* path,
+                           const char* interface) const override;
+
+    MapperServiceMap
+        getServiceMap(const char* path,
+                      const dbus::Interfaces& ifaceList) const override;
     MOCK_METHOD(GetSubTreeResponse, getSubtree,
                 (const std::string& path, int depth,
                  const dbus::Interfaces& ifaceList),
@@ -87,35 +92,17 @@ class MockDBusHandler : public IDBusHandler
     MOCK_METHOD(void, setDbusProperty,
                 (const DBusMapping& dBusMap, const PropertyValue& value),
                 (const, override));
+    PropertyValue
+        getDbusPropertyVariant(const char* objPath, const char* dbusProp,
+                               const char* dbusInterface) const override;
 
-    MOCK_METHOD(PropertyValue, getDbusPropertyVariant,
-                (const char* objPath, const char* dbusProp,
-                 const char* dbusInterface),
-                (const, override));
-    MOCK_METHOD(PropertyValuesCollection, getDbusProperties,
-                (const char* objPath, const char* dbusInterface),
-                (const, override));
+    PropertyValuesCollection
+        getDbusProperties(const char* objPath,
+                          const char* dbusInterface) const override;
+
     MOCK_METHOD(GetAssociatedObjectsResponse, getAssociatedObjects,
                 (const std::string& path, const std::string& association),
                 (const, override));
-};
-
-struct SdBusTestError : public sdbusplus::exception::exception
-{
-    int error = 0;
-    SdBusTestError(int error) : error(error) {}
-    const char* name() const noexcept override
-    {
-        return "";
-    };
-    const char* description() const noexcept override
-    {
-        return "";
-    };
-    int get_errno() const noexcept override
-    {
-        return error;
-    };
 };
 
 class DBusTest
@@ -123,13 +110,10 @@ class DBusTest
   protected:
     MockDBusHandler& mockDBus = MockDBusHandler::instance();
 
-    static const PropertyValuesCollection::value_type
-        get(const PropertyValuesCollection& properties, const DbusProp& name);
-    template <typename T>
-    static T get(const PropertyValuesCollection& properties,
-                 const DbusProp& name)
+    virtual ~DBusTest()
     {
-        return std::get<T>(get(properties, name).second);
+        MockDbusAsync::dbus().clear();
+        MockDbusAsync::serviceMap().clear();
     }
 };
 

@@ -4,7 +4,7 @@
 # nsmDot async handler integration tests
 # nsmDot is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
 
-tests = ['nsmDotUtils_test']
+tests = ['dotErrorHandler_test', 'nsmDotUtils_test']
 
 foreach t : tests
     test(

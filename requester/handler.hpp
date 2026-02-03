@@ -20,7 +20,6 @@
 #include "config.h"
 
 #include "libnsm/base.h"
-#include "libnsm/requester/mctp.h"
 
 #include "common/types.hpp"
 #include "common/utils.hpp"

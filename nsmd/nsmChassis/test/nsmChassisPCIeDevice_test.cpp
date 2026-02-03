@@ -25,6 +25,7 @@ using namespace ::testing;
 #include "base.h"
 #include "pci-links.h"
 
+#include "nsmAERError.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmChassisPCIeDevice.hpp"
 #include "nsmClockOutputEnableState.hpp"
@@ -39,9 +40,6 @@ requester::Coroutine
     nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
                                       const std::string& interface,
                                       const std::string& objPath);
-NsmDeviceTable devices;
-std::shared_ptr<MockNsmDeviceBase> gpu;
-std::shared_ptr<MockNsmDeviceBase> fpga;
 } // namespace nsm
 
 using namespace nsm;
@@ -63,37 +61,36 @@ struct NsmChassisPCIeDeviceTest :
     const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
     const uuid_t gpuDeviceUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
 
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+    std::shared_ptr<MockNsmDevice> fpga;
+
     NsmChassisPCIeDeviceTest() : SensorManagerTest(devices)
     {
-        if (fpga)
-        {
-            fpga->staticSensors.clear();
-            fpga->deviceSensors.clear();
-            fpga->prioritySensors.clear();
-            fpga->roundRobinSensors.clear();
-        }
-        if (gpu)
-        {
-            gpu->staticSensors.clear();
-            gpu->deviceSensors.clear();
-            gpu->prioritySensors.clear();
-            gpu->roundRobinSensors.clear();
-        }
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        fpga = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(fpgaUuid));
+        EXPECT_EQ(2, devices.size());
+        EXPECT_NE(gpu, nullptr);
+        EXPECT_NE(fpga, nullptr);
+        EXPECT_EQ(NSM_DEV_ID_GPU, gpu->getDeviceType());
+        EXPECT_EQ(NSM_DEV_ID_BASEBOARD, fpga->getDeviceType());
     }
 
-    const PropertyValuesCollection error = {
+    dbus::PropertyMap error = {
         {"Type", "NSM_ChassispCIeDevice"},
     };
-    const PropertyValuesCollection basic = {
+    dbus::PropertyMap basic = {
         {"ChassisName", chassisName},      {"Name", name},
         {"Type", "NSM_ChassisPCIeDevice"}, {"UUID", gpuUuid},
         {"DEVICE_UUID", gpuDeviceUuid},
     };
-    const PropertyValuesCollection chassisAttributes = {
+    dbus::PropertyMap chassisAttributes = {
         {"Type", "NSM_Chassis_Attributes"},
         {"Name", "HGX_GPU_SXM_1"},
     };
-    const PropertyValuesCollection associations[2] = {
+    dbus::PropertyMap associations[2] = {
         {
             {"Forward", "chassis"},
             {"Backward", "pciedevice"},
@@ -107,16 +104,16 @@ struct NsmChassisPCIeDeviceTest :
              "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_0/Switches/PCIeRetimer_0/Ports/Down_0"},
         },
     };
-    const PropertyValuesCollection pcieDevice = {
+    dbus::PropertyMap pcieDevice = {
         {"Type", "NSM_PCIeDevice"},
     };
-    const PropertyValuesCollection ltssmState = {
+    dbus::PropertyMap ltssmState = {
         {"Type", "NSM_LTSSMState"},
         {"DeviceIndex", uint64_t(1)},
         {"InventoryObjPath",
          "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_0/Switches/PCIeRetimer_0/Ports/Down_0"},
     };
-    const PropertyValuesCollection clockOutputEnableState = {
+    dbus::PropertyMap clockOutputEnableState = {
         {"Type", "NSM_ClockOutputEnableState"},
         {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"InstanceNumber", uint64_t(instanceId)},
@@ -136,58 +133,56 @@ struct NsmChassisPCIeDeviceTest :
 
 TEST_F(NsmChassisPCIeDeviceTest, badTestCreateDeviceSensors)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["ChassisName"] =
-        std::get<std::string>(get(basic, "ChassisName").second);
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
 
     // Set up interface-specific properties with invalid type
-    propertyMap["Type"] = std::get<std::string>(get(error, "Type").second);
+    propertyMap["Type"] = error["Type"];
 
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(1, devices.size());
-    gpu = dynamic_pointer_cast<MockNsmDeviceBase>(devices[0]);
-    EXPECT_EQ(1, gpu->deviceSensors.size());
+    EXPECT_EQ(2, devices.size());
+    EXPECT_EQ(1, gpu->deviceSensors.size());     // Only msgTypes sensor
     EXPECT_EQ(0, gpu->prioritySensors.size());
-    EXPECT_EQ(1, gpu->roundRobinSensors.size());
+    EXPECT_EQ(1, gpu->roundRobinSensors.size()); // Only msgTypes sensor
 }
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 {
-    auto& map = utils::MockDbusAsync::getServiceMap();
+    auto& map = utils::MockDbusAsync::serviceMap();
     map = gpuServiceMap;
 
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["ChassisName"] =
-        std::get<std::string>(get(basic, "ChassisName").second);
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
 
     // First call: NSM_ChassisPCIeDevice
-    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
-    propertyMap["DEVICE_UUID"] =
-        std::get<uuid_t>(get(basic, "DEVICE_UUID").second);
-    propertyMap["Forward"] =
-        std::get<std::string>(get(associations[0], "Forward").second);
-    propertyMap["Backward"] =
-        std::get<std::string>(get(associations[0], "Backward").second);
-    propertyMap["AbsolutePath"] =
-        std::get<std::string>(get(associations[0], "AbsolutePath").second);
+    propertyMap["Type"] = basic["Type"];
+    propertyMap["DEVICE_UUID"] = basic["DEVICE_UUID"];
+
+    auto& propertyMapAssociation0 = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".Associations0");
+    propertyMapAssociation0 = associations[0];
+    auto& propertyMapAssociation1 = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".Associations1");
+    propertyMapAssociation1 = associations[1];
+
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
 
-    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(2, devices.size());
     EXPECT_EQ(0, gpu->prioritySensors.size());
     EXPECT_EQ(2, gpu->staticSensors.size());
-    EXPECT_EQ(0, gpu->roundRobinSensors.size());
-    EXPECT_EQ(2, gpu->deviceSensors.size());
+    EXPECT_EQ(1, gpu->roundRobinSensors.size()); // msgTypes sensor
+    EXPECT_EQ(3, gpu->deviceSensors.size());     // msgTypes + 2 others
 
-    auto sensor = 0;
+    auto sensor = 1; // Skip msgTypes sensor at index 0
     auto uuidObject = dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
         gpu->deviceSensors[sensor++]);
     auto associationsObject =
@@ -203,53 +198,55 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["ChassisName"] =
-        std::get<std::string>(get(basic, "ChassisName").second);
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+    basePropertyMap["ChassisName"] = basic["ChassisName"];
+    basePropertyMap["Name"] = basic["Name"];
+    basePropertyMap["UUID"] = basic["UUID"];
 
     // First call: NSM_Chassis_Attributes
-    propertyMap["Type"] =
-        std::get<std::string>(get(chassisAttributes, "Type").second);
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMap["Type"] = chassisAttributes["Type"];
     nsmChassisPCIeDeviceCreateSensors(
         mockManager, basicIntfName + ".ChassisAttributes", objPath);
 
     // Second call: NSM_PCIeDevice
-    propertyMap["Type"] = std::get<std::string>(get(pcieDevice, "Type").second);
+    auto& propertyMapPCIe = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".PCIeDevice");
+    propertyMapPCIe["Type"] = pcieDevice["Type"];
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".PCIeDevice", objPath);
 
     // Third call: NSM_LTSSMState
-    propertyMap["Type"] = std::get<std::string>(get(ltssmState, "Type").second);
-    propertyMap["DeviceIndex"] =
-        std::get<uint64_t>(get(ltssmState, "DeviceIndex").second);
-    propertyMap["InventoryObjPath"] =
-        std::get<std::string>(get(ltssmState, "InventoryObjPath").second);
+    auto& propertyMapLTSSM = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".LTSSMState");
+    propertyMapLTSSM["Type"] = ltssmState["Type"];
+    propertyMapLTSSM["DeviceIndex"] = ltssmState["DeviceIndex"];
+    propertyMapLTSSM["InventoryObjPath"] = ltssmState["InventoryObjPath"];
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".LTSSMState", objPath);
 
     // Fourth call: NSM_ClockOutputEnableState
-    propertyMap["Type"] =
-        std::get<std::string>(get(clockOutputEnableState, "Type").second);
-    propertyMap["DeviceType"] =
-        std::get<uint64_t>(get(clockOutputEnableState, "DeviceType").second);
-    propertyMap["InstanceNumber"] = std::get<uint64_t>(
-        get(clockOutputEnableState, "InstanceNumber").second);
+    auto& propertyMapClock = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".NSM_ClockOutputEnableState");
+    propertyMapClock["Type"] = clockOutputEnableState["Type"];
+    propertyMapClock["DeviceType"] = clockOutputEnableState["DeviceType"];
+    propertyMapClock["InstanceNumber"] =
+        clockOutputEnableState["InstanceNumber"];
     nsmChassisPCIeDeviceCreateSensors(
         mockManager, basicIntfName + ".NSM_ClockOutputEnableState", objPath);
 
-    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(2, devices.size());
     EXPECT_EQ(0, gpu->prioritySensors.size());
     EXPECT_EQ(5, gpu->staticSensors.size());
-    EXPECT_EQ(5, gpu->roundRobinSensors.size());
-    EXPECT_EQ(10, gpu->deviceSensors.size());
+    EXPECT_EQ(6, gpu->roundRobinSensors.size()); // msgTypes + 5 others
+    EXPECT_EQ(11, gpu->deviceSensors.size());    // msgTypes + 10 others
 
-    auto sensors = 0;
-    // Asset sensors (indices 0-2: partNumber, serialNumber, model)
+    auto sensors = 1; // Skip msgTypes sensor at index 0
+    // Asset sensors (indices 1-3: partNumber, serialNumber, model)
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         gpu->deviceSensors[sensors++]);
     auto serialNumber =
@@ -258,30 +255,30 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         gpu->deviceSensors[sensors++]);
 
-    // Health sensor (index 3)
+    // Health sensor (index 4)
     auto healthObject = dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
         gpu->deviceSensors[sensors++]);
 
-    // PCIeDevice sensor (index 4)
+    // PCIeDevice sensor (index 5)
     auto pcieDeviceObject =
         dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
             gpu->deviceSensors[sensors++]);
 
-    // Function sensor (index 5)
+    // Function sensor (index 6)
     auto functionSensor =
         dynamic_pointer_cast<NsmPCIeFunction>(gpu->deviceSensors[sensors++]);
     sensors++;
 
-    // LTSSMState sensor (index 7)
+    // LTSSMState sensor (index 8)
     auto ltssmStateSensor =
         dynamic_pointer_cast<NsmPCIeLTSSMState>(gpu->deviceSensors[sensors++]);
 
-    // PCIeRefClock sensor (index 8)
+    // PCIeRefClock sensor (index 9)
     auto pcieRefClock =
         dynamic_pointer_cast<NsmClockOutputEnableState<PCIeRefClockIntf>>(
             gpu->deviceSensors[sensors++]);
 
-    // NVLinkRefClock sensor (index 9)
+    // NVLinkRefClock sensor (index 10)
     auto nvLinkRefClock =
         dynamic_pointer_cast<NsmClockOutputEnableState<NVLinkRefClockIntf>>(
             gpu->deviceSensors[sensors++]);
@@ -307,7 +304,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(PCIE_DEVICE_TYPE_SINGLE_FUNCTION,
               PCIeDeviceIntf::convertDeviceTypesToString(
                   pcieDeviceObject->invoke(pdiMethod(deviceType))));
-    EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),
+    EXPECT_EQ(std::get<uint64_t>(ltssmState["DeviceIndex"]),
               ltssmStateSensor->deviceIndex);
     EXPECT_EQ(PCIE_CLKBUF_INDEX, pcieRefClock->bufferIndex);
     EXPECT_EQ(NVHS_CLKBUF_INDEX, nvLinkRefClock->bufferIndex);
@@ -649,4 +646,697 @@ TEST_F(NsmPCIeLTSSMStateTest, badTestCompletionErrorResponse)
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(LTSSMStateIntf::State::NA, sensor->invoke(pdiMethod(ltssmState)));
+}
+
+#ifdef ENABLE_PCIE_AER_ERROR
+
+struct NsmAERErrorTest : public NsmPCIeDeviceTest
+{
+    std::string aerObjPath;
+    std::shared_ptr<NsmAERErrorStatusIntf> aerIntf;
+    std::shared_ptr<NsmPCIeAERErrorStatus> sensor;
+
+    void SetUp() override
+    {
+        // Use unique path for each test to avoid D-Bus conflicts
+        static int testCounter = 0;
+        aerObjPath = std::string(chassisInventoryBasePath / chassisName /
+                                 "PCIeDevices" / name) +
+                     "_aer_test_" + std::to_string(testCounter++);
+        aerIntf = std::make_shared<NsmAERErrorStatusIntf>(
+            utils::DBusHandler::getBus(), aerObjPath.c_str(), 0, gpu);
+        sensor = std::make_shared<NsmPCIeAERErrorStatus>(
+            name, "PCIeAerErrorStatus", aerIntf, 0);
+        EXPECT_NE(sensor, nullptr);
+        EXPECT_EQ(sensor->getName(), name);
+        EXPECT_EQ(sensor->getType(), "PCIeAerErrorStatus");
+        EXPECT_EQ(sensor->deviceIndex, 0);
+    }
+
+    void TearDown() override
+    {
+        sensor.reset();
+        aerIntf.reset();
+    }
+
+    void testRequest()
+    {
+        auto request = sensor->genRequestMsg(eid, instanceId);
+        EXPECT_TRUE(request.has_value());
+        EXPECT_EQ(request.value().size(),
+                  sizeof(nsm_msg_hdr) +
+                      sizeof(nsm_query_scalar_group_telemetry_v1_req));
+        auto requestPtr =
+            reinterpret_cast<struct nsm_msg*>(request.value().data());
+        uint8_t deviceId = 0;
+        uint8_t groupId = 0;
+        auto rc = decode_query_scalar_group_telemetry_v1_req(
+            requestPtr, request.value().size(), &deviceId, &groupId);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        EXPECT_EQ(deviceId, 0);
+        EXPECT_EQ(groupId, GROUP_ID_9);
+    }
+
+    void testResponse(uint32_t uncorrectable, uint32_t correctable)
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_9_resp));
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        nsm_query_scalar_group_telemetry_group_9 data{uncorrectable,
+                                                      correctable};
+        auto rc = encode_query_scalar_group_telemetry_v1_group9_resp(
+            instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        rc = sensor->handleResponseMsg(responseMsg, response.size());
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    }
+};
+
+TEST_F(NsmAERErrorTest, goodTestConstructor)
+{
+    EXPECT_EQ(sensor->deviceIndex, 0);
+}
+
+TEST_F(NsmAERErrorTest, goodTestRequest)
+{
+    testRequest();
+}
+
+TEST_F(NsmAERErrorTest, goodTestResponse)
+{
+    uint32_t uncorrectable = 0x12345678;
+    uint32_t correctable = 0x9ABCDEF0;
+    testResponse(uncorrectable, correctable);
+
+    EXPECT_STREQ(aerIntf->aerUncorrectableErrorStatus().c_str(), "0x12345678");
+    EXPECT_STREQ(aerIntf->aerCorrectableErrorStatus().c_str(), "0x9ABCDEF0");
+}
+
+TEST_F(NsmAERErrorTest, goodTestResponseZeroValues)
+{
+    testResponse(0, 0);
+    EXPECT_STREQ(aerIntf->aerUncorrectableErrorStatus().c_str(), "0x00000000");
+    EXPECT_STREQ(aerIntf->aerCorrectableErrorStatus().c_str(), "0x00000000");
+}
+
+TEST_F(NsmAERErrorTest, goodTestResponseMaxValues)
+{
+    testResponse(0xFFFFFFFF, 0xFFFFFFFF);
+    EXPECT_STREQ(aerIntf->aerUncorrectableErrorStatus().c_str(), "0xFFFFFFFF");
+    EXPECT_STREQ(aerIntf->aerCorrectableErrorStatus().c_str(), "0xFFFFFFFF");
+}
+
+TEST_F(NsmAERErrorTest, badTestResponseSize)
+{
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_scalar_group_telemetry_group_9) -
+        1);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmAERErrorTest, badTestCompletionErrorResponse)
+{
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_9_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    nsm_query_scalar_group_telemetry_group_9 data{0, 0};
+    auto rc = encode_query_scalar_group_telemetry_v1_group9_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto resp = reinterpret_cast<
+        struct nsm_query_scalar_group_telemetry_v1_group_9_resp*>(
+        responseMsg->payload);
+    resp->hdr.completion_code = NSM_ERROR;
+    response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_ERROR);
+}
+
+TEST_F(NsmAERErrorTest, goodTestLinkAerStatusSensor)
+{
+    aerIntf->linkAerStatusSensor(sensor);
+    EXPECT_EQ(aerIntf->aerStatusSensor, sensor);
+}
+
+#endif // ENABLE_PCIE_AER_ERROR
+
+struct NsmPCIeLTSSMStateStandaloneTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    eid_t eid = 0;
+    uint8_t instanceId = 0;
+    const std::string name = "PCIeDevice1";
+    const std::string type = "NSM_PCIeLTSSMState";
+    const std::string objPath = "/xyz/openbmc_project/inventory/system/chassis/"
+                                "HGX_GPU_SXM_1/PCIeDevices/PCIeDevice1";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<NsmPCIeLTSSMState> sensor;
+
+    NsmPCIeLTSSMStateStandaloneTest() : SensorManagerTest(devices) {}
+
+    void SetUp() override
+    {
+        uint8_t deviceIndex = 0;
+        NsmInterfaceProvider<LTSSMStateIntf> provider(name, type, objPath);
+        sensor = std::make_shared<NsmPCIeLTSSMState>(provider, deviceIndex);
+        EXPECT_NE(sensor, nullptr);
+        EXPECT_EQ(sensor->getName(), name);
+        EXPECT_EQ(sensor->getType(), type);
+        EXPECT_EQ(sensor->deviceIndex, deviceIndex);
+    }
+
+    void testRequest()
+    {
+        auto request = sensor->genRequestMsg(eid, instanceId);
+        EXPECT_TRUE(request.has_value());
+        EXPECT_EQ(request.value().size(),
+                  sizeof(nsm_msg_hdr) +
+                      sizeof(nsm_query_scalar_group_telemetry_v1_req));
+        auto requestPtr =
+            reinterpret_cast<struct nsm_msg*>(request.value().data());
+        uint8_t deviceIndex;
+        uint8_t groupId;
+        auto rc = decode_query_scalar_group_telemetry_v1_req(
+            requestPtr, request.value().size(), &deviceIndex, &groupId);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        EXPECT_EQ(groupId, GROUP_ID_6);
+    }
+
+    void testResponse(uint8_t ltssmState)
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp));
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        nsm_query_scalar_group_telemetry_group_6 data = {};
+        data.ltssm_state = ltssmState;
+
+        auto rc = encode_query_scalar_group_telemetry_v1_group6_resp(
+            instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        rc = sensor->handleResponseMsg(responseMsg, response.size());
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    }
+};
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestRequest)
+{
+    testRequest();
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseDetect)
+{
+    testResponse(0x0);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::Detect);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponsePolling)
+{
+    testResponse(0x1);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::Polling);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseConfiguration)
+{
+    testResponse(0x2);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::Configuration);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseRecovery)
+{
+    testResponse(0x3);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::Recovery);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseRecoveryEQ)
+{
+    testResponse(0x4);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::RecoveryEQ);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseL0)
+{
+    testResponse(0x5);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)), LTSSMStateIntf::State::L0);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseL0s)
+{
+    testResponse(0x6);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::L0s);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseL1)
+{
+    testResponse(0x7);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)), LTSSMStateIntf::State::L1);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseL1_PLL_PD)
+{
+    testResponse(0x8);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::L1_PLL_PD);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseL2)
+{
+    testResponse(0x9);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)), LTSSMStateIntf::State::L2);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseL1_CPM)
+{
+    testResponse(0xA);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::L1_CPM);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseL1_1)
+{
+    testResponse(0xB);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::L1_1);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseL1_2)
+{
+    testResponse(0xC);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::L1_2);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseHotReset)
+{
+    testResponse(0xD);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::HotReset);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseLoopback)
+{
+    testResponse(0xE);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::Loopback);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseDisabled)
+{
+    testResponse(0xF);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::Disabled);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseLinkDown)
+{
+    testResponse(0x10);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::LinkDown);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseLinkReady)
+{
+    testResponse(0x11);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::LinkReady);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseLanesInSleep)
+{
+    testResponse(0x12);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::LanesInSleep);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestResponseIllegalState)
+{
+    testResponse(0xFF);
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)),
+              LTSSMStateIntf::State::IllegalState);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, badTestResponseSize)
+{
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp) - 1);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, badTestCompletionErrorResponse)
+{
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    nsm_query_scalar_group_telemetry_group_6 data = {};
+    data.ltssm_state = 0x5; // L0
+
+    auto rc = encode_query_scalar_group_telemetry_v1_group6_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto resp = reinterpret_cast<
+        struct nsm_query_scalar_group_telemetry_v1_group_6_resp*>(
+        responseMsg->payload);
+    resp->hdr.completion_code = NSM_ERROR;
+    response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_ERROR);
+    // When error, state should be NA
+    EXPECT_EQ(sensor->invoke(pdiMethod(ltssmState)), LTSSMStateIntf::State::NA);
+}
+
+TEST_F(NsmPCIeLTSSMStateStandaloneTest, goodTestMultipleDeviceIndices)
+{
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        // Use unique path for each sensor to avoid D-Bus conflicts
+        std::filesystem::path uniquePath = objPath + "_dev" + std::to_string(i);
+        NsmInterfaceProvider<LTSSMStateIntf> provider(name, type, uniquePath);
+        auto testSensor = std::make_shared<NsmPCIeLTSSMState>(provider, i);
+        EXPECT_EQ(testSensor->deviceIndex, i);
+    }
+}
+
+struct NsmClockOutputEnableStateStandaloneTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    eid_t eid = 0;
+    uint8_t instanceId = 0;
+    const std::string name = "GPU_SXM_1";
+    const std::string type = "NSM_ClockOutputEnableState";
+    const std::string objPath = "/xyz/openbmc_project/inventory/system/chassis/"
+                                "HGX_GPU_SXM_1";
+
+    NsmDeviceTable devices;
+
+    NsmClockOutputEnableStateStandaloneTest() : SensorManagerTest(devices) {}
+
+    void testRequest(std::shared_ptr<NsmClockOutputEnableStateBase> sensor,
+                     uint8_t expectedIndex)
+    {
+        auto request = sensor->genRequestMsg(eid, instanceId);
+        EXPECT_TRUE(request.has_value());
+        EXPECT_EQ(request.value().size(),
+                  sizeof(nsm_msg_hdr) +
+                      sizeof(nsm_get_clock_output_enabled_state_req));
+        auto requestPtr =
+            reinterpret_cast<struct nsm_msg*>(request.value().data());
+        uint8_t bufferIndex;
+        auto rc = decode_get_clock_output_enable_state_req(
+            requestPtr, request.value().size(), &bufferIndex);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        EXPECT_EQ(bufferIndex, expectedIndex);
+    }
+
+    template <typename DataType>
+    void testResponse(std::shared_ptr<NsmClockOutputEnableStateBase> sensor,
+                      const DataType& data)
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_get_clock_output_enabled_state_resp));
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+        uint32_t rawData;
+        memcpy(&rawData, &data, sizeof(uint32_t));
+
+        auto rc = encode_get_clock_output_enable_state_resp(
+            instanceId, NSM_SUCCESS, ERR_NULL, rawData, responseMsg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        rc = sensor->handleResponseMsg(responseMsg, response.size());
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    }
+};
+
+TEST_F(NsmClockOutputEnableStateStandaloneTest, goodTestPCIeRefClockGpuRequest)
+{
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        NsmInterfaceProvider<PCIeRefClockIntf> provider(name, type, objPath);
+        auto sensor =
+            std::make_shared<NsmClockOutputEnableState<PCIeRefClockIntf>>(
+                provider, PCIE_CLKBUF_INDEX, NSM_DEV_ID_GPU, i, false);
+        EXPECT_NE(sensor, nullptr);
+        testRequest(sensor, PCIE_CLKBUF_INDEX);
+    }
+}
+
+TEST_F(NsmClockOutputEnableStateStandaloneTest, goodTestPCIeRefClockGpuResponse)
+{
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        NsmInterfaceProvider<PCIeRefClockIntf> provider(name, type, objPath);
+        auto sensor =
+            std::make_shared<NsmClockOutputEnableState<PCIeRefClockIntf>>(
+                provider, PCIE_CLKBUF_INDEX, NSM_DEV_ID_GPU, i, false);
+
+        nsm_pcie_clock_buffer_data data = {};
+        // Set the corresponding GPU clock buffer bit
+        switch (i)
+        {
+            case 0:
+                data.clk_buf_gpu1 = 1;
+                break;
+            case 1:
+                data.clk_buf_gpu2 = 1;
+                break;
+            case 2:
+                data.clk_buf_gpu3 = 1;
+                break;
+            case 3:
+                data.clk_buf_gpu4 = 1;
+                break;
+            case 4:
+                data.clk_buf_gpu5 = 1;
+                break;
+            case 5:
+                data.clk_buf_gpu6 = 1;
+                break;
+            case 6:
+                data.clk_buf_gpu7 = 1;
+                break;
+            case 7:
+                data.clk_buf_gpu8 = 1;
+                break;
+        }
+
+        testResponse(sensor, data);
+        EXPECT_TRUE(sensor->invoke(pdiMethod(pcIeReferenceClockEnabled)));
+    }
+}
+
+TEST_F(NsmClockOutputEnableStateStandaloneTest,
+       goodTestPCIeRefClockSwitchResponse)
+{
+    for (uint8_t i = 0; i < 2; i++)
+    {
+        NsmInterfaceProvider<PCIeRefClockIntf> provider(name, type, objPath);
+        auto sensor =
+            std::make_shared<NsmClockOutputEnableState<PCIeRefClockIntf>>(
+                provider, PCIE_CLKBUF_INDEX, NSM_DEV_ID_SWITCH, i, false);
+
+        nsm_pcie_clock_buffer_data data = {};
+        if (i == 0)
+        {
+            data.clk_buf_nvSwitch_1 = 1;
+        }
+        else
+        {
+            data.clk_buf_nvSwitch_2 = 1;
+        }
+
+        testResponse(sensor, data);
+        EXPECT_TRUE(sensor->invoke(pdiMethod(pcIeReferenceClockEnabled)));
+    }
+}
+
+TEST_F(NsmClockOutputEnableStateStandaloneTest,
+       goodTestPCIeRefClockRetimerResponse)
+{
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        NsmInterfaceProvider<PCIeRefClockIntf> provider(name, type, objPath);
+        auto sensor =
+            std::make_shared<NsmClockOutputEnableState<PCIeRefClockIntf>>(
+                provider, PCIE_CLKBUF_INDEX, NSM_DEV_ID_BASEBOARD, i, true);
+
+        nsm_pcie_clock_buffer_data data = {};
+        switch (i)
+        {
+            case 0:
+                data.clk_buf_retimer1 = 1;
+                break;
+            case 1:
+                data.clk_buf_retimer2 = 1;
+                break;
+            case 2:
+                data.clk_buf_retimer3 = 1;
+                break;
+            case 3:
+                data.clk_buf_retimer4 = 1;
+                break;
+            case 4:
+                data.clk_buf_retimer5 = 1;
+                break;
+            case 5:
+                data.clk_buf_retimer6 = 1;
+                break;
+            case 6:
+                data.clk_buf_retimer7 = 1;
+                break;
+            case 7:
+                data.clk_buf_retimer8 = 1;
+                break;
+        }
+
+        testResponse(sensor, data);
+        EXPECT_TRUE(sensor->invoke(pdiMethod(pcIeReferenceClockEnabled)));
+    }
+}
+
+TEST_F(NsmClockOutputEnableStateStandaloneTest,
+       goodTestNVLinkRefClockGpuResponse)
+{
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        NsmInterfaceProvider<NVLinkRefClockIntf> provider(name, type, objPath);
+        auto sensor =
+            std::make_shared<NsmClockOutputEnableState<NVLinkRefClockIntf>>(
+                provider, NVHS_CLKBUF_INDEX, NSM_DEV_ID_GPU, i, false);
+
+        nsm_nvhs_clock_buffer_data data = {};
+        switch (i)
+        {
+            case 0:
+                data.clk_buf_sxm_nvhs1 = 1;
+                break;
+            case 1:
+                data.clk_buf_sxm_nvhs2 = 1;
+                break;
+            case 2:
+                data.clk_buf_sxm_nvhs3 = 1;
+                break;
+            case 3:
+                data.clk_buf_sxm_nvhs4 = 1;
+                break;
+            case 4:
+                data.clk_buf_sxm_nvhs5 = 1;
+                break;
+            case 5:
+                data.clk_buf_sxm_nvhs6 = 1;
+                break;
+            case 6:
+                data.clk_buf_sxm_nvhs7 = 1;
+                break;
+            case 7:
+                data.clk_buf_sxm_nvhs8 = 1;
+                break;
+        }
+
+        testResponse(sensor, data);
+        EXPECT_TRUE(sensor->invoke(pdiMethod(nvLinkReferenceClockEnabled)));
+    }
+}
+
+TEST_F(NsmClockOutputEnableStateStandaloneTest,
+       goodTestNVLinkRefClockSwitchResponse)
+{
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        NsmInterfaceProvider<NVLinkRefClockIntf> provider(name, type, objPath);
+        auto sensor =
+            std::make_shared<NsmClockOutputEnableState<NVLinkRefClockIntf>>(
+                provider, NVHS_CLKBUF_INDEX, NSM_DEV_ID_SWITCH, i, false);
+
+        nsm_nvhs_clock_buffer_data data = {};
+        switch (i)
+        {
+            case 0:
+                data.clk_buf_nvSwitch_nvhs1 = 1;
+                break;
+            case 1:
+                data.clk_buf_nvSwitch_nvhs2 = 1;
+                break;
+            case 2:
+                data.clk_buf_nvSwitch_nvhs3 = 1;
+                break;
+            case 3:
+                data.clk_buf_nvSwitch_nvhs4 = 1;
+                break;
+        }
+
+        testResponse(sensor, data);
+        EXPECT_TRUE(sensor->invoke(pdiMethod(nvLinkReferenceClockEnabled)));
+    }
+}
+
+TEST_F(NsmClockOutputEnableStateStandaloneTest, badTestResponseSize)
+{
+    NsmInterfaceProvider<PCIeRefClockIntf> provider(name, type, objPath);
+    auto sensor = std::make_shared<NsmClockOutputEnableState<PCIeRefClockIntf>>(
+        provider, PCIE_CLKBUF_INDEX, NSM_DEV_ID_GPU, 0, false);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_clock_output_enabled_state_resp) -
+        1);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmClockOutputEnableStateStandaloneTest, badTestCompletionErrorResponse)
+{
+    NsmInterfaceProvider<PCIeRefClockIntf> provider(name, type, objPath);
+    auto sensor = std::make_shared<NsmClockOutputEnableState<PCIeRefClockIntf>>(
+        provider, PCIE_CLKBUF_INDEX, NSM_DEV_ID_GPU, 0, false);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_clock_output_enabled_state_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint32_t data = 0;
+
+    auto rc = encode_get_clock_output_enable_state_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto resp =
+        reinterpret_cast<struct nsm_get_clock_output_enabled_state_resp*>(
+            responseMsg->payload);
+    resp->hdr.completion_code = NSM_ERROR;
+    response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_ERROR);
+}
+
+TEST_F(NsmClockOutputEnableStateStandaloneTest, goodTestDisabledClockResponse)
+{
+    NsmInterfaceProvider<PCIeRefClockIntf> provider(name, type, objPath);
+    auto sensor = std::make_shared<NsmClockOutputEnableState<PCIeRefClockIntf>>(
+        provider, PCIE_CLKBUF_INDEX, NSM_DEV_ID_GPU, 0, false);
+
+    nsm_pcie_clock_buffer_data data = {};
+    data.clk_buf_gpu1 = 0; // Disabled
+
+    testResponse(sensor, data);
+    EXPECT_FALSE(sensor->invoke(pdiMethod(pcIeReferenceClockEnabled)));
 }

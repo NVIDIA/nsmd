@@ -964,9 +964,9 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
     co_return NSM_SW_SUCCESS;
 }
 
-static requester::Coroutine createNsmGraceSpi(SensorManager& manager,
-                                              const std::string& interface,
-                                              const std::string& objPath)
+requester::Coroutine createNsmGraceSpi(SensorManager& manager,
+                                       const std::string& interface,
+                                       const std::string& objPath)
 {
     try
     {

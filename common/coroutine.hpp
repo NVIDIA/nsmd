@@ -47,6 +47,10 @@ struct Coroutine
          */
         uint8_t data;
 
+        /** @brief For holding exception if any.
+         */
+        std::exception_ptr exception;
+
         bool detached = false;
 
         /** @brief Get the return object object
@@ -121,6 +125,7 @@ struct Coroutine
             {
                 lg2::error("Caught unknown exception in coroutine");
             }
+            exception = std::current_exception();
         }
 
         /** @brief Keeping the value returned by co_return operator
@@ -148,12 +153,30 @@ struct Coroutine
         return done();
     }
 
+    /** @brief Get the exception if any.
+     *
+     * @return The exception if any.
+     */
+    std::exception_ptr exception() const noexcept
+    {
+        return handle ? handle.promise().exception : nullptr;
+    }
+
+    /** @brief Get the data returned by the coroutine.
+     *
+     * @return The data returned by the coroutine.
+     */
+    uint8_t data() const noexcept
+    {
+        return handle ? std::move(handle.promise().data) : 0;
+    }
+
     /** @brief Called by co_await operator to get return value when coroutine
      * finished.
      */
     uint8_t await_resume() const noexcept
     {
-        return handle ? std::move(handle.promise().data) : 0;
+        return data();
     }
 
     /** @brief Called when the coroutine itself is being suspended. The
@@ -259,6 +282,8 @@ struct Coroutine
 
         // Assign the new coroutine
         handle = co.handle;
+        co.handle = nullptr; // transfer ownership, prevent ~Coroutine() from
+                             // destroying the suspended frame
         return true;
     }
 };

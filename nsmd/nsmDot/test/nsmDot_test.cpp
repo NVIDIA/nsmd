@@ -25,11 +25,12 @@
 #include "nsmDot.hpp"
 #include "test/mockSensorManager.hpp"
 
-#include <fcntl.h>
-#include <unistd.h>
-
-#include <cstring>
-#include <vector>
+namespace nsm
+{
+requester::Coroutine createNsmDot(SensorManager& manager,
+                                  const std::string& interface,
+                                  const std::string& objPath);
+} // namespace nsm
 
 using namespace nsm;
 using namespace ::testing;
@@ -69,14 +70,26 @@ int createTempFileWithData(const std::vector<uint8_t>& data)
 class NsmDotTest : public Test, public SensorManagerTest
 {
   protected:
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> mockDevice;
+
     NsmDotTest() : SensorManagerTest(devices)
     {
         uuid_t testUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
-        mockDevice = std::dynamic_pointer_cast<MockNsmDeviceBase>(
+        mockDevice = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(testUuid));
+
+        EXPECT_EQ(1, devices.size());
+        EXPECT_NE(mockDevice, nullptr);
+        EXPECT_EQ(NSM_DEV_ID_GPU, mockDevice->getDeviceType());
 
         dotObject = std::make_unique<NsmDotObject>(utils::DBusHandler::getBus(),
                                                    "test_dot", testUuid);
+    }
+
+    ~NsmDotTest()
+    {
+        cleanupDeviceSensors(devices);
     }
 
     Response createDotCAKInstallResponse(uint8_t completionCode = NSM_SUCCESS,
@@ -227,8 +240,8 @@ class NsmDotTest : public Test, public SensorManagerTest
                       ->dotCAKInstallAsyncHandler(
                           DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
                           DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
-                          false, 0, 0, statusInterface, valueInterface)
-                      .await_resume();
+                          false, 0, statusInterface, valueInterface)
+                      .data();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
 
@@ -238,7 +251,7 @@ class NsmDotTest : public Test, public SensorManagerTest
             AsyncOperationManager::getInstance()->getNewStatusValueInterface();
 
         auto rc = dotObject->bypassAsyncHandler(statusInterface, valueInterface)
-                      .await_resume();
+                      .data();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
 
@@ -267,7 +280,7 @@ class NsmDotTest : public Test, public SensorManagerTest
 
         auto rc =
             dotObject->lockAsyncHandler(params, statusInterface, valueInterface)
-                .await_resume();
+                .data();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
 
@@ -280,7 +293,7 @@ class NsmDotTest : public Test, public SensorManagerTest
                       ->unlockChallengeAsyncHandler(
                           DotActionIntf::UnlockType::OwnerUnlock,
                           statusInterface, valueInterface)
-                      .await_resume();
+                      .data();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
 
@@ -296,7 +309,7 @@ class NsmDotTest : public Test, public SensorManagerTest
                       ->unlockAsyncHandler(DotActionIntf::KeyAuthScheme::Ecdsa,
                                            ecdsaSignature, lmsSignature,
                                            statusInterface, valueInterface)
-                      .await_resume();
+                      .data();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
 
@@ -315,7 +328,7 @@ class NsmDotTest : public Test, public SensorManagerTest
                           DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
                           DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaSignature,
                           lmsSignature, statusInterface, valueInterface)
-                      .await_resume();
+                      .data();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
 
@@ -326,7 +339,7 @@ class NsmDotTest : public Test, public SensorManagerTest
 
         auto rc = dotObject
                       ->getInfoAsyncHandler(statusInterface, valueInterface)
-                      .await_resume();
+                      .data();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
 
@@ -400,7 +413,6 @@ TEST_F(NsmDotTest, ConstructorSetsInitialDOTStateToUnknown)
 
 TEST_F(NsmDotTest, DotCAKInstallSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotCAKInstallResponse()));
 
@@ -447,7 +459,6 @@ TEST_F(NsmDotTest, DotCAKInstallHybridModeWithoutLmsKey)
 
 TEST_F(NsmDotTest, DotCAKInstallAsyncHandlerSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotCAKInstallResponse()));
 
@@ -510,7 +521,6 @@ TEST_F(NsmDotTest, DotCAKInstallAsyncHandlerSendFailure)
 
 TEST_F(NsmDotTest, BypassSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotBypassResponse()));
 
@@ -521,7 +531,6 @@ TEST_F(NsmDotTest, BypassSuccess)
 
 TEST_F(NsmDotTest, BypassAsyncHandlerSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotBypassResponse()));
 
@@ -588,7 +597,6 @@ TEST_F(NsmDotTest, BypassAsyncHandlerSendFailure)
 
 TEST_F(NsmDotTest, LockAsyncHandlerSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotLockResponse()));
 
@@ -648,7 +656,6 @@ TEST_F(NsmDotTest, LockAsyncHandlerSendFailure)
 
 TEST_F(NsmDotTest, UnlockChallengeAsyncHandlerSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotUnlockChallengeResponse()));
 
@@ -713,7 +720,6 @@ TEST_F(NsmDotTest, UnlockChallengeAsyncHandlerSendFailure)
 
 TEST_F(NsmDotTest, UnlockAsyncHandlerSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotUnlockResponse()));
 
@@ -773,7 +779,6 @@ TEST_F(NsmDotTest, UnlockAsyncHandlerSendFailure)
 
 TEST_F(NsmDotTest, CAKRotateAsyncHandlerSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotCAKRotateResponse()));
 
@@ -833,7 +838,6 @@ TEST_F(NsmDotTest, CAKRotateAsyncHandlerSendFailure)
 
 TEST_F(NsmDotTest, GetInfoSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotGetInfoResponse()));
 
@@ -844,7 +848,6 @@ TEST_F(NsmDotTest, GetInfoSuccess)
 
 TEST_F(NsmDotTest, GetInfoAsyncHandlerSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotGetInfoResponse()));
 
@@ -906,7 +909,6 @@ TEST_F(NsmDotTest, GetInfoAsyncHandlerSendFailure)
 
 TEST_F(NsmDotTest, LockSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotLockResponse()));
 
@@ -926,7 +928,6 @@ TEST_F(NsmDotTest, LockSuccess)
 
 TEST_F(NsmDotTest, UnlockChallengeSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotUnlockChallengeResponse()));
 
@@ -938,7 +939,6 @@ TEST_F(NsmDotTest, UnlockChallengeSuccess)
 
 TEST_F(NsmDotTest, UnlockSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotUnlockResponse()));
 
@@ -953,7 +953,6 @@ TEST_F(NsmDotTest, UnlockSuccess)
 
 TEST_F(NsmDotTest, CAKRotateSuccess)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotCAKRotateResponse()));
 
@@ -1110,10 +1109,9 @@ TEST_F(NsmDotTest, DisableSuccess)
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotDisableResponse()));
 
-    auto path = dotObject->disable(
-        DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '0'), "",
-        DotActionIntf::UnlockMethod::OwnerUnlock, "",
-        DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '1'), "");
+    auto path = dotObject->disable(DotActionIntf::UnlockMethod::OwnerUnlock, "",
+                                   DotActionIntf::KeyAuthScheme::Ecdsa,
+                                   std::string(192, '1'), "");
 
     EXPECT_NE(path, sdbusplus::message::object_path{});
 }
@@ -1433,4 +1431,261 @@ TEST_F(NsmDotTest, RecoveryAsyncHandlerSendFailure)
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(statusInterface->status(),
               AsyncOperationStatusType::WriteFailure);
-}
+    struct NsmDotCreateTestFixture :
+        public Test,
+        public utils::DBusTest,
+        public SensorManagerTest
+    {
+        const std::string basicIntfName =
+            "xyz.openbmc_project.Configuration.NSM_DOT";
+        const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:25";
+
+        NsmDeviceTable devices;
+        std::shared_ptr<MockNsmDevice> gpu;
+
+        NsmDotCreateTestFixture() : SensorManagerTest(devices)
+        {
+            gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+                mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+            EXPECT_NE(gpu, nullptr);
+        }
+
+        ~NsmDotCreateTestFixture()
+        {
+            cleanupDeviceSensors(devices);
+        }
+    };
+
+    TEST_F(NsmDotCreateTestFixture, goodTestCreateDot)
+    {
+        dbus::PropertyMap properties = {
+            {"ChassisName", std::string("HGX_Chassis")},
+            {"UUID", gpuUuid},
+        };
+
+        auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+        propertyMap = properties;
+
+        createNsmDot(mockManager, basicIntfName, objPath);
+
+        // Should create NsmDotObject and NsmDotStatusObject
+        EXPECT_GE(gpu->staticSensors.size(), 1);
+        EXPECT_GE(gpu->roundRobinSensors.size(), 1);
+    }
+
+    TEST_F(NsmDotCreateTestFixture, badTestMissingUUID)
+    {
+        dbus::PropertyMap properties = {
+            {"ChassisName", std::string("HGX_Chassis")},
+        };
+
+        auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+        propertyMap = properties;
+
+        EXPECT_THROW_COROUTINE(
+            createNsmDot(mockManager, basicIntfName, objPath),
+            std::runtime_error);
+    }
+
+    TEST_F(NsmDotCreateTestFixture, badTestInvalidUUID)
+    {
+        dbus::PropertyMap properties = {
+            {"ChassisName", std::string("HGX_Chassis")},
+            {"UUID", std::string("INVALID:UUID:FORMAT")},
+        };
+
+        auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+        propertyMap = properties;
+
+        EXPECT_THROW_COROUTINE(
+            createNsmDot(mockManager, basicIntfName, objPath),
+            std::runtime_error);
+    }
+
+    TEST_F(NsmDotCreateTestFixture, testDotStatusObjectUpdate)
+    {
+        std::string chassisName = "TestChassis";
+        uuid_t testUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:26";
+
+        auto dotActionIntf = std::make_unique<NsmDotObject>(
+            utils::DBusHandler::getBus(), chassisName, testUuid);
+
+        NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
+                                     dotActionIntf.get(), testUuid);
+
+        // Mock DOT status response - Locked state
+        Response dotStatusResp(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_status_resp), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(dotStatusResp.data());
+
+        uint8_t status = 0x02; // DOT_STATUS_LOCKED
+
+        auto rc = encode_nsm_dot_get_status_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                 status, msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+        EXPECT_CALL(*gpu, sensorIO)
+            .WillOnce(mockSensorIO(dotStatusResp, Response{}));
+
+        rc = dotStatus.handleResponseMsg(msg, dotStatusResp.size());
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        EXPECT_EQ(dotActionIntf->dotState(), DotActionIntf::DOTStates::Locked);
+    }
+
+    TEST_F(NsmDotCreateTestFixture, testDotStatusObjectAllStates)
+    {
+        std::string chassisName = "TestChassisStates";
+        uuid_t testUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:27";
+
+        auto dotActionIntf = std::make_unique<NsmDotObject>(
+            utils::DBusHandler::getBus(), chassisName, testUuid);
+
+        NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
+                                     dotActionIntf.get(), testUuid);
+
+        // Test all DOT states
+        std::vector<std::pair<uint8_t, DotActionIntf::DOTStates>> dotStates = {
+            {0x00, DotActionIntf::DOTStates::
+                       Uninitialized}, // DOT_STATUS_UNINITIALIZED
+            {0x01, DotActionIntf::DOTStates::Volatile}, // DOT_STATUS_VOLATILE
+            {0x02, DotActionIntf::DOTStates::Locked},   // DOT_STATUS_LOCKED
+            {0x03, DotActionIntf::DOTStates::Disabled}  // DOT_STATUS_DISABLED
+        };
+
+        for (const auto& [statusByte, expectedState] : dotStates)
+        {
+            Response dotStatusResp(
+                sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_status_resp), 0);
+            auto msg = reinterpret_cast<nsm_msg*>(dotStatusResp.data());
+
+            auto rc = encode_nsm_dot_get_status_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                     statusByte, msg);
+            EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+            EXPECT_CALL(*gpu, sensorIO)
+                .WillOnce(mockSensorIO(dotStatusResp, Response{}));
+
+            rc = dotStatus.handleResponseMsg(msg, dotStatusResp.size());
+            EXPECT_EQ(rc, NSM_SW_SUCCESS);
+            EXPECT_EQ(dotActionIntf->dotState(), expectedState);
+        }
+    }
+
+    TEST_F(NsmDotCreateTestFixture, testDotStatusObjectGenRequest)
+    {
+        std::string chassisName = "TestChassisReq";
+        uuid_t testUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:28";
+
+        auto dotActionIntf = std::make_unique<NsmDotObject>(
+            utils::DBusHandler::getBus(), chassisName, testUuid);
+
+        NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
+                                     dotActionIntf.get(), testUuid);
+
+        eid_t eid = 10;
+        uint8_t instanceId = 5;
+
+        auto request = dotStatus.genRequestMsg(eid, instanceId);
+        EXPECT_TRUE(request.has_value());
+        EXPECT_EQ(request.value().size(),
+                  sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_status_req));
+    }
+
+    TEST_F(NsmDotCreateTestFixture, badTestDotStatusObjectDecodeError)
+    {
+        std::string chassisName = "TestChassisDecErr";
+        uuid_t testUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:29";
+
+        auto dotActionIntf = std::make_unique<NsmDotObject>(
+            utils::DBusHandler::getBus(), chassisName, testUuid);
+
+        NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
+                                     dotActionIntf.get(), testUuid);
+
+        // Mock invalid response (wrong size)
+        Response badResp(sizeof(nsm_msg_hdr), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(badResp.data());
+
+        auto rc = dotStatus.handleResponseMsg(msg, badResp.size());
+        EXPECT_NE(rc, NSM_SW_SUCCESS);
+    }
+
+    TEST_F(NsmDotCreateTestFixture, badTestDotStatusObjectCompletionCodeError)
+    {
+        std::string chassisName = "TestChassisCCErr";
+        uuid_t testUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:30";
+
+        auto dotActionIntf = std::make_unique<NsmDotObject>(
+            utils::DBusHandler::getBus(), chassisName, testUuid);
+
+        NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
+                                     dotActionIntf.get(), testUuid);
+
+        // Mock error response with completion code error
+        Response dotStatusResp(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_status_resp), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(dotStatusResp.data());
+
+        uint8_t status = 0x00;
+
+        auto rc = encode_nsm_dot_get_status_resp(0, NSM_ERROR, 0x9999, status,
+                                                 msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+        rc = dotStatus.handleResponseMsg(msg, dotStatusResp.size());
+        EXPECT_EQ(rc, NSM_ERROR);
+    }
+
+    TEST_F(NsmDotCreateTestFixture, testDotStatusObjectUnexpectedStatus)
+    {
+        std::string chassisName = "TestChassisUnexpected";
+        uuid_t testUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:31";
+
+        auto dotActionIntf = std::make_unique<NsmDotObject>(
+            utils::DBusHandler::getBus(), chassisName, testUuid);
+
+        NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
+                                     dotActionIntf.get(), testUuid);
+
+        // Mock unexpected status value (not 0-3)
+        Response dotStatusResp(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_status_resp), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(dotStatusResp.data());
+
+        uint8_t status = 0xFF; // Unexpected value
+
+        auto rc = encode_nsm_dot_get_status_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                 status, msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+        EXPECT_CALL(*gpu, sensorIO)
+            .WillOnce(mockSensorIO(dotStatusResp, Response{}));
+
+        rc = dotStatus.handleResponseMsg(msg, dotStatusResp.size());
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        // Should default to Uninitialized for unexpected status
+        EXPECT_EQ(dotActionIntf->dotState(),
+                  DotActionIntf::DOTStates::Uninitialized);
+    }
+
+    TEST_F(NsmDotCreateTestFixture, badTestCreateDotDeviceNotFound)
+    {
+        // Use a UUID that doesn't exist
+        uuid_t invalidUuid = "STATIC:99:99:NSM_DEVICE_INSTANCE_NUMBER:99";
+
+        dbus::PropertyMap properties = {
+            {"ChassisName", std::string("NonExistentChassis")},
+            {"UUID", invalidUuid},
+        };
+
+        auto& propertyMap = utils::MockDbusAsync::propertyMap(
+            objPath + "_notfound", basicIntfName);
+        propertyMap = properties;
+
+        EXPECT_THROW_COROUTINE(
+            createNsmDot(mockManager, basicIntfName, objPath + "_notfound"),
+            std::runtime_error);
+    }

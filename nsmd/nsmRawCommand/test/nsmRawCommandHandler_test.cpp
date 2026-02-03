@@ -27,18 +27,26 @@ using namespace nsm;
 using namespace ::testing;
 using sdbusplus::message::unix_fd;
 
-NsmDeviceTable devices;
-std::shared_ptr<MockNsmDeviceBase> mockDevice;
-
 class NsmRawCommandHandlerTest : public Test, public SensorManagerTest
 {
   protected:
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> mockDevice;
     NsmRawCommandHandlerTest() : SensorManagerTest(devices)
     {
-        mockDevice = std::dynamic_pointer_cast<MockNsmDeviceBase>(
+        mockDevice = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(
                 "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0"));
+        EXPECT_EQ(1, devices.size());
+        EXPECT_NE(mockDevice, nullptr);
+        EXPECT_EQ(NSM_DEV_ID_GPU, mockDevice->getDeviceType());
     }
+
+    ~NsmRawCommandHandlerTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+
     utils::CustomFD fd{memfd_create("nsmRawCommand", 0)};
 
     Response response(uint8_t messageType, uint8_t commandCode)
@@ -62,7 +70,7 @@ class NsmRawCommandHandlerTest : public Test, public SensorManagerTest
                                      messageType, commandCode, dup(fd),
                                      statusInterface, valueInterface,
                                      msgFormatVersion)
-                      .await_resume();
+                      .data();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
 };
@@ -77,7 +85,6 @@ TEST(NsmRawCommandHandler, InitializeTest)
 
 TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequest)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(response(0, 0)));
     auto path = NsmRawCommandHandler::getInstance().sendRequest(
@@ -141,7 +148,6 @@ TEST_F(NsmRawCommandHandlerTest, BadTestDecodeError)
 
 TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequestV2Format)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(response(0, 0)));
     auto path = NsmRawCommandHandler::getInstance().sendRequest(
@@ -151,7 +157,6 @@ TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequestV2Format)
 
 TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequestV2FormatViaDoSend)
 {
-    testing::Mock::AllowLeak(mockDevice.get());
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(response(0, 0)));
     const auto [rc, statusInterface, valueInterface] = sendRequest(0, 0, 0, 0,

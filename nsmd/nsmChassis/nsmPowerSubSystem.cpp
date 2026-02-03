@@ -54,9 +54,9 @@ NsmPowerPowerSupply::NsmPowerPowerSupply(
     powerSupplyIntf = std::make_unique<PowerSupplyIntf>(bus, path.c_str());
 }
 
-static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
-                                                 const std::string& interface,
-                                                 const std::string& objPath)
+requester::Coroutine createPowerSubSystem(SensorManager& manager,
+                                          const std::string& interface,
+                                          const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
@@ -93,7 +93,7 @@ static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
     {
         // cannot found a nsmDevice for the sensor
         lg2::error(
-            "The UUID of CreatePowerSubSystem PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
+            "The UUID of createPowerSubSystem PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
         // coverity[missing_return]
         co_return NSM_ERROR;
@@ -111,5 +111,5 @@ static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
 }
 
 REGISTER_NSM_CREATION_FUNCTION(
-    CreatePowerSubSystem, "xyz.openbmc_project.Configuration.NSM_PowerSupply")
+    createPowerSubSystem, "xyz.openbmc_project.Configuration.NSM_PowerSupply")
 } // namespace nsm

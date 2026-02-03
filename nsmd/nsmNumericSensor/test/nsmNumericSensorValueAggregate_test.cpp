@@ -22,7 +22,6 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include <gmock/gmock.h>
@@ -87,23 +86,24 @@ TEST_F(NsmNumericSensorValueAggregateTest, NsmTempSingleDbusValue)
     const double reading1 = 45.5;
     const double reading2 = 50.0;
 
-    // First update should always work
-    aggregate->updateReading(reading1);
+    // First update with explicit timestamp
+    uint64_t timestamp1 = 1000;
+    aggregate->updateReading(reading1, timestamp1);
 
     // Check that nextUpdateTimestamp was updated in the DbusValue
     EXPECT_GT(dbusValue->nextUpdateTimestamp, 0);
     uint64_t firstTimestamp = dbusValue->nextUpdateTimestamp;
 
     // Second update immediately (within 1000ms) should not update DbusValue
-    aggregate->updateReading(reading2);
+    uint64_t timestamp2 = timestamp1 + 500; // Still within 1000ms threshold
+    aggregate->updateReading(reading2, timestamp2);
 
     // nextUpdateTimestamp should not change
     EXPECT_EQ(dbusValue->nextUpdateTimestamp, firstTimestamp);
 
-    // Wait for > 1000ms and try again
-    std::this_thread::sleep_for(std::chrono::milliseconds(1001));
-
-    aggregate->updateReading(reading2);
+    // Third update after > 1000ms should update
+    uint64_t timestamp3 = timestamp1 + 1500; // More than 1000ms later
+    aggregate->updateReading(reading2, timestamp3);
 
     // Now nextUpdateTimestamp should be updated
     EXPECT_GT(dbusValue->nextUpdateTimestamp, firstTimestamp);
@@ -164,21 +164,22 @@ TEST_F(NsmNumericSensorValueAggregateTest, NsmPowerMultipleElements)
     const double reading2 = 175.0;
 
     // First update should work for all elements
-    aggregate->updateReading(reading1);
+    uint64_t timestamp1 = 2000;
+    aggregate->updateReading(reading1, timestamp1);
 
     EXPECT_GT(dbusValue->nextUpdateTimestamp, 0);
     uint64_t firstTimestamp = dbusValue->nextUpdateTimestamp;
 
     // Second update immediately (within 1000ms) should not update DbusValue
-    aggregate->updateReading(reading2);
+    uint64_t timestamp2 = timestamp1 + 500; // Still within 1000ms threshold
+    aggregate->updateReading(reading2, timestamp2);
 
     // nextUpdateTimestamp should not change
     EXPECT_EQ(dbusValue->nextUpdateTimestamp, firstTimestamp);
 
-    // Wait for > 1000ms and try again
-    std::this_thread::sleep_for(std::chrono::milliseconds(1001));
-
-    aggregate->updateReading(reading2);
+    // Third update after > 1000ms should update
+    uint64_t timestamp3 = timestamp1 + 1500; // More than 1000ms later
+    aggregate->updateReading(reading2, timestamp3);
 
     // Now nextUpdateTimestamp should be updated
     EXPECT_GT(dbusValue->nextUpdateTimestamp, firstTimestamp);
@@ -218,21 +219,22 @@ TEST_F(NsmNumericSensorValueAggregateTest, NsmEnergySingleDbusValue)
     const double reading2 = 2000.0;
 
     // First update should always work
-    aggregate->updateReading(reading1);
+    uint64_t timestamp1 = 3000;
+    aggregate->updateReading(reading1, timestamp1);
 
     EXPECT_GT(dbusValue->nextUpdateTimestamp, 0);
     uint64_t firstTimestamp = dbusValue->nextUpdateTimestamp;
 
     // Second update immediately (within 1000ms) should not update DbusValue
-    aggregate->updateReading(reading2);
+    uint64_t timestamp2 = timestamp1 + 500; // Still within 1000ms threshold
+    aggregate->updateReading(reading2, timestamp2);
 
     // nextUpdateTimestamp should not change
     EXPECT_EQ(dbusValue->nextUpdateTimestamp, firstTimestamp);
 
-    // Wait for > 1000ms and try again
-    std::this_thread::sleep_for(std::chrono::milliseconds(1001));
-
-    aggregate->updateReading(reading2);
+    // Third update after > 1000ms should update
+    uint64_t timestamp3 = timestamp1 + 1500; // More than 1000ms later
+    aggregate->updateReading(reading2, timestamp3);
 
     // Now nextUpdateTimestamp should be updated
     EXPECT_GT(dbusValue->nextUpdateTimestamp, firstTimestamp);
@@ -458,20 +460,22 @@ TEST_F(NsmNumericSensorValueAggregateTest, MultipleUpdatesWithDelays)
     ASSERT_NE(dbusValue, nullptr);
 
     std::vector<double> readings = {25.0, 30.0, 35.0};
-    std::vector<uint64_t> timestamps;
+    std::vector<uint64_t> nextUpdateTimestamps;
 
     // First update
-    aggregate->updateReading(readings[0]);
-    timestamps.push_back(dbusValue->nextUpdateTimestamp);
-    EXPECT_GT(timestamps[0], 0);
+    uint64_t timestamp1 = 4000;
+    aggregate->updateReading(readings[0], timestamp1);
+    nextUpdateTimestamps.push_back(dbusValue->nextUpdateTimestamp);
+    EXPECT_GT(nextUpdateTimestamps[0], 0);
 
     // Update immediately - should not change timestamp
-    aggregate->updateReading(readings[1]);
-    EXPECT_EQ(dbusValue->nextUpdateTimestamp, timestamps[0]);
+    uint64_t timestamp2 = timestamp1 + 500; // Still within 1000ms threshold
+    aggregate->updateReading(readings[1], timestamp2);
+    EXPECT_EQ(dbusValue->nextUpdateTimestamp, nextUpdateTimestamps[0]);
 
-    // Wait and update - should change timestamp
-    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
-    aggregate->updateReading(readings[2]);
-    timestamps.push_back(dbusValue->nextUpdateTimestamp);
-    EXPECT_GT(timestamps[1], timestamps[0]);
+    // Update after > 1000ms - should change timestamp
+    uint64_t timestamp3 = timestamp1 + 1500; // More than 1000ms later
+    aggregate->updateReading(readings[2], timestamp3);
+    nextUpdateTimestamps.push_back(dbusValue->nextUpdateTimestamp);
+    EXPECT_GT(nextUpdateTimestamps[1], nextUpdateTimestamps[0]);
 }

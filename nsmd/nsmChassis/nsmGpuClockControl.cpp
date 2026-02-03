@@ -306,9 +306,9 @@ requester::Coroutine NsmChassisClockControl::setRangeClockLimits(
     co_return cc ? cc : rc;
 }
 
-static requester::Coroutine CreateControlGpuClock(SensorManager& manager,
-                                                  const std::string& interface,
-                                                  const std::string& objPath)
+requester::Coroutine createControlGpuClock(SensorManager& manager,
+                                           const std::string& interface,
+                                           const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
@@ -409,6 +409,6 @@ static requester::Coroutine CreateControlGpuClock(SensorManager& manager,
 }
 
 REGISTER_NSM_CREATION_FUNCTION(
-    CreateControlGpuClock,
+    createControlGpuClock,
     "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0")
 } // namespace nsm

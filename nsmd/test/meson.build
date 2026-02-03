@@ -1,4 +1,14 @@
-tests = ['nsmDevice_test', 'stateChangeLogger_test', 'instance_id_test']
+tests = [
+    'circularQueue_test',
+    'eventHandler_test',
+    'eventTypeHandlers_test',
+    'instance_id_test',
+    'interfaceWrapper_test',
+    'nsmDevice_test',
+    'nsmObject_test',
+    'nsmObjectFactory_test',
+    'stateChangeLogger_test',
+]
 
 foreach t : tests
     test(

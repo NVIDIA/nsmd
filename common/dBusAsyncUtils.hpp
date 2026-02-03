@@ -40,6 +40,7 @@ struct coGetDbusPropertyBase
     const std::string interface;
     const std::string property;
 
+    bool setRetValueByProperty() noexcept;
     virtual void setRetValue(const PropertyValue& value) = 0;
     virtual void resetRetValue() = 0;
 
@@ -76,8 +77,39 @@ struct coGetDbusPropertyBase
  *
  * @tparam type - property data type
  */
+
+template <typename type, typename = void>
+struct coGetDbusProperty : coGetDbusPropertyBase, type
+{
+    void setRetValue(const PropertyValue& value) override final
+    {
+        static_cast<type&>(*this) = std::get<type>(value);
+    }
+
+    void resetRetValue() override final
+    {
+        static_cast<type&>(*this) = type();
+    }
+
+    /** @brief Called by co_await operator to get return value when awaitable
+     * object completed.
+     */
+    type await_resume() const noexcept
+    {
+        return static_cast<type>(*this);
+    }
+
+    coGetDbusProperty(const std::string& objectPath,
+                      const std::string& property, const std::string& interface,
+                      const std::string& service = entityManagerService) :
+        coGetDbusPropertyBase(objectPath, property, interface, service), type()
+    {}
+};
+
 template <typename type>
-struct coGetDbusProperty : public coGetDbusPropertyBase
+struct coGetDbusProperty<type, std::enable_if_t<std::is_arithmetic_v<type> ||
+                                                std::is_enum_v<type>>> :
+    coGetDbusPropertyBase
 {
     /** @brief For keeping the return value.
      */
@@ -101,7 +133,11 @@ struct coGetDbusProperty : public coGetDbusPropertyBase
         return ret;
     }
 
-    using coGetDbusPropertyBase::coGetDbusPropertyBase;
+    coGetDbusProperty(const std::string& objectPath,
+                      const std::string& property, const std::string& interface,
+                      const std::string& service = entityManagerService) :
+        coGetDbusPropertyBase(objectPath, property, interface, service), ret()
+    {}
 };
 
 /** @struct coGetServiceMap
@@ -112,14 +148,10 @@ struct coGetDbusProperty : public coGetDbusPropertyBase
  *
  * @tparam type - property data type
  */
-struct coGetServiceMap
+struct coGetServiceMap : MapperServiceMap
 {
     const std::string objectPath;
     const dbus::Interfaces ifaceList;
-
-    /** @brief For keeping the return value.
-     */
-    MapperServiceMap ret;
 
     /** @brief Returning false to make await_suspend() to be called.
      */
@@ -136,27 +168,21 @@ struct coGetServiceMap
      */
     MapperServiceMap await_resume() const noexcept
     {
-        return ret;
+        return static_cast<MapperServiceMap>(*this);
     }
 
     /** @brief Constructor of awaitable object to initialize necessary member
      * variables.
      */
     coGetServiceMap(const std::string& objectPath,
-                    const dbus::Interfaces& ifaceList) :
-        objectPath(objectPath), ifaceList(ifaceList)
-    {}
+                    const dbus::Interfaces& ifaceList);
 };
 
-struct coGetAllDbusProperty
+struct coGetAllDbusProperty : dbus::PropertyMap
 {
     const std::string service;
     const std::string objectPath;
     const std::string interface;
-
-    /** @brief For keeping the return value.
-     */
-    dbus::PropertyMap ret;
 
     /** @brief Returning false to make await_suspend() to be called.
      */
@@ -173,7 +199,7 @@ struct coGetAllDbusProperty
      */
     dbus::PropertyMap await_resume() const noexcept
     {
-        return ret;
+        return static_cast<dbus::PropertyMap>(*this);
     }
 
     /** @brief Constructor of awaitable object to initialize necessary member
@@ -181,9 +207,7 @@ struct coGetAllDbusProperty
      */
     coGetAllDbusProperty(const std::string& service,
                          const std::string& objectPath,
-                         const std::string& interface = "") :
-        service(service), objectPath(objectPath), interface(interface), ret{}
-    {}
+                         const std::string& interface = "");
 };
 
 /* @struct coLogEvent

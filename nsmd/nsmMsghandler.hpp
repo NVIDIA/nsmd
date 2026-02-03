@@ -103,8 +103,8 @@ class NsmMessageHandler : public std::enable_shared_from_this<NsmMessageHandler>
     explicit NsmMessageHandler(RequesterHandler& handler) : reqHandler(handler)
     {}
 
-    // Protected destructor
-    ~NsmMessageHandler() = default;
+    // Protected virtual destructor
+    virtual ~NsmMessageHandler() = default;
 
   private:
     /**
@@ -116,7 +116,7 @@ class NsmMessageHandler : public std::enable_shared_from_this<NsmMessageHandler>
      * @param responseLen Response length
      * @return Coroutine with the result code
      */
-    inline requester::Coroutine
+    virtual inline requester::Coroutine
         SendRecvNsmMsg(eid_t eid, Request& request,
                        std::shared_ptr<const nsm_msg>& responseMsg,
                        size_t* responseLen)

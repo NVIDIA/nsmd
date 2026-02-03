@@ -29,36 +29,6 @@
 
 #define MCTP_PREFIX_LEN 3 // tag, eid, mctp_type
 
-nsm_requester_rc_t nsm_open()
-{
-	int fd = -1;
-	int rc = -1;
-
-	fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-	if (-1 == fd) {
-		return fd;
-	}
-
-	const char path[] = "\0mctp-mux";
-	struct sockaddr_un addr;
-	addr.sun_family = AF_UNIX;
-	memcpy(addr.sun_path, path, sizeof(path) - 1);
-	rc = connect(fd, (struct sockaddr *)&addr,
-		     sizeof(path) + sizeof(addr.sun_family) - 1);
-	if (-1 == rc) {
-		close(fd);
-		return -1;
-	}
-	uint8_t mctpMsgType = MCTP_MSG_TYPE_PCI_VDM;
-	rc = write(fd, &mctpMsgType, sizeof(mctpMsgType));
-	if (-1 == rc) {
-		close(fd);
-		return -1;
-	}
-
-	return fd;
-}
-
 static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 				    uint8_t **nsm_resp_msg,
 				    size_t *resp_msg_len, uint8_t *tag)

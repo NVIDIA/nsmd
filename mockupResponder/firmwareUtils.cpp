@@ -92,7 +92,9 @@ std::optional<std::vector<uint8_t>>
     /* Exact message size will be counted in the encode function,
         just, make sure this buffer is big enough to cover
         the above number of slots */
-    uint16_t msg_size = sizeof(struct nsm_msg_hdr) + 250;
+    uint16_t msg_size = sizeof(struct nsm_msg_hdr) +
+                        sizeof(nsm_firmware_erot_state_info_hdr_resp) +
+                        sizeof(nsm_firmware_slot_info) * 2;
     std::vector<uint8_t> response(msg_size, 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;

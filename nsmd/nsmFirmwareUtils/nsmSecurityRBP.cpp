@@ -218,7 +218,10 @@ uint8_t NsmSecurityCfgObject::handleResponseMsg(const nsm_msg* responseMsg,
     LG2_ERROR_FLT(
         "decode_nsm_firmware_irreversible_config_request_0_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-    securityCfgObject->updateState(stateInfo);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        securityCfgObject->updateState(stateInfo);
+    }
     return cc ? cc : rc;
 }
 

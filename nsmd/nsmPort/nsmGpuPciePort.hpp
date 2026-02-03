@@ -57,16 +57,16 @@ using PortType = sdbusplus::server::xyz::openbmc_project::inventory::decorator::
 using PortProtocol = sdbusplus::server::xyz::openbmc_project::inventory::
     decorator::PortInfo::PortProtocol;
 
-std::map<std::string, std::tuple<uint8_t, uint8_t>> counterToGroupIdMap = {
-    {"CorrectableErrorCount", std::make_tuple(GROUP_ID_2, DS_ID_3)},
-    {"NonFatalErrorCount", std::make_tuple(GROUP_ID_2, DS_ID_0)},
-    {"FatalErrorCount", std::make_tuple(GROUP_ID_2, DS_ID_1)},
-    {"L0ToRecoveryCount", std::make_tuple(GROUP_ID_3, DS_ID_0)},
-    {"ReplayCount", std::make_tuple(GROUP_ID_4, DS_ID_6)},
-    {"ReplayRolloverCount", std::make_tuple(GROUP_ID_4, DS_ID_4)},
-    {"NAKSentCount", std::make_tuple(GROUP_ID_4, DS_ID_2)},
-    {"NAKReceivedCount", std::make_tuple(GROUP_ID_4, DS_ID_1)},
-    {"UnsupportedRequestCount", std::make_tuple(GROUP_ID_2, DS_ID_2)}};
+inline std::map<std::string, std::tuple<uint8_t, uint8_t>> counterToGroupIdMap =
+    {{"CorrectableErrorCount", std::make_tuple(GROUP_ID_2, DS_ID_3)},
+     {"NonFatalErrorCount", std::make_tuple(GROUP_ID_2, DS_ID_0)},
+     {"FatalErrorCount", std::make_tuple(GROUP_ID_2, DS_ID_1)},
+     {"L0ToRecoveryCount", std::make_tuple(GROUP_ID_3, DS_ID_0)},
+     {"ReplayCount", std::make_tuple(GROUP_ID_4, DS_ID_6)},
+     {"ReplayRolloverCount", std::make_tuple(GROUP_ID_4, DS_ID_4)},
+     {"NAKSentCount", std::make_tuple(GROUP_ID_4, DS_ID_2)},
+     {"NAKReceivedCount", std::make_tuple(GROUP_ID_4, DS_ID_1)},
+     {"UnsupportedRequestCount", std::make_tuple(GROUP_ID_2, DS_ID_2)}};
 
 class NsmGpuPciePort : public NsmObject
 {

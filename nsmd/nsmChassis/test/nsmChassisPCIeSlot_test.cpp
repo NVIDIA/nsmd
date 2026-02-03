@@ -33,8 +33,6 @@ requester::Coroutine
     nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
                                     const std::string& interface,
                                     const std::string& objPath);
-NsmDeviceTable devices;
-std::shared_ptr<MockNsmDeviceBase> baseboard;
 } // namespace nsm
 
 using namespace nsm;
@@ -54,20 +52,22 @@ struct NsmChassisPCIeSlotTest :
 
     const uuid_t baseboardUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:255";
 
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> baseboard;
+
     NsmChassisPCIeSlotTest() : SensorManagerTest(devices)
     {
-        if (baseboard)
-        {
-            baseboard->deviceSensors.clear();
-            baseboard->prioritySensors.clear();
-            baseboard->roundRobinSensors.clear();
-        }
+        baseboard = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(baseboardUuid));
+        EXPECT_EQ(1, devices.size());
+        EXPECT_NE(baseboard, nullptr);
+        EXPECT_EQ(NSM_DEV_ID_BASEBOARD, baseboard->getDeviceType());
     }
 
-    const PropertyValuesCollection error = {
+    dbus::PropertyMap error = {
         {"UUID", "99sb3ec1-e468-f145-8686-409009062aa8"},
     };
-    const PropertyValuesCollection basic = {
+    dbus::PropertyMap basic = {
         {"ChassisName", chassisName},
         {"Name", name},
         {"Type", "NSM_ChassisPCIeSlot"},
@@ -82,28 +82,25 @@ struct NsmChassisPCIeSlotTest :
 
 TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
 {
-    auto& map = utils::MockDbusAsync::getServiceMap();
+    auto& map = utils::MockDbusAsync::serviceMap();
     map = serviceMap;
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["ChassisName"] =
-        std::get<std::string>(get(basic, "ChassisName").second);
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
 
     // Set up interface-specific properties
-    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
-    propertyMap["DeviceIndex"] =
-        std::get<uint64_t>(get(basic, "DeviceIndex").second);
-    propertyMap["SlotType"] =
-        std::get<std::string>(get(basic, "SlotType").second);
-    propertyMap["Priority"] = std::get<bool>(get(basic, "Priority").second);
+    propertyMap["Type"] = basic["Type"];
+    propertyMap["DeviceIndex"] = basic["DeviceIndex"];
+    propertyMap["SlotType"] = basic["SlotType"];
+    propertyMap["Priority"] = basic["Priority"];
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
 
     EXPECT_EQ(1, devices.size());
-    baseboard = dynamic_pointer_cast<MockNsmDeviceBase>(devices[0]);
+    baseboard = dynamic_pointer_cast<MockNsmDevice>(devices[0]);
     EXPECT_EQ(0, baseboard->prioritySensors.size());
     EXPECT_EQ(1, baseboard->staticSensors.size());
     EXPECT_EQ(2, baseboard->roundRobinSensors.size());
@@ -114,7 +111,7 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
         baseboard->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, sensor);
     EXPECT_EQ(PCIeSlotIntf::convertSlotTypesFromString(
-                  get<std::string>(basic, "SlotType")),
+                  std::get<std::string>(basic["SlotType"])),
               sensor->invoke(pdiMethod(slotType)));
     auto associations =
         dynamic_pointer_cast<NsmChassisPCIeSlot<AssociationDefinitionsIntf>>(
@@ -124,30 +121,26 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
 }
 TEST_F(NsmChassisPCIeSlotTest, badTestNoDeviceFound)
 {
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
 
-    // Set up base properties with INVALID UUID that doesn't match any device
+    // Set up base properties with INVALID UUID that doesn't match any
+    // device
     const uuid_t invalidUuid =
         "99sb3ec1-e468-f145-8686-409009062aa8"; // From error collection
-    propertyMap["ChassisName"] =
-        std::get<std::string>(get(basic, "ChassisName").second);
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
     propertyMap["UUID"] = invalidUuid; // Invalid UUID as uuid_t type
 
     // Set up interface-specific properties
-    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
-    propertyMap["DeviceIndex"] =
-        std::get<uint64_t>(get(basic, "DeviceIndex").second);
-    propertyMap["SlotType"] =
-        std::get<std::string>(get(basic, "SlotType").second);
-    propertyMap["Priority"] = std::get<bool>(get(basic, "Priority").second);
+    propertyMap["Type"] = basic["Type"];
+    propertyMap["DeviceIndex"] = basic["DeviceIndex"];
+    propertyMap["SlotType"] = basic["SlotType"];
+    propertyMap["Priority"] = basic["Priority"];
 
-    nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(1, devices.size());
-    EXPECT_EQ(0, baseboard->prioritySensors.size());
-    EXPECT_EQ(0, baseboard->roundRobinSensors.size());
-    EXPECT_EQ(0, baseboard->deviceSensors.size());
+    EXPECT_THROW_COROUTINE(
+        nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath),
+        std::runtime_error);
 }
 
 struct NsmPCIeSlotTest : public NsmChassisPCIeSlotTest
