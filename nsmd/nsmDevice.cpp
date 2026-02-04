@@ -131,12 +131,22 @@ bool NsmDevice::allCommandCodesAreRetrieved()
 {
     return areMessageTypesRetrieved &&
            std::ranges::all_of(retrievedMessageTypes, [&](auto messageType) {
+        // Skip message types that are out of the valid range
+        if (messageType >= NUM_NSM_TYPES)
+        {
+            return true; // Consider out-of-range types as "retrieved" to not
+                         // block
+        }
         return commandCodesRetrieved[messageType];
     });
 }
 
 bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
 {
+    if (messageType >= NUM_NSM_TYPES)
+    {
+        return false;
+    }
     return messageTypesToCommandCodeMatrix[messageType][commandCode];
 }
 
@@ -144,6 +154,14 @@ void NsmDevice::updateMessageTypesToCommandCodeMatrix(
     uint8_t messageType, const bitfield8_t supportedCommands[],
     size_t supportedCommandsSize)
 {
+    // Check if messageType is within the valid range
+    if (messageType >= NUM_NSM_TYPES)
+    {
+        lg2::warning(
+            "updateMessageTypesToCommandCodeMatrix: skipping invalid message type={MT} (>= NUM_NSM_TYPES={NUM})",
+            "MT", messageType, "NUM", NUM_NSM_TYPES);
+        return;
+    }
     // check applied to avoid core dump in case of supportedCommandsSize*8 is
     // greater than NUM_COMMAND_CODES
     auto maxCommandCode = std::min(supportedCommandsSize * 8,
@@ -549,6 +567,15 @@ requester::Coroutine NsmDevice::updateNsmDevice()
     // Loop through supported message types
     for (uint8_t messageType : supportedMessageTypes)
     {
+        // Skip message types that are out of the valid range
+        if (messageType >= NUM_NSM_TYPES)
+        {
+            lg2::warning(
+                "Skipping unsupported message type={MT} (>= NUM_NSM_TYPES={NUM}) for eid={EID}",
+                "MT", messageType, "NUM", NUM_NSM_TYPES, "EID", eid);
+            continue;
+        }
+
         std::vector<uint8_t> supportedCommands;
         rc = co_await getSupportedCommandCodes(messageType, supportedCommands);
         discoveryEvents().setValue(
@@ -998,6 +1025,12 @@ requester::Coroutine NsmDevice::refreshCommandMatrix()
     // Retrieve supported command codes for each message type
     for (uint8_t messageType : retrievedMessageTypes)
     {
+        // Skip message types that are out of the valid range
+        if (messageType >= NUM_NSM_TYPES)
+        {
+            continue;
+        }
+
         if (!commandCodesRetrieved[messageType])
         {
             std::vector<uint8_t> supportedCommands;

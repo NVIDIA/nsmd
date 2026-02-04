@@ -78,7 +78,6 @@ enum nsm_type {
 	NSM_TYPE_DIAGNOSTIC = 4,
 	NSM_TYPE_DEVICE_CONFIGURATION = 5,
 	NSM_TYPE_FIRMWARE = 6,
-	NSM_TYPE_UNKNOWN = 0xFF,
 };
 
 /** @brief NSM Type0 Device Capability Discovery Commands
