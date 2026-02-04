@@ -452,7 +452,7 @@ TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
     EXPECT_EQ(1, fpga->roundRobinSensors.size());
     EXPECT_EQ(1, fpga->deviceSensors.size());
     EXPECT_EQ(2, gpu->roundRobinSensors.size());
-    EXPECT_EQ(3, gpu->deviceSensors.size());
+    EXPECT_EQ(4, gpu->deviceSensors.size());
 }
 
 TEST_F(NsmChassisTest, badTestCreateStaticSensors)

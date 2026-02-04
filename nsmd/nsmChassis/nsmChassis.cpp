@@ -322,8 +322,8 @@ static void
             allCurrentIfaceProperties.at("AssetInformationAvailable")))
     {
         createAsset(device, name, allCurrentIfaceProperties);
-        createSKU(device, name);
     }
+    createSKU(device, name);
     // Handle Location and LocationCode from ChassisAttributes
     if (allCurrentIfaceProperties.count("LocationType"))
     {
