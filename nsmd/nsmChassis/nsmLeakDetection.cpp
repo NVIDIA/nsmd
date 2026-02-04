@@ -91,7 +91,7 @@ NsmLeakDetection::NsmLeakDetection(
             "xyz.openbmc_project.State.Decorator.OperationalStatus.StateType.None"));
         detectorStateIntf->detectorState(
             StateLeakDetectorIntf::convertDetectorStateEnumFromString(
-                "xyz.openbmc_project.State.LeakDetector.DetectorStateEnum.Warning"));
+                "xyz.openbmc_project.State.LeakDetector.DetectorStateEnum.Unavailable"));
 
         leakDetectorSensorValueIntf->value(0);
         leakDetectorSensorValueIntf->unit(
@@ -169,7 +169,7 @@ void NsmLeakDetection::updateLeakDetectorState(uint8_t sensorId,
                     "xyz.openbmc_project.State.Decorator.OperationalStatus.StateType.Degraded"));
             detectorStateIntf->detectorState(
                 StateLeakDetectorIntf::convertDetectorStateEnumFromString(
-                    "xyz.openbmc_project.State.LeakDetector.DetectorStateEnum.Critical"));
+                    "xyz.openbmc_project.State.LeakDetector.DetectorStateEnum.Unavailable"));
             break;
         default:
             lg2::debug(
@@ -180,7 +180,7 @@ void NsmLeakDetection::updateLeakDetectorState(uint8_t sensorId,
                     "xyz.openbmc_project.State.Decorator.OperationalStatus.StateType.None"));
             detectorStateIntf->detectorState(
                 StateLeakDetectorIntf::convertDetectorStateEnumFromString(
-                    "xyz.openbmc_project.State.LeakDetector.DetectorStateEnum.Warning"));
+                    "xyz.openbmc_project.State.LeakDetector.DetectorStateEnum.Unavailable"));
             break;
     }
 }
