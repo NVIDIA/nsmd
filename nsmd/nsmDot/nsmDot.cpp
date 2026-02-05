@@ -29,6 +29,7 @@
 #include "nsmSensor.hpp"
 #include "sensorManager.hpp"
 
+#include <endian.h>
 #include <fcntl.h>
 #include <openssl/evp.h>
 #include <sys/stat.h>
@@ -396,7 +397,8 @@ requester::Coroutine NsmDotObject::dotCAKInstallAsyncHandler(
     DotActionIntf::KeyAuthScheme cakKeyAuthScheme, std::string cakEcdsaKey,
     std::string cakLmsKey, DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
     std::string lakEcdsaKey, std::string lakLmsKey, bool lockDisable,
-    uint32_t minSvn, std::shared_ptr<AsyncStatusIntf> statusIntf,
+    uint8_t ownerMinSvn, uint8_t vendorMinSvn,
+    std::shared_ptr<AsyncStatusIntf> statusIntf,
     std::shared_ptr<AsyncValueIntf> valueIntf)
 {
     statusIntf->status(AsyncOperationStatusType::InProgress);
@@ -428,7 +430,9 @@ requester::Coroutine NsmDotObject::dotCAKInstallAsyncHandler(
     }
 
     dotReq.lock_disable = lockDisable ? DOT_LOCK_DISABLE : DOT_LOCK_ENABLE;
-    dotReq.min_svn = minSvn;
+    uint32_t minSvnBitmap = ownerMinSvn |
+                            (static_cast<uint32_t>(vendorMinSvn) << 8);
+    dotReq.min_svn = htole32(minSvnBitmap);
 
     auto request = std::make_shared<Request>(
         sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
@@ -580,12 +584,11 @@ requester::Coroutine NsmDotObject::bypassAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
-    NsmDotObject::dotCAKInstall(DotActionIntf::KeyAuthScheme cakKeyAuthScheme,
-                                std::string cakEcdsaKey, std::string cakLmsKey,
-                                DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
-                                std::string lakEcdsaKey, std::string lakLmsKey,
-                                bool lockDisable, uint32_t minSvn)
+sdbusplus::message::object_path NsmDotObject::dotCAKInstall(
+    DotActionIntf::KeyAuthScheme cakKeyAuthScheme, std::string cakEcdsaKey,
+    std::string cakLmsKey, DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
+    std::string lakEcdsaKey, std::string lakLmsKey, bool lockDisable,
+    uint8_t ownerMinSvn, uint8_t vendorMinSvn)
 {
     uint8_t cakEcdsaBuf[dot::ECDSA_KEY_SIZE] = {0};
     if (!dot::decodeKeyData(cakEcdsaKey, cakEcdsaBuf, dot::ECDSA_KEY_SIZE))
@@ -627,7 +630,8 @@ sdbusplus::message::object_path
 
     dotCAKInstallAsyncHandler(cakKeyAuthScheme, cakEcdsaKey, cakLmsKey,
                               lakKeyAuthScheme, lakEcdsaKey, lakLmsKey,
-                              lockDisable, minSvn, statusIntf, valueIntf)
+                              lockDisable, ownerMinSvn, vendorMinSvn,
+                              statusIntf, valueIntf)
         .detach();
 
     return objPath;

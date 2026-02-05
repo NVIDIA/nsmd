@@ -610,7 +610,8 @@ struct nsm_dot_cak_install_req {
 	uint8_t cak_pub[DOT_KEY_AUTH_DATA_SIZE];
 	uint8_t lak_pub[DOT_KEY_AUTH_DATA_SIZE];
 	uint8_t lock_disable; /* 0: Allow DOT_LOCK, 1: DOT_LOCK not allowed */
-	uint32_t min_svn;     /* MIN_SVN for minimal SVN */
+	uint32_t min_svn;     /* MIN_SVN bitmap: bits 0-7 (Owner), bits 8-15
+			       * (Vendor), bits 16-31 (reserved) */
 } __attribute__((packed));
 
 /** @struct nsm_dot_cak_install_req_command

@@ -227,7 +227,7 @@ class NsmDotTest : public Test, public SensorManagerTest
                       ->dotCAKInstallAsyncHandler(
                           DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
                           DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
-                          false, 0, statusInterface, valueInterface)
+                          false, 0, 0, statusInterface, valueInterface)
                       .await_resume();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
@@ -404,7 +404,7 @@ TEST_F(NsmDotTest, DotCAKInstallSuccess)
                                  std::string(192, '0'), // 96 bytes in hex
                                  "", DotActionIntf::KeyAuthScheme::Ecdsa,
                                  std::string(192, '0'), // 96 bytes in hex
-                                 "", false, 0);
+                                 "", false, 0, 0);
 
     EXPECT_NE(path, sdbusplus::message::object_path{});
 }
@@ -415,16 +415,17 @@ TEST_F(NsmDotTest, DotCAKInstallInvalidCAKEcdsaKey)
         dotObject->dotCAKInstall(DotActionIntf::KeyAuthScheme::Ecdsa,
                                  "invalid_key", "",
                                  DotActionIntf::KeyAuthScheme::Ecdsa,
-                                 std::string(192, '0'), "", false, 0),
+                                 std::string(192, '0'), "", false, 0, 0),
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
 }
 
 TEST_F(NsmDotTest, DotCAKInstallInvalidLAKEcdsaKey)
 {
     EXPECT_THROW(
-        dotObject->dotCAKInstall(
-            DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '0'), "",
-            DotActionIntf::KeyAuthScheme::Ecdsa, "invalid_key", "", false, 0),
+        dotObject->dotCAKInstall(DotActionIntf::KeyAuthScheme::Ecdsa,
+                                 std::string(192, '0'), "",
+                                 DotActionIntf::KeyAuthScheme::Ecdsa,
+                                 "invalid_key", "", false, 0, 0),
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
 }
 
@@ -435,7 +436,7 @@ TEST_F(NsmDotTest, DotCAKInstallHybridModeWithoutLmsKey)
                                  std::string(192, '0'),
                                  "", // Missing LMS key
                                  DotActionIntf::KeyAuthScheme::Ecdsa,
-                                 std::string(192, '0'), "", false, 0),
+                                 std::string(192, '0'), "", false, 0, 0),
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
 }
 

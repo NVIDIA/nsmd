@@ -1083,10 +1083,16 @@ class DotCAKInstall : public CommandInterface
             ->check(CLI::Range(0, 1));
 
         ccOptionGroup
-            ->add_option("--min_svn", minSvn,
-                         "Minimum Firmware Security Version")
+            ->add_option("--vendor_min_svn", vendorMinSvn,
+                         "Vendor Minimum Firmware Security Version (0-255)")
             ->default_val(0)
-            ->check(CLI::Range(0U, UINT32_MAX));
+            ->check(CLI::Range(0U, 255U));
+
+        ccOptionGroup
+            ->add_option("--owner_min_svn", ownerMinSvn,
+                         "Owner Minimum Firmware Security Version (0-255)")
+            ->default_val(0)
+            ->check(CLI::Range(0U, 255U));
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
@@ -1202,7 +1208,9 @@ class DotCAKInstall : public CommandInterface
         memcpy(nsm_req.lak_pub, lakCryptoPcp.data(), CRYPTO_PCP_SIZE);
 
         nsm_req.lock_disable = lockDisable;
-        nsm_req.min_svn = htole32(minSvn);
+        uint32_t minSvnBitmap = ownerMinSvn |
+                                (static_cast<uint32_t>(vendorMinSvn) << 8);
+        nsm_req.min_svn = htole32(minSvnBitmap);
 
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
         auto rc = encode_nsm_dot_cak_install_req(instanceId, &nsm_req, request);
@@ -1273,7 +1281,8 @@ class DotCAKInstall : public CommandInterface
     std::string lakKeyEcdsaKeyFile;
     std::string lakLmsKeyFile;
     uint8_t lockDisable;
-    uint32_t minSvn;
+    uint8_t vendorMinSvn;
+    uint8_t ownerMinSvn;
 };
 
 class DotCAKBypass : public CommandInterface

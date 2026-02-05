@@ -81,12 +81,15 @@ inline void createDotCAKInstallRequest(nsm_dot_cak_install_req &req,
 				       uint8_t cakPattern = 0,
 				       uint8_t lakPattern = 0xA0,
 				       uint8_t lockDisable = 0,
-				       uint32_t minSvn = 0x12345678)
+				       uint32_t vendorMinSvn = 0x78,
+				       uint32_t ownerMinSvn = 0x56)
 {
 	fillPatternSequential(req.cak_pub, CAK_KEY_SIZE, cakPattern);
 	fillPatternCycling(req.lak_pub, LAK_KEY_SIZE, lakPattern);
 	req.lock_disable = lockDisable;
-	req.min_svn = minSvn;
+	uint32_t minSvnBitmap =
+	    (ownerMinSvn & 0xFF) | ((vendorMinSvn & 0xFF) << 8);
+	req.min_svn = minSvnBitmap;
 }
 
 /**
