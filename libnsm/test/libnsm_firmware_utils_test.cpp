@@ -1615,7 +1615,8 @@ TEST(DotCAKInstall, testGoodEncodeRequest)
 			  req->dot_cak_install_req.lak_pub[i]);
 	}
 	EXPECT_EQ(0, req->dot_cak_install_req.lock_disable);
-	EXPECT_EQ(0x12345678, le32toh(req->dot_cak_install_req.min_svn));
+	uint32_t expectedMinSvn = (0x56 & 0xFF) | ((0x78 & 0xFF) << 8);
+	EXPECT_EQ(expectedMinSvn, le32toh(req->dot_cak_install_req.min_svn));
 }
 
 TEST(DotCAKInstall, testGoodDecodeRequest)
@@ -1643,7 +1644,8 @@ TEST(DotCAKInstall, testGoodDecodeRequest)
 	dot_test::fillPatternCycling(req_cmd->dot_cak_install_req.lak_pub,
 				     dot_test::LAK_KEY_SIZE, 0xA0);
 	req_cmd->dot_cak_install_req.lock_disable = 1;
-	req_cmd->dot_cak_install_req.min_svn = htole32(0xAABBCCDD);
+	uint32_t testMinSvn = (0xDD & 0xFF) | ((0xCC & 0xFF) << 8);
+	req_cmd->dot_cak_install_req.min_svn = htole32(testMinSvn);
 
 	nsm_dot_cak_install_req dot_req;
 	auto rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
@@ -1656,7 +1658,7 @@ TEST(DotCAKInstall, testGoodDecodeRequest)
 		EXPECT_EQ(((i + 0xA0) % 256), dot_req.lak_pub[i]);
 	}
 	EXPECT_EQ(1, dot_req.lock_disable);
-	EXPECT_EQ(0xAABBCCDD, dot_req.min_svn);
+	EXPECT_EQ(testMinSvn, dot_req.min_svn);
 }
 
 TEST(DotCAKInstall, testShortDecodeRequest)
@@ -1893,13 +1895,14 @@ TEST(DotCAKInstall, testDataIntegrity)
 		uint8_t cak_pattern_start;
 		uint8_t lak_pattern_start;
 		uint8_t lock_disable;
-		uint32_t min_svn;
+		uint8_t vendor_min_svn;
+		uint8_t owner_min_svn;
 	} test_cases[] = {
-	    {"all_zeros", 0x00, 0x00, 0, 0x00000000},
-	    {"all_ones", 0xFF, 0xFF, 1, 0xFFFFFFFF},
-	    {"alternating", 0xAA, 0x55, 1, 0xAAAAAAAA},
-	    {"sequential", 0x00, 0x00, 0, 0x12345678},
-	    {"random", 0x42, 0xDE, 1, 0xDEADBEEF},
+	    {"all_zeros", 0x00, 0x00, 0, 0x00, 0x00},
+	    {"all_ones", 0xFF, 0xFF, 1, 0xFF, 0xFF},
+	    {"alternating", 0xAA, 0x55, 1, 0xAA, 0x55},
+	    {"sequential", 0x00, 0x00, 0, 0x78, 0x56},
+	    {"random", 0x42, 0xDE, 1, 0xEF, 0xBE},
 	};
 
 	for (const auto &test : test_cases) {
@@ -1911,7 +1914,9 @@ TEST(DotCAKInstall, testDataIntegrity)
 			    (test.lak_pattern_start + i) & 0xFF;
 		}
 		original_req.lock_disable = test.lock_disable;
-		original_req.min_svn = test.min_svn;
+		uint32_t minSvnBitmap = (test.owner_min_svn & 0xFF) |
+					((test.vendor_min_svn & 0xFF) << 8);
+		original_req.min_svn = minSvnBitmap;
 
 		std::vector<uint8_t> requestMsg(
 		    sizeof(nsm_msg_hdr) +

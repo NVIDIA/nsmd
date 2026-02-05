@@ -121,19 +121,19 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * ECDSA-only)
      * @param lockDisable Lock disable flag (false: lock enabled, true: lock
      * disabled)
-     * @param minSvn Minimum Security Version Number
+     * @param minSvn MIN_SVN bitmap: bits 0-7 (Owner), bits 8-15 (Vendor), bits
+     * 16-31 (reserved)
      * @return Object path for monitoring the async operation status
      * @throws Common::Error::InvalidArgument if key data is invalid
      * @throws Common::Error::InternalFailure if encoding fails
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path
-        dotCAKInstall(DotActionIntf::KeyAuthScheme cakKeyAuthScheme,
-                      std::string cakEcdsaKey, std::string cakLmsKey,
-                      DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
-                      std::string lakEcdsaKey, std::string lakLmsKey,
-                      bool lockDisable, uint32_t minSvn) override;
+    sdbusplus::message::object_path dotCAKInstall(
+        DotActionIntf::KeyAuthScheme cakKeyAuthScheme, std::string cakEcdsaKey,
+        std::string cakLmsKey, DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
+        std::string lakEcdsaKey, std::string lakLmsKey, bool lockDisable,
+        uint8_t ownerMinSvn, uint8_t vendorMinSvn) override;
 
     /**
      * @brief Bypass DOT CAK installation
@@ -320,7 +320,8 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @param lakEcdsaKey LAK ECDSA key (base64/hex string)
      * @param lakLmsKey LAK LMS key (base64/hex string)
      * @param lockDisable Lock disable flag
-     * @param minSvn Minimum SVN
+     * @param minSvn MIN_SVN bitmap: bits 0-7 (OEM), bits 8-15 (NVIDIA), bits
+     * 16-31 (reserved)
      * @param statusIntf Async status interface
      * @param valueIntf Async value interface
      * @return Coroutine result code
@@ -329,7 +330,8 @@ class NsmDotObject : public NsmObject, public DotActionIntf
         DotActionIntf::KeyAuthScheme cakKeyAuthScheme, std::string cakEcdsaKey,
         std::string cakLmsKey, DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
         std::string lakEcdsaKey, std::string lakLmsKey, bool lockDisable,
-        uint32_t minSvn, std::shared_ptr<AsyncStatusIntf> statusIntf,
+        uint8_t ownerMinSvn, uint8_t vendorMinSvn,
+        std::shared_ptr<AsyncStatusIntf> statusIntf,
         std::shared_ptr<AsyncValueIntf> valueIntf);
 
     /**
