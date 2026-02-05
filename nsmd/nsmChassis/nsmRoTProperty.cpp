@@ -130,11 +130,17 @@ uint8_t NsmInbandUpdatePolicyObject::handleResponseMsg(
 
     auto rc = decode_nsm_query_get_erot_state_parameters_resp(
         responseMsg, responseLen, &cc, &reason_code, &erot_info);
+
+    if (shouldLog("decode_nsm_query_get_erot_state_parameters_resp",
+                  reason_code, cc, rc))
+    {
+        LG2_ERROR(
+            "decode_nsm_query_get_erot_state_parameters_resp failed. reasonCode={REASONCODE}, cc={CC}, rc={RC}",
+            "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    }
+
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error(
-            "Response message error: rc={RC}, cc={CC}, reasonCode={REASONCODE}",
-            "RC", rc, "CC", (int)cc, "REASONCODE", (int)reason_code);
         free(erot_info.slot_info);
         return cc ? cc : rc;
     }
