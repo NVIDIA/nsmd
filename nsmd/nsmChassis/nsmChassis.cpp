@@ -182,6 +182,24 @@ static void
     device->addStaticSensor(chassisLocationContext);
 }
 
+static void
+    createFieldReplaceable(std::shared_ptr<NsmDevice> device,
+                           const std::string& name,
+                           const dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    bool fieldReplaceable;
+    if (allCurrentIfaceProperties.count("FieldReplaceable"))
+    {
+        fieldReplaceable =
+            std::get<bool>(allCurrentIfaceProperties.at("FieldReplaceable"));
+    }
+
+    auto chassisReplaceable =
+        std::make_shared<NsmChassis<ReplaceableIntf>>(name);
+    chassisReplaceable->invoke(pdiMethod(fieldReplaceable), fieldReplaceable);
+    device->addStaticSensor(chassisReplaceable);
+}
+
 static void createPowerLimit(std::shared_ptr<NsmDevice> device,
                              const std::string& name,
                              const dbus::PropertyMap& allCurrentIfaceProperties)
@@ -336,6 +354,10 @@ static void
     if (allCurrentIfaceProperties.count("LocationContext"))
     {
         createLocationContext(device, name, allCurrentIfaceProperties);
+    }
+    if (allCurrentIfaceProperties.count("FieldReplaceable"))
+    {
+        createFieldReplaceable(device, name, allCurrentIfaceProperties);
     }
     if (allCurrentIfaceProperties.count("ChassisType"))
     {

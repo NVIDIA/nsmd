@@ -33,6 +33,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/LocationContext/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Replaceable/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/server.hpp>
 #include <xyz/openbmc_project/MCTP/UUID/server.hpp>
@@ -52,6 +53,7 @@ using LocationIntf = object_t<Inventory::Decorator::server::Location>;
 using LocationCodeIntf = object_t<Inventory::Decorator::server::LocationCode>;
 using LocationContextIntf =
     object_t<Inventory::Decorator::server::LocationContext>;
+using ReplaceableIntf = object_t<Inventory::Decorator::server::Replaceable>;
 using MctpUuidIntf = object_t<MCTP::server::UUID>;
 using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
 using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
