@@ -54,6 +54,7 @@ NsmFirmwareSlot::NsmFirmwareSlot(
     slotId(slotNum);
     type(fwType);
     extendedVersion("NA");
+    buildType(FirmwareBuildType::Unknown);
 }
 
 void NsmFirmwareSlot::updateActiveSlotAssociation()
