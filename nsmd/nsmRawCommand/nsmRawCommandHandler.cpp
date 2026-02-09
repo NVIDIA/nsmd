@@ -363,8 +363,13 @@ sdbusplus::message::object_path NsmRawCommandHandler::sendRequest(
     bool isLongRunning, uint8_t messageType, uint8_t commandCode,
     sdbusplus::message::unix_fd fd, uint8_t msgFormatVersion)
 {
-    if (deviceType > NSM_DEV_ID_MCTP_BRIDGE || messageType > NSM_TYPE_FIRMWARE)
+    if (deviceType > NSM_DEV_ID_CPU || messageType > NSM_TYPE_FIRMWARE)
     {
+        lg2::error(
+            "NsmRawCommandHandler::sendRequest failed: deviceType={DEVICE_TYPE}, deviceRole={DEVICE_ROLE}, instanceId={INSTANCE_ID}, isLongRunning={IS_LONG_RUNNING}, messageType={MESSAGE_TYPE}, commandCode={COMMAND_CODE}",
+            "DEVICE_TYPE", deviceType, "DEVICE_ROLE", deviceRole, "INSTANCE_ID",
+            instanceId, "IS_LONG_RUNNING", isLongRunning, "MESSAGE_TYPE",
+            messageType, "COMMAND_CODE", commandCode);
         throw sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument();
     }
 
