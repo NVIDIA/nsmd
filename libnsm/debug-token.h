@@ -29,18 +29,35 @@ extern "C" {
 #define NSM_DEBUG_TOKEN_ERASE_ALL_TOKENS 0xFFFFFFFF
 #define NSM_DEBUG_TOKEN_ERASE_ALL_TOKENS_INCREMENT_RATCHET_COUNTER 0xFFFFFFFE
 
+/**
+ * @brief Size of MCTP binding header
+ *
+ * This includes:
+ * - 1 bit: IC (Integrity Check, always 0 for System Management API)
+ * - 7 bits: Message Type (0x7E for PCI Vendor Defined Message)
+ * Total: 1 byte
+ */
+#define MCTP_BINDING_HEADER_SIZE 1
+
 /** @brief Calculate the optimal chunk size for token installation based on the
  * maximum input buffer size. The chunk size is calculated by subtracting the
- * size of the fixed size variables present in the install token request header
- * from the maximum input buffer size.
+ * size of the fixed size variables and headers from the maximum input buffer
+ * size.
  *
- *  @param[in] buffer_size - Maximum input buffer size
- *  @return Optimal chunk size
+ * Total overhead includes:
+ * - 1 byte: MCTP binding header (IC + Message Type = 0x7E)
+ * - 5 bytes: nsm_msg_hdr (PCI VID + Instance ID + OCP fields + NVIDIA msg type)
+ * - 6 bytes: nsm_common_req_v2 (command + reserved + data_size + reserved)
+ * - 12 bytes: chunk_offset + chunk_length + length_remaining
+ * Total: 24 bytes overhead
+ *
+ *  @param[in] buffer_size - Maximum input buffer size (including all headers)
+ *  @return Optimal chunk size (buffer_size - 24)
  */
 #define NSM_DEBUG_TOKEN_INSTALL_CHUNK_SIZE(buffer_size)                        \
-	(buffer_size - ((sizeof(struct nsm_install_token_req) -                \
-			 sizeof(struct nsm_common_req_v2) -                    \
-			 sizeof(((struct nsm_install_token_req *)0)->data))))
+	(buffer_size - MCTP_BINDING_HEADER_SIZE - sizeof(struct nsm_msg_hdr) - \
+	 (sizeof(struct nsm_install_token_req) -                               \
+	  sizeof(((struct nsm_install_token_req *)0)->data)))
 
 /** @brief NSM debug token type
  */
