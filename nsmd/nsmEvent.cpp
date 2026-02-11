@@ -32,8 +32,8 @@ namespace nsm
 {
 
 requester::Coroutine
-    logEventAsync(const std::string& messageId, Level level,
-                  const std::map<std::string, std::string>& data)
+    logEventAsync(const std::string messageId, Level level,
+                  const std::map<std::string, std::string> data)
 {
     static constexpr auto logObjPath = "/xyz/openbmc_project/logging";
     static constexpr auto logInterface = "xyz.openbmc_project.Logging.Create";

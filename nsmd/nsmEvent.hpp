@@ -65,8 +65,8 @@ class NsmEvent
  * @return requester::Coroutine - Coroutine that can be co_awaited
  */
 requester::Coroutine
-    logEventAsync(const std::string& messageId, Level level,
-                  const std::map<std::string, std::string>& data);
+    logEventAsync(const std::string messageId, Level level,
+                  const std::map<std::string, std::string> data);
 
 class EventDispatcher
 {
