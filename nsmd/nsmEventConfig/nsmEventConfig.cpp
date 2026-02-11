@@ -270,8 +270,9 @@ bool NsmGetEventConfig::validateEventIds(
             }
             uint64_t eventId = (byteIndex * 8) + bitOffset;
             // Check if this configured event is supported
-            bool isNotSupported = eventSources[byteIndex].byte &
-                                  (1 << bitOffset);
+            // If bit is SET in eventSources, event IS supported
+            bool isNotSupported =
+                !(eventSources[byteIndex].byte & (1 << bitOffset));
             anyOfEventIdNotSupported |= isNotSupported;
             const auto clearloggerMsg =
                 std::format("Validation of Event ID {} for Message Type {}",
