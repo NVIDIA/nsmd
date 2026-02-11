@@ -37,6 +37,7 @@ EventType0Handler::EventType0Handler()
 {
     enableDelegation(NSM_REDISCOVERY_EVENT);
     enableDelegation(NSM_LONG_RUNNING_EVENT);
+    enableDelegation(NSM_GPIO_STATE_CHANGE_EVENT);
 }
 
 EventType1Handler::EventType1Handler()
