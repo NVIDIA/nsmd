@@ -363,7 +363,9 @@ sdbusplus::message::object_path NsmRawCommandHandler::sendRequest(
     bool isLongRunning, uint8_t messageType, uint8_t commandCode,
     sdbusplus::message::unix_fd fd, uint8_t msgFormatVersion)
 {
-    if (deviceType > NSM_DEV_ID_MCTP_BRIDGE || messageType > NSM_TYPE_FIRMWARE)
+    // Raw command allows any NSM message type (0-255); only deviceType is
+    // validated against known NSM device IDs.
+    if (deviceType > NSM_DEV_ID_CPU)
     {
         throw sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument();
     }
