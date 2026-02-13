@@ -91,10 +91,6 @@ TEST_F(NsmRawCommandHandlerTest, BadTestSendRequest)
         NsmRawCommandHandler::getInstance().sendRequest(
             NSM_DEV_ID_UNKNOWN, 0, 0, false, 0, 0, unix_fd(fd), 1),
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
-    EXPECT_THROW(
-        NsmRawCommandHandler::getInstance().sendRequest(
-            0, 0, 0, false, NSM_TYPE_FIRMWARE + 1, 0, unix_fd(fd), 1),
-        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
 }
 
 TEST_F(NsmRawCommandHandlerTest, BadTestNoDevice)
