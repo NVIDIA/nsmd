@@ -1,5 +1,6 @@
 dep_src_files = [
     '../nsmProcessor.cpp',
+    '../nsmGpuOperationalStatus.cpp',
     '../nsmReconfigPermissions.cpp',
     '../nsmPowerSmoothing.cpp',
     '../nsmOemResetStatistics.cpp',

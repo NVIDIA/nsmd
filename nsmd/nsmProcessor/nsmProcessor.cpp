@@ -38,6 +38,7 @@
 #include "nsmAssetIntf.hpp"
 #include "nsmDevice.hpp"
 #include "nsmErrorInjection/nsmErrorInjectionCommon.hpp"
+#include "nsmGpuOperationalStatus.hpp"
 #include "nsmInterface.hpp"
 #include "nsmMNNVLinkTopologyIntf.hpp"
 #include "nsmObjectFactory.hpp"
@@ -271,6 +272,18 @@ static void createTotalNvLinksCount(std::shared_ptr<NsmDevice> nsmDevice,
     auto totalNvLinkSensor = std::make_shared<NsmTotalNvLinks>(
         name, type, totalNvLinkInterface, inventoryObjPath);
     nsmDevice->addSensor(totalNvLinkSensor, priority);
+}
+
+static void createGpuOperationalStatus(std::shared_ptr<NsmDevice> nsmDevice,
+                                       sdbusplus::bus::bus& bus,
+                                       std::string& name, std::string& type,
+                                       std::string& inventoryObjPath)
+{
+    bool priority = false;
+
+    auto gpuOpStatusSensor = std::make_shared<NsmGpuOperationalStatus>(
+        bus, name, type, inventoryObjPath);
+    nsmDevice->addSensor(gpuOpStatusSensor, priority);
 }
 
 static void createEGMMode(std::shared_ptr<NsmDevice> nsmDevice,
@@ -3697,6 +3710,14 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             createGPUPowerLimit(nsmDevice, bus, name,
                                 "NSM_GPU_COPY_CPU_POWER_LIMIT",
                                 inventoryObjPath);
+        }
+        if (allCurrentIfaceProperties.count(
+                "MctpNsmOperationalStatusSupported") &&
+            std::get<bool>(allCurrentIfaceProperties.at(
+                "MctpNsmOperationalStatusSupported")))
+        {
+            createGpuOperationalStatus(nsmDevice, bus, name, type,
+                                       inventoryObjPath);
         }
     }
     else if (type == "NSM_PCIe")
