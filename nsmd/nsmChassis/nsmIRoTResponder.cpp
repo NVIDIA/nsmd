@@ -193,6 +193,57 @@ void createIRoTResponderChassis(std::shared_ptr<NsmDevice> device,
     device->addStaticSensor(chassisObject);
 }
 
+static void createIRoTResponderLocationCode(
+    std::shared_ptr<NsmDevice> device, std::string& name,
+    const std::string& baseType, dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    std::string locationCode;
+    if (allCurrentIfaceProperties.count("LocationCode"))
+    {
+        locationCode =
+            std::get<std::string>(allCurrentIfaceProperties.at("LocationCode"));
+    }
+
+    auto locationCodeObject =
+        std::make_shared<NsmIRoTResponder<LocationCodeIntf>>(name, baseType);
+    locationCodeObject->invoke(pdiMethod(locationCode), locationCode);
+    device->addStaticSensor(locationCodeObject);
+}
+
+static void createIRoTResponderLocationContext(
+    std::shared_ptr<NsmDevice> device, std::string& name,
+    const std::string& baseType, dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    std::string locationContext;
+    if (allCurrentIfaceProperties.count("LocationContext"))
+    {
+        locationContext = std::get<std::string>(
+            allCurrentIfaceProperties.at("LocationContext"));
+    }
+
+    auto locationContextObject =
+        std::make_shared<NsmIRoTResponder<LocationContextIntf>>(name, baseType);
+    locationContextObject->invoke(pdiMethod(locationContext), locationContext);
+    device->addStaticSensor(locationContextObject);
+}
+
+static void createIRoTResponderFieldReplaceable(
+    std::shared_ptr<NsmDevice> device, std::string& name,
+    const std::string& baseType, dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    bool fieldReplaceable = false;
+    if (allCurrentIfaceProperties.count("FieldReplaceable"))
+    {
+        fieldReplaceable =
+            std::get<bool>(allCurrentIfaceProperties.at("FieldReplaceable"));
+    }
+
+    auto replaceableObject =
+        std::make_shared<NsmIRoTResponder<ReplaceableIntf>>(name, baseType);
+    replaceableObject->invoke(pdiMethod(fieldReplaceable), fieldReplaceable);
+    device->addStaticSensor(replaceableObject);
+}
+
 static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
                                                    const std::string& interface,
                                                    const std::string& objPath)
@@ -267,6 +318,21 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
         {
             createIRoTResponderChassis(device, name, baseType,
                                        allCurrentIfaceProperties);
+        }
+        if (allCurrentIfaceProperties.count("LocationCode"))
+        {
+            createIRoTResponderLocationCode(device, name, baseType,
+                                            allCurrentIfaceProperties);
+        }
+        if (allCurrentIfaceProperties.count("LocationContext"))
+        {
+            createIRoTResponderLocationContext(device, name, baseType,
+                                               allCurrentIfaceProperties);
+        }
+        if (allCurrentIfaceProperties.count("FieldReplaceable"))
+        {
+            createIRoTResponderFieldReplaceable(device, name, baseType,
+                                                allCurrentIfaceProperties);
         }
     }
     co_return NSM_SUCCESS;
