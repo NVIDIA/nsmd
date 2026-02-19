@@ -2673,6 +2673,22 @@ class QueryScalarGroupTelemetry : public CommandInterface
                     return;
                 }
 
+                auto encodedSizeToBytes = [](uint32_t encoded) -> uint32_t {
+                    return (encoded <= 5) ? (128u << encoded) : 0;
+                };
+
+                auto clockModeToString = [](uint32_t mode) -> std::string {
+                    switch (mode)
+                    {
+                        case NSM_PCIE_CLOCK_MODE_SEPARATE:
+                            return "SeparateClock";
+                        case NSM_PCIE_CLOCK_MODE_COMMON:
+                            return "CommonClock";
+                        default:
+                            return "Unknown";
+                    }
+                };
+
                 ordered_json result;
                 result["Completion Code"] = cc;
                 result["NegotiatedLinkSpeed"] = (int)data.negotiated_link_speed;
@@ -2680,6 +2696,11 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 result["TargetLinkSpeed"] = (int)data.target_link_speed;
                 result["maxLinkSpeed"] = (int)data.max_link_speed;
                 result["maxLinkWidth"] = (int)data.max_link_width;
+                result["MaxReadRequestSizeBytes"] =
+                    encodedSizeToBytes(data.max_read_request_size_bytes);
+                result["MaxPayloadSizeBytes"] =
+                    encodedSizeToBytes(data.max_payload_size_bytes);
+                result["ClockMode"] = clockModeToString(data.clock_mode);
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
@@ -2711,6 +2732,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 result["Completion Code"] = cc;
                 result["nonfeCount"] = (int)data.non_fatal_errors;
                 result["feCount"] = (int)data.fatal_errors;
+                result["UnsupportedRequestCount"] =
+                    (int)data.unsupported_request_count;
                 result["ceCount"] = (int)data.correctable_errors;
                 nsmtool::helper::DisplayInJson(result);
                 break;
@@ -2741,7 +2764,12 @@ class QueryScalarGroupTelemetry : public CommandInterface
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                result["l0ToRecoveryCount"] = (int)data.L0ToRecoveryCount;
+                result["L0ToRecoveryCount"] = (uint32_t)data.L0ToRecoveryCount;
+                result["EIEOSTimeout"] = (uint32_t)data.eieos_timeout;
+                result["TrainingSequenceErrorCount"] =
+                    (uint32_t)data.training_seq_errors;
+                result["FramingErrorCount"] = (uint32_t)data.framing_errors;
+                result["LinkDownCount"] = (uint32_t)data.link_down_count;
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
@@ -2771,13 +2799,16 @@ class QueryScalarGroupTelemetry : public CommandInterface
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                result["ReceiverErrorCount"] = (int)data.recv_err_cnt;
-                result["nakRecievedCount"] = (int)data.NAK_recv_cnt;
-                result["nakSentCount"] = (int)data.NAK_sent_cnt;
-                result["BadTLPCount"] = (int)data.bad_TLP_cnt;
-                result["replayRolloverCount"] = (int)data.replay_rollover_cnt;
-                result["FCTimeoutErrorCount"] = (int)data.FC_timeout_err_cnt;
-                result["replayCount"] = (int)data.replay_cnt;
+                result["ReceiverErrorCount"] = (uint32_t)data.recv_err_cnt;
+                result["NAKReceivedCount"] = (uint32_t)data.NAK_recv_cnt;
+                result["NAKSentCount"] = (uint32_t)data.NAK_sent_cnt;
+                result["BadTLPCount"] = (uint32_t)data.bad_TLP_cnt;
+                result["ReplayRolloverCount"] =
+                    (uint32_t)data.replay_rollover_cnt;
+                result["FCTimeoutErrorCount"] =
+                    (uint32_t)data.FC_timeout_err_cnt;
+                result["ReplayCount"] = (uint32_t)data.replay_cnt;
+                result["DLLPCRCErrorCount"] = (uint32_t)data.dllp_crc_errors;
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
@@ -2840,6 +2871,54 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 result["Completion Code"] = cc;
                 result["InvalidFlitCounter"] = (int)data.invalid_flit_counter;
                 result["LTSSMState"] = (int)data.ltssm_state;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+
+            case GROUP_ID_7:
+            {
+                struct nsm_query_scalar_group_telemetry_group_7 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group7_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_7_resp));
+
+                    return;
+                }
+
+                auto portTypeToString = [](uint32_t portType) -> std::string {
+                    switch (portType)
+                    {
+                        case NSM_PCIE_PORT_TYPE_ENDPOINT:
+                            return "Endpoint";
+                        case NSM_PCIE_PORT_TYPE_ROOT_PORT:
+                            return "RootPort";
+                        case NSM_PCIE_PORT_TYPE_UPSTREAM:
+                            return "UpstreamPort";
+                        case NSM_PCIE_PORT_TYPE_DOWNSTREAM:
+                            return "DownstreamPort";
+                        default:
+                            return "Unknown";
+                    }
+                };
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["PortType"] = portTypeToString(data.port_type);
+                result["PCIeBusNumber"] = (uint32_t)data.pcie_bus_number;
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
@@ -3039,6 +3118,106 @@ class QueryMultiportScalarGroupTelemetry : public QueryScalarGroupTelemetry
     uint8_t type;
     uint8_t upstreamPortIndex;
     uint8_t index;
+};
+
+class QueryVectorGroupTelemetry : public CommandInterface
+{
+  public:
+    ~QueryVectorGroupTelemetry() = default;
+    QueryVectorGroupTelemetry() = delete;
+    QueryVectorGroupTelemetry(const QueryVectorGroupTelemetry&) = delete;
+    QueryVectorGroupTelemetry(QueryVectorGroupTelemetry&&) = default;
+    QueryVectorGroupTelemetry&
+        operator=(const QueryVectorGroupTelemetry&) = delete;
+    QueryVectorGroupTelemetry& operator=(QueryVectorGroupTelemetry&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit QueryVectorGroupTelemetry(const char* type, const char* name,
+                                       CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto vectorTelemetryOptionGroup = app->add_option_group(
+            "Required",
+            "Vector Group Telemetry parameters for per-lane queries.");
+
+        vectorTelemetryOptionGroup->add_option(
+            "-t, --Type", portType, "Port Type (0 - Upstream, 1 - Downstream)");
+        vectorTelemetryOptionGroup->add_option("-u, --UpstreamPortNumber",
+                                               upstreamPortNumber,
+                                               "Upstream Port Number (0-127)");
+        vectorTelemetryOptionGroup->add_option("-i, --Index", portIndex,
+                                               "Port Index");
+        vectorTelemetryOptionGroup->add_option(
+            "-g, --groupId", groupId, "Vector Group ID (1 for CDR errors)");
+        vectorTelemetryOptionGroup->add_option(
+            "-s, --speedCode", speedCode,
+            "Link Speed Code (1=Gen1, 2=Gen2, 3=Gen3, 4=Gen4, 5=Gen5, 6=Gen6)");
+        vectorTelemetryOptionGroup->add_option("-l, --laneNumber", laneNumber,
+                                               "Lane Number (0-31)");
+        vectorTelemetryOptionGroup->require_option(6);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_vector_group_telemetry_v2_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        auto rc = encode_query_vector_group_telemetry_v2_req(
+            instanceId, upstreamPortNumber, portType, portIndex, groupId,
+            speedCode, laneNumber, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        size_t msgLen = sizeof(struct nsm_msg_hdr) + payloadLength;
+
+        switch (groupId)
+        {
+            case GROUP_ID_1:
+            {
+                struct nsm_query_vector_group_1_data data;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_vector_group_telemetry_v2_group1_resp(
+                    responsePtr, msgLen, &cc, &reason_code, &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr << "Response message error: "
+                              << "rc=" << rc << ", cc=" << (int)cc
+                              << ", reasonCode=" << (int)reason_code << "\n";
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["LaneNumber"] = (int)laneNumber;
+                result["SpeedCode"] = (int)speedCode;
+                result["CDRErrorCount"] = (uint32_t)data.cdr_error_per_lane;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+
+            default:
+            {
+                std::cerr << "Invalid Vector Group Id: " << (int)groupId
+                          << "\n";
+                break;
+            }
+        }
+    }
+
+  private:
+    uint8_t portType;
+    uint8_t upstreamPortNumber;
+    uint8_t portIndex;
+    uint8_t groupId;
+    uint8_t speedCode;
+    uint8_t laneNumber;
 };
 
 class QueryAvailableAndClearableScalarGroup : public CommandInterface
@@ -6360,6 +6539,12 @@ void registerCommand(CLI::App& app)
         "QueryScalarGroupTelemetry", "retrieve Scalar Data source for group ");
     commands.push_back(std::make_unique<QueryScalarGroupTelemetry>(
         "telemetry", "QueryScalarGroupTelemetry", queryScalarGroupTelemetry));
+
+    auto queryVectorGroupTelemetry = telemetry->add_subcommand(
+        "QueryVectorGroupTelemetry",
+        "retrieve Vector Data source for group (per-lane telemetry)");
+    commands.push_back(std::make_unique<QueryVectorGroupTelemetry>(
+        "telemetry", "QueryVectorGroupTelemetry", queryVectorGroupTelemetry));
 
     auto queryAvailableAndClearableScalarGroup = telemetry->add_subcommand(
         "QueryAvailableAndClearableScalarGroup",

@@ -63,18 +63,17 @@ NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
     updateMetricOnSharedMemory();
 }
 
-NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
-                                   const std::string& type,
-                                   const std::string& inventoryPath,
-                                   std::shared_ptr<PortInfoIntf> portInfoIntf,
-                                   std::shared_ptr<PortWidthIntf> portWidthIntf,
-                                   uint8_t multiPortType,
-                                   uint8_t multiPortIndex,
-                                   uint8_t multiPortUpstreamPortNumber) :
+NsmPCIeECCGroup1::NsmPCIeECCGroup1(
+    const std::string& name, const std::string& type,
+    const std::string& inventoryPath,
+    std::shared_ptr<PortInfoIntf> portInfoIntf,
+    std::shared_ptr<PortWidthIntf> portWidthIntf,
+    std::shared_ptr<PCIeClockModeIntf> pcieClockModeIntf, uint8_t multiPortType,
+    uint8_t multiPortIndex, uint8_t multiPortUpstreamPortNumber) :
     NsmPcieGroup(name, type, GROUP_ID_1, multiPortType, multiPortIndex,
                  multiPortUpstreamPortNumber),
     objPath(inventoryPath), portInfoIntf(portInfoIntf),
-    portWidthIntf(portWidthIntf)
+    portWidthIntf(portWidthIntf), pcieClockModeIntf(pcieClockModeIntf)
 {
     lg2::info("NsmMultiPCIeECCGroup1: {NAME}", "NAME", name.c_str());
 
@@ -83,6 +82,9 @@ NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
     portInfoIntf->targetSpeed(0);
     portWidthIntf->width(0);
     portWidthIntf->activeWidth(0);
+    portInfoIntf->maxReadRequestSizeBytes(0);
+    portInfoIntf->maxPayloadSizeBytes(0);
+    pcieClockModeIntf->commonClockMode(ClockMode::SeparateClockMode);
 
     updateMetricOnSharedMemory();
 }
@@ -91,42 +93,56 @@ double NsmPCIeECCGroup1::convertEncodedSpeedToGbps(const uint32_t& speed)
 {
     switch (speed)
     {
-        case 1:
-        {
-            return 2.5;
-        }
-        case 2:
-        {
-            return 5.0;
-        }
-        case 3:
-        {
-            return 8.0;
-        }
-        case 4:
-        {
-            return 16.0;
-        }
-        case 5:
-        {
-            return 32.0;
-        }
-        case 6:
-        {
-            return 64.0;
-        }
+        case NSM_PCIE_LINK_SPEED_CODE_GEN1:
+            return NSM_PCIE_SPEED_GBPS_GEN1;
+        case NSM_PCIE_LINK_SPEED_CODE_GEN2:
+            return NSM_PCIE_SPEED_GBPS_GEN2;
+        case NSM_PCIE_LINK_SPEED_CODE_GEN3:
+            return NSM_PCIE_SPEED_GBPS_GEN3;
+        case NSM_PCIE_LINK_SPEED_CODE_GEN4:
+            return NSM_PCIE_SPEED_GBPS_GEN4;
+        case NSM_PCIE_LINK_SPEED_CODE_GEN5:
+            return NSM_PCIE_SPEED_GBPS_GEN5;
+        case NSM_PCIE_LINK_SPEED_CODE_GEN6:
+            return NSM_PCIE_SPEED_GBPS_GEN6;
         default:
-        {
             lg2::debug("NsmPCIeECCGroup1: {NAME}, unknown speed {SPEED}",
                        "NAME", getName(), "SPEED", speed);
             return 0;
-        }
     }
 }
 
 size_t NsmPCIeECCGroup1::convertEncodedWidthToActualWidth(const uint32_t& width)
 {
     return (width > 0 && width <= 6) ? (uint32_t)pow(2, width - 1) : 0;
+}
+
+size_t NsmPCIeECCGroup1::convertEncodedSizeToBytes(const uint32_t& size)
+{
+    return (size <= 5) ? (static_cast<size_t>(128) << size) : 0;
+}
+
+ClockMode
+    NsmPCIeECCGroup1::convertEncodedClockModeToEnum(const uint32_t& clockMode)
+{
+    switch (clockMode)
+    {
+        case NSM_PCIE_CLOCK_MODE_SEPARATE:
+        {
+            return ClockMode::SeparateClockMode;
+        }
+        case NSM_PCIE_CLOCK_MODE_COMMON:
+        {
+            return ClockMode::CommonClockMode;
+        }
+        default:
+        {
+            LG2_DEBUG_FLT(
+                "NsmPCIeECCGroup1: {NAME}, unknown clock mode {CLOCKMODE}",
+                "NAME", getName(), "CLOCKMODE", clockMode);
+            return ClockMode::Unknown;
+        }
+    }
 }
 
 uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -154,6 +170,13 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
             convertEncodedWidthToActualWidth(data.max_link_width));
         portWidthIntf->activeWidth(
             convertEncodedWidthToActualWidth(data.negotiated_link_width));
+        portInfoIntf->maxReadRequestSizeBytes(
+            convertEncodedSizeToBytes(data.max_read_request_size_bytes));
+        portInfoIntf->maxPayloadSizeBytes(
+            convertEncodedSizeToBytes(data.max_payload_size_bytes));
+        pcieClockModeIntf->commonClockMode(
+            convertEncodedClockModeToEnum(data.clock_mode));
+
         updateMetricOnSharedMemory();
     }
     return cc ? cc : rc;
@@ -240,6 +263,7 @@ uint8_t NsmPCIeECCGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
         pcieEccIntf->feCount(data.fatal_errors);
         pcieEccIntf->ceCount(data.correctable_errors);
         pcieEccIntf->unsupportedRequestCount(data.unsupported_request_count);
+
         updateMetricOnSharedMemory();
     }
     return cc ? cc : rc;
@@ -304,6 +328,9 @@ NsmPCIeECCGroup3::NsmPCIeECCGroup3(const std::string& name,
     lg2::info("NsmMultiPCIeECCGroup3: {NAME}", "NAME", name.c_str());
 
     pcieEccIntf->l0ToRecoveryCount(0);
+    pcieEccIntf->trainingSequenceErrorCount(0);
+    pcieEccIntf->framingErrorCount(0);
+    pcieEccIntf->linkDownedCount(0);
     updateMetricOnSharedMemory();
 }
 
@@ -324,6 +351,10 @@ uint8_t NsmPCIeECCGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         pcieEccIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
+        pcieEccIntf->trainingSequenceErrorCount(data.training_seq_errors);
+        pcieEccIntf->framingErrorCount(data.framing_errors);
+        pcieEccIntf->linkDownedCount(data.link_down_count);
+
         updateMetricOnSharedMemory();
     }
     return cc ? cc : rc;
@@ -340,6 +371,24 @@ void NsmPCIeECCGroup3::updateMetricOnSharedMemory()
     std::string propName = "L0ToRecoveryCount";
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantL0TRC);
+
+    nv::sensor_aggregation::DbusVariantType variantTSEC{
+        pcieEccIntf->trainingSequenceErrorCount()};
+    propName = "TrainingSequenceErrorCount";
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantTSEC);
+
+    nv::sensor_aggregation::DbusVariantType variantFEC{
+        pcieEccIntf->framingErrorCount()};
+    propName = "FramingErrorCount";
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantFEC);
+
+    nv::sensor_aggregation::DbusVariantType variantLDC{
+        pcieEccIntf->linkDownedCount()};
+    propName = "LinkDownedCount";
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantLDC);
 #endif
 }
 
@@ -385,6 +434,7 @@ NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
     pcieEccIntf->fcTimeoutErrors(0);
     pcieEccIntf->badTLPCount(0);
     pcieEccIntf->receiverErrorCount(0);
+    pcieEccIntf->dllpcrcErrorCount(0);
 
     updateMetricOnSharedMemory();
 }
@@ -412,6 +462,8 @@ uint8_t NsmPCIeECCGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
         pcieEccIntf->fcTimeoutErrors(data.FC_timeout_err_cnt);
         pcieEccIntf->badTLPCount(data.bad_TLP_cnt);
         pcieEccIntf->receiverErrorCount(data.recv_err_cnt);
+        pcieEccIntf->dllpcrcErrorCount(data.dllp_crc_errors);
+
         updateMetricOnSharedMemory();
     }
     return cc ? cc : rc;
@@ -463,6 +515,12 @@ void NsmPCIeECCGroup4::updateMetricOnSharedMemory()
     propName = "BadTLPCount";
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantBTC);
+
+    nv::sensor_aggregation::DbusVariantType variantDLLPCRC{
+        pcieEccIntf->dllpcrcErrorCount()};
+    propName = "DLLPCRCErrorCount";
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantDLLPCRC);
 #endif
 }
 
@@ -546,6 +604,127 @@ void NsmPCIeECCGroup5::updateMetricOnSharedMemory()
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePortMetricsOem2Name, propName, rawSmbpbiData, variantRXB);
 #endif
+}
+
+NsmPCIeECCGroup7::NsmPCIeECCGroup7(const std::string& name,
+                                   const std::string& type,
+                                   const std::string& inventoryPath,
+                                   std::shared_ptr<PortInfoIntf> portInfoIntf,
+                                   uint8_t deviceIndex) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_7), objPath(inventoryPath),
+    portInfoIntf(portInfoIntf)
+{
+    lg2::info("NsmPCIeECCGroup7: {NAME}", "NAME", name.c_str());
+    updateMetricOnSharedMemory();
+}
+
+NsmPCIeECCGroup7::NsmPCIeECCGroup7(const std::string& name,
+                                   const std::string& type,
+                                   const std::string& inventoryPath,
+                                   std::shared_ptr<PortInfoIntf> portInfoIntf,
+                                   uint8_t multiPortType,
+                                   uint8_t multiPortIndex,
+                                   uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, GROUP_ID_7, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
+    objPath(inventoryPath), portInfoIntf(portInfoIntf)
+{
+    lg2::info("NsmMultiPCIeECCGroup7: {NAME}", "NAME", name.c_str());
+}
+
+NsmPCIeECCGroup7::NsmPCIeECCGroup7(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<PCIeDeviceIntf> pcieDeviceIntf,
+    const std::vector<uint64_t>& functionIds, uint8_t multiPortType,
+    uint8_t multiPortIndex, uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, GROUP_ID_7, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
+    pcieDeviceIntf(pcieDeviceIntf), functionIds(functionIds)
+{
+    lg2::info("NsmPCIeECCGroup7 (PCIeDevice): {NAME}, functionCount: {CNT}",
+              "NAME", name.c_str(), "CNT", functionIds.size());
+}
+
+uint8_t NsmPCIeECCGroup7::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    struct nsm_query_scalar_group_telemetry_group_7 data;
+
+    auto rc = decode_query_scalar_group_telemetry_v1_group7_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    LG2_ERROR_FLT(
+        "NsmPCIeECCGroup7 decode_query_scalar_group_telemetry_v1_group7_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        // Handle PortInfoIntf case (retimer ports - sets PortType)
+        if (portInfoIntf)
+        {
+            PortType portType;
+            auto pciePortType = static_cast<nsm_pcie_port_type>(data.port_type);
+            switch (pciePortType)
+            {
+                case NSM_PCIE_PORT_TYPE_ROOT_PORT:
+                    portType = PortType::RootPort;
+                    break;
+                case NSM_PCIE_PORT_TYPE_UPSTREAM:
+                    portType = PortType::UpstreamPort;
+                    break;
+                case NSM_PCIE_PORT_TYPE_DOWNSTREAM:
+                    portType = PortType::DownstreamPort;
+                    break;
+                case NSM_PCIE_PORT_TYPE_ENDPOINT:
+                    portType = PortType::EndpointPort;
+                    break;
+                default:
+                    portType = PortType::DownstreamPort;
+                    break;
+            }
+            portInfoIntf->type(portType);
+        }
+
+        // Handle PCIeDeviceIntf case - sets Function{N}BusNumber for all
+        // functions
+        if (pcieDeviceIntf)
+        {
+            auto busNumber = static_cast<uint8_t>(data.pcie_bus_number);
+            for (const auto& funcId : functionIds)
+            {
+                switch (funcId)
+                {
+                    case 0:
+                        pcieDeviceIntf->function0BusNumber(busNumber);
+                        break;
+                    case 1:
+                        pcieDeviceIntf->function1BusNumber(busNumber);
+                        break;
+                    case 2:
+                        pcieDeviceIntf->function2BusNumber(busNumber);
+                        break;
+                    case 3:
+                        pcieDeviceIntf->function3BusNumber(busNumber);
+                        break;
+                    case 4:
+                        pcieDeviceIntf->function4BusNumber(busNumber);
+                        break;
+                    case 5:
+                        pcieDeviceIntf->function5BusNumber(busNumber);
+                        break;
+                    case 6:
+                        pcieDeviceIntf->function6BusNumber(busNumber);
+                        break;
+                    case 7:
+                        pcieDeviceIntf->function7BusNumber(busNumber);
+                        break;
+                }
+            }
+        }
+    }
+    return cc ? cc : rc;
 }
 
 // TODO refactor usage to NsmPCIeErrors(8)
@@ -680,35 +859,87 @@ uint8_t NsmPCIeECCGroup9::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc ? cc : rc;
 }
 
-NsmPCIeECCGroup10::NsmPCIeECCGroup10(sdbusplus::bus::bus& bus,
-                                     const std::string& name,
+NsmPCIeECCGroup10::NsmPCIeECCGroup10(const std::string& name,
                                      const std::string& type,
                                      const std::string& inventoryObjPath,
-                                     uint8_t deviceIndex) :
+                                     uint8_t deviceIndex,
+                                     bool includeInboundCounters) :
     NsmPcieGroup(name, type, deviceIndex, GROUP_ID_10),
-    inventoryObjPath(inventoryObjPath)
+    inventoryObjPath(inventoryObjPath),
+    includeInboundCounters(includeInboundCounters)
 {
-    lg2::info("NsmPCIeECCGroup10: create sensor:{NAME}", "NAME", name.c_str());
-    pcieTransactionCounterIntf = std::make_unique<PCIeTransactionCounterIntf>(
-        bus, inventoryObjPath.c_str());
-
+    lg2::info("NsmPCIeECCGroup10: create sensor:{NAME} includeInbound:{INC}",
+              "NAME", name.c_str(), "INC", includeInboundCounters);
+    registerProperties();
     updateMetricOnSharedMemory();
 }
 
-NsmPCIeECCGroup10::NsmPCIeECCGroup10(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
-    const std::string& inventoryObjPath, uint8_t multiPortType,
-    uint8_t multiPortIndex, uint8_t multiPortUpstreamPortNumber) :
+NsmPCIeECCGroup10::NsmPCIeECCGroup10(const std::string& name,
+                                     const std::string& type,
+                                     const std::string& inventoryObjPath,
+                                     uint8_t multiPortType,
+                                     uint8_t multiPortIndex,
+                                     uint8_t multiPortUpstreamPortNumber,
+                                     bool includeInboundCounters) :
     NsmPcieGroup(name, type, GROUP_ID_10, multiPortType, multiPortIndex,
                  multiPortUpstreamPortNumber),
-    inventoryObjPath(inventoryObjPath)
+    inventoryObjPath(inventoryObjPath),
+    includeInboundCounters(includeInboundCounters)
 {
-    lg2::info("NsmMultiPCIeECCGroup10: create sensor:{NAME}", "NAME",
-              name.c_str());
-    pcieTransactionCounterIntf = std::make_unique<PCIeTransactionCounterIntf>(
-        bus, inventoryObjPath.c_str());
-
+    lg2::info(
+        "NsmMultiPCIeECCGroup10: create sensor:{NAME} includeInbound:{INC}",
+        "NAME", name.c_str(), "INC", includeInboundCounters);
+    registerProperties();
     updateMetricOnSharedMemory();
+}
+
+uint64_t NsmPCIeECCGroup10::join64BitCounterLowHigh(uint32_t high, uint32_t low)
+{
+    return (static_cast<uint64_t>(high) << 32) | low;
+}
+
+uint64_t NsmPCIeECCGroup10::convertDwordsSizeToBytes(uint64_t dwords)
+{
+    return dwords * static_cast<uint64_t>(BYTES_PER_DWORD);
+}
+
+void NsmPCIeECCGroup10::registerProperties()
+{
+    pcieTransactionCounterIntf =
+        SensorManager::getInstance().getObjServer().add_unique_interface(
+            inventoryObjPath,
+            "xyz.openbmc_project.PCIe.PCIeTransactionCounter");
+
+    // Common properties (available on all platforms)
+    pcieTransactionCounterIntf->register_property("OutboundWritePktCount",
+                                                  uint64_t(0));
+    pcieTransactionCounterIntf->register_property("OutboundWriteTransfer",
+                                                  uint64_t(0));
+    pcieTransactionCounterIntf->register_property("ReqDroppedTag", uint64_t(0));
+    pcieTransactionCounterIntf->register_property("ReqDroppedCreditCompletion",
+                                                  uint64_t(0));
+    pcieTransactionCounterIntf->register_property("ReqDroppedNonPostCredit",
+                                                  uint64_t(0));
+
+    if (!includeInboundCounters)
+    {
+        pcieTransactionCounterIntf->register_property("OutboundReadPktCount",
+                                                      uint64_t(0));
+        pcieTransactionCounterIntf->register_property("OutboundReadTransfer",
+                                                      uint64_t(0));
+        pcieTransactionCounterIntf->register_property("OutboundTLPCount",
+                                                      uint64_t(0));
+        pcieTransactionCounterIntf->register_property("OutboundTLPsTransfer",
+                                                      uint64_t(0));
+    }
+    else
+    {
+        pcieTransactionCounterIntf->register_property("InboundTLPCount",
+                                                      uint64_t(0));
+        pcieTransactionCounterIntf->register_property("InboundTLPsTransfer",
+                                                      uint64_t(0));
+    }
+    pcieTransactionCounterIntf->initialize();
 }
 
 uint8_t NsmPCIeECCGroup10::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -716,56 +947,423 @@ uint8_t NsmPCIeECCGroup10::handleResponseMsg(const struct nsm_msg* responseMsg,
 {
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
-    nsm_query_scalar_group_telemetry_group_10 data = {};
+    int rc;
 
-    auto rc = decode_query_scalar_group_telemetry_v1_group10_resp(
-        responseMsg, responseLen, &cc, &reasonCode, &data);
-
-    LG2_ERROR_FLT(
-        "decode_query_scalar_group_telemetry_v1_group10_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    if (includeInboundCounters)
     {
-        pcieTransactionCounterIntf->outboundReadPktCount(
-            static_cast<uint64_t>(data.outbound_read_tlp_count));
-        pcieTransactionCounterIntf->outboundWritePktCount(
-            static_cast<uint64_t>(data.outbound_write_tlp_count));
-        pcieTransactionCounterIntf->outboundTLPCount(
-            static_cast<uint64_t>(data.outbound_completion_tlp_count));
+        nsm_query_scalar_group_telemetry_group_10_extended data = {};
+        rc = decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+            responseMsg, responseLen, &cc, &reasonCode, &data);
 
-        uint64_t outboundReadTransfer =
-            (static_cast<uint64_t>(
-                 data.dwords_transferred_in_outbound_read_tlp_high)
-             << 32) |
-            data.dwords_transferred_in_outbound_read_tlp_low;
-        uint64_t outboundWriteTransfer =
-            (static_cast<uint64_t>(
-                 data.dwords_transferred_in_outbound_write_tlp_high)
-             << 32) |
-            data.dwords_transferred_in_outbound_write_tlp_low;
-        // convert dwords to bytes and update dwords
-        pcieTransactionCounterIntf->outboundReadTransfer(outboundReadTransfer *
-                                                         4);
-        pcieTransactionCounterIntf->outboundWriteTransfer(
-            outboundWriteTransfer * 4);
-        pcieTransactionCounterIntf->outboundTLPsTransfer(
-            static_cast<uint64_t>(
-                data.dwords_transferred_in_outbound_completion) *
-            4);
+        LG2_ERROR_FLT(
+            "decode_query_scalar_group_telemetry_v1_group10_extended_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
 
-        pcieTransactionCounterIntf->reqDroppedTag(
-            static_cast<uint64_t>(data.read_requests_dropped_tag_unavailable));
-        pcieTransactionCounterIntf->reqDroppedCreditCompletion(
-            static_cast<uint64_t>(
-                data.read_requests_dropped_credit_exhaustion));
-        pcieTransactionCounterIntf->reqDroppedNonPostCredit(
-            static_cast<uint64_t>(
-                data.read_requests_dropped_credit_not_posted));
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+        {
+            outboundWritePktCount =
+                static_cast<uint64_t>(data.outbound_write_tlp_count);
+            pcieTransactionCounterIntf->set_property("OutboundWritePktCount",
+                                                     outboundWritePktCount);
 
-        updateMetricOnSharedMemory();
+            outboundWriteTransfer =
+                convertDwordsSizeToBytes(join64BitCounterLowHigh(
+                    data.dwords_transferred_in_outbound_write_tlp_high,
+                    data.dwords_transferred_in_outbound_write_tlp_low));
+            pcieTransactionCounterIntf->set_property("OutboundWriteTransfer",
+                                                     outboundWriteTransfer);
+
+            reqDroppedTag = static_cast<uint64_t>(
+                data.read_requests_dropped_tag_unavailable);
+            pcieTransactionCounterIntf->set_property("ReqDroppedTag",
+                                                     reqDroppedTag);
+
+            reqDroppedCreditCompletion = static_cast<uint64_t>(
+                data.read_requests_dropped_credit_exhaustion);
+            pcieTransactionCounterIntf->set_property(
+                "ReqDroppedCreditCompletion", reqDroppedCreditCompletion);
+
+            reqDroppedNonPostCredit = static_cast<uint64_t>(
+                data.read_requests_dropped_credit_not_posted);
+            pcieTransactionCounterIntf->set_property("ReqDroppedNonPostCredit",
+                                                     reqDroppedNonPostCredit);
+
+            inboundTLPCount =
+                static_cast<uint64_t>(data.inbound_completion_tlp_count);
+            pcieTransactionCounterIntf->set_property("InboundTLPCount",
+                                                     inboundTLPCount);
+
+            inboundTLPsTransfer = convertDwordsSizeToBytes(
+                join64BitCounterLowHigh(data.inbound_completion_tlp_bytes_high,
+                                        data.inbound_completion_tlp_bytes_low));
+            pcieTransactionCounterIntf->set_property("InboundTLPsTransfer",
+                                                     inboundTLPsTransfer);
+
+            updateMetricOnSharedMemory();
+        }
+    }
+    else
+    {
+        nsm_query_scalar_group_telemetry_group_10 data = {};
+        rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+            responseMsg, responseLen, &cc, &reasonCode, &data);
+
+        LG2_ERROR_FLT(
+            "decode_query_scalar_group_telemetry_v1_group10_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+        {
+            outboundReadPktCount =
+                static_cast<uint64_t>(data.outbound_read_tlp_count);
+            pcieTransactionCounterIntf->set_property("OutboundReadPktCount",
+                                                     outboundReadPktCount);
+
+            outboundTLPCount =
+                static_cast<uint64_t>(data.outbound_completion_tlp_count);
+            pcieTransactionCounterIntf->set_property("OutboundTLPCount",
+                                                     outboundTLPCount);
+
+            outboundReadTransfer =
+                convertDwordsSizeToBytes(join64BitCounterLowHigh(
+                    data.dwords_transferred_in_outbound_read_tlp_high,
+                    data.dwords_transferred_in_outbound_read_tlp_low));
+            pcieTransactionCounterIntf->set_property("OutboundReadTransfer",
+                                                     outboundReadTransfer);
+
+            outboundTLPsTransfer = convertDwordsSizeToBytes(
+                data.dwords_transferred_in_outbound_completion);
+            pcieTransactionCounterIntf->set_property("OutboundTLPsTransfer",
+                                                     outboundTLPsTransfer);
+
+            outboundWritePktCount =
+                static_cast<uint64_t>(data.outbound_write_tlp_count);
+            pcieTransactionCounterIntf->set_property("OutboundWritePktCount",
+                                                     outboundWritePktCount);
+
+            outboundWriteTransfer =
+                convertDwordsSizeToBytes(join64BitCounterLowHigh(
+                    data.dwords_transferred_in_outbound_write_tlp_high,
+                    data.dwords_transferred_in_outbound_write_tlp_low));
+            pcieTransactionCounterIntf->set_property("OutboundWriteTransfer",
+                                                     outboundWriteTransfer);
+
+            reqDroppedTag = static_cast<uint64_t>(
+                data.read_requests_dropped_tag_unavailable);
+            pcieTransactionCounterIntf->set_property("ReqDroppedTag",
+                                                     reqDroppedTag);
+
+            reqDroppedCreditCompletion = static_cast<uint64_t>(
+                data.read_requests_dropped_credit_exhaustion);
+            pcieTransactionCounterIntf->set_property(
+                "ReqDroppedCreditCompletion", reqDroppedCreditCompletion);
+
+            reqDroppedNonPostCredit = static_cast<uint64_t>(
+                data.read_requests_dropped_credit_not_posted);
+            pcieTransactionCounterIntf->set_property("ReqDroppedNonPostCredit",
+                                                     reqDroppedNonPostCredit);
+            updateMetricOnSharedMemory();
+        }
     }
 
     return cc ? cc : rc;
+}
+
+void NsmPCIeECCGroup10::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName =
+        std::string("xyz.openbmc_project.PCIe.PCIeTransactionCounter");
+    std::vector<uint8_t> rawSmbpbiData = {};
+
+    nv::sensor_aggregation::DbusVariantType variantOWPC{outboundWritePktCount};
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, "OutboundWritePktCount", rawSmbpbiData,
+        variantOWPC);
+
+    nv::sensor_aggregation::DbusVariantType variantOWT{outboundWriteTransfer};
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, "OutboundWriteTransfer", rawSmbpbiData,
+        variantOWT);
+
+    nv::sensor_aggregation::DbusVariantType variantRDT{reqDroppedTag};
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, "ReqDroppedTag", rawSmbpbiData,
+        variantRDT);
+
+    nv::sensor_aggregation::DbusVariantType variantRDCC{
+        reqDroppedCreditCompletion};
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, "ReqDroppedCreditCompletion",
+        rawSmbpbiData, variantRDCC);
+
+    nv::sensor_aggregation::DbusVariantType variantRDNPC{
+        reqDroppedNonPostCredit};
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, "ReqDroppedNonPostCredit", rawSmbpbiData,
+        variantRDNPC);
+
+    if (includeInboundCounters)
+    {
+        nv::sensor_aggregation::DbusVariantType variantITC{inboundTLPCount};
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            inventoryObjPath, ifaceName, "InboundTLPCount", rawSmbpbiData,
+            variantITC);
+
+        nv::sensor_aggregation::DbusVariantType variantITT{inboundTLPsTransfer};
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            inventoryObjPath, ifaceName, "InboundTLPsTransfer", rawSmbpbiData,
+            variantITT);
+    }
+    else
+    {
+        nv::sensor_aggregation::DbusVariantType variantORPC{
+            outboundReadPktCount};
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            inventoryObjPath, ifaceName, "OutboundReadPktCount", rawSmbpbiData,
+            variantORPC);
+
+        nv::sensor_aggregation::DbusVariantType variantORT{
+            outboundReadTransfer};
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            inventoryObjPath, ifaceName, "OutboundReadTransfer", rawSmbpbiData,
+            variantORT);
+
+        nv::sensor_aggregation::DbusVariantType variantOTC{outboundTLPCount};
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            inventoryObjPath, ifaceName, "OutboundTLPCount", rawSmbpbiData,
+            variantOTC);
+
+        nv::sensor_aggregation::DbusVariantType variantOTT{
+            outboundTLPsTransfer};
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            inventoryObjPath, ifaceName, "OutboundTLPsTransfer", rawSmbpbiData,
+            variantOTT);
+    }
+#endif
+}
+
+NsmPCIeVectorGroup1::NsmPCIeVectorGroup1(
+    const std::string& name, const std::string& type,
+    const std::string& laneObjPath,
+    std::shared_ptr<PCIeLaneErrorIntf> laneErrorIntf,
+    std::shared_ptr<AssociationDefIntf> laneAssocIntf, uint8_t laneIndex,
+    uint8_t linkSpeedCode, uint8_t multiPortType, uint8_t multiPortIndex,
+    uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, GROUP_ID_1, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
+    laneObjPath(laneObjPath), laneErrorIntf(laneErrorIntf),
+    laneAssocIntf(laneAssocIntf), laneIndex(laneIndex),
+    linkSpeedCode(linkSpeedCode)
+{
+    lg2::info("NsmPCIeVectorGroup1: {NAME} lane={LANE} speedCode={SPEED}",
+              "NAME", name.c_str(), "LANE", laneIndex, "SPEED", linkSpeedCode);
+
+    laneErrorIntf->cdrErrorCount(0);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmPCIeVectorGroup1::genRequestMsg([[maybe_unused]] eid_t eid,
+                                       uint8_t instanceId)
+{
+    std::vector<uint8_t> request(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_vector_group_telemetry_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    auto rc = encode_query_vector_group_telemetry_v2_req(
+        instanceId, getMultiPortUpstreamPortNumber(), getMultiPortType(),
+        getMultiPortIndex(), getGroupId(), linkSpeedCode, laneIndex,
+        requestPtr);
+
+    if (rc)
+    {
+        LG2_ERROR_FLT(
+            "NsmPCIeVectorGroup1 encode_query_vector_group_telemetry_v2_req "
+            "failed | laneIndex={LANE} linkSpeedCode={SPEED} rc={RC}",
+            "LANE", laneIndex, "SPEED", linkSpeedCode, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t
+    NsmPCIeVectorGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                           size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reasonCode = ERR_NULL;
+    struct nsm_query_vector_group_1_data data;
+
+    auto rc = decode_query_vector_group_telemetry_v2_group1_resp(
+        responseMsg, responseLen, &cc, &reasonCode, &data);
+
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        LG2_ERROR_FLT("NsmPCIeVectorGroup1 decode failure | lane={LANE} "
+                      "reasonCode={REASONCODE} cc={CC} rc={RC}",
+                      "LANE", laneIndex, "REASONCODE", reasonCode, "CC", cc,
+                      "RC", rc);
+        return cc ? cc : rc;
+    }
+
+    uint32_t cdrErrorCount = data.cdr_error_per_lane;
+    laneErrorIntf->cdrErrorCount(static_cast<uint64_t>(cdrErrorCount));
+
+    LG2_DEBUG_FLT("NsmPCIeVectorGroup1: lane {LANE} CDR error count: {COUNT}",
+                  "LANE", laneIndex, "COUNT", cdrErrorCount);
+
+    return NSM_SUCCESS;
+}
+
+NsmPCIeLaneManager::NsmPCIeLaneManager(
+    const std::string& name, const std::string& type,
+    const std::string& portObjPath, std::shared_ptr<PortInfoIntf> portInfoIntf,
+    std::shared_ptr<PortWidthIntf> portWidthIntf, uint8_t multiPortType,
+    uint8_t multiPortIndex, uint8_t multiPortUpstreamPortNumber) :
+    NsmSensor(name, type), portObjPath(portObjPath), portInfoIntf(portInfoIntf),
+    portWidthIntf(portWidthIntf), multiPortType(multiPortType),
+    multiPortIndex(multiPortIndex),
+    multiPortUpstreamPortNumber(multiPortUpstreamPortNumber)
+{
+    lg2::info("NsmPCIeLaneManager: {NAME} portPath={PATH}", "NAME",
+              name.c_str(), "PATH", portObjPath.c_str());
+}
+
+uint8_t NsmPCIeLaneManager::convertSpeedGbpsToLinkSpeedCode(double speedGbps)
+{
+    if (speedGbps >= NSM_PCIE_SPEED_GBPS_GEN6)
+        return NSM_PCIE_LINK_SPEED_CODE_GEN6;
+    if (speedGbps >= NSM_PCIE_SPEED_GBPS_GEN5)
+        return NSM_PCIE_LINK_SPEED_CODE_GEN5;
+    if (speedGbps >= NSM_PCIE_SPEED_GBPS_GEN4)
+        return NSM_PCIE_LINK_SPEED_CODE_GEN4;
+    if (speedGbps >= NSM_PCIE_SPEED_GBPS_GEN3)
+        return NSM_PCIE_LINK_SPEED_CODE_GEN3;
+    if (speedGbps >= NSM_PCIE_SPEED_GBPS_GEN2)
+        return NSM_PCIE_LINK_SPEED_CODE_GEN2;
+    if (speedGbps >= NSM_PCIE_SPEED_GBPS_GEN1)
+        return NSM_PCIE_LINK_SPEED_CODE_GEN1;
+    return NSM_PCIE_LINK_SPEED_CODE_UNKNOWN;
+}
+
+bool NsmPCIeLaneManager::hasLaneSensor(uint8_t laneIdx) const
+{
+    return laneSensors.find(laneIdx) != laneSensors.end();
+}
+
+void NsmPCIeLaneManager::clearAllLaneSensors()
+{
+    laneSensors.clear();
+    lanesInitialized = false;
+    currentLaneCount = 0;
+    lg2::debug("NsmPCIeLaneManager: cleared all lane sensors for {NAME}",
+               "NAME", getName());
+}
+
+void NsmPCIeLaneManager::createLaneSensor(std::shared_ptr<NsmDevice> nsmDevice,
+                                          uint8_t laneIdx, uint8_t speedCode)
+{
+    if (hasLaneSensor(laneIdx))
+    {
+        return;
+    }
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string laneObjPath = portObjPath + "/Lanes/" + std::to_string(laneIdx);
+    std::string laneName = getName() + "_Lane_" + std::to_string(laneIdx);
+
+    auto laneErrorIntf =
+        std::make_shared<PCIeLaneErrorIntf>(bus, laneObjPath.c_str());
+    auto laneAssocIntf =
+        std::make_shared<AssociationDefIntf>(bus, laneObjPath.c_str());
+
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        laneAssociations;
+    laneAssociations.emplace_back("associated_port", "associated_lanes",
+                                  portObjPath);
+    laneAssocIntf->associations(laneAssociations);
+
+    auto laneSensor = std::make_shared<NsmPCIeVectorGroup1>(
+        laneName, getType(), laneObjPath, laneErrorIntf, laneAssocIntf, laneIdx,
+        speedCode, multiPortType, multiPortIndex, multiPortUpstreamPortNumber);
+
+    laneSensors[laneIdx] = laneSensor;
+    nsmDevice->addSensor(laneSensor, false);
+
+    lg2::info(
+        "NsmPCIeLaneManager: created lane sensor {NAME} at {PATH} speedCode={SPEED}",
+        "NAME", laneName.c_str(), "PATH", laneObjPath.c_str(), "SPEED",
+        speedCode);
+}
+
+requester::Coroutine
+    NsmPCIeLaneManager::update(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    size_t activeLaneCount = 0;
+    uint8_t speedCode = NSM_PCIE_LINK_SPEED_CODE_UNKNOWN;
+
+    try
+    {
+        activeLaneCount = portWidthIntf->activeWidth();
+        double currentSpeedGbps = portInfoIntf->currentSpeed();
+        speedCode = convertSpeedGbpsToLinkSpeedCode(currentSpeedGbps);
+    }
+    catch (const std::exception& e)
+    {
+        LG2_DEBUG_FLT(
+            "NsmPCIeLaneManager: failed to read activeLaneCount/currentSpeed: {ERR}",
+            "ERR", e.what());
+        co_return NSM_ERROR;
+    }
+
+    bool validLaneCount = (activeLaneCount > 0 &&
+                           activeLaneCount <= NSM_PCIE_LANE_COUNT_MAX);
+    bool validSpeedCode = (speedCode != NSM_PCIE_LINK_SPEED_CODE_UNKNOWN);
+
+    if (!validLaneCount || !validSpeedCode)
+    {
+        if (lanesInitialized)
+        {
+            LG2_DEBUG_FLT(
+                "NsmPCIeLaneManager: activeLaneCount={LANECOUNT} or speedCode={SPEED} "
+                "invalid, clearing lane sensors",
+                "LANECOUNT", activeLaneCount, "SPEED", speedCode);
+            clearAllLaneSensors();
+        }
+        co_return NSM_SUCCESS;
+    }
+
+    uint8_t newLaneCount = static_cast<uint8_t>(activeLaneCount);
+
+    if (lanesInitialized &&
+        (newLaneCount != currentLaneCount || speedCode != currentSpeedCode))
+    {
+        lg2::info(
+            "NsmPCIeLaneManager: lane config changed "
+            "(lanes: {OLD_LANES}->{NEW_LANES}, speed: {OLD_SPEED}->{NEW_SPEED}), "
+            "recreating sensors",
+            "OLD_LANES", currentLaneCount, "NEW_LANES", newLaneCount,
+            "OLD_SPEED", currentSpeedCode, "NEW_SPEED", speedCode);
+        clearAllLaneSensors();
+    }
+
+    if (!lanesInitialized)
+    {
+        for (uint8_t laneIdx = 0; laneIdx < newLaneCount; laneIdx++)
+        {
+            createLaneSensor(nsmDevice, laneIdx, speedCode);
+        }
+        lanesInitialized = true;
+        currentLaneCount = newLaneCount;
+        currentSpeedCode = speedCode;
+
+        lg2::info(
+            "NsmPCIeLaneManager: initialized {COUNT} lane sensors for {NAME}",
+            "COUNT", newLaneCount, "NAME", getName());
+    }
+
+    co_return NSM_SUCCESS;
 }
 
 static requester::Coroutine
@@ -868,8 +1466,10 @@ static requester::Coroutine
             portName, type, objPath, portInfoIntf, portWidthIntf, deviceIndex);
         auto pcieECCIntfSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
             portName, type, objPath, pcieECCIntf, deviceIndex);
+        auto pcieSensorGroup7 = std::make_shared<NsmPCIeECCGroup7>(
+            portName, type, objPath, portInfoIntf, deviceIndex);
 
-        if (!pcieSensorGroup1 || !pcieECCIntfSensorGroup3)
+        if (!pcieSensorGroup1 || !pcieECCIntfSensorGroup3 || !pcieSensorGroup7)
         {
             lg2::error(
                 "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
@@ -881,6 +1481,7 @@ static requester::Coroutine
 
         nsmDevice->addSensor(pcieSensorGroup1, priority);
         nsmDevice->addSensor(pcieECCIntfSensorGroup3, priority);
+        nsmDevice->addSensor(pcieSensorGroup7, priority);
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
@@ -997,6 +1598,9 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
+    bool includeInboundCounters =
+        (nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9);
+
     for (auto [count, upstreamPortNumber] :
          std::views::zip(counts, upstreamPortNumbers))
     {
@@ -1017,6 +1621,8 @@ static requester::Coroutine
                                                                objPath.c_str());
             auto portWidthIntf =
                 std::make_shared<PortWidthIntf>(bus, objPath.c_str());
+            auto pcieClockModeIntf =
+                std::make_shared<PCIeClockModeIntf>(bus, objPath.c_str());
             auto portMetricsOem2Intf =
                 std::make_shared<PortMetricsOem2Intf>(bus, objPath.c_str());
 
@@ -1026,7 +1632,8 @@ static requester::Coroutine
                 PortInfoIntf::convertPortTypeFromString(portType));
             auto multipcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
                 portName, type, objPath, portInfoIntf, portWidthIntf,
-                portTypeVal, index, static_cast<uint8_t>(upstreamPortNumber));
+                pcieClockModeIntf, portTypeVal, index,
+                static_cast<uint8_t>(upstreamPortNumber));
             auto multipcieSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
                 portName, type, objPath, pcieECCIntf, portTypeVal, index,
                 static_cast<uint8_t>(upstreamPortNumber));
@@ -1039,12 +1646,18 @@ static requester::Coroutine
             auto multipcieSensorGroup5 = std::make_shared<NsmPCIeECCGroup5>(
                 portName, type, objPath, portMetricsOem2Intf, portTypeVal,
                 index, static_cast<uint8_t>(upstreamPortNumber));
-            auto multipcieSensorGroup10 = std::make_shared<NsmPCIeECCGroup10>(
-                bus, portName, type, objPath, portTypeVal, index,
+            auto multipcieSensorGroup7 = std::make_shared<NsmPCIeECCGroup7>(
+                portName, type, objPath, portInfoIntf, portTypeVal, index,
                 static_cast<uint8_t>(upstreamPortNumber));
+            auto multipcieSensorGroup10 = std::make_shared<NsmPCIeECCGroup10>(
+                portName, type, objPath, portTypeVal, index,
+                static_cast<uint8_t>(upstreamPortNumber),
+                includeInboundCounters);
+
             if (!multipcieSensorGroup1 || !multipcieSensorGroup2 ||
                 !multipcieSensorGroup3 || !multipcieSensorGroup4 ||
-                !multipcieSensorGroup5 || !multipcieSensorGroup10)
+                !multipcieSensorGroup5 || !multipcieSensorGroup7 ||
+                !multipcieSensorGroup10)
             {
                 lg2::error(
                     "Failed to create NSM Multi PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
@@ -1058,7 +1671,13 @@ static requester::Coroutine
             nsmDevice->addSensor(multipcieSensorGroup3, priority);
             nsmDevice->addSensor(multipcieSensorGroup4, priority);
             nsmDevice->addSensor(multipcieSensorGroup5, priority);
+            nsmDevice->addSensor(multipcieSensorGroup7, priority);
             nsmDevice->addSensor(multipcieSensorGroup10, priority);
+
+            auto laneManager = std::make_shared<NsmPCIeLaneManager>(
+                portName, type, objPath, portInfoIntf, portWidthIntf,
+                portTypeVal, index, static_cast<uint8_t>(upstreamPortNumber));
+            nsmDevice->addSensor(laneManager, priority);
 
             if (portTypeVal == NSM_PORT_TYPE_UPSTREAM)
             {

@@ -368,7 +368,7 @@ TEST_F(NsmPCIeDeviceTest, goodTestResponse)
         sizeof(nsm_msg_hdr) +
         sizeof(nsm_query_scalar_group_telemetry_v1_group_1_resp));
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    nsm_query_scalar_group_telemetry_group_1 data{4, 1, 3, 5, 2};
+    nsm_query_scalar_group_telemetry_group_1 data{4, 1, 3, 5, 2, 0, 0, 0};
     auto rc = encode_query_scalar_group_telemetry_v1_group1_resp(
         instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -401,7 +401,7 @@ TEST_F(NsmPCIeDeviceTest, badTestCompletionErrorResponse)
         sizeof(nsm_msg_hdr) +
         sizeof(nsm_query_scalar_group_telemetry_v1_group_1_resp));
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    nsm_query_scalar_group_telemetry_group_1 data{4, 1, 3, 5, 2};
+    nsm_query_scalar_group_telemetry_group_1 data{4, 1, 3, 5, 2, 0, 0, 0};
     auto rc = encode_query_scalar_group_telemetry_v1_group1_resp(
         instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);

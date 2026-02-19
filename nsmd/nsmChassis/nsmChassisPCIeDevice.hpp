@@ -72,6 +72,11 @@ class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
         NsmInterfaceProvider<IntfType>(name, "NSM_ChassisPCIeDevice",
                                        inventoryPaths)
     {}
+    NsmChassisPCIeDevice(const std::string& name, const std::string& type,
+                         const path& inventoryPath,
+                         std::shared_ptr<IntfType> pdi) :
+        NsmInterfaceProvider<IntfType>(name, type, inventoryPath, pdi)
+    {}
     virtual requester::Coroutine
         update(std::shared_ptr<NsmDevice> nsmDevice) override;
 };

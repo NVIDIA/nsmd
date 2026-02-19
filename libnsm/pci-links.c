@@ -320,6 +320,31 @@ int decode_query_scalar_group_telemetry_v1_group6_resp(
 	return ret;
 }
 
+int encode_query_scalar_group_telemetry_v1_group7_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_query_scalar_group_telemetry_group_7 *data, struct nsm_msg *msg)
+{
+	return encode_query_scalar_group_telemetry_v1_resp(
+	    instance_id, cc, reason_code,
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_7),
+	    (uint8_t *)data, msg);
+}
+
+int decode_query_scalar_group_telemetry_v1_group7_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code,
+    struct nsm_query_scalar_group_telemetry_group_7 *data)
+{
+	int ret = decode_query_scalar_group_telemetry_v1_resp(
+	    msg, msg_len, cc, data_size, reason_code, (uint8_t *)data);
+	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
+		return ret;
+	if (*data_size <
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_7))
+		ret = NSM_SW_ERROR_LENGTH;
+	return ret;
+}
+
 int encode_query_scalar_group_telemetry_v1_group8_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
     struct nsm_query_scalar_group_telemetry_group_8 *data, struct nsm_msg *msg)
@@ -381,6 +406,17 @@ int encode_query_scalar_group_telemetry_v1_group10_resp(
 	    (uint8_t *)data, msg);
 }
 
+int encode_query_scalar_group_telemetry_v1_group10_extended_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_query_scalar_group_telemetry_group_10_extended *data,
+    struct nsm_msg *msg)
+{
+	return encode_query_scalar_group_telemetry_v1_resp(
+	    instance_id, cc, reason_code,
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_10_extended),
+	    (uint8_t *)data, msg);
+}
+
 int decode_query_scalar_group_telemetry_v1_group10_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code,
@@ -399,6 +435,29 @@ int decode_query_scalar_group_telemetry_v1_group10_resp(
 	}
 	if (data_size !=
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_10))
+		ret = NSM_SW_ERROR_LENGTH;
+	return ret;
+}
+
+int decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_query_scalar_group_telemetry_group_10_extended *data)
+{
+	uint16_t data_size = 0;
+	int ret = decode_query_scalar_group_telemetry_v1_resp(
+	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)data);
+	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
+		return ret;
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(
+		    struct
+		    nsm_query_scalar_group_telemetry_v1_group_10_extended_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (data_size !=
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_10_extended))
 		ret = NSM_SW_ERROR_LENGTH;
 	return ret;
 }
@@ -1160,4 +1219,177 @@ int decode_set_port_config_aggregate_resp(const struct nsm_msg *msg,
 					  uint16_t *reason_code)
 {
 	return decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+}
+
+int encode_query_vector_group_telemetry_v2_req(
+    uint8_t instance_id, uint8_t port_number, uint8_t port_type, uint8_t index,
+    uint8_t group_id, uint8_t selector_0, uint8_t selector_1,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 NSM_TYPE_PCI_LINK};
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_query_vector_group_telemetry_v2_req *request =
+	    (struct nsm_query_vector_group_telemetry_v2_req *)msg->payload;
+
+	request->hdr.command = NSM_QUERY_VECTOR_DATA_SOURCES_V2;
+	request->hdr.data_size =
+	    sizeof(struct nsm_query_vector_group_telemetry_v2_req) -
+	    sizeof(struct nsm_common_req);
+	request->port_number = port_number;
+	request->port_type = port_type;
+	request->index = index;
+	request->group_id = group_id;
+	request->selector_0 = selector_0;
+	request->selector_1 = selector_1;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_vector_group_telemetry_v2_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *port_number,
+    uint8_t *port_type, uint8_t *index, uint8_t *group_id, uint8_t *selector_0,
+    uint8_t *selector_1)
+{
+	if (msg == NULL || port_number == NULL || port_type == NULL ||
+	    index == NULL || group_id == NULL || selector_0 == NULL ||
+	    selector_1 == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len !=
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_query_vector_group_telemetry_v2_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_query_vector_group_telemetry_v2_req *request =
+	    (struct nsm_query_vector_group_telemetry_v2_req *)msg->payload;
+
+	if (request->hdr.data_size !=
+	    sizeof(struct nsm_query_vector_group_telemetry_v2_req) -
+		sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_number = request->port_number;
+	*port_type = request->port_type;
+	*index = request->index;
+	*group_id = request->group_id;
+	*selector_0 = request->selector_0;
+	*selector_1 = request->selector_1;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_vector_group_telemetry_v2_resp(uint8_t instance_id, uint8_t cc,
+						uint16_t reason_code,
+						uint16_t data_count,
+						const uint32_t *data_values,
+						struct nsm_msg *msg)
+{
+	if (msg == NULL || (data_count > 0 && data_values == NULL)) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {NSM_RESPONSE, instance_id,
+					 NSM_TYPE_PCI_LINK};
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_QUERY_VECTOR_DATA_SOURCES_V2, msg);
+	}
+
+	struct nsm_query_vector_data_sources_v2_resp *resp =
+	    (struct nsm_query_vector_data_sources_v2_resp *)msg->payload;
+
+	resp->hdr.command = NSM_QUERY_VECTOR_DATA_SOURCES_V2;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = data_count * sizeof(uint32_t);
+	resp->hdr.data_size = htole16(data_size);
+
+	// Copy and convert data values to little endian
+	for (int i = 0; i < data_count; i++) {
+		uint32_t val = htole32(data_values[i]);
+		memcpy(&resp->data_values[i], &val, sizeof(uint32_t));
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_vector_group_telemetry_v2_resp(const struct nsm_msg *msg,
+						size_t msg_len, uint8_t *cc,
+						uint16_t *data_size,
+						uint16_t *reason_code,
+						uint8_t *data)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL ||
+	    reason_code == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_query_vector_data_sources_v2_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_query_vector_data_sources_v2_resp *resp =
+	    (struct nsm_query_vector_data_sources_v2_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+	int cnt = *data_size / sizeof(uint32_t);
+	uint32_t val;
+	for (int idx = 0; idx < cnt; idx++) {
+		memcpy(&val, resp->data_values + idx, sizeof(uint32_t));
+		val = le32toh(val);
+		memcpy(data + idx * sizeof(uint32_t), &val, sizeof(uint32_t));
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_vector_group_telemetry_v2_group1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_query_vector_group_1_data *data, struct nsm_msg *msg)
+{
+	if (data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint32_t value = data->cdr_error_per_lane;
+	return encode_query_vector_group_telemetry_v2_resp(
+	    instance_id, cc, reason_code, 1, &value, msg);
+}
+
+int decode_query_vector_group_telemetry_v2_group1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_query_vector_group_1_data *data)
+{
+	uint16_t data_size = 0;
+	int ret = decode_query_vector_group_telemetry_v2_resp(
+	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)data);
+	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
+		return ret;
+	if (data_size != sizeof(struct nsm_query_vector_group_1_data))
+		ret = NSM_SW_ERROR_LENGTH;
+	return ret;
 }
