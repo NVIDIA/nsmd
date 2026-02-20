@@ -171,11 +171,16 @@ void createChassisPCIeDeviceMultiPortPCIeDevice(
         upstreamPortCount = std::get<uint64_t>(
             allCurrentIfaceProperties.at("UpstreamPortCount"));
     }
-    auto pcieDeviceObject = NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName,
-                                                                 name);
-    pcieDeviceObject.invoke(
-        pdiMethod(deviceType),
+
+    const std::string inventoryObjPath = chassisInventoryBasePath /
+                                         chassisName / "PCIeDevices" / name;
+    auto pcieDeviceIntf = std::make_shared<PCIeDeviceIntf>(
+        utils::DBusHandler::getBus(), inventoryObjPath.c_str());
+    pcieDeviceIntf->deviceType(
         PCIeDeviceIntf::convertDeviceTypesFromString(deviceType));
+
+    auto pcieDeviceObject = NsmChassisPCIeDevice<PCIeDeviceIntf>(
+        name, "NSM_ChassisPCIeDevice", inventoryObjPath, pcieDeviceIntf);
     device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
                           pcieDeviceObject, upstreamPortCount, true),
                       PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY);
@@ -186,6 +191,12 @@ void createChassisPCIeDeviceMultiPortPCIeDevice(
                                                           0, 0, 0);
         device->addStaticSensor(function);
     }
+
+    // Add single sensor to query Group 7 and set Function{N}BusNumber for all
+    // functions
+    auto busNumberSensor = std::make_shared<NsmPCIeECCGroup7>(
+        name, "PCIeBusNumber", pcieDeviceIntf, functionIds, 0, 0, 0);
+    device->addStaticSensor(busNumberSensor);
 }
 
 void createChassisPCIeDeviceRetimerAERErrorStatus(

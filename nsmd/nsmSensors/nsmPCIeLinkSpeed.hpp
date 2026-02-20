@@ -103,6 +103,29 @@ class NsmPCIeLinkSpeed :
             .target_link_speed = 0,
             .max_link_speed = 1, // Gen1
             .max_link_width = 0,
+            .max_read_request_size_bytes = 0,
+            .max_payload_size_bytes = 0,
+            .clock_mode = 0,
+        };
+        handleResponse(data);
+        updateMetricOnSharedMemory();
+    }
+    NsmPCIeLinkSpeed(const NsmInterfaceProvider<IntfType>& provider,
+                     uint8_t multiPortType, uint8_t multiPortIndex,
+                     uint8_t multiPortUpstreamPortNumber) :
+        NsmPCIeLinkSpeedBase(provider, multiPortType, multiPortIndex,
+                             multiPortUpstreamPortNumber),
+        NsmInterfaceContainer<IntfType>(provider)
+    {
+        nsm_query_scalar_group_telemetry_group_1 data{
+            .negotiated_link_speed = 1, // Gen1
+            .negotiated_link_width = 0,
+            .target_link_speed = 0,
+            .max_link_speed = 1, // Gen1
+            .max_link_width = 0,
+            .max_read_request_size_bytes = 0,
+            .max_payload_size_bytes = 0,
+            .clock_mode = 0,
         };
         handleResponse(data);
         updateMetricOnSharedMemory();
@@ -186,30 +209,18 @@ inline void NsmPCIeLinkSpeed<NsmPortInfoIntf>::handleResponse(
     auto convertToTransferRate = [](uint32_t generation) {
         switch (generation)
         {
-            case 1:
-            {
-                return 2.5;
-            }
-            case 2:
-            {
-                return 5.0;
-            }
-            case 3:
-            {
-                return 8.0;
-            }
-            case 4:
-            {
-                return 16.0;
-            }
-            case 5:
-            {
-                return 32.0;
-            }
-            case 6:
-            {
-                return 64.0;
-            }
+            case NSM_PCIE_LINK_SPEED_CODE_GEN1:
+                return NSM_PCIE_SPEED_GBPS_GEN1;
+            case NSM_PCIE_LINK_SPEED_CODE_GEN2:
+                return NSM_PCIE_SPEED_GBPS_GEN2;
+            case NSM_PCIE_LINK_SPEED_CODE_GEN3:
+                return NSM_PCIE_SPEED_GBPS_GEN3;
+            case NSM_PCIE_LINK_SPEED_CODE_GEN4:
+                return NSM_PCIE_SPEED_GBPS_GEN4;
+            case NSM_PCIE_LINK_SPEED_CODE_GEN5:
+                return NSM_PCIE_SPEED_GBPS_GEN5;
+            case NSM_PCIE_LINK_SPEED_CODE_GEN6:
+                return NSM_PCIE_SPEED_GBPS_GEN6;
             default:
             {
                 lg2::debug(

@@ -31,6 +31,33 @@ class NsmPcieGroup : public NsmSensor
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
 
+  protected:
+    // Accessors for derived classes
+    uint8_t getMultiPortType() const
+    {
+        return multiPortType;
+    }
+    uint8_t getMultiPortIndex() const
+    {
+        return multiPortIndex;
+    }
+    uint8_t getMultiPortUpstreamPortNumber() const
+    {
+        return multiPortUpstreamPortNumber;
+    }
+    uint8_t getGroupId() const
+    {
+        return groupId;
+    }
+    uint8_t getDeviceId() const
+    {
+        return deviceId;
+    }
+    bool isMultiPortEnabled() const
+    {
+        return isMultiPciePortEnabled;
+    }
+
   private:
     std::optional<std::vector<uint8_t>>
         genSinglePortRequestMsg(eid_t eid, uint8_t instanceId);

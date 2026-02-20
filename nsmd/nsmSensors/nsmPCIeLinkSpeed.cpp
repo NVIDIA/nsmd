@@ -104,6 +104,9 @@ requester::Coroutine
         .target_link_speed = 0,
         .max_link_speed = 1, // Gen1
         .max_link_width = 0,
+        .max_read_request_size_bytes = 0,
+        .max_payload_size_bytes = 0,
+        .clock_mode = 0,
     };
 
     while (multiPortUpstreamPortNumber < upstreamPortCount)
