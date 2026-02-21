@@ -611,6 +611,13 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         setDevicemodeSettingsHandler(const nsm_msg* requestMsg,
                                      size_t requestLen);
+    std::vector<uint8_t> getDeviceModeSettingsV2Data(uint32_t deviceModeIndex);
+    std::optional<std::vector<uint8_t>>
+        getDeviceModeSettingsV2Handler(const nsm_msg* requestMsg,
+                                       size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setDeviceModeSettingsV2Handler(const nsm_msg* requestMsg,
+                                       size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         dotCAKInstallHandler(const nsm_msg* requestMsg, size_t requestLen);

@@ -2583,3 +2583,530 @@ TEST(setDeviceModeSettings, testBadDecodeResponse)
 						 &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+TEST(getDeviceModeSettingsV2, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint32_t device_mode_index = DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT;
+	auto rc = encode_get_device_mode_settings_v2_req(0, device_mode_index,
+							 request);
+
+	struct nsm_get_device_mode_settings_v2_req *req =
+	    reinterpret_cast<struct nsm_get_device_mode_settings_v2_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_DEVICE_MODE_SETTINGS_V2, req->hdr.command);
+	EXPECT_EQ(sizeof(req->device_mode_index), req->hdr.data_size);
+	EXPECT_EQ(device_mode_index, le32toh(req->device_mode_index));
+}
+
+TEST(getDeviceModeSettingsV2, testBadEncodeRequest)
+{
+	auto rc = encode_get_device_mode_settings_v2_req(0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getDeviceModeSettingsV2, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint32_t device_mode_index =
+	    DEVICE_MODE_PERSISTENT_GPU_BASE_POWER_LIMIT;
+	encode_get_device_mode_settings_v2_req(0, device_mode_index, request);
+
+	uint32_t decoded_index = 0;
+	auto rc = decode_get_device_mode_settings_v2_req(
+	    request, requestMsg.size(), &decoded_index);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(device_mode_index, decoded_index);
+}
+
+TEST(getDeviceModeSettingsV2, testBadDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint32_t device_mode_index = 0;
+	size_t msg_len = requestMsg.size();
+
+	auto rc = decode_get_device_mode_settings_v2_req(nullptr, 0,
+							 &device_mode_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_settings_v2_req(request, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_settings_v2_req(request, msg_len - 1,
+						    &device_mode_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	struct nsm_get_device_mode_settings_v2_req *req =
+	    reinterpret_cast<struct nsm_get_device_mode_settings_v2_req *>(
+		request->payload);
+	req->hdr.data_size = 0;
+	rc = decode_get_device_mode_settings_v2_req(request, msg_len,
+						    &device_mode_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getDeviceModeSettingsV2, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+		sizeof(nsm_get_device_mode_settings_v2_req::device_mode_index) *
+		    2,
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint32_t current_power_limit = 500000;
+	uint32_t pending_power_limit = 600000;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_device_mode_settings_v2_resp(
+	    0, NSM_SUCCESS, reason_code,
+	    reinterpret_cast<uint8_t *>(&current_power_limit),
+	    sizeof(current_power_limit),
+	    reinterpret_cast<uint8_t *>(&pending_power_limit),
+	    sizeof(pending_power_limit), response);
+
+	struct nsm_get_device_mode_settings_v2_resp *resp =
+	    reinterpret_cast<struct nsm_get_device_mode_settings_v2_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_DEVICE_MODE_SETTINGS_V2, resp->hdr.command);
+	EXPECT_EQ(sizeof(current_power_limit),
+		  le16toh(resp->current_mode_length));
+	EXPECT_EQ(sizeof(pending_power_limit),
+		  le16toh(resp->pending_mode_length));
+}
+
+TEST(getDeviceModeSettingsV2, testGoodEncodeResponseNoPending)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+		sizeof(nsm_get_device_mode_settings_v2_req::device_mode_index),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint32_t current_power_limit = 500000;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_device_mode_settings_v2_resp(
+	    0, NSM_SUCCESS, reason_code,
+	    reinterpret_cast<uint8_t *>(&current_power_limit),
+	    sizeof(current_power_limit), nullptr, 0, response);
+
+	struct nsm_get_device_mode_settings_v2_resp *resp =
+	    reinterpret_cast<struct nsm_get_device_mode_settings_v2_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(sizeof(current_power_limit),
+		  le16toh(resp->current_mode_length));
+	EXPECT_EQ(0, le16toh(resp->pending_mode_length));
+}
+
+TEST(getDeviceModeSettingsV2, testBadEncodeResponse)
+{
+	uint32_t current_power_limit = 500000;
+	uint32_t pending_power_limit = 0;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_device_mode_settings_v2_resp(
+	    0, NSM_SUCCESS, reason_code,
+	    reinterpret_cast<uint8_t *>(&current_power_limit),
+	    sizeof(current_power_limit), nullptr, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+		sizeof(nsm_get_device_mode_settings_v2_req::device_mode_index),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	rc = encode_get_device_mode_settings_v2_resp(
+	    0, NSM_SUCCESS, reason_code, nullptr, sizeof(current_power_limit),
+	    nullptr, 0, response);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_get_device_mode_settings_v2_resp(
+	    0, NSM_SUCCESS, reason_code,
+	    reinterpret_cast<uint8_t *>(&current_power_limit),
+	    sizeof(current_power_limit), nullptr, sizeof(pending_power_limit),
+	    response);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getDeviceModeSettingsV2, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+		sizeof(nsm_get_device_mode_settings_v2_req::device_mode_index) *
+		    2,
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint32_t current_power_limit = 500000;
+	uint32_t pending_power_limit = 600000;
+	uint16_t reason_code = ERR_NULL;
+
+	encode_get_device_mode_settings_v2_resp(
+	    0, NSM_SUCCESS, reason_code,
+	    reinterpret_cast<uint8_t *>(&current_power_limit),
+	    sizeof(current_power_limit),
+	    reinterpret_cast<uint8_t *>(&pending_power_limit),
+	    sizeof(pending_power_limit), response);
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t decoded_reason_code = 0;
+	uint8_t current_mode_data[sizeof(current_power_limit)] = {0};
+	uint16_t current_mode_length = 0;
+	uint8_t pending_mode_data[sizeof(pending_power_limit)] = {0};
+	uint16_t pending_mode_length = 0;
+
+	auto rc = decode_get_device_mode_settings_v2_resp(
+	    response, responseMsg.size(), &cc, &decoded_reason_code,
+	    current_mode_data, &current_mode_length, pending_mode_data,
+	    &pending_mode_length);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(sizeof(current_power_limit), current_mode_length);
+	EXPECT_EQ(sizeof(pending_power_limit), pending_mode_length);
+
+	uint32_t decoded_current = 0;
+	uint32_t decoded_pending = 0;
+	memcpy(&decoded_current, current_mode_data, sizeof(decoded_current));
+	memcpy(&decoded_pending, pending_mode_data, sizeof(decoded_pending));
+	EXPECT_EQ(current_power_limit, decoded_current);
+	EXPECT_EQ(pending_power_limit, decoded_pending);
+}
+
+TEST(getDeviceModeSettingsV2, testBadDecodeResponse)
+{
+	uint32_t current_power_limit = 500000;
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+		sizeof(current_power_limit),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	encode_get_device_mode_settings_v2_resp(
+	    0, NSM_SUCCESS, ERR_NULL,
+	    reinterpret_cast<uint8_t *>(&current_power_limit),
+	    sizeof(current_power_limit), nullptr, 0, response);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	uint8_t current_mode_data[sizeof(current_power_limit)] = {0};
+	uint16_t current_mode_length = 0;
+	uint8_t pending_mode_data[sizeof(current_power_limit)] = {0};
+	uint16_t pending_mode_length = 0;
+	size_t msg_len = responseMsg.size();
+
+	auto rc = decode_get_device_mode_settings_v2_resp(
+	    nullptr, msg_len, &cc, &reason_code, current_mode_data,
+	    &current_mode_length, pending_mode_data, &pending_mode_length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_settings_v2_resp(
+	    response, msg_len, nullptr, &reason_code, current_mode_data,
+	    &current_mode_length, pending_mode_data, &pending_mode_length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_settings_v2_resp(
+	    response, msg_len, &cc, nullptr, current_mode_data,
+	    &current_mode_length, pending_mode_data, &pending_mode_length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_settings_v2_resp(
+	    response, msg_len, &cc, &reason_code, current_mode_data, nullptr,
+	    pending_mode_data, &pending_mode_length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_settings_v2_resp(
+	    response, msg_len, &cc, &reason_code, current_mode_data,
+	    &current_mode_length, pending_mode_data, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	struct nsm_get_device_mode_settings_v2_resp *resp =
+	    reinterpret_cast<struct nsm_get_device_mode_settings_v2_resp *>(
+		response->payload);
+	rc = decode_get_device_mode_settings_v2_resp(
+	    response,
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) -
+		sizeof(resp->mode_data) - 1,
+	    &cc, &reason_code, current_mode_data, &current_mode_length,
+	    pending_mode_data, &pending_mode_length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(setDeviceModeSettingsV2, testGoodEncodeRequest)
+{
+	uint32_t device_mode_index = DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT;
+	uint32_t power_limit = 500000;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
+		sizeof(power_limit),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_set_device_mode_settings_v2_req(
+	    0, device_mode_index, reinterpret_cast<uint8_t *>(&power_limit),
+	    sizeof(power_limit), request);
+
+	struct nsm_set_device_mode_settings_v2_req *req =
+	    reinterpret_cast<struct nsm_set_device_mode_settings_v2_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_SET_DEVICE_MODE_SETTINGS_V2, req->hdr.command);
+	EXPECT_EQ(sizeof(req->device_mode_index) + sizeof(power_limit),
+		  req->hdr.data_size);
+	EXPECT_EQ(device_mode_index, le32toh(req->device_mode_index));
+}
+
+TEST(setDeviceModeSettingsV2, testBadEncodeRequest)
+{
+	uint32_t power_limit = 500000;
+
+	auto rc = encode_set_device_mode_settings_v2_req(
+	    0, 0, reinterpret_cast<uint8_t *>(&power_limit),
+	    sizeof(power_limit), nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
+		sizeof(power_limit),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	rc = encode_set_device_mode_settings_v2_req(
+	    0, 0, nullptr, sizeof(power_limit), request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(setDeviceModeSettingsV2, testGoodDecodeRequest)
+{
+	uint32_t device_mode_index =
+	    DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY;
+	uint32_t power_limit = 750000;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
+		sizeof(power_limit),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	encode_set_device_mode_settings_v2_req(
+	    0, device_mode_index, reinterpret_cast<uint8_t *>(&power_limit),
+	    sizeof(power_limit), request);
+
+	uint32_t decoded_index = 0;
+	uint8_t decoded_data[sizeof(power_limit)] = {0};
+	uint16_t decoded_data_length = 0;
+
+	auto rc = decode_set_device_mode_settings_v2_req(
+	    request, requestMsg.size(), &decoded_index, decoded_data,
+	    &decoded_data_length);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(device_mode_index, decoded_index);
+	EXPECT_EQ(sizeof(power_limit), decoded_data_length);
+
+	uint32_t decoded_power_limit = 0;
+	memcpy(&decoded_power_limit, decoded_data, sizeof(decoded_power_limit));
+	EXPECT_EQ(power_limit, decoded_power_limit);
+}
+
+TEST(setDeviceModeSettingsV2, testBadDecodeRequest)
+{
+	struct nsm_set_device_mode_settings_v2_req dummy_req;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
+		sizeof(dummy_req.device_mode_index),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint32_t device_mode_index = 0;
+	uint8_t device_mode_data[sizeof(dummy_req.device_mode_index)] = {0};
+	uint16_t device_mode_data_length = 0;
+	size_t msg_len = requestMsg.size();
+
+	auto rc = decode_set_device_mode_settings_v2_req(
+	    nullptr, msg_len, &device_mode_index, device_mode_data,
+	    &device_mode_data_length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_mode_settings_v2_req(request, msg_len, nullptr,
+						    device_mode_data,
+						    &device_mode_data_length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_mode_settings_v2_req(
+	    request, msg_len, &device_mode_index, device_mode_data, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	struct nsm_set_device_mode_settings_v2_req *req =
+	    reinterpret_cast<struct nsm_set_device_mode_settings_v2_req *>(
+		request->payload);
+	rc = decode_set_device_mode_settings_v2_req(
+	    request,
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) -
+		sizeof(req->device_mode_data) - 1,
+	    &device_mode_index, device_mode_data, &device_mode_data_length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	req->hdr.data_size = sizeof(req->device_mode_index) - 1;
+	rc = decode_set_device_mode_settings_v2_req(
+	    request, msg_len, &device_mode_index, device_mode_data,
+	    &device_mode_data_length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(setDeviceModeSettingsV2, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_set_device_mode_settings_v2_resp(
+	    0, NSM_SUCCESS, reason_code, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_common_resp *resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_SET_DEVICE_MODE_SETTINGS_V2, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(setDeviceModeSettingsV2, testBadEncodeResponse)
+{
+	auto rc = encode_set_device_mode_settings_v2_resp(0, NSM_SUCCESS,
+							  ERR_NULL, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(setDeviceModeSettingsV2, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION,   // NVIDIA_MSG_TYPE
+	    NSM_SET_DEVICE_MODE_SETTINGS_V2, // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0,
+	    0 // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_set_device_mode_settings_v2_resp(response, msg_len,
+							  &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reason_code, ERR_NULL);
+}
+
+TEST(setDeviceModeSettingsV2, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION,   // NVIDIA_MSG_TYPE
+	    NSM_SET_DEVICE_MODE_SETTINGS_V2, // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    1,				     // incorrect data size
+	    0,				     // data size MSB
+	    0				     // invalid data byte
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	size_t msg_len = responseMsg.size();
+
+	auto rc = decode_set_device_mode_settings_v2_resp(nullptr, msg_len, &cc,
+							  &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_mode_settings_v2_resp(response, msg_len, nullptr,
+						     &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_mode_settings_v2_resp(response, msg_len, &cc,
+						     nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_mode_settings_v2_resp(response, msg_len - 1, &cc,
+						     &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_set_device_mode_settings_v2_resp(response, msg_len, &cc,
+						     &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(deviceModeSettingsV2, testAllDeviceModeIndices)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	std::vector<device_mode_index> indices = {
+	    DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT,
+	    DEVICE_MODE_PERSISTENT_GPU_BASE_POWER_LIMIT,
+	    DEVICE_MODE_ONE_SHOT_CPU_POWER_LIMIT_GPU_COPY,
+	    DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY};
+
+	for (auto idx : indices) {
+		auto rc = encode_get_device_mode_settings_v2_req(
+		    0, static_cast<uint32_t>(idx), request);
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+		uint32_t decoded_index = 0;
+		rc = decode_get_device_mode_settings_v2_req(
+		    request, requestMsg.size(), &decoded_index);
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+		EXPECT_EQ(static_cast<uint32_t>(idx), decoded_index);
+	}
+}

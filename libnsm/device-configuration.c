@@ -2171,3 +2171,260 @@ int decode_get_device_mode_setting_resp(
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_get_device_mode_settings_v2_req(uint8_t instance_id,
+					   uint32_t device_mode_index,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_device_mode_settings_v2_req *request =
+	    (struct nsm_get_device_mode_settings_v2_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_DEVICE_MODE_SETTINGS_V2;
+	request->hdr.data_size = sizeof(request->device_mode_index);
+	request->device_mode_index = htole32(device_mode_index);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_device_mode_settings_v2_req(const struct nsm_msg *msg,
+					   size_t msg_len,
+					   uint32_t *device_mode_index)
+{
+	if (msg == NULL || device_mode_index == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_device_mode_settings_v2_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_device_mode_settings_v2_req *request =
+	    (struct nsm_get_device_mode_settings_v2_req *)msg->payload;
+
+	if (request->hdr.data_size != sizeof(request->device_mode_index)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*device_mode_index = le32toh(request->device_mode_index);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_device_mode_settings_v2_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    const uint8_t *current_mode_data,
+					    uint16_t current_mode_length,
+					    const uint8_t *pending_mode_data,
+					    uint16_t pending_mode_length,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_DEVICE_MODE_SETTINGS_V2, msg);
+	}
+
+	if (current_mode_data == NULL && current_mode_length > 0) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (pending_mode_data == NULL && pending_mode_length > 0) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_get_device_mode_settings_v2_resp *resp =
+	    (struct nsm_get_device_mode_settings_v2_resp *)msg->payload;
+
+	resp->hdr.command = NSM_GET_DEVICE_MODE_SETTINGS_V2;
+	resp->hdr.completion_code = cc;
+	resp->current_mode_length = htole16(current_mode_length);
+	resp->pending_mode_length = htole16(pending_mode_length);
+
+	uint16_t data_size = sizeof(resp->current_mode_length) +
+			     sizeof(resp->pending_mode_length) +
+			     current_mode_length + pending_mode_length;
+	resp->hdr.data_size = htole16(data_size);
+
+	if (current_mode_length > 0) {
+		memcpy(resp->mode_data, current_mode_data, current_mode_length);
+	}
+	if (pending_mode_length > 0) {
+		memcpy(resp->mode_data + current_mode_length, pending_mode_data,
+		       pending_mode_length);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_device_mode_settings_v2_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code,
+					    uint8_t *current_mode_data,
+					    uint16_t *current_mode_length,
+					    uint8_t *pending_mode_data,
+					    uint16_t *pending_mode_length)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL ||
+	    current_mode_length == NULL || pending_mode_length == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_device_mode_settings_v2_resp) -
+			  sizeof(uint8_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_device_mode_settings_v2_resp *resp =
+	    (struct nsm_get_device_mode_settings_v2_resp *)msg->payload;
+
+	*current_mode_length = le16toh(resp->current_mode_length);
+	*pending_mode_length = le16toh(resp->pending_mode_length);
+
+	uint16_t expected_data_size = sizeof(resp->current_mode_length) +
+				      sizeof(resp->pending_mode_length) +
+				      *current_mode_length +
+				      *pending_mode_length;
+	if (le16toh(resp->hdr.data_size) != expected_data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	if (*current_mode_length > 0 && current_mode_data != NULL) {
+		memcpy(current_mode_data, resp->mode_data,
+		       *current_mode_length);
+	}
+	if (*pending_mode_length > 0 && pending_mode_data != NULL) {
+		memcpy(pending_mode_data,
+		       resp->mode_data + *current_mode_length,
+		       *pending_mode_length);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_device_mode_settings_v2_req(uint8_t instance_id,
+					   uint32_t device_mode_index,
+					   const uint8_t *device_mode_data,
+					   uint16_t device_mode_data_length,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (device_mode_data == NULL && device_mode_data_length > 0) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_device_mode_settings_v2_req *request =
+	    (struct nsm_set_device_mode_settings_v2_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_DEVICE_MODE_SETTINGS_V2;
+	request->hdr.data_size =
+	    sizeof(request->device_mode_index) + device_mode_data_length;
+	request->device_mode_index = htole32(device_mode_index);
+
+	if (device_mode_data_length > 0) {
+		memcpy(request->device_mode_data, device_mode_data,
+		       device_mode_data_length);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_device_mode_settings_v2_req(const struct nsm_msg *msg,
+					   size_t msg_len,
+					   uint32_t *device_mode_index,
+					   uint8_t *device_mode_data,
+					   uint16_t *device_mode_data_length)
+{
+	if (msg == NULL || device_mode_index == NULL ||
+	    device_mode_data_length == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_set_device_mode_settings_v2_req) -
+			  sizeof(uint8_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_device_mode_settings_v2_req *request =
+	    (struct nsm_set_device_mode_settings_v2_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->device_mode_index)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*device_mode_index = le32toh(request->device_mode_index);
+	*device_mode_data_length =
+	    request->hdr.data_size - sizeof(request->device_mode_index);
+
+	if (*device_mode_data_length > 0 && device_mode_data != NULL) {
+		memcpy(device_mode_data, request->device_mode_data,
+		       *device_mode_data_length);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_device_mode_settings_v2_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_DEVICE_CONFIGURATION,
+				  NSM_SET_DEVICE_MODE_SETTINGS_V2, msg);
+}
+
+int decode_set_device_mode_settings_v2_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return rc;
+}
