@@ -1351,9 +1351,6 @@ enum power_limit_id {
 	DEVICE = 0,
 	MODULE = 1,
 	SWITCH = 2,
-	GPU_BASE = 3,
-	CPU_LIMIT_GPU_COPY = 4,
-	SWITCH_LIMIT_GPU_COPY = 5
 };
 /** @brief Operation to be performed on power limits
  */
@@ -3014,52 +3011,6 @@ int decode_get_power_limit_resp(const struct nsm_msg *msg, size_t msg_len,
 				uint32_t *requested_persistent_limit,
 				uint32_t *requested_oneshot_limit,
 				uint32_t *enforced_limit);
-
-/** @brief Encode a Get Power Limits request for GPU Base message
- *
- *  @param[in] instance_id - NSM instance ID
- *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
- */
-int encode_get_gpu_base_power_limit_req(uint8_t instance, struct nsm_msg *msg);
-
-/** @brief Encode a Get Power Limits request for CPU Limit GPU Copy message
- *
- *  @param[in] instance_id - NSM instance ID
- *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
- */
-int encode_get_cpu_limit_gpu_copy_power_limit_req(uint8_t instance,
-						  struct nsm_msg *msg);
-
-/** @brief Encode a Set Power Limits request for GPU Base message
- *
- *  @param[in] instance_id - NSM instance ID
- *  @param[in] action - operation to be performed
- *  @param[in] persistence - lifetime of power limit one-shot/persistent
- *  @param[in] power_limit - power limit to set
- *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
- */
-int encode_set_gpu_base_power_limit_req(uint8_t instance, uint8_t action,
-					uint8_t persistence,
-					uint32_t power_limit,
-					struct nsm_msg *msg);
-
-/** @brief Encode a Set Power Limits request for CPU Limit GPU Copy message
-
- *  @param[in] instance_id - NSM instance ID
- *  @param[in] action - operation to be performed
- *  @param[in] persistence - lifetime of power limit one-shot/persistent
- *  @param[in] power_limit - power limit to set
- *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
- */
-int encode_set_cpu_limit_gpu_copy_power_limit_req(uint8_t instance,
-						  uint8_t action,
-						  uint8_t persistence,
-						  uint32_t power_limit,
-						  struct nsm_msg *msg);
 
 /** @brief Encode a Get Clock Output Enabled State request message
  *

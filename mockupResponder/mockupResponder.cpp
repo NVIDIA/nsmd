@@ -730,6 +730,10 @@ std::optional<Response>
                     return getDevicemodeSettingsHandler(request, requestLen);
                 case NSM_SET_DEVICE_MODE_SETTING:
                     return setDevicemodeSettingsHandler(request, requestLen);
+                case NSM_GET_DEVICE_MODE_SETTINGS_V2:
+                    return getDeviceModeSettingsV2Handler(request, requestLen);
+                case NSM_SET_DEVICE_MODE_SETTINGS_V2:
+                    return setDeviceModeSettingsV2Handler(request, requestLen);
                 case NSM_GET_PROTECTION_OPTIONS:
                     return getProtectionOptionsHandler(request, requestLen);
                 default:
@@ -975,7 +979,9 @@ std::optional<std::vector<uint8_t>>
                   {0, NSM_GET_DEVICE_DIAGNOSTICS,
                    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_ERASE_DEBUG_INFO}},
-                 {5, {3, 4, 5, 6, 7, 8, 9, 64, 65}},
+                 {5,
+                  {3, 4, 5, 6, 7, 8, 9, 64, 65, NSM_SET_DEVICE_MODE_SETTINGS_V2,
+                   NSM_GET_DEVICE_MODE_SETTINGS_V2}},
                  {6,
                   {1, 2, 3, 4, 5, 6, NSM_FW_DOT_CAK_INSTALL,
                    NSM_FW_DOT_CAK_BYPASS, NSM_FW_DOT_LOCK,
@@ -7977,6 +7983,139 @@ std::optional<std::vector<uint8_t>>
                    rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::vector<uint8_t>
+    MockupResponder::getDeviceModeSettingsV2Data(uint32_t deviceModeIndex)
+{
+    std::vector<uint8_t> data;
+
+    switch (deviceModeIndex)
+    {
+        case DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT:
+        {
+            uint32_t powerLimit = htole32(550000);
+            data.resize(sizeof(uint32_t));
+            memcpy(data.data(), &powerLimit, sizeof(uint32_t));
+            break;
+        }
+        case DEVICE_MODE_PERSISTENT_GPU_BASE_POWER_LIMIT:
+        {
+            uint32_t powerLimit = htole32(500000);
+            data.resize(sizeof(uint32_t));
+            memcpy(data.data(), &powerLimit, sizeof(uint32_t));
+            break;
+        }
+        case DEVICE_MODE_ONE_SHOT_CPU_POWER_LIMIT_GPU_COPY:
+        {
+            uint32_t powerLimit = htole32(450000);
+            data.resize(sizeof(uint32_t));
+            memcpy(data.data(), &powerLimit, sizeof(uint32_t));
+            break;
+        }
+        case DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY:
+        {
+            uint32_t powerLimit = htole32(400000);
+            data.resize(sizeof(uint32_t));
+            memcpy(data.data(), &powerLimit, sizeof(uint32_t));
+            break;
+        }
+        default:
+        {
+            uint32_t defaultValue = htole32(0);
+            data.resize(sizeof(uint32_t));
+            memcpy(data.data(), &defaultValue, sizeof(uint32_t));
+            break;
+        }
+    }
+
+    return data;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDeviceModeSettingsV2Handler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getDeviceModeSettingsV2Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint32_t deviceModeIndex = 0;
+    auto rc = decode_get_device_mode_settings_v2_req(requestMsg, requestLen,
+                                                     &deviceModeIndex);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_device_mode_settings_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    auto currentModeData = getDeviceModeSettingsV2Data(deviceModeIndex);
+    auto pendingModeData = getDeviceModeSettingsV2Data(deviceModeIndex);
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            currentModeData.size() + pendingModeData.size() - 2,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_device_mode_settings_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+        currentModeData.data(), currentModeData.size(), pendingModeData.data(),
+        pendingModeData.size(), responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_device_mode_settings_v2_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setDeviceModeSettingsV2Handler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setDeviceModeSettingsV2Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint32_t deviceModeIndex = 0;
+    uint8_t deviceModeData[sizeof(uint32_t)] = {0};
+    uint16_t deviceModeDataLength = 0;
+
+    auto rc = decode_set_device_mode_settings_v2_req(
+        requestMsg, requestLen, &deviceModeIndex, deviceModeData,
+        &deviceModeDataLength);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_device_mode_settings_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    rc = encode_set_device_mode_settings_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_set_device_mode_settings_v2_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
     return response;
 }
 

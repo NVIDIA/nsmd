@@ -4010,16 +4010,6 @@ class SetPowerLimit : public CommandInterface
             rc = encode_set_module_power_limit_req(
                 instanceId, action, persistence, power_limit, request);
         }
-        else if (powerLimitId == GPU_BASE)
-        {
-            rc = encode_set_gpu_base_power_limit_req(
-                instanceId, action, persistence, power_limit, request);
-        }
-        else if (powerLimitId == CPU_LIMIT_GPU_COPY)
-        {
-            rc = encode_set_cpu_limit_gpu_copy_power_limit_req(
-                instanceId, action, persistence, power_limit, request);
-        }
         else
         {
             rc = encode_set_power_limit_req(instanceId, powerLimitId, action,
@@ -4092,15 +4082,6 @@ class GetPowerLimit : public CommandInterface
         else if (powerLimitId == MODULE)
         {
             rc = encode_get_module_power_limit_req(instanceId, request);
-        }
-        else if (powerLimitId == GPU_BASE)
-        {
-            rc = encode_get_gpu_base_power_limit_req(instanceId, request);
-        }
-        else if (powerLimitId == CPU_LIMIT_GPU_COPY)
-        {
-            rc = encode_get_cpu_limit_gpu_copy_power_limit_req(instanceId,
-                                                               request);
         }
         else
         {

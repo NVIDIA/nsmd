@@ -91,6 +91,10 @@ uint8_t NsmProcessorModulePowerControl::handleResponseMsg(
         responseMsg, responseLen, &cc, &data_size, &reasonCode,
         &requested_persistent_limit, &requested_oneshot_limit, &enforced_limit);
 
+    LG2_ERROR_FLT(
+        "decode_get_module_power_limit_resp_module failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         uint32_t reading = (enforced_limit == INVALID_POWER_LIMIT)
@@ -98,10 +102,6 @@ uint8_t NsmProcessorModulePowerControl::handleResponseMsg(
                                : enforced_limit / 1000;
         powerCapIntf->powerCap(reading);
     }
-    LG2_ERROR_FLT(
-        "decode_get_module_power_limit_resp_module failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-
     return cc ? cc : rc;
 }
 

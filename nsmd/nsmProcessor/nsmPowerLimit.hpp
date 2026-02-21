@@ -17,16 +17,18 @@
 #pragma once
 #include "config.h"
 
+#include "device-configuration.h"
+
 #include "asyncOperationManager.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
 #include <com/nvidia/Common/ClearPowerCap/server.hpp>
-#include <com/nvidia/Common/ClearPowerCapAsync/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Control/Power/Cap/server.hpp>
 #include <xyz/openbmc_project/Control/Power/Mode/server.hpp>
+#include <xyz/openbmc_project/Control/Power/Persistency/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 
 namespace nsm
@@ -41,8 +43,17 @@ using AssociationDefinitionsIntf = sdbusplus::server::object_t<
 using DecoratorAreaIntf = object_t<Inventory::Decorator::server::Area>;
 using ClearPowerLimitIntf =
     object_t<sdbusplus::com::nvidia::Common::server::ClearPowerCap>;
-using ClearPowerLimitAsyncIntf =
-    object_t<sdbusplus::com::nvidia::Common::server::ClearPowerCapAsync>;
+using PowerPersistencyIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::control::power::Persistency>;
+
+/**
+ * @brief Power Limit Id for GPU power limits
+ */
+enum GpuPowerLimitId
+{
+    GPU_BASE = 0,
+    CPU_LIMIT_GPU_COPY = 1,
+};
 
 class NsmClearPowerLimitIntf : public ClearPowerLimitIntf
 {
@@ -51,17 +62,16 @@ class NsmClearPowerLimitIntf : public ClearPowerLimitIntf
                            const std::string& inventoryObjPath);
     int32_t clearPowerCap() override;
 };
-class NsmPowerLimit : public NsmSensor, ClearPowerLimitAsyncIntf
+class NsmPersistentPowerLimit : public NsmSensor
 {
   public:
-    NsmPowerLimit(
-        sdbusplus::bus::bus& bus, const std::string& name,
-        const std::string& type,
+    NsmPersistentPowerLimit(
+        const std::string& name, const std::string& type,
         std::shared_ptr<PowerLimitsIntf> powerLimitsIntf,
         std::shared_ptr<NsmClearPowerLimitIntf> clearPowerLimitIntf,
         std::shared_ptr<AssociationDefinitionsIntf> associationDefinitionsIntf,
         std::shared_ptr<NsmDevice> nsmDevice, uint8_t powerLimitId,
-        const std::string& path);
+        std::shared_ptr<PowerPersistencyIntf> persistencyIntf = nullptr);
 
     /**
      * @brief AsyncSetOperationHandler for setting the power limit
@@ -79,29 +89,29 @@ class NsmPowerLimit : public NsmSensor, ClearPowerLimitAsyncIntf
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
     void handleOfflineState() override;
-    sdbusplus::message::object_path clearPowerCap() override;
 
   private:
-    requester::Coroutine
-        doClearPowerLimit(std::shared_ptr<AsyncStatusIntf> statusInterface);
-
     /**
      * @brief set power limit
      * @param status[in] Pointer to the async call action result
-     * @param action[in] specifies the operation to perform on the power limit.
-     *                   0 = new power limit, 1 = reset to default
+     * @param persistent[in] If true, set persistent power limit; otherwise
+     * one-shot
      * @param value[in] target power limit in Watts
      */
     requester::Coroutine updatePowerLimit(AsyncOperationStatusType* status,
                                           std::shared_ptr<NsmDevice> nsmDevice,
-                                          const uint8_t action,
+                                          const bool persistent,
                                           const uint32_t value);
 
     std::shared_ptr<PowerLimitsIntf> powerLimitsIntf;
     std::shared_ptr<NsmClearPowerLimitIntf> clearPowerLimitIntf;
     std::shared_ptr<AssociationDefinitionsIntf> associationDefinitionsIntf;
     std::shared_ptr<NsmDevice> nsmDevice;
+    std::shared_ptr<PowerPersistencyIntf> persistencyIntf;
     uint8_t powerLimitId;
+
+    /** @brief Pending power limit value after reset (from v2 response) */
+    std::optional<uint32_t> pendingPowerLimit;
 };
 
 class NsmPowerLimitRange : public NsmObject
@@ -133,8 +143,27 @@ class NsmDefaultPowerLimit : public NsmObject
     std::string propertyName;
 };
 
+class NsmOneShotPowerLimit : public NsmSensor
+{
+  public:
+    NsmOneShotPowerLimit(const std::string& name, const std::string& type,
+                         uint8_t powerLimitId,
+                         std::shared_ptr<PowerPersistencyIntf> persistencyIntf,
+                         std::shared_ptr<PowerLimitsIntf> powerLimitsIntf);
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    uint8_t powerLimitId;
+    std::shared_ptr<PowerPersistencyIntf> persistencyIntf;
+    std::shared_ptr<PowerLimitsIntf> powerLimitsIntf;
+};
+
 void createGPUPowerLimit(std::shared_ptr<NsmDevice> nsmDevice,
                          sdbusplus::bus::bus& bus, const std::string& name,
-                         const std::string type,
+                         const std::string& type,
                          const std::string& inventoryObjPath);
 } // namespace nsm

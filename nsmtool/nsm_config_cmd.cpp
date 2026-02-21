@@ -1427,6 +1427,177 @@ class GetDevicemodeSettings : public CommandInterface
     uint8_t mode_index;
 };
 
+class GetDeviceModeSettingsV2 : public CommandInterface
+{
+  public:
+    ~GetDeviceModeSettingsV2() = default;
+    GetDeviceModeSettingsV2() = delete;
+    GetDeviceModeSettingsV2(const GetDeviceModeSettingsV2&) = delete;
+    GetDeviceModeSettingsV2(GetDeviceModeSettingsV2&&) = default;
+    GetDeviceModeSettingsV2& operator=(const GetDeviceModeSettingsV2&) = delete;
+    GetDeviceModeSettingsV2& operator=(GetDeviceModeSettingsV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetDeviceModeSettingsV2(const char* type, const char* name,
+                                     CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto getDeviceModeSettingsV2Group =
+            app->add_option_group("Required", "Get Device Mode Settings v2");
+        getDeviceModeSettingsV2Group->add_option(
+            "-i, --deviceModeIndex", deviceModeIndex,
+            "Device mode index (NvU32)\n"
+            " 11 - One Shot GPU Base Power Limit\n"
+            " 12 - Persistent GPU Base Power Limit\n"
+            " 13 - One Shot CPU Power Limit GPU Copy\n"
+            " 14 - Persistent CPU Power Limit GPU Copy");
+        getDeviceModeSettingsV2Group->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req),
+            0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_device_mode_settings_v2_req(
+            instanceId, deviceModeIndex, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        uint8_t currentModeData[256];
+        uint16_t currentModeLength = 0;
+        uint8_t pendingModeData[256];
+        uint16_t pendingModeLength = 0;
+
+        auto rc = decode_get_device_mode_settings_v2_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, currentModeData,
+            &currentModeLength, pendingModeData, &pendingModeLength);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Current Mode Length"] = currentModeLength;
+
+        if (currentModeLength == sizeof(uint32_t))
+        {
+            uint32_t currentValue;
+            memcpy(&currentValue, currentModeData, sizeof(uint32_t));
+            result["Current Mode Value"] = le32toh(currentValue);
+        }
+        else if (currentModeLength > 0)
+        {
+            std::vector<uint8_t> currentData(
+                currentModeData, currentModeData + currentModeLength);
+            result["Current Mode Data"] = currentData;
+        }
+
+        result["Pending Mode Length"] = pendingModeLength;
+        if (pendingModeLength == sizeof(uint32_t))
+        {
+            uint32_t pendingValue;
+            memcpy(&pendingValue, pendingModeData, sizeof(uint32_t));
+            result["Pending Mode Value"] = le32toh(pendingValue);
+        }
+        else if (pendingModeLength > 0)
+        {
+            std::vector<uint8_t> pendingData(
+                pendingModeData, pendingModeData + pendingModeLength);
+            result["Pending Mode Data"] = pendingData;
+        }
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint32_t deviceModeIndex = 0;
+};
+
+class SetDeviceModeSettingsV2 : public CommandInterface
+{
+  public:
+    ~SetDeviceModeSettingsV2() = default;
+    SetDeviceModeSettingsV2() = delete;
+    SetDeviceModeSettingsV2(const SetDeviceModeSettingsV2&) = delete;
+    SetDeviceModeSettingsV2(SetDeviceModeSettingsV2&&) = default;
+    SetDeviceModeSettingsV2& operator=(const SetDeviceModeSettingsV2&) = delete;
+    SetDeviceModeSettingsV2& operator=(SetDeviceModeSettingsV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetDeviceModeSettingsV2(const char* type, const char* name,
+                                     CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto setDeviceModeSettingsV2Group =
+            app->add_option_group("Required", "Set Device Mode Settings v2");
+        setDeviceModeSettingsV2Group->add_option(
+            "-i, --deviceModeIndex", deviceModeIndex,
+            "Device mode index (NvU32)\n"
+            " 11 - One Shot GPU Base Power Limit\n"
+            " 12 - Persistent GPU Base Power Limit\n"
+            " 13 - One Shot CPU Power Limit GPU Copy\n"
+            " 14 - Persistent CPU Power Limit GPU Copy");
+        setDeviceModeSettingsV2Group->add_option("-l, --value", deviceModeValue,
+                                                 "Device mode value (NvU32)");
+        setDeviceModeSettingsV2Group->require_option(2);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        uint32_t deviceModeValueLE = htole32(deviceModeValue);
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
+                sizeof(uint32_t) - 1,
+            0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_device_mode_settings_v2_req(
+            instanceId, deviceModeIndex,
+            reinterpret_cast<const uint8_t*>(&deviceModeValueLE),
+            sizeof(uint32_t), request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+
+        auto rc = decode_set_device_mode_settings_v2_resp(
+            responsePtr, payloadLength, &cc, &reasonCode);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint32_t deviceModeIndex = 0;
+    uint32_t deviceModeValue = 0;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto config = app.add_subcommand("config",
@@ -1527,6 +1698,16 @@ void registerCommand(CLI::App& app)
         "SetDevicemodeSettings", "Set device mode settings");
     commands.push_back(std::make_unique<SetDevicemodeSettings>(
         "config", "SetDevicemodeSettings", setDeviceModeSettings));
+
+    auto getDeviceModeSettingsV2 = config->add_subcommand(
+        "GetDeviceModeSettingsV2", "Get device mode settings v2 (0x83)");
+    commands.push_back(std::make_unique<GetDeviceModeSettingsV2>(
+        "config", "GetDeviceModeSettingsV2", getDeviceModeSettingsV2));
+
+    auto setDeviceModeSettingsV2 = config->add_subcommand(
+        "SetDeviceModeSettingsV2", "Set device mode settings v2 (0x82)");
+    commands.push_back(std::make_unique<SetDeviceModeSettingsV2>(
+        "config", "SetDeviceModeSettingsV2", setDeviceModeSettingsV2));
 }
 
 } // namespace config
