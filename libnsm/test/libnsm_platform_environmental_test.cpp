@@ -6530,3 +6530,236 @@ TEST(doubleToNvU8, testGoodDoubleToNvU8)
 	value = doubleToNvU8(reading);
 	EXPECT_EQ(value, 0);
 }
+
+TEST(getSupportedGPMMetrics, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_gpm_metrics_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	const uint8_t metric_type = 1;
+
+	auto rc = encode_get_supported_gpm_metrics_req(0, metric_type, request);
+
+	struct nsm_get_supported_gpm_metrics_req *req =
+	    reinterpret_cast<struct nsm_get_supported_gpm_metrics_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_SUPPORTED_GPM_METRICS, req->hdr.command);
+	EXPECT_EQ(1, req->hdr.data_size);
+	EXPECT_EQ(metric_type, req->metric_type);
+}
+
+TEST(getSupportedGPMMetrics, testBadEncodeRequest)
+{
+	auto rc = encode_get_supported_gpm_metrics_req(0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getSupportedGPMMetrics, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_SUPPORTED_GPM_METRICS,   // command
+	    1,				     // data size
+	    1,				     // metric_type
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	uint8_t metric_type = 0;
+
+	auto rc = decode_get_supported_gpm_metrics_req(request, msg_len,
+						       &metric_type);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(metric_type, 1);
+}
+
+TEST(getSupportedGPMMetrics, testBadDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,
+	    0x80,
+	    0x89,
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_SUPPORTED_GPM_METRICS,
+	    1,
+	    1,
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t metric_type = 0;
+
+	auto rc = decode_get_supported_gpm_metrics_req(nullptr, msg_len,
+						       &metric_type);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_supported_gpm_metrics_req(request, msg_len, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_supported_gpm_metrics_req(request, msg_len - 1,
+						  &metric_type);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getSupportedGPMMetrics, testGoodEncodeResponse)
+{
+	const uint16_t mask_size = 4;
+	const uint16_t max_metrics_per_command = 8;
+	const uint8_t bitmask[4] = {0x12, 0x34, 0x56, 0x78};
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_gpm_metrics_resp) -
+	    1 + mask_size);
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc = encode_get_supported_gpm_metrics_resp(
+	    0, NSM_SUCCESS, 0, mask_size, max_metrics_per_command, bitmask,
+	    response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_supported_gpm_metrics_resp *resp =
+	    reinterpret_cast<struct nsm_get_supported_gpm_metrics_resp *>(
+		response->payload);
+
+	EXPECT_EQ(le16toh(resp->hdr.data_size), 8);
+	EXPECT_EQ(le16toh(resp->mask_size), mask_size);
+	EXPECT_EQ(le16toh(resp->max_metrics_per_command),
+		  max_metrics_per_command);
+	EXPECT_EQ(resp->supported_metrics_bitmask[0], 0x12);
+	EXPECT_EQ(resp->supported_metrics_bitmask[1], 0x34);
+	EXPECT_EQ(resp->supported_metrics_bitmask[2], 0x56);
+	EXPECT_EQ(resp->supported_metrics_bitmask[3], 0x78);
+}
+
+TEST(getSupportedGPMMetrics, testBadEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_gpm_metrics_resp));
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc = encode_get_supported_gpm_metrics_resp(0, NSM_SUCCESS, 0, 4, 8,
+							nullptr, response);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getSupportedGPMMetrics, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_SUPPORTED_GPM_METRICS,   // command
+	    0,				     // CC
+	    0,
+	    0,	  // reason code
+	    8,	  // data_size low byte
+	    0,	  // data_size high byte
+	    4,	  // mask_size low byte
+	    0,	  // mask_size high byte
+	    8,	  // max_metrics_per_command low byte
+	    0,	  // max_metrics_per_command high byte
+	    0xAB, // bitmask[0]
+	    0xCD, // bitmask[1]
+	    0xEF, // bitmask[2]
+	    0x12, // bitmask[3]
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	uint16_t mask_size = 0;
+	uint16_t max_metrics_per_command = 0;
+	std::vector<uint8_t> bitmask(256);
+	uint16_t bitmask_size = 0;
+
+	auto rc = decode_get_supported_gpm_metrics_resp(
+	    response, msg_len, &cc, &reason_code, &mask_size,
+	    &max_metrics_per_command, bitmask.data(), &bitmask_size);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reason_code, 0);
+	EXPECT_EQ(mask_size, 4);
+	EXPECT_EQ(max_metrics_per_command, 8);
+	EXPECT_EQ(bitmask_size, 4);
+	EXPECT_EQ(bitmask[0], 0xAB);
+	EXPECT_EQ(bitmask[1], 0xCD);
+	EXPECT_EQ(bitmask[2], 0xEF);
+	EXPECT_EQ(bitmask[3], 0x12);
+}
+
+TEST(getSupportedGPMMetrics, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,
+	    0x80,
+	    0x89,
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_SUPPORTED_GPM_METRICS,
+	    0,
+	    0,
+	    0,
+	    8,
+	    0,
+	    4,
+	    0,
+	    8,
+	    0,
+	    0xAB,
+	    0xCD,
+	    0xEF,
+	    0x12,
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	uint16_t mask_size = 0;
+	uint16_t max_metrics_per_command = 0;
+	std::vector<uint8_t> bitmask(256);
+	uint16_t bitmask_size = 0;
+
+	auto rc = decode_get_supported_gpm_metrics_resp(
+	    response, msg_len, &cc, &reason_code, nullptr,
+	    &max_metrics_per_command, bitmask.data(), &bitmask_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_supported_gpm_metrics_resp(
+	    response, msg_len, &cc, &reason_code, &mask_size, nullptr,
+	    bitmask.data(), &bitmask_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_supported_gpm_metrics_resp(
+	    response, msg_len, &cc, &reason_code, &mask_size,
+	    &max_metrics_per_command, nullptr, &bitmask_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_supported_gpm_metrics_resp(
+	    response, msg_len, &cc, &reason_code, &mask_size,
+	    &max_metrics_per_command, bitmask.data(), nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
