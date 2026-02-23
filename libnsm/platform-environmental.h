@@ -69,9 +69,10 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_ROW_REMAPPING_COUNTS = 0x7E,
 	NSM_SET_POWER_LIMITS = 0x08,
 	NSM_GET_POWER_LIMITS = 0x07,
+	NSM_GET_SUPPORTED_GPM_METRICS = 0x48,
 	NSM_QUERY_AGGREGATE_GPM_METRICS = 0x49,
 	NSM_QUERY_PER_INSTANCE_GPM_METRICS = 0x4A,
-	NSM_QUERY_PER_INSTANCE_GPM_METRICS_V2 = 0x4B,
+	NSM_QUERY_PER_INSTANCE_GPM_METRICS_V2 = 0xAB,
 	NSM_GET_VIOLATION_DURATION = 0x45,
 	NSM_SET_SPI = 0x80,
 	NSM_GET_SPI = 0x81,
@@ -192,6 +193,9 @@ enum nsm_inventory_property_identifiers {
 	GPU_MODULE_ID = 35,
 	GPU_NVLINK_PEER_TYPE = 36,
 	ASSET_TAG = 37,
+	RATED_GPU_BASE_POWER_LIMIT = 38,
+	MINIMUM_GPU_BASE_POWER_LIMIT = 39,
+	MAXIMUM_GPU_BASE_POWER_LIMIT = 40,
 	FPGA_FIRMWARE_VERSION = 128,
 	PCIERETIMER_0_EEPROM_VERSION = 144,
 	PCIERETIMER_1_EEPROM_VERSION = 145,
@@ -702,6 +706,26 @@ struct nsm_xid_event_payload {
 	uint32_t reason;
 	uint32_t sequence_number;
 	uint64_t timestamp;
+} __attribute__((packed));
+
+/** @struct nsm_get_supported_gpm_metrics_req
+ *
+ *  Structure representing Get Supported GPM Metrics request.
+ */
+struct nsm_get_supported_gpm_metrics_req {
+	struct nsm_common_req hdr;
+	uint8_t metric_type;
+} __attribute__((packed));
+
+/** @struct nsm_get_supported_gpm_metrics_resp
+ *
+ *  Structure representing Get Supported GPM Metrics response.
+ */
+struct nsm_get_supported_gpm_metrics_resp {
+	struct nsm_common_resp hdr;
+	uint16_t mask_size;
+	uint16_t max_metrics_per_command;
+	uint8_t supported_metrics_bitmask[1];
 } __attribute__((packed));
 
 /** @struct nsm_query_aggregate_gpm_metrics_req
@@ -3240,6 +3264,62 @@ int encode_nsm_reset_required_event(uint8_t instance_id, bool ackr,
 int decode_nsm_reset_required_event(const struct nsm_msg *msg, size_t msg_len,
 				    uint8_t *event_class,
 				    uint16_t *event_state);
+
+/** @brief Encode a Get Supported GPM Metrics request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] metric_type - metric type (0 = aggregate, 1 = individual)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_supported_gpm_metrics_req(uint8_t instance_id,
+					 uint8_t metric_type,
+					 struct nsm_msg *msg);
+
+/** @brief Decode a Get Supported GPM Metrics request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] metric_type - metric type (0 = aggregate, 1 = individual)
+ *  @return nsm_completion_codes
+ */
+int decode_get_supported_gpm_metrics_req(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *metric_type);
+
+/** @brief Encode a Get Supported GPM Metrics response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] mask_size - size of the supported metrics bitmask in bytes
+ *  @param[in] max_metrics_per_command - maximum metrics per command
+ *  @param[in] supported_metrics_bitmask - pointer to supported metrics bitmask
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_supported_gpm_metrics_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint16_t mask_size,
+    uint16_t max_metrics_per_command, const uint8_t *supported_metrics_bitmask,
+    struct nsm_msg *msg);
+
+/** @brief Decode a Get Supported GPM Metrics response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - pointer to reason code
+ *  @param[out] mask_size - size of the supported metrics bitmask in bytes
+ *  @param[out] max_metrics_per_command - maximum metrics per command
+ *  @param[out] supported_metrics_bitmask - pointer to supported metrics bitmask
+ *  @param[in,out] supported_metrics_bitmask_size - in: size of caller's buffer,
+ * out: actual size written
+ *  @return nsm_completion_codes
+ */
+int decode_get_supported_gpm_metrics_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *mask_size,
+    uint16_t *max_metrics_per_command, uint8_t *supported_metrics_bitmask,
+    uint16_t *supported_metrics_bitmask_size);
 
 /** @brief Encode an Query Aggregate GPM Metrics request message
  *

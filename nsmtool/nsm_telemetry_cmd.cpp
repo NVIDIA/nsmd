@@ -4802,6 +4802,86 @@ class GetClockOutputEnableState : public CommandInterface
     uint8_t index;
 };
 
+class GetSupportedGPMMetrics : public CommandInterface
+{
+  public:
+    ~GetSupportedGPMMetrics() = default;
+    GetSupportedGPMMetrics() = delete;
+    GetSupportedGPMMetrics(const GetSupportedGPMMetrics&) = delete;
+    GetSupportedGPMMetrics(GetSupportedGPMMetrics&&) = default;
+    GetSupportedGPMMetrics& operator=(const GetSupportedGPMMetrics&) = delete;
+    GetSupportedGPMMetrics& operator=(GetSupportedGPMMetrics&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetSupportedGPMMetrics(const char* type, const char* name,
+                                    CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-t, --metricType", metricType,
+                        "Metric Type (0 = aggregate, 1 = individual)")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_gpm_metrics_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_supported_gpm_metrics_req(instanceId, metricType,
+                                                       request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t maskSize = 0;
+        uint16_t maxMetricsPerCommand = 0;
+        std::vector<uint8_t> supportedMetricsBitmask(256);
+        uint16_t supportedMetricsBitmaskSize;
+
+        auto rc = decode_get_supported_gpm_metrics_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &maskSize,
+            &maxMetricsPerCommand, supportedMetricsBitmask.data(),
+            &supportedMetricsBitmaskSize);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Mask Size"] = maskSize;
+        result["Maximum Metrics Per Command"] = maxMetricsPerCommand;
+
+        std::vector<int> supportedMetricIds;
+        for (uint16_t byteIdx = 0; byteIdx < supportedMetricsBitmaskSize;
+             ++byteIdx)
+        {
+            for (int bitIdx = 0; bitIdx < 8; ++bitIdx)
+            {
+                if (supportedMetricsBitmask[byteIdx] & (1 << bitIdx))
+                {
+                    supportedMetricIds.push_back(byteIdx * 8 + bitIdx);
+                }
+            }
+        }
+        result["Supported Metric IDs"] = supportedMetricIds;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t metricType;
+};
+
 class QueryAggregatedGPMMetrics : public CommandInterface
 {
   public:
@@ -6632,6 +6712,11 @@ void registerCommand(CLI::App& app)
         "GetClockOutputEnableState", "get clock output enable state");
     commands.push_back(std::make_unique<GetClockOutputEnableState>(
         "telemetry", "GetClockOutputEnableState", getClockOutputEnableState));
+
+    auto getSupportedGPMMetrics = telemetry->add_subcommand(
+        "GetSupportedGPMMetrics", "Get Supported GPM Metrics");
+    commands.push_back(std::make_unique<GetSupportedGPMMetrics>(
+        "telemetry", "GetSupportedGPMMetrics", getSupportedGPMMetrics));
 
     auto queryAggregatedGPMMetrics = telemetry->add_subcommand(
         "QueryAggregatedGPMMetrics", "Query Aggregated GPM Metrics");

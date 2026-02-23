@@ -455,6 +455,9 @@ class MockupResponder
         queryAggregatedGPMMetrics(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
+        getSupportedGPMMetrics(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         queryAggregatedResetMetrics(const nsm_msg* requestMsg,
                                     size_t requestLen);
 

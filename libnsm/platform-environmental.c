@@ -4020,6 +4020,137 @@ int decode_nsm_xid_event(const struct nsm_msg *msg, size_t msg_len,
 	return NSM_SW_SUCCESS;
 }
 
+int encode_get_supported_gpm_metrics_req(uint8_t instance_id,
+					 uint8_t metric_type,
+					 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_supported_gpm_metrics_req *request =
+	    (struct nsm_get_supported_gpm_metrics_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_SUPPORTED_GPM_METRICS;
+	request->hdr.data_size = sizeof(request->metric_type);
+	request->metric_type = metric_type;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_supported_gpm_metrics_req(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *metric_type)
+{
+	if (msg == NULL || metric_type == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_get_supported_gpm_metrics_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_supported_gpm_metrics_req *request =
+	    (struct nsm_get_supported_gpm_metrics_req *)msg->payload;
+
+	if (request->hdr.data_size !=
+	    sizeof(struct nsm_get_supported_gpm_metrics_req) -
+		sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*metric_type = request->metric_type;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_supported_gpm_metrics_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint16_t mask_size,
+    uint16_t max_metrics_per_command, const uint8_t *supported_metrics_bitmask,
+    struct nsm_msg *msg)
+{
+	int rc = encode_common_resp(instance_id, cc, reason_code,
+				    NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+				    NSM_GET_SUPPORTED_GPM_METRICS, msg);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return NSM_SW_SUCCESS;
+	}
+
+	if (supported_metrics_bitmask == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_get_supported_gpm_metrics_resp *resp =
+	    (struct nsm_get_supported_gpm_metrics_resp *)msg->payload;
+
+	resp->hdr.data_size =
+	    htole16(sizeof(resp->mask_size) +
+		    sizeof(resp->max_metrics_per_command) + mask_size);
+	resp->mask_size = htole16(mask_size);
+	resp->max_metrics_per_command = htole16(max_metrics_per_command);
+	memcpy(resp->supported_metrics_bitmask, supported_metrics_bitmask,
+	       mask_size);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_supported_gpm_metrics_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *mask_size,
+    uint16_t *max_metrics_per_command, uint8_t *supported_metrics_bitmask,
+    uint16_t *supported_metrics_bitmask_size)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (mask_size == NULL || max_metrics_per_command == NULL ||
+	    supported_metrics_bitmask == NULL ||
+	    supported_metrics_bitmask_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_supported_gpm_metrics_resp) -
+			  1) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_supported_gpm_metrics_resp *resp =
+	    (struct nsm_get_supported_gpm_metrics_resp *)msg->payload;
+
+	*mask_size = le16toh(resp->mask_size);
+	*max_metrics_per_command = le16toh(resp->max_metrics_per_command);
+
+	const size_t min_data_size =
+	    sizeof(resp->mask_size) + sizeof(resp->max_metrics_per_command);
+	if (data_size < min_data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	*supported_metrics_bitmask_size = data_size - min_data_size;
+
+	memcpy(supported_metrics_bitmask, resp->supported_metrics_bitmask,
+	       *supported_metrics_bitmask_size);
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_query_aggregate_gpm_metrics_req(
     uint8_t instance, uint8_t retrieval_source, uint8_t gpu_instance,
     uint8_t compute_instance, const uint8_t *metrics_bitfield,

@@ -548,6 +548,8 @@ std::optional<Response>
                 case NSM_GET_MEMORY_CAPACITY_UTILIZATION:
                     return getMemoryCapacityUtilHandler(request, requestLen,
                                                         true, longRunningEvent);
+                case NSM_GET_SUPPORTED_GPM_METRICS:
+                    return getSupportedGPMMetrics(request, requestLen);
                 case NSM_QUERY_AGGREGATE_GPM_METRICS:
                     return queryAggregatedGPMMetrics(request, requestLen);
                 case NSM_QUERY_PER_INSTANCE_GPM_METRICS:
@@ -964,11 +966,11 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
-                 {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,
-                      14,  15,  16,  17,  69,  70,  71,  73,  74,  75,
-                      77,  78,  79,  97,  114, 115, 116, 117, 119, 121,
-                      123, 124, 125, 126, 127, 163, 164, 165, 166, 167,
-                      168, 169, 170, 172, 173, 118, 113, 122, 120}},
+                 {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,
+                      15,  16,  17,  69,  70,  71,  72,  73,  74,  75,  77,
+                      78,  79,  97,  114, 115, 116, 117, 119, 121, 123, 124,
+                      125, 126, 127, 163, 164, 165, 166, 167, 168, 169, 170,
+                      171, 172, 173, 118, 113, 122, 120}},
                  {4,
                   {0, NSM_GET_DEVICE_DIAGNOSTICS,
                    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
@@ -6192,6 +6194,60 @@ std::optional<std::vector<uint8_t>>
                                NSM_GET_DEVICE_RESET_STATISTICS, NSM_SUCCESS,
                                samplesCount, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getSupportedGPMMetrics(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getSupportedGPMMetrics: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t metricType{};
+    auto rc = decode_get_supported_gpm_metrics_req(requestMsg, requestLen,
+                                                   &metricType);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "getSupportedGPMMetrics: decode_get_supported_gpm_metrics_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("getSupportedGPMMetrics: metricType={METRIC_TYPE}",
+                  "METRIC_TYPE", metricType);
+    }
+
+    // Mock response: support all 32 metrics (metric IDs 0-31)
+    // 4 bytes = 32 bits, all set to 1
+    constexpr uint16_t maskSize = 4;
+    constexpr uint16_t maxMetricsPerCommand = 21;
+    std::array<uint8_t, maskSize> supportedMetricsBitmask = {0xFF, 0xFF, 0xFF,
+                                                             0xFF};
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_gpm_metrics_resp) - 1 +
+            maskSize,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_supported_gpm_metrics_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, 0, maskSize,
+        maxMetricsPerCommand, supportedMetricsBitmask.data(), responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "getSupportedGPMMetrics: encode_get_supported_gpm_metrics_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
 
     return response;
 }
