@@ -36,7 +36,7 @@ reviews:
     # Do not review draft MRs
     drafts: false
 
-    # Skip review when title contains any of these keywords
+    # Skip review when title contains any of these keywords below
     ignore_title_keywords:
         - WIP
         - DRAFT
