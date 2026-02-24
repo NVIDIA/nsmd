@@ -24,8 +24,7 @@ namespace nsm
  * @param type D-Bus ErrorInjectionCapability Type
  * @return NSM protocol bit position for the error injection type
  */
-static uint8_t
-    getErrorInjectionBitPosition(ErrorInjectionCapabilityIntf::Type type)
+uint8_t getErrorInjectionBitPosition(ErrorInjectionCapabilityIntf::Type type)
 {
     switch (type)
     {
