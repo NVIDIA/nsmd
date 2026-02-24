@@ -32,6 +32,7 @@
 #include <phosphor-logging/lg2.hpp>
 
 #include <ranges>
+#include <string>
 
 namespace nsm
 {
@@ -157,9 +158,15 @@ void NsmDevice::updateMessageTypesToCommandCodeMatrix(
     // Check if messageType is within the valid range
     if (messageType >= NUM_NSM_TYPES)
     {
-        lg2::warning(
-            "updateMessageTypesToCommandCodeMatrix: skipping invalid message type={MT} (>= NUM_NSM_TYPES={NUM})",
-            "MT", messageType, "NUM", NUM_NSM_TYPES);
+        if (shouldLog("updateMessageTypesToCommandCodeMatrix:EID:" +
+                          std::to_string(getEid()) +
+                          ":MT:" + std::to_string(messageType),
+                      true))
+        {
+            lg2::warning(
+                "updateMessageTypesToCommandCodeMatrix: skipping invalid message type={MT} (>= NUM_NSM_TYPES={NUM})",
+                "EID", getEid(), "MT", messageType, "NUM", NUM_NSM_TYPES);
+        }
         return;
     }
     // check applied to avoid core dump in case of supportedCommandsSize*8 is
