@@ -1,50 +1,29 @@
-# Primary language used in reviews and summaries
-language: en
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 
-# Do not opt into experimental features
+language: en
+tone_instructions: "Be concise, engineering-focused, and avoid creative writing."
 early_access: false
 
 chat:
-    # Allow CodeRabbit to automatically respond in MR discussions
     auto_reply: true
 
-
 reviews:
-    # Use a rigorous, engineering-focused tone
-    profile: technical
+    profile: assertive
 
-    # Post a concise high-level MR summary
     high_level_summary: true
-
-    # Marker used when manually requesting a summary
     high_level_summary_placeholder: "@coderabbitai summary"
 
-    # Disable poem-style summaries explicitly
     poem: false
-
-    # Post review status (pass/needs attention)
     review_status: true
-
-    # Collapse detailed walkthrough by default to reduce noise
     collapse_walkthrough: true
 
-
     auto_review:
-        # Automatically review new merge requests
-        enabled: true
-
-    # Do not review draft MRs
-    drafts: false
-
-    # Skip review when title contains any of these keywords below
-    ignore_title_keywords:
+      enabled: true
+      drafts: false
+      ignore_title_keywords:
         - WIP
         - DRAFT
         - DO NOT MERGE
         - NO REVIEW
 
     commit_status: false
-
-    style: concise
-
-    avoid_creative_writing: true
