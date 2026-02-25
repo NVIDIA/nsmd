@@ -25,6 +25,9 @@
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationContext/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Replaceable/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/SPDMResponder/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
@@ -38,6 +41,10 @@ using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
 using UuidIntf = object_t<Common::server::UUID>;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
+using LocationCodeIntf = object_t<Inventory::Decorator::server::LocationCode>;
+using LocationContextIntf =
+    object_t<Inventory::Decorator::server::LocationContext>;
+using ReplaceableIntf = object_t<Inventory::Decorator::server::Replaceable>;
 using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
 using SPDMResponderIntf = object_t<Inventory::Item::server::SPDMResponder>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
