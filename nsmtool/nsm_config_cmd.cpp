@@ -1482,6 +1482,10 @@ class GetDeviceModeSettingsV2 : public CommandInterface
         getDeviceModeSettingsV2Group->add_option(
             "-i, --deviceModeIndex", deviceModeIndex,
             "Device mode index (NvU32)\n"
+            "  3 - DPU Operation Mode (1 byte: 0=DPU, 1=NIC)\n"
+            "  4 - PCIe Device Mode (3 bytes: multi-socket, EW, bifurcation)\n"
+            "      value encodes sub-modes in LE byte order:\n"
+            "      byte[0]=multi-socket byte[1]=controlledEW byte[2]=bifurcation\n"
             "  7 - Max AC Power Ramp Rate Config (NvUFXP8_24)\n"
             "  8 - SoC Power Smoothing Enabled (NvBool)\n"
             "  9 - SoC Power Smoothing Preset Index (NvU8)\n"
@@ -1603,19 +1607,30 @@ class SetDeviceModeSettingsV2 : public CommandInterface
         setDeviceModeSettingsV2Group->add_option(
             "-i, --deviceModeIndex", deviceModeIndex,
             "Device mode index (NvU32)\n"
+            "  3 - DPU Operation Mode (1 byte: 0=DPU, 1=NIC)\n"
+            "  4 - PCIe Device Mode (3 bytes: multi-socket, EW, bifurcation)\n"
+            "      value encodes sub-modes in LE byte order:\n"
+            "      byte[0]=multi-socket byte[1]=controlledEW byte[2]=bifurcation\n"
             "  7 - Max AC Power Ramp Rate Config (NvUFXP8_24)\n"
             "  8 - SoC Power Smoothing Enabled (NvBool)\n"
             "  9 - SoC Power Smoothing Preset Index (NvU8)\n"
             " 10 - SoC Power Brake Enabled (NvBool)\n"
-            " 11 - One Shot GPU Base Power Limit\n"
-            " 12 - Persistent GPU Base Power Limit\n"
-            " 13 - One Shot CPU Power Limit GPU Copy\n"
-            " 14 - Persistent CPU Power Limit GPU Copy");
+            " 11 - One Shot GPU Base Power Limit (NvU32)\n"
+            " 12 - Persistent GPU Base Power Limit (NvU32)\n"
+            " 13 - One Shot CPU Power Limit GPU Copy (NvU32)\n"
+            " 14 - Persistent CPU Power Limit GPU Copy (NvU32)");
         setDeviceModeSettingsV2Group->add_option(
             "-l, --value", deviceModeValue,
             "Device mode value\n"
             "  index  7 - double (NvUFXP8_24, e.g. 25.0)\n"
             "  others - uint32");
+        setDeviceModeSettingsV2Group->add_option(
+            "-s, --size", deviceModeDataSize,
+            "Number of bytes of mode data to send (default: 4).\n"
+            "Must match the mode data length expected by the device\n"
+            "for the given device mode index (see NSM spec).\n"
+            "Only the first -s bytes of the LE value are sent.\n"
+            "Max: 4 bytes.");
         setDeviceModeSettingsV2Group->require_option(2);
     }
 
@@ -1644,10 +1659,18 @@ class SetDeviceModeSettingsV2 : public CommandInterface
             }
             default:
             {
+                uint16_t modeDataLen =
+                    static_cast<uint16_t>(deviceModeDataSize);
+                if (modeDataLen > sizeof(uint32_t))
+                {
+                    std::cerr
+                        << "Error: mode data size cannot exceed 4 bytes\n";
+                    return {NSM_SW_ERROR, {}};
+                }
                 uint32_t valueLE =
                     htole32(static_cast<uint32_t>(deviceModeValue));
                 memcpy(payload, &valueLE, sizeof(uint32_t));
-                payloadLen = sizeof(uint32_t);
+                payloadLen = modeDataLen;
                 break;
             }
         }
@@ -1687,6 +1710,7 @@ class SetDeviceModeSettingsV2 : public CommandInterface
   private:
     uint32_t deviceModeIndex = 0;
     double deviceModeValue = 0;
+    uint32_t deviceModeDataSize = sizeof(uint32_t);
 };
 
 class SetDeviceConfig : public CommandInterface

@@ -2182,12 +2182,8 @@ int encode_get_device_mode_settings_v2_req(uint8_t instance_id,
 		return NSM_SW_ERROR_NULL;
 	}
 
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_REQUEST;
-	header.instance_id = instance_id;
-	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
-
-	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_GET_DEVICE_MODE_SETTINGS_V2, msg);
 	if (rc != NSM_SW_SUCCESS) {
 		return rc;
 	}
@@ -2195,7 +2191,6 @@ int encode_get_device_mode_settings_v2_req(uint8_t instance_id,
 	struct nsm_get_device_mode_settings_v2_req *request =
 	    (struct nsm_get_device_mode_settings_v2_req *)msg->payload;
 
-	request->hdr.command = NSM_GET_DEVICE_MODE_SETTINGS_V2;
 	request->hdr.data_size = sizeof(request->device_mode_index);
 	request->device_mode_index = htole32(device_mode_index);
 
@@ -2348,12 +2343,8 @@ int encode_set_device_mode_settings_v2_req(uint8_t instance_id,
 		return NSM_SW_ERROR_NULL;
 	}
 
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_REQUEST;
-	header.instance_id = instance_id;
-	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
-
-	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_SET_DEVICE_MODE_SETTINGS_V2, msg);
 	if (rc != NSM_SW_SUCCESS) {
 		return rc;
 	}
@@ -2361,7 +2352,6 @@ int encode_set_device_mode_settings_v2_req(uint8_t instance_id,
 	struct nsm_set_device_mode_settings_v2_req *request =
 	    (struct nsm_set_device_mode_settings_v2_req *)msg->payload;
 
-	request->hdr.command = NSM_SET_DEVICE_MODE_SETTINGS_V2;
 	request->hdr.data_size =
 	    sizeof(request->device_mode_index) + device_mode_data_length;
 	request->device_mode_index = htole32(device_mode_index);

@@ -144,6 +144,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
         0,  // migMode
         0,  // eccMode
         0,  // protectionMode
+        {}, // deviceModeSettingsV2
         {}, // eventSources
     })
 {
@@ -948,7 +949,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS,
                    NSM_GET_DEVICE_DEBUG_PARAMETERS,
                    NSM_SET_DEVICE_DEBUG_PARAMETERS}},
-                 {5, {3, 4, 5, 6, 7, 128, 129}},
+                 {5, {3, 4, 5, 6, 7, 128, 129, 130, 131}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
@@ -970,7 +971,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_QUERY_TOKEN_PARAMETERS,
                    NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
                    NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
-                 {5, {3, 4, 5, 6, 7, 128, 129}},
+                 {5, {3, 4, 5, 6, 7, 128, 129, 130, 131}},
              }},
             {NSM_DEV_ID_GPU,
              {
@@ -8134,8 +8135,23 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    auto currentModeData = getDeviceModeSettingsV2Data(deviceModeIndex);
-    auto pendingModeData = getDeviceModeSettingsV2Data(deviceModeIndex);
+    // Return stored current/pending values when available; otherwise fall
+    // back to deterministic mock defaults for this device mode index.
+    std::vector<uint8_t> currentModeData;
+    std::vector<uint8_t> pendingModeData;
+    auto it = state.deviceModeSettingsV2.find(deviceModeIndex);
+    if (it != state.deviceModeSettingsV2.end())
+    {
+        currentModeData = it->second.first.empty()
+                              ? getDeviceModeSettingsV2Data(deviceModeIndex)
+                              : it->second.first;
+        pendingModeData = it->second.second;
+    }
+    else
+    {
+        currentModeData = getDeviceModeSettingsV2Data(deviceModeIndex);
+        pendingModeData = getDeviceModeSettingsV2Data(deviceModeIndex);
+    }
     uint16_t reason_code = ERR_NULL;
 
     std::vector<uint8_t> response(
@@ -8170,11 +8186,23 @@ std::optional<std::vector<uint8_t>>
     }
 
     uint32_t deviceModeIndex = 0;
-    uint8_t deviceModeData[sizeof(uint32_t)] = {0};
     uint16_t deviceModeDataLength = 0;
 
+    // Pre-allocate deviceModeData buffer:
+    // minReqSize = sizeof(nsm_msg_hdr) +
+    // sizeof(nsm_set_device_mode_settings_v2_req) - sizeof(uint8_t) maxDataSize
+    // = max(requestLen - minReqSize, 1024).
+    // decode_set_device_mode_settings_v2_req sets deviceModeDataLength to
+    // actual length.
+    size_t minReqSize = sizeof(nsm_msg_hdr) +
+                        sizeof(nsm_set_device_mode_settings_v2_req) -
+                        sizeof(uint8_t);
+    size_t maxDataSize = (requestLen > minReqSize) ? (requestLen - minReqSize)
+                                                   : 1024;
+    std::vector<uint8_t> deviceModeData(maxDataSize, 0);
+
     auto rc = decode_set_device_mode_settings_v2_req(
-        requestMsg, requestLen, &deviceModeIndex, deviceModeData,
+        requestMsg, requestLen, &deviceModeIndex, deviceModeData.data(),
         &deviceModeDataLength);
     if (rc != NSM_SW_SUCCESS)
     {
@@ -8215,6 +8243,14 @@ std::optional<std::vector<uint8_t>>
             "LEN", deviceModeDataLength, "EXP", expectedLen, "IDX",
             deviceModeIndex);
         cc = NSM_ERR_INVALID_DATA_LENGTH;
+    }
+    else
+    {
+        deviceModeData.resize(deviceModeDataLength);
+
+        // Store as pending device mode (current remains unchanged until reset).
+        auto& modeSettings = state.deviceModeSettingsV2[deviceModeIndex];
+        modeSettings.second = deviceModeData;
     }
 
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),

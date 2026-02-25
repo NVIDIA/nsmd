@@ -1,5 +1,6 @@
 #pragma once
 
+#include "device-configuration.h"
 #include "libnsm/diagnostics.h"
 
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)
@@ -11,6 +12,10 @@
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
+#include <com/nvidia/DeviceMode/DPUOperationMode/server.hpp>
+#include <com/nvidia/DeviceMode/PCIeBifurcation/server.hpp>
+#include <com/nvidia/DeviceMode/PCIeControlledEWTraffic/server.hpp>
+#include <com/nvidia/DeviceMode/PCIeMultiSocket/server.hpp>
 #include <com/nvidia/DeviceProtection/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Control/Reset/server.hpp>
@@ -33,6 +38,27 @@ using ProtectionIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::DeviceProtection>;
 using ProtectionOption =
     sdbusplus::server::com::nvidia::DeviceProtection::ProtectionOption;
+using DPUOperationModeIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::DeviceMode::server::DPUOperationMode,
+    Association::server::Definitions>;
+using DPUOperationModeServer =
+    sdbusplus::com::nvidia::DeviceMode::server::DPUOperationMode;
+using OperationMode = DPUOperationModeServer::OperationMode;
+
+using PCIeDeviceModeIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::DeviceMode::server::PCIeMultiSocket,
+    sdbusplus::com::nvidia::DeviceMode::server::PCIeControlledEWTraffic,
+    sdbusplus::com::nvidia::DeviceMode::server::PCIeBifurcation,
+    Association::server::Definitions>;
+using PCIeMultiSocketServer =
+    sdbusplus::com::nvidia::DeviceMode::server::PCIeMultiSocket;
+using SocketMode = PCIeMultiSocketServer::SocketMode;
+using PCIeControlledEWTrafficServer =
+    sdbusplus::com::nvidia::DeviceMode::server::PCIeControlledEWTraffic;
+using EWTrafficMode = PCIeControlledEWTrafficServer::EWTrafficMode;
+using PCIeBifurcationServer =
+    sdbusplus::com::nvidia::DeviceMode::server::PCIeBifurcation;
+using BifurcationMode = PCIeBifurcationServer::BifurcationMode;
 
 class NsmDeviceProtectionOptions : public NsmSensor
 {
@@ -88,4 +114,162 @@ class NsmNetworkAdapterDIReset : public NsmObject
     std::string objPath;
 };
 #endif
+
+// ---- Device Mode Settings V2 sensor classes ----
+
+class NsmDeviceModeSettingsV2Base : public NsmSensor
+{
+  public:
+    NsmDeviceModeSettingsV2Base(const std::string& name,
+                                const std::string& type,
+                                enum device_mode_index deviceModeIndex,
+                                uint8_t patchabilityBitmap);
+
+    static bool isModeBitSet(uint8_t bitmap,
+                             enum device_mode_index subDeviceMode);
+
+  protected:
+    static uint8_t getSubDeviceModeIndex(enum device_mode_index subDeviceMode);
+    bool isSubDeviceModePatchable(enum device_mode_index subDeviceMode) const;
+
+    enum device_mode_index deviceModeIndex;
+    uint8_t patchabilityBitmap;
+    static constexpr uint8_t deviceModeSettingsNoChange = 0xFF;
+};
+
+class NsmDeviceModeSettingsV2GetBase : public NsmDeviceModeSettingsV2Base
+{
+  public:
+    NsmDeviceModeSettingsV2GetBase(const std::string& name,
+                                   const std::string& type,
+                                   enum device_mode_index deviceModeIndex,
+                                   uint8_t patchabilityBitmap);
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  protected:
+    virtual uint8_t handleDeviceModeGetPayload(const uint8_t* currentData,
+                                               uint16_t currentLength,
+                                               const uint8_t* pendingData,
+                                               uint16_t pendingLength) = 0;
+};
+
+class NsmDeviceModeSettingsV2SetBase : public NsmDeviceModeSettingsV2Base
+{
+  public:
+    NsmDeviceModeSettingsV2SetBase(const std::string& name,
+                                   const std::string& type,
+                                   enum device_mode_index deviceModeIndex,
+                                   uint8_t patchabilityBitmap);
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg([[maybe_unused]] eid_t eid,
+                      [[maybe_unused]] uint8_t instanceId) override;
+    uint8_t
+        handleResponseMsg([[maybe_unused]] const struct nsm_msg* responseMsg,
+                          [[maybe_unused]] size_t responseLen) override;
+
+  protected:
+    std::optional<std::vector<uint8_t>>
+        createSetRequestMsg(uint8_t instanceId,
+                            const std::vector<uint8_t>& modeData) const;
+    bool asyncPatchInProgress{false};
+};
+
+class NsmDPUOperationModeDeviceModeSettingsV2Get :
+    public NsmDeviceModeSettingsV2GetBase
+{
+  public:
+    static constexpr enum device_mode_index modeIndex =
+        DEVICE_MODE_DPU_OPERATION_MODE;
+
+    NsmDPUOperationModeDeviceModeSettingsV2Get(
+        const std::string& name, const std::string& type,
+        uint8_t patchabilityBitmap,
+        std::shared_ptr<DPUOperationModeIntf> deviceModeIntf);
+
+  protected:
+    uint8_t handleDeviceModeGetPayload(const uint8_t* currentData,
+                                       uint16_t currentLength,
+                                       const uint8_t* pendingData,
+                                       uint16_t pendingLength) override;
+
+  private:
+    std::shared_ptr<DPUOperationModeIntf> deviceModeIntf;
+};
+
+class NsmDPUOperationModeDeviceModeSettingsV2Set :
+    public NsmDeviceModeSettingsV2SetBase
+{
+  public:
+    static constexpr enum device_mode_index modeIndex =
+        DEVICE_MODE_DPU_OPERATION_MODE;
+    static constexpr enum device_mode_index dpuOperationSubMode =
+        DEVICE_MODE_DPU_OPERATION_MODE_DPU_OPERATION;
+
+    NsmDPUOperationModeDeviceModeSettingsV2Set(
+        const std::string& name, const std::string& type,
+        uint8_t patchabilityBitmap,
+        std::shared_ptr<DPUOperationModeIntf> deviceModeIntf);
+
+    requester::Coroutine setPendingMode(const AsyncSetOperationValueType& value,
+                                        AsyncOperationStatusType* status,
+                                        std::shared_ptr<NsmDevice> nsmDevice);
+
+  private:
+    std::shared_ptr<DPUOperationModeIntf> deviceModeIntf;
+};
+
+class NsmPCIeDeviceModeDeviceModeSettingsV2Get :
+    public NsmDeviceModeSettingsV2GetBase
+{
+  public:
+    static constexpr enum device_mode_index modeIndex =
+        DEVICE_MODE_PCIE_DEVICE_MODE;
+
+    NsmPCIeDeviceModeDeviceModeSettingsV2Get(
+        const std::string& name, const std::string& type,
+        uint8_t patchabilityBitmap,
+        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf);
+
+  protected:
+    uint8_t handleDeviceModeGetPayload(const uint8_t* currentData,
+                                       uint16_t currentLength,
+                                       const uint8_t* pendingData,
+                                       uint16_t pendingLength) override;
+
+  private:
+    std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf;
+};
+
+class NsmPCIeDeviceModeDeviceModeSettingsV2Set :
+    public NsmDeviceModeSettingsV2SetBase
+{
+  public:
+    static constexpr enum device_mode_index modeIndex =
+        DEVICE_MODE_PCIE_DEVICE_MODE;
+    static constexpr enum device_mode_index multiSocketSubMode =
+        DEVICE_MODE_MULTI_SOCKET_MODE_PCIE_DEVICE;
+    static constexpr enum device_mode_index controlledEWSubMode =
+        DEVICE_MODE_CONTROLLED_EW_TRAFFIC_MODE_PCIE_DEVICE;
+    static constexpr enum device_mode_index bifurcationSubMode =
+        DEVICE_MODE_PCIE_BIFURCATION_MODE_PCIE_DEVICE;
+
+    NsmPCIeDeviceModeDeviceModeSettingsV2Set(
+        const std::string& name, const std::string& type,
+        uint8_t patchabilityBitmap,
+        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf);
+
+    requester::Coroutine
+        setPendingModes(const AsyncSetOperationValueType& value,
+                        AsyncOperationStatusType* status,
+                        std::shared_ptr<NsmDevice> nsmDevice);
+
+  private:
+    std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf;
+};
+
 } // namespace nsm

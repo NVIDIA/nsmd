@@ -700,6 +700,13 @@ class MockupResponder
         uint8_t migMode;
         uint8_t eccMode;
         uint8_t protectionMode;
+        // v2 device mode settings: map<device_mode_index, pair<current,
+        // pending>> Type-safe structs (defined in libnsm) are serialized into
+        // these vectors by the encoding/decoding layer for flexible storage in
+        // the mock responder
+        std::map<uint32_t,
+                 std::pair<std::vector<uint8_t>, std::vector<uint8_t>>>
+            deviceModeSettingsV2;
         std::unordered_map<uint8_t,
                            std::array<bitfield8_t, EVENT_SOURCES_LENGTH>>
             eventSources;
