@@ -393,6 +393,11 @@ class NsmDotTest : public Test, public SensorManagerTest
     std::unique_ptr<NsmDotObject> dotObject;
 };
 
+TEST_F(NsmDotTest, ConstructorSetsInitialDOTStateToUnknown)
+{
+    EXPECT_EQ(dotObject->dotState(), DotActionIntf::DOTStates::Unknown);
+}
+
 TEST_F(NsmDotTest, DotCAKInstallSuccess)
 {
     testing::Mock::AllowLeak(mockDevice.get());

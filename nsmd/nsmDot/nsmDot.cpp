@@ -154,7 +154,7 @@ NsmDotObject::NsmDotObject(sdbusplus::bus::bus& bus, const std::string& name,
     lg2::debug("Dot: create Unified object: {PATH}, blobPathName: {BLOB}",
                "PATH", dotObjectBasePath / name, "BLOB", blobPathName_);
 
-    DotActionIntf::dotState(DotActionIntf::DOTStates::Uninitialized);
+    DotActionIntf::dotState(DotActionIntf::DOTStates::Unknown);
 }
 
 requester::Coroutine NsmDotObject::update(std::shared_ptr<NsmDevice> nsmDevice)
@@ -2049,6 +2049,7 @@ uint8_t NsmDotStatusObject::handleResponseMsg(const nsm_msg* responseMsg,
         lg2::debug(
             "NsmDotStatusObject: decode_nsm_dot_get_status_resp failed: rc={RC} cc={CC} reason={REASON}",
             "RC", rc, "CC", cc, "REASON", reasonCode);
+        dotActionIntf_->dotState(DotActionIntf::DOTStates::Unknown);
         return cc ? cc : rc;
     }
 
@@ -2080,7 +2081,7 @@ uint8_t NsmDotStatusObject::handleResponseMsg(const nsm_msg* responseMsg,
                            "STATUS", status);
             }
             statusText = "Unknown";
-            currentDotState = DotActionIntf::DOTStates::Uninitialized;
+            currentDotState = DotActionIntf::DOTStates::Unknown;
             break;
     }
 
