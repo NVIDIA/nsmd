@@ -2528,6 +2528,7 @@ class DotGetStatus : public CommandInterface
             result["Reserved"] = "0000";
             result["dataSize"] = "0000";
             result["reasonCode"] = reasonCodeHex.str();
+            result["statusText"] = "Unknown";
 
             std::cerr << "Response message error: "
                       << "rc=" << rc << ", cc=" << (int)cc
@@ -3079,7 +3080,7 @@ void registerCommand(CLI::App& app)
         std::make_unique<DotGetInfo>("firmware", "DotGetInfo", dotGetInfo));
     auto dotGetStatus = firmware->add_subcommand(
         "DotGetStatus",
-        "Get DOT status (Uninitialized/Volatile/Locked/Disabled)");
+        "Get DOT status (Uninitialized/Volatile/Locked/Disabled/Unknown)");
     commands.push_back(std::make_unique<DotGetStatus>(
         "firmware", "DotGetStatus", dotGetStatus));
     auto dotDisable = firmware->add_subcommand(
