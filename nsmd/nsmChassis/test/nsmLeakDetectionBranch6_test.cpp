@@ -40,6 +40,9 @@ using namespace ::testing;
 #include "nsmLeakDetection.hpp"
 #include "test/commonMock.hpp"
 
+#include <memory>
+#include <tuple>
+
 namespace nsm
 {
 requester::Coroutine nsmLeakDetectionCreateSensors(SensorManager& manager,
@@ -48,6 +51,34 @@ requester::Coroutine nsmLeakDetectionCreateSensors(SensorManager& manager,
 } // namespace nsm
 
 using namespace nsm;
+
+/** Assert Area.PhysicalContext on the leak detector inventory for sensorId. */
+static void expectLeakDetectorPhysicalContext(
+    const std::shared_ptr<NsmLeakDetection>& ld, uint8_t sensorId,
+    const char* physicalContextName)
+{
+    const auto& inv = ld->leakDetectorInventoryIntfMap.at(sensorId);
+    const auto& areaIntf = std::get<2>(inv);
+    ASSERT_NE(areaIntf, nullptr);
+    EXPECT_EQ(
+        areaIntf->physicalContext(),
+        AreaIntf::convertPhysicalContextTypeFromString(
+            std::string(
+                "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.") +
+            physicalContextName));
+}
+
+static void
+    expectLeakDetectorMoistureType(const std::shared_ptr<NsmLeakDetection>& ld,
+                                   uint8_t sensorId)
+{
+    const auto& inv = ld->leakDetectorInventoryIntfMap.at(sensorId);
+    const auto& leakDetectorIntf = std::get<0>(inv);
+    EXPECT_EQ(
+        leakDetectorIntf->leakDetectorType(),
+        LeakDetectorIntf::convertLeakDetectorTypeEnumFromString(
+            "xyz.openbmc_project.Inventory.Item.LeakDetector.LeakDetectorTypeEnum.Moisture"));
+}
 
 // ============================================================================
 // Fixture
@@ -77,8 +108,9 @@ struct NsmLeakDetectionBranch6Test :
         cleanupDeviceSensors(devices);
     }
 
-    std::shared_ptr<NsmLeakDetection> makeSensor(const std::string& prefix,
-                                                 std::vector<uint8_t> ids)
+    std::shared_ptr<NsmLeakDetection>
+        makeSensor(const std::string& prefix, std::vector<uint8_t> ids,
+                   const std::vector<std::string>& physicalContextMap = {})
     {
         auto& bus = utils::DBusHandler::getBus();
         std::string n = "LeakB6_" + prefix;
@@ -89,8 +121,9 @@ struct NsmLeakDetectionBranch6Test :
             idMap.push_back(id);
             nameMap.push_back(prefix + "_s" + std::to_string(id));
         }
-        return std::make_shared<NsmLeakDetection>(
-            n, "NSM_LeakDetection", bus, idMap, nameMap, chassisPath, 5.0, 0.0);
+        return std::make_shared<NsmLeakDetection>(n, "NSM_LeakDetection", bus,
+                                                  idMap, nameMap, chassisPath,
+                                                  5.0, 0.0, physicalContextMap);
     }
 };
 
@@ -275,14 +308,59 @@ TEST_F(NsmLeakDetectionBranch6Test,
 TEST_F(NsmLeakDetectionBranch6Test,
        LeakDetectionCtor_LeakDetectorTypeInitialization)
 {
-    auto ld = makeSensor("ctortype", {8});
+    // Single sensor id 8: physicalContextMap index 0 applies to that sensor.
+    auto ld = makeSensor("ctortype", {8}, {"Board"});
 
-    auto& [leakDetectorIntf, assocIntf] = ld->leakDetectorInventoryIntfMap[8];
+    expectLeakDetectorPhysicalContext(ld, 8, "Board");
+    expectLeakDetectorMoistureType(ld, 8);
+}
 
-    EXPECT_EQ(
-        leakDetectorIntf->leakDetectorType(),
-        LeakDetectorIntf::convertLeakDetectorTypeEnumFromString(
-            "xyz.openbmc_project.Inventory.Item.LeakDetector.LeakDetectorTypeEnum.Moisture"));
+TEST_F(NsmLeakDetectionBranch6Test,
+       LeakDetectionCtor_EmptyPhysicalContextMap_DefaultsToBoard)
+{
+    auto ld = makeSensor("empty_pc", {8});
+
+    expectLeakDetectorPhysicalContext(ld, 8, "Board");
+    expectLeakDetectorMoistureType(ld, 8);
+}
+
+TEST_F(NsmLeakDetectionBranch6Test,
+       LeakDetectionCtor_InvalidPhysicalContextMapEntry_FallbackToBoard)
+{
+    auto ld = makeSensor("bad_pc", {8}, {"NotARealPhysicalContext"});
+
+    expectLeakDetectorPhysicalContext(ld, 8, "Board");
+    expectLeakDetectorMoistureType(ld, 8);
+}
+
+TEST_F(NsmLeakDetectionBranch6Test,
+       LeakDetectionCtor_MultipleSensorsWithDistinctContexts)
+{
+    auto ld = makeSensor("distinct_pc", {8, 9}, {"Board", "CPU"});
+
+    expectLeakDetectorPhysicalContext(ld, 8, "Board");
+    expectLeakDetectorPhysicalContext(ld, 9, "CPU");
+    expectLeakDetectorMoistureType(ld, 8);
+    expectLeakDetectorMoistureType(ld, 9);
+}
+
+TEST_F(NsmLeakDetectionBranch6Test,
+       LeakDetectionCtor_PhysicalContextMapSizeMismatch_ShortAndLong)
+{
+    {
+        // Shorter map than sensor count: first entry applies; missing -> Board.
+        auto ld = makeSensor("short_pc", {8, 9}, {"Board"});
+        expectLeakDetectorPhysicalContext(ld, 8, "Board");
+        expectLeakDetectorPhysicalContext(ld, 9, "Board");
+        expectLeakDetectorMoistureType(ld, 8);
+        expectLeakDetectorMoistureType(ld, 9);
+    }
+    {
+        // Longer map than sensor count: extras ignored; only index 0 used.
+        auto ld = makeSensor("long_pc", {8}, {"Board", "CPU", "Fan"});
+        expectLeakDetectorPhysicalContext(ld, 8, "Board");
+        expectLeakDetectorMoistureType(ld, 8);
+    }
 }
 
 TEST_F(NsmLeakDetectionBranch6Test, LeakDetectionCtor_NameAndType)

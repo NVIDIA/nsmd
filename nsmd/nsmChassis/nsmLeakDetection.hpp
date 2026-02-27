@@ -23,6 +23,7 @@
 #include "nsmSensor.hpp"
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/LeakDetector/server.hpp>
 #include <xyz/openbmc_project/Sensor/Threshold/Critical/server.hpp>
 #include <xyz/openbmc_project/Sensor/Value/server.hpp>
@@ -37,6 +38,7 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
+using AreaIntf = object_t<Inventory::Decorator::server::Area>;
 using OperationalStatusIntf =
     object_t<State::Decorator::server::OperationalStatus>;
 using LeakDetectorIntf = object_t<Inventory::Item::server::LeakDetector>;
@@ -55,7 +57,8 @@ class NsmLeakDetection : public NsmSensor
                      const std::vector<uint64_t>& sensorIdMap,
                      const std::vector<std::string>& sensorNameMap,
                      const std::string& chassisPath, const double maxValue,
-                     const double minValue);
+                     const double minValue,
+                     const std::vector<std::string>& physicalContextMap = {});
     NsmLeakDetection() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -87,7 +90,8 @@ class NsmLeakDetection : public NsmSensor
                            uint8_t numberOfThresholdLevels);
 
     std::map<uint8_t, std::tuple<std::shared_ptr<LeakDetectorIntf>,
-                                 std::shared_ptr<AssociationDefinitionsInft>>>
+                                 std::shared_ptr<AssociationDefinitionsInft>,
+                                 std::shared_ptr<AreaIntf>>>
         leakDetectorInventoryIntfMap;
 
     std::map<uint8_t, std::tuple<std::shared_ptr<AssociationDefinitionsInft>,

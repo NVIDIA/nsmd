@@ -29,10 +29,12 @@
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 
+#include <exception>
 #include <limits>
 #include <map>
 #include <optional>
 #include <ranges>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -45,11 +47,14 @@ NsmLeakDetection::NsmLeakDetection(
     const std::vector<uint64_t>& sensorIdMap,
     const std::vector<std::string>& sensorNameMap,
     const std::string& chassisPath, const double maxValue,
-    const double minValue) : NsmSensor(name, type)
+    const double minValue, const std::vector<std::string>& physicalContextMap) :
+    NsmSensor(name, type)
 {
-    for (auto [sensorId, sensorName] :
-         std::views::zip(sensorIdMap, sensorNameMap))
+    for (size_t i = 0; i < sensorNameMap.size(); ++i)
     {
+        uint64_t sensorId = sensorIdMap[i];
+        const std::string& sensorName = sensorNameMap[i];
+
         lg2::debug(
             "Creating LeakDetection sensor: SensorId={SENSOR_ID}, SensorName={SENSOR_NAME}",
             "SENSOR_ID", sensorId, "SENSOR_NAME", sensorName);
@@ -66,6 +71,8 @@ NsmLeakDetection::NsmLeakDetection(
         auto inventoryAssociationIntf =
             std::make_shared<AssociationDefinitionsInft>(
                 bus, leakDetectorInventoryObjPath.c_str());
+        auto areaIntf = std::make_shared<AreaIntf>(
+            bus, leakDetectorInventoryObjPath.c_str());
 
         auto stateAssociationIntf =
             std::make_shared<AssociationDefinitionsInft>(
@@ -88,6 +95,42 @@ NsmLeakDetection::NsmLeakDetection(
         leakDetectorInventoryIntf->leakDetectorType(
             LeakDetectorIntf::convertLeakDetectorTypeEnumFromString(
                 "xyz.openbmc_project.Inventory.Item.LeakDetector.LeakDetectorTypeEnum.Moisture"));
+        auto setPhysicalContextDefaultBoard = [&areaIntf, i]() {
+            try
+            {
+                areaIntf->physicalContext(
+                    AreaIntf::convertPhysicalContextTypeFromString(
+                        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.Board"));
+            }
+            catch (const std::exception& e)
+            {
+                lg2::warning(
+                    "Default PhysicalContext Board failed for leak detector index {INDEX}: {ERROR}",
+                    "INDEX", i, "ERROR", e.what());
+            }
+        };
+        if (i < physicalContextMap.size())
+        {
+            try
+            {
+                areaIntf->physicalContext(
+                    AreaIntf::convertPhysicalContextTypeFromString(
+                        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType." +
+                        physicalContextMap[i]));
+            }
+            catch (const std::exception& e)
+            {
+                lg2::error(
+                    "Invalid PhysicalContext for leak detector index {INDEX}, value \"{VALUE}\": {ERROR}",
+                    "INDEX", i, "VALUE", physicalContextMap[i], "ERROR",
+                    e.what());
+                setPhysicalContextDefaultBoard();
+            }
+        }
+        else
+        {
+            setPhysicalContextDefaultBoard();
+        }
         operationalStatusIntf->functional(false);
         operationalStatusIntf->state(OperationalStatusIntf::convertStateTypeFromString(
             "xyz.openbmc_project.State.Decorator.OperationalStatus.StateType.None"));
@@ -108,8 +151,8 @@ NsmLeakDetection::NsmLeakDetection(
                             leakDetectorInventoryObjPath, chassisPath);
 
         leakDetectorInventoryIntfMap[static_cast<uint8_t>(sensorId)] =
-            std::make_tuple(leakDetectorInventoryIntf,
-                            inventoryAssociationIntf);
+            std::make_tuple(leakDetectorInventoryIntf, inventoryAssociationIntf,
+                            areaIntf);
 
         leakDetectorStateIntfMap[static_cast<uint8_t>(sensorId)] =
             std::make_tuple(stateAssociationIntf, operationalStatusIntf,
@@ -132,8 +175,12 @@ void NsmLeakDetection::addAssociationOnObj(
         {{"chassis", "contained_by", chassisPath}});
     stateAssociationIntf->associations(
         {{"inventory", "leak_detecting", leakDetectorInventoryObjPath}});
+    // From inventory .../leak_voltage_sensor, object mapper resolves this
+    // voltage sensor (same contract as state .../leak_detecting for
+    // LeakDetector state).
     sensorAssociationIntf->associations(
-        {{"chassis", "all_sensors", chassisPath}});
+        {{"chassis", "all_sensors", chassisPath},
+         {"inventory", "leak_voltage_sensor", leakDetectorInventoryObjPath}});
 }
 
 void NsmLeakDetection::updateLeakDetectorState(uint8_t sensorId,
@@ -621,6 +668,7 @@ requester::Coroutine
     uuid_t uuid{};
     std::vector<uint64_t> sensorIdMap{};
     std::vector<std::string> sensorNameMap{};
+    std::vector<std::string> physicalContextMap{};
     std::string chassisPath{};
     std::vector<uint64_t> minThresholds{};
     std::vector<uint64_t> criticalThresholds{};
@@ -652,6 +700,11 @@ requester::Coroutine
     {
         sensorNameMap = std::get<std::vector<std::string>>(
             allCurrentIfaceProperties.at("SensorNameMap"));
+    }
+    if (allCurrentIfaceProperties.count("PhysicalContextMap"))
+    {
+        physicalContextMap = std::get<std::vector<std::string>>(
+            allCurrentIfaceProperties.at("PhysicalContextMap"));
     }
     if (allCurrentIfaceProperties.count("ChassisPath"))
     {
@@ -733,7 +786,7 @@ requester::Coroutine
     // Create NsmLeakDetection sensor with all interfaces
     auto leakDetectorInfoObject = std::make_shared<NsmLeakDetection>(
         name, type, bus, sensorIdMap, sensorNameMap, chassisPath, maxValue,
-        minValue);
+        minValue, physicalContextMap);
     device->addSensor(leakDetectorInfoObject, true);
 
     // Create NsmLeakDetectionThresholdsPatch for each sensor for runtime
