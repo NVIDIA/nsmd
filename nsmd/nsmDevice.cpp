@@ -809,6 +809,7 @@ requester::Coroutine NsmDevice::updateFruDeviceIntf()
     // Always include fixed properties
     currentProperties.insert("DEVICE_TYPE");
     currentProperties.insert("INSTANCE_NUMBER");
+    currentProperties.insert("DEVICE_ROLE");
     currentProperties.insert("UUID");
 
     // Check if interface needs recreation
@@ -1224,6 +1225,7 @@ void FruInterfaceManager::updateAllPropertyValues(
 
     interface->set_property("DEVICE_TYPE", nsmDevice->getDeviceType());
     interface->set_property("INSTANCE_NUMBER", nsmDevice->getInstanceNumber());
+    interface->set_property("DEVICE_ROLE", nsmDevice->getDeviceRole());
     interface->set_property("UUID", nsmDevice->getUuid());
 }
 
@@ -1274,6 +1276,7 @@ void FruInterfaceManager::registerAllProperties(
     interface->register_property("DEVICE_TYPE", nsmDevice->getDeviceType());
     interface->register_property("INSTANCE_NUMBER",
                                  nsmDevice->getInstanceNumber());
+    interface->register_property("DEVICE_ROLE", nsmDevice->getDeviceRole());
     interface->register_property("UUID", nsmDevice->getUuid());
 }
 
