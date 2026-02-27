@@ -546,7 +546,7 @@ bool NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
 requester::Coroutine NsmDevice::updateNsmDevice()
 {
     auto localEid = eid;
-    discoverNsmDeviceSemaphore.acquire(localEid);
+    co_await discoverNsmDeviceSemaphore.acquire(localEid);
     lg2::info(
         "NsmDevice::updateNsmDevice discoverNsmDeviceSemaphore acqired for EID = {EID}",
         "EID", localEid);
