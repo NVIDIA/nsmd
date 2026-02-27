@@ -17,6 +17,7 @@
 
 #include "cmd_helper.hpp"
 #include "nsm_config_cmd.hpp"
+#include "nsm_dbus_cmd.hpp"
 #include "nsm_diag_cmd.hpp"
 #include "nsm_discovery_cmd.hpp"
 #include "nsm_firmware_cmd.hpp"
@@ -122,8 +123,13 @@ int main(int argc, char** argv)
     {
         CLI::App app{"NSM requester tool for OpenBMC"};
 
-        // Check if nsmd is running first - prevent conflicts
-        if (isNsmdServiceActive())
+        // Check if "dbus" subcommand is used
+        // Since no global options are defined before subcommand registration,
+        // the subcommand is always at argv[1]
+        bool useDbusMode = (argc > 1 && std::string(argv[1]) == "dbus");
+
+        // Check if nsmd is running - only block for non-dbus modes
+        if (!useDbusMode && isNsmdServiceActive())
         {
             std::cerr
                 << "Error: NSM daemon (nsmd) is currently active.\n\n"
@@ -131,11 +137,27 @@ int main(int argc, char** argv)
                 << " as this would interrupt crucial NSM operations.\n\n"
                 << "To proceed with nsmtool, please Stop the nsmd service first: systemctl stop nsmd\n\n"
                 << "Note: nsmtool is intended for internal use. For production or "
-                << "automated workflows, out-of-band methods are recommended.\n";
+                << "automated workflows, out-of-band methods are recommended.\n\n"
+                << "Tip: Use 'nsmtool dbus' commands to interact via DBus when nsmd is running.\n";
             return -1;
         }
+
+        // For DBus mode, nsmd MUST be running
+        if (useDbusMode && !isNsmdServiceActive())
+        {
+            std::cerr
+                << "Error: NSM daemon (nsmd) is not running.\n\n"
+                << "DBus mode requires nsmd to be active.\n"
+                << "Please start the nsmd service: systemctl start nsmd\n";
+            return -1;
+        }
+
         app.require_subcommand(1)->ignore_case();
 
+        // Register DBus commands (requires nsmd to be running)
+        nsmtool::dbus_cmd::registerCommand(app);
+
+        // Register direct access commands (requires nsmd to be stopped)
         nsmtool::raw::registerCommand(app);
         nsmtool::config::registerCommand(app);
         nsmtool::diag::registerCommand(app);
