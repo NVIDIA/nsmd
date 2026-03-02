@@ -682,17 +682,31 @@ requester::Coroutine
         minValue = std::get<double>(allCurrentIfaceProperties.at("MinValue"));
     }
 
-    // Validate array sizes match sensorIdMap size
-    if (sensorNameMap.size() != sensorIdMap.size() ||
-        minThresholds.size() != sensorIdMap.size() ||
-        criticalThresholds.size() != sensorIdMap.size() ||
-        maxThresholds.size() != sensorIdMap.size())
+    // Validate array sizes: SensorNameMap must always match SensorIdMap
+    if (sensorNameMap.size() != sensorIdMap.size())
     {
         lg2::error(
-            "Array size mismatch: SensorIdMap={SENSOR_SIZE}, SensorNameMap={NAME_SIZE}, MinThresholds={MIN_SIZE}, CriticalThresholds={CRIT_SIZE}, MaxThresholds={MAX_SIZE}",
+            "Array size mismatch: SensorIdMap={SENSOR_SIZE}, SensorNameMap={NAME_SIZE}",
             "SENSOR_SIZE", sensorIdMap.size(), "NAME_SIZE",
-            sensorNameMap.size(), "MIN_SIZE", minThresholds.size(), "CRIT_SIZE",
-            criticalThresholds.size(), "MAX_SIZE", maxThresholds.size());
+            sensorNameMap.size());
+        co_return NSM_ERROR;
+    }
+
+    // If thresholds are provided, all three must be present and match sensor
+    // count
+    bool thresholdsGiven =
+        allCurrentIfaceProperties.count("MinThresholdsmV") &&
+        allCurrentIfaceProperties.count("CriticalThresholdsmV") &&
+        allCurrentIfaceProperties.count("MaxThresholdsmV");
+    if (thresholdsGiven && (minThresholds.size() != sensorIdMap.size() ||
+                            criticalThresholds.size() != sensorIdMap.size() ||
+                            maxThresholds.size() != sensorIdMap.size()))
+    {
+        lg2::error(
+            "Array size mismatch: SensorIdMap={SENSOR_SIZE}, MinThresholds={MIN_SIZE}, CriticalThresholds={CRIT_SIZE}, MaxThresholds={MAX_SIZE}",
+            "SENSOR_SIZE", sensorIdMap.size(), "MIN_SIZE", minThresholds.size(),
+            "CRIT_SIZE", criticalThresholds.size(), "MAX_SIZE",
+            maxThresholds.size());
         co_return NSM_ERROR;
     }
 
@@ -705,11 +719,16 @@ requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    // Create NsmSetLeakDetectionThresholds for initial threshold setup
-    auto setThresholdsSensor = std::make_shared<NsmSetLeakDetectionThresholds>(
-        name + "_SetThresholds", type + "_SetThresholds", sensorIdMap,
-        minThresholds, criticalThresholds, maxThresholds);
-    device->addStaticSensor(setThresholdsSensor);
+    // Create NsmSetLeakDetectionThresholds for initial threshold setup only
+    // when thresholds are provided in config
+    if (thresholdsGiven)
+    {
+        auto setThresholdsSensor =
+            std::make_shared<NsmSetLeakDetectionThresholds>(
+                name + "_SetThresholds", type + "_SetThresholds", sensorIdMap,
+                minThresholds, criticalThresholds, maxThresholds);
+        device->addStaticSensor(setThresholdsSensor);
+    }
 
     // Create NsmLeakDetection sensor with all interfaces
     auto leakDetectorInfoObject = std::make_shared<NsmLeakDetection>(
