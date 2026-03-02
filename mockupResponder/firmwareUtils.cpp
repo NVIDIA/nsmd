@@ -60,6 +60,10 @@ class FirmwareStateMachine
     // RoT policy states
     uint8_t backgroundCopyPolicy = 1;
     uint8_t inbandUpdatePolicy = 1;
+
+    // Global Failover Policy state
+    uint8_t globalFailoverPolicy =
+        NSM_ROT_GLOBAL_FAILOVER_POLICY_AUTOMATIC_FAILOVER;
 };
 
 static std::unique_ptr<FirmwareStateMachine> fwStateMachine = nullptr;
@@ -115,6 +119,8 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.ap_sku_id = 0;
         fq_resp.fq_resp_hdr.inband_update_policy_current = 0;
         fq_resp.fq_resp_hdr.background_copy_policy_current = 0;
+        fq_resp.fq_resp_hdr.global_failover_policy =
+            fwStateMachine->globalFailoverPolicy;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -166,6 +172,8 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.ap_sku_id = 0x12345678;
         fq_resp.fq_resp_hdr.inband_update_policy_current = 0;
         fq_resp.fq_resp_hdr.background_copy_policy_current = 0;
+        fq_resp.fq_resp_hdr.global_failover_policy =
+            fwStateMachine->globalFailoverPolicy;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -218,6 +226,8 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.boot_status_code = 1;
         fq_resp.fq_resp_hdr.inband_update_policy_current = 0;
         fq_resp.fq_resp_hdr.background_copy_policy_current = 0;
+        fq_resp.fq_resp_hdr.global_failover_policy =
+            fwStateMachine->globalFailoverPolicy;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -270,6 +280,8 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.ap_sku_id = 0xABCDEF00;
         fq_resp.fq_resp_hdr.inband_update_policy_current = 0x36;
         fq_resp.fq_resp_hdr.background_copy_policy_current = 0x37;
+        fq_resp.fq_resp_hdr.global_failover_policy =
+            fwStateMachine->globalFailoverPolicy;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -959,8 +971,8 @@ std::optional<std::vector<uint8_t>>
             requestMsg->payload);
     auto& req = reqCommand->rot_property_req;
 
-    // Validate property type (should be 0, 1, or 2)
-    if (req.property > 2)
+    // Validate property type (should be 0, 1, 2 or 3)
+    if (req.property > 3)
     {
         lg2::error("Invalid property type: {PROP}", "PROP", req.property);
         return encodeResp(NSM_ERR_INVALID_DATA);
@@ -1054,7 +1066,32 @@ std::optional<std::vector<uint8_t>>
             "Setting AP SKU ID: skuId={SKUID} (0x{SKUID:x}), lifespan={LIFESPAN}",
             "SKUID", apSkuId, "LIFESPAN", lifespan);
     }
+    else if (req.property == NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY)
+    {
+        // Property 3: Global Failover Policy (no lifespan)
+        if (req.argument_length != 1)
+        {
+            lg2::error("Invalid argument length for property 3: {LEN}", "LEN",
+                       req.argument_length);
+            return encodeResp(NSM_ERR_INVALID_DATA_LENGTH);
+        }
 
+        uint8_t globalFailoverPolicy = req.argument_data[0];
+
+        if (globalFailoverPolicy !=
+                NSM_ROT_GLOBAL_FAILOVER_POLICY_NO_FAILOVER &&
+            globalFailoverPolicy !=
+                NSM_ROT_GLOBAL_FAILOVER_POLICY_AUTOMATIC_FAILOVER)
+        {
+            lg2::error("Invalid global failover policy: {POLICY}", "POLICY",
+                       globalFailoverPolicy);
+            return encodeResp(NSM_ERR_INVALID_DATA);
+        }
+
+        lg2::info("Setting Global Failover Policy: policy={POLICY}", "POLICY",
+                  globalFailoverPolicy);
+        fwStateMachine->globalFailoverPolicy = globalFailoverPolicy;
+    }
     return encodeResp(NSM_SUCCESS);
 }
 
