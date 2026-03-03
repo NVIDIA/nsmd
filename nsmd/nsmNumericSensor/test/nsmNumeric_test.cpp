@@ -40,7 +40,9 @@ static const std::vector<utils::Association>
     associations({{"chassis", "all_sensors",
                    "/xyz/openbmc_project/inventory/dummy_device"}});
 static const std::string physicalContexnt("GPU");
-static const double maxAllowableValue{std::numeric_limits<double>::infinity()};
+static const double maxAllowableValue{125.0};
+static const double maxValue{100.0};
+static const double minValue{-40.0};
 static const std::string readingBasis("Headroom");
 static const std::string description("dummy_sensor");
 
@@ -49,20 +51,29 @@ static const double val{32432.8970};
 TEST(NsmNumericSensorDbusValue, GoodTest)
 {
     nsm::NsmNumericSensorDbusValue value{
-        bus,           sensorName,       sensorType, nsm::SensorUnit::DegreesC,
-        associations,  physicalContexnt, nullptr,    maxAllowableValue,
+        bus,           sensorName,
+        sensorType,    nsm::SensorUnit::DegreesC,
+        associations,  physicalContexnt,
+        nullptr,       maxAllowableValue,
+        maxValue,      minValue,
         &readingBasis, &description};
     value.updateReading(val);
 
     EXPECT_EQ(value.valueIntf.value(), val);
     EXPECT_EQ(value.valueIntf.unit(), nsm::SensorUnit::DegreesC);
+    EXPECT_EQ(value.valueIntf.maxAllowableValue(), maxAllowableValue);
+    EXPECT_EQ(value.valueIntf.maxValue(), maxValue);
+    EXPECT_EQ(value.valueIntf.minValue(), minValue);
 }
 
 TEST(NsmNumericSensorDbusValueTimestamp, GoodTest)
 {
     nsm::NsmNumericSensorDbusValueTimestamp value{
-        bus,           sensorName,       sensorType, nsm::SensorUnit::DegreesC,
-        associations,  physicalContexnt, nullptr,    maxAllowableValue,
+        bus,           sensorName,
+        sensorType,    nsm::SensorUnit::DegreesC,
+        associations,  physicalContexnt,
+        nullptr,       maxAllowableValue,
+        maxValue,      minValue,
         &readingBasis, &description};
     auto timestamp = utils::getCurrentSteadyClockTimestamp();
     value.updateReading(val, timestamp);
@@ -70,6 +81,9 @@ TEST(NsmNumericSensorDbusValueTimestamp, GoodTest)
     EXPECT_EQ(value.timestampIntf.elapsed(), timestamp);
     EXPECT_EQ(value.valueIntf.value(), val);
     EXPECT_EQ(value.valueIntf.unit(), nsm::SensorUnit::DegreesC);
+    EXPECT_EQ(value.valueIntf.maxAllowableValue(), maxAllowableValue);
+    EXPECT_EQ(value.valueIntf.maxValue(), maxValue);
+    EXPECT_EQ(value.valueIntf.minValue(), minValue);
 }
 
 TEST(SMBPBIPowerSMBusSensorBytesConverter, GoodTest)

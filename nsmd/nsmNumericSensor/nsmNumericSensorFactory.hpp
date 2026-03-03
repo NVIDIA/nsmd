@@ -42,6 +42,10 @@ struct NumericSensorInfo
     double maxAllowableValue{std::numeric_limits<double>::infinity()};
     std::unique_ptr<std::string> readingBasis{};
     std::unique_ptr<std::string> description{};
+    double maxValue{
+        std::numeric_limits<double>::infinity()}; // default same as PDI default
+    double minValue{-std::numeric_limits<double>::infinity()}; // default same
+                                                               // as PDI default
 };
 
 class NumericSensorAggregatorBuilder

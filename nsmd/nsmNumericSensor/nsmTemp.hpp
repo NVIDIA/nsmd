@@ -31,6 +31,7 @@ class NsmTemp : public NsmNumericSensor
             const std::string& chassis_association,
             const std::string& physicalContext,
             const std::string* implementation, const double maxAllowableValue,
+            const double maxValue, const double minValue,
             const std::string* readingBasis, const std::string* description);
 
     std::optional<std::vector<uint8_t>>

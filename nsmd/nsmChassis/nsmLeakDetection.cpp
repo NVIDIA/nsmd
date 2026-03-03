@@ -29,6 +29,7 @@
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 
+#include <limits>
 #include <map>
 #include <optional>
 #include <ranges>
@@ -43,7 +44,8 @@ NsmLeakDetection::NsmLeakDetection(
     std::string& name, const std::string& type, sdbusplus::bus::bus& bus,
     const std::vector<uint64_t>& sensorIdMap,
     const std::vector<std::string>& sensorNameMap,
-    const std::string& chassisPath) : NsmSensor(name, type)
+    const std::string& chassisPath, const double maxValue,
+    const double minValue) : NsmSensor(name, type)
 {
     for (auto [sensorId, sensorName] :
          std::views::zip(sensorIdMap, sensorNameMap))
@@ -97,6 +99,8 @@ NsmLeakDetection::NsmLeakDetection(
         leakDetectorSensorValueIntf->unit(
             SensorValueIntf::convertUnitFromString(
                 "xyz.openbmc_project.Sensor.Value.Unit.Volts"));
+        leakDetectorSensorValueIntf->maxValue(maxValue);
+        leakDetectorSensorValueIntf->minValue(minValue);
 
         // Add association for sensor
         addAssociationOnObj(inventoryAssociationIntf, stateAssociationIntf,
@@ -621,6 +625,8 @@ requester::Coroutine
     std::vector<uint64_t> minThresholds{};
     std::vector<uint64_t> criticalThresholds{};
     std::vector<uint64_t> maxThresholds{};
+    double maxValue = std::numeric_limits<double>::infinity();
+    double minValue = -std::numeric_limits<double>::infinity();
 
     dbus::PropertyMap allCurrentIfaceProperties =
         co_await utils::coGetAllDbusProperty(utils::entityManagerServiceStr,
@@ -667,6 +673,14 @@ requester::Coroutine
         maxThresholds = std::get<std::vector<uint64_t>>(
             allCurrentIfaceProperties.at("MaxThresholdsmV"));
     }
+    if (allCurrentIfaceProperties.count("MaxValue"))
+    {
+        maxValue = std::get<double>(allCurrentIfaceProperties.at("MaxValue"));
+    }
+    if (allCurrentIfaceProperties.count("MinValue"))
+    {
+        minValue = std::get<double>(allCurrentIfaceProperties.at("MinValue"));
+    }
 
     // Validate array sizes match sensorIdMap size
     if (sensorNameMap.size() != sensorIdMap.size() ||
@@ -699,7 +713,8 @@ requester::Coroutine
 
     // Create NsmLeakDetection sensor with all interfaces
     auto leakDetectorInfoObject = std::make_shared<NsmLeakDetection>(
-        name, type, bus, sensorIdMap, sensorNameMap, chassisPath);
+        name, type, bus, sensorIdMap, sensorNameMap, chassisPath, maxValue,
+        minValue);
     device->addSensor(leakDetectorInfoObject, true);
 
     // Create NsmLeakDetectionThresholdsPatch for each sensor for runtime

@@ -16,13 +16,15 @@ NsmAltitudePressure::NsmAltitudePressure(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::vector<utils::Association>& association,
     const std::string& physicalContext, const std::string* implementation,
-    const double maxAllowableValue) :
-    NsmNumericSensor(name, type, 0,
-                     std::make_shared<NsmNumericSensorValueAggregate>(
-                         std::make_unique<NsmNumericSensorDbusValue>(
-                             bus, name, getSensorType(), SensorUnit::Pascals,
-                             association, physicalContext, implementation,
-                             maxAllowableValue, nullptr, nullptr)))
+    const double maxAllowableValue, const double maxValue,
+    const double minValue) :
+    NsmNumericSensor(
+        name, type, 0,
+        std::make_shared<NsmNumericSensorValueAggregate>(
+            std::make_unique<NsmNumericSensorDbusValue>(
+                bus, name, getSensorType(), SensorUnit::Pascals, association,
+                physicalContext, implementation, maxAllowableValue, maxValue,
+                minValue, nullptr, nullptr)))
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -126,6 +128,24 @@ requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,
     catch (const std::exception& e)
     {}
 
+    double maxValue{std::numeric_limits<double>::infinity()};
+    try
+    {
+        maxValue = utils::DBusHandler().getDbusProperty<double>(
+            objPath.c_str(), "MaxValue", interface.c_str());
+    }
+    catch (const std::exception& e)
+    {}
+
+    double minValue{-std::numeric_limits<double>::infinity()};
+    try
+    {
+        minValue = utils::DBusHandler().getDbusProperty<double>(
+            objPath.c_str(), "MinValue", interface.c_str());
+    }
+    catch (const std::exception& e)
+    {}
+
     std::vector<utils::Association> associations{};
     co_await utils::coGetAssociations(objPath, interface + ".Associations",
                                       associations);
@@ -134,22 +154,19 @@ requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,
 
     if (!nsmDevice)
     {
-        // cannot found a nsmDevice for the sensor
         lg2::error(
             "The UUID of Altitude Pressure Sensor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
     auto sensor = std::make_shared<NsmAltitudePressure>(
         bus, name, type, associations, physicalContext, implementation.get(),
-        maxAllowableValue);
+        maxAllowableValue, maxValue, minValue);
     lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
               "UUID", uuid, "NAME", name, "TYPE", type);
 
     nsmDevice->addSensor(sensor, priority);
-    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

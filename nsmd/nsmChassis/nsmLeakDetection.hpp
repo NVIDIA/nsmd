@@ -54,7 +54,8 @@ class NsmLeakDetection : public NsmSensor
                      sdbusplus::bus::bus& bus,
                      const std::vector<uint64_t>& sensorIdMap,
                      const std::vector<std::string>& sensorNameMap,
-                     const std::string& chassisPath);
+                     const std::string& chassisPath, const double maxValue,
+                     const double minValue);
     NsmLeakDetection() = default;
 
     std::optional<std::vector<uint8_t>>

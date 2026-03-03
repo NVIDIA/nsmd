@@ -48,6 +48,8 @@ class NsmNumericSensorValueAggregateTest : public ::testing::Test
          "/xyz/openbmc_project/inventory/test_device"}};
     std::string physicalContext = "GPU";
     double maxAllowableValue = std::numeric_limits<double>::infinity();
+    double maxValue = std::numeric_limits<double>::infinity();
+    double minValue = -std::numeric_limits<double>::infinity();
     std::string readingBasis = "Headroom";
     std::string description = "test sensor description";
 };
@@ -64,6 +66,8 @@ TEST_F(NsmNumericSensorValueAggregateTest, NsmTempSingleDbusValue)
                             physicalContext,
                             nullptr,
                             maxAllowableValue,
+                            maxValue,
+                            minValue,
                             &readingBasis,
                             &description};
 
@@ -119,6 +123,8 @@ TEST_F(NsmNumericSensorValueAggregateTest, NsmPowerMultipleElements)
                               physicalContext,
                               nullptr,
                               maxAllowableValue,
+                              maxValue,
+                              minValue,
                               &readingBasis,
                               &description};
 
@@ -190,6 +196,8 @@ TEST_F(NsmNumericSensorValueAggregateTest, NsmEnergySingleDbusValue)
                                 physicalContext,
                                 nullptr,
                                 maxAllowableValue,
+                                maxValue,
+                                minValue,
                                 &readingBasis,
                                 &description};
 
@@ -239,8 +247,8 @@ TEST_F(NsmNumericSensorValueAggregateTest, MixedDbusValueAndNonDbusValue)
     auto aggregate = std::make_shared<nsm::NsmNumericSensorValueAggregate>(
         std::make_unique<nsm::NsmNumericSensorDbusValue>(
             bus, "mixed_sensor_dbus", "power", nsm::SensorUnit::Watts,
-            associations, physicalContext, nullptr, maxAllowableValue,
-            &readingBasis, &description),
+            associations, physicalContext, nullptr, maxAllowableValue, maxValue,
+            minValue, &readingBasis, &description),
         std::move(mockValue));
 
     EXPECT_EQ(aggregate->objects.size(), 2);
@@ -264,8 +272,8 @@ TEST_F(NsmNumericSensorValueAggregateTest, TimingThresholdBoundary)
     auto aggregate = std::make_shared<nsm::NsmNumericSensorValueAggregate>(
         std::make_unique<nsm::NsmNumericSensorDbusValue>(
             bus, "threshold_sensor", "power", nsm::SensorUnit::Watts,
-            associations, physicalContext, nullptr, maxAllowableValue,
-            &readingBasis, &description));
+            associations, physicalContext, nullptr, maxAllowableValue, maxValue,
+            minValue, &readingBasis, &description));
 
     // Find the DbusValue element
     nsm::NsmNumericSensorDbusValue* dbusValue = nullptr;
@@ -353,6 +361,8 @@ TEST_F(NsmNumericSensorValueAggregateTest, AppendMethod)
                               physicalContext,
                               nullptr,
                               maxAllowableValue,
+                              maxValue,
+                              minValue,
                               &readingBasis,
                               &description};
 
@@ -364,8 +374,8 @@ TEST_F(NsmNumericSensorValueAggregateTest, AppendMethod)
     // Test appending additional element
     aggregate->append(std::make_unique<nsm::NsmNumericSensorDbusValue>(
         bus, "power_sensor_append_2", "power", nsm::SensorUnit::Watts,
-        associations, physicalContext, nullptr, maxAllowableValue,
-        &readingBasis, &description));
+        associations, physicalContext, nullptr, maxAllowableValue, maxValue,
+        minValue, &readingBasis, &description));
 
     EXPECT_EQ(aggregate->objects.size(), initialSize + 1);
 
@@ -429,6 +439,8 @@ TEST_F(NsmNumericSensorValueAggregateTest, MultipleUpdatesWithDelays)
                             physicalContext,
                             nullptr,
                             maxAllowableValue,
+                            maxValue,
+                            minValue,
                             &readingBasis,
                             &description};
 

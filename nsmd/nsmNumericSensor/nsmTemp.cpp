@@ -36,8 +36,8 @@ NsmTemp::NsmTemp(sdbusplus::bus::bus& bus, const std::string& name,
                  [[maybe_unused]] const std::string& chassis_association,
                  const std::string& physicalContext,
                  const std::string* implementation,
-                 const double maxAllowableValue,
-                 const std::string* readingBasis,
+                 const double maxAllowableValue, const double maxValue,
+                 const double minValue, const std::string* readingBasis,
                  const std::string* description) :
     NsmNumericSensor(
         name, type, sensorId,
@@ -49,8 +49,8 @@ NsmTemp::NsmTemp(sdbusplus::bus::bus& bus, const std::string& name,
 #endif
             std::make_unique<NsmNumericSensorDbusValue>(
                 bus, name, getSensorType(), SensorUnit::DegreesC, association,
-                physicalContext, implementation, maxAllowableValue,
-                readingBasis, description)))
+                physicalContext, implementation, maxAllowableValue, maxValue,
+                minValue, readingBasis, description)))
 {}
 
 std::optional<std::vector<uint8_t>> NsmTemp::genRequestMsg(eid_t eid,
@@ -107,8 +107,8 @@ class TempSensorFactory : public NumericSensorBuilder
         return std::make_shared<NsmTemp>(
             bus, info.name, info.type, info.sensorId, info.associations,
             info.chassis_association, info.physicalContext,
-            info.implementation.get(), info.maxAllowableValue,
-            info.readingBasis.get(), info.description.get());
+            info.implementation.get(), info.maxAllowableValue, info.maxValue,
+            info.minValue, info.readingBasis.get(), info.description.get());
     };
 
     std::shared_ptr<NsmNumericAggregator>

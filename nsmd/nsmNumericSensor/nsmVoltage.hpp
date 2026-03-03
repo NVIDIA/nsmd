@@ -30,7 +30,8 @@ class NsmVoltage : public NsmNumericSensor
                const std::vector<utils::Association>& association,
                const std::string& physicalContext,
                const std::string* implementation,
-               const double maxAllowableValue, const std::string* readingBasis,
+               const double maxAllowableValue, const double maxValue,
+               const double minValue, const std::string* readingBasis,
                const std::string* description);
 
     std::optional<std::vector<uint8_t>>
