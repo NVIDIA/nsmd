@@ -41,8 +41,8 @@ NsmPower::NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
                    [[maybe_unused]] const std::string& chassis_association,
                    const std::string& physicalContext,
                    const std::string* implementation,
-                   const double maxAllowableValue,
-                   const std::string* readingBasis,
+                   const double maxAllowableValue, const double maxValue,
+                   const double minValue, const std::string* readingBasis,
                    const std::string* description) :
     NsmNumericSensor(
         name, type, sensorId,
@@ -54,8 +54,8 @@ NsmPower::NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
 #endif
             std::make_unique<NsmNumericSensorDbusValueTimestamp>(
                 bus, name, getSensorType(), SensorUnit::Watts, association,
-                physicalContext, implementation, maxAllowableValue,
-                readingBasis, description))),
+                physicalContext, implementation, maxAllowableValue, maxValue,
+                minValue, readingBasis, description))),
     averagingInterval(averagingInterval)
 {}
 
@@ -128,8 +128,8 @@ class PowerSensorFactory : public NumericSensorBuilder
         auto sensor = std::make_shared<NsmPower>(
             bus, info.name, info.type, info.sensorId, averagingInterval,
             info.associations, info.chassis_association, info.physicalContext,
-            info.implementation.get(), info.maxAllowableValue,
-            info.readingBasis.get(), info.description.get());
+            info.implementation.get(), info.maxAllowableValue, info.maxValue,
+            info.minValue, info.readingBasis.get(), info.description.get());
 
         if (!candidateForList.empty())
         {

@@ -86,7 +86,8 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
         const std::string& sensor_type, const SensorUnit unit,
         const std::vector<utils::Association>& association,
         const std::string& physicalContext, const std::string* implementation,
-        const double maxAllowableValue, const std::string* readingBasis,
+        const double maxAllowableValue, const double maxValue,
+        const double minValue, const std::string* readingBasis,
         const std::string* description);
     void updateReading(double value, uint64_t timestamp = 0) override;
     bool canUpdate(const uint64_t& timestamp) const;
@@ -113,7 +114,8 @@ class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
         const std::string& sensor_type, const SensorUnit unit,
         const std::vector<utils::Association>& association,
         const std::string& physicalContext, const std::string* implementation,
-        const double maxAllowableValue, const std::string* readingBasis,
+        const double maxAllowableValue, const double maxValue,
+        const double minValue, const std::string* readingBasis,
         const std::string* description);
     void updateReading(double value, uint64_t timestamp) final;
 

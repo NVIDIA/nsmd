@@ -105,6 +105,22 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
 
     try
     {
+        info.maxValue = utils::DBusHandler().getDbusProperty<double>(
+            objPath.c_str(), "MaxValue", interface.c_str());
+    }
+    catch (const std::exception& e)
+    {}
+
+    try
+    {
+        info.minValue = utils::DBusHandler().getDbusProperty<double>(
+            objPath.c_str(), "MinValue", interface.c_str());
+    }
+    catch (const std::exception& e)
+    {}
+
+    try
+    {
         info.readingBasis = std::make_unique<std::string>(
             utils::DBusHandler().getDbusProperty<std::string>(
                 objPath.c_str(), "ReadingBasis", interface.c_str()));

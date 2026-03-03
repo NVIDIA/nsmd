@@ -45,6 +45,8 @@ static const std::vector<utils::Association>
                    "/xyz/openbmc_project/inventory/dummy_device"}});
 static const std::string physicalContexnt("GPU");
 static const double maxAllowableValue{std::numeric_limits<double>::infinity()};
+static const double maxValue{std::numeric_limits<double>::infinity()};
+static const double minValue{-std::numeric_limits<double>::infinity()};
 static const std::string readingBasis("Headroom");
 static const std::string description("dummy_sensor");
 
@@ -59,6 +61,8 @@ TEST(nsmTemp, GoodGenReq)
                         physicalContexnt,
                         nullptr,
                         maxAllowableValue,
+                        maxValue,
+                        minValue,
                         &readingBasis,
                         &description};
 
@@ -89,6 +93,8 @@ TEST(nsmTemp, GoodHandleResp)
                         physicalContexnt,
                         nullptr,
                         maxAllowableValue,
+                        maxValue,
+                        minValue,
                         &readingBasis,
                         &description};
 
@@ -127,6 +133,8 @@ TEST(nsmTemp, BadHandleResp)
                         physicalContexnt,
                         nullptr,
                         maxAllowableValue,
+                        maxValue,
+                        minValue,
                         &readingBasis,
                         &description};
 
@@ -169,6 +177,8 @@ TEST(nsmPower, GoodGenReq)
                          physicalContexnt,
                          nullptr,
                          maxAllowableValue,
+                         maxValue,
+                         minValue,
                          &readingBasis,
                          &description};
 
@@ -203,6 +213,8 @@ TEST(nsmPower, GoodHandleResp)
                          physicalContexnt,
                          nullptr,
                          maxAllowableValue,
+                         maxValue,
+                         minValue,
                          &readingBasis,
                          &description};
 
@@ -241,6 +253,8 @@ TEST(nsmPower, BadHandleResp)
                          physicalContexnt,
                          nullptr,
                          maxAllowableValue,
+                         maxValue,
+                         minValue,
                          &readingBasis,
                          &description};
 
@@ -363,6 +377,8 @@ TEST(nsmEnergy, GoodGenReq)
                           physicalContexnt,
                           nullptr,
                           maxAllowableValue,
+                          maxValue,
+                          minValue,
                           &readingBasis,
                           &description};
 
@@ -394,6 +410,8 @@ TEST(nsmEnergy, GoodHandleResp)
                           physicalContexnt,
                           nullptr,
                           maxAllowableValue,
+                          maxValue,
+                          minValue,
                           &readingBasis,
                           &description};
 
@@ -432,6 +450,8 @@ TEST(nsmEnergy, BadHandleResp)
                           physicalContexnt,
                           nullptr,
                           maxAllowableValue,
+                          maxValue,
+                          minValue,
                           &readingBasis,
                           &description};
 
@@ -464,10 +484,10 @@ TEST(nsmEnergy, BadHandleResp)
 
 TEST(nsmVoltage, GoodGenReq)
 {
-    nsm::NsmVoltage sensor{bus,         sensorName,        sensorType,
-                           1,           associations,      physicalContexnt,
-                           nullptr,     maxAllowableValue, &readingBasis,
-                           &description};
+    nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
+                           1,        associations,      physicalContexnt,
+                           nullptr,  maxAllowableValue, maxValue,
+                           minValue, &readingBasis,     &description};
 
     EXPECT_EQ(sensor.sensorId, 1);
 
@@ -487,10 +507,10 @@ TEST(nsmVoltage, GoodGenReq)
 
 TEST(nsmVoltage, GoodHandleResp)
 {
-    nsm::NsmVoltage sensor{bus,         sensorName,        sensorType,
-                           1,           associations,      physicalContexnt,
-                           nullptr,     maxAllowableValue, &readingBasis,
-                           &description};
+    nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
+                           1,        associations,      physicalContexnt,
+                           nullptr,  maxAllowableValue, maxValue,
+                           minValue, &readingBasis,     &description};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -517,10 +537,10 @@ TEST(nsmVoltage, GoodHandleResp)
 
 TEST(nsmVoltage, BadHandleResp)
 {
-    nsm::NsmVoltage sensor{bus,         sensorName,        sensorType,
-                           1,           associations,      physicalContexnt,
-                           nullptr,     maxAllowableValue, &readingBasis,
-                           &description};
+    nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
+                           1,        associations,      physicalContexnt,
+                           nullptr,  maxAllowableValue, maxValue,
+                           minValue, &readingBasis,     &description};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -551,8 +571,8 @@ TEST(nsmVoltage, BadHandleResp)
 TEST(nsmAltitudePressure, GoodGenReq)
 {
     nsm::NsmAltitudePressure sensor{
-        bus,     sensorName,       sensorType, associations, physicalContexnt,
-        nullptr, maxAllowableValue};
+        bus,     sensorName,        sensorType, associations, physicalContexnt,
+        nullptr, maxAllowableValue, maxValue,   minValue};
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -570,8 +590,8 @@ TEST(nsmAltitudePressure, GoodGenReq)
 TEST(nsmAltitudePressure, GoodHandleResp)
 {
     nsm::NsmAltitudePressure sensor{
-        bus,     sensorName,       sensorType, associations, physicalContexnt,
-        nullptr, maxAllowableValue};
+        bus,     sensorName,        sensorType, associations, physicalContexnt,
+        nullptr, maxAllowableValue, maxValue,   minValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -598,8 +618,8 @@ TEST(nsmAltitudePressure, GoodHandleResp)
 TEST(nsmAltitudePressure, BadHandleResp)
 {
     nsm::NsmAltitudePressure sensor{
-        bus,     sensorName,       sensorType, associations, physicalContexnt,
-        nullptr, maxAllowableValue};
+        bus,     sensorName,        sensorType, associations, physicalContexnt,
+        nullptr, maxAllowableValue, maxValue,   minValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
