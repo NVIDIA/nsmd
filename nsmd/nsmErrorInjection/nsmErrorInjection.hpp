@@ -22,6 +22,12 @@ using ErrorInjectionCapabilityIntf = sdbusplus::server::object_t<
 using ErrorInjectionPayloadIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::ErrorInjection::server::ErrorInjectionPayload>;
 
+/**
+ * @brief Convert D-Bus ErrorInjectionCapability Type to NSM protocol bit
+ * position (EI_* enum). Used when building or reading the error injection
+ * types mask.
+ */
+uint8_t getErrorInjectionBitPosition(ErrorInjectionCapabilityIntf::Type type);
 class NsmErrorInjection :
     public NsmSensor,
     public NsmInterfaceContainer<ErrorInjectionIntf>

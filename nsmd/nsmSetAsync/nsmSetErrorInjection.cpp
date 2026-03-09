@@ -18,6 +18,7 @@
 
 #include "device-configuration.h"
 
+#include "nsmErrorInjection/nsmErrorInjection.hpp"
 #include "sensorManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -144,13 +145,16 @@ requester::Coroutine
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     nsm_error_injection_types_mask data = {0, 0, 0, 0, 0, 0, 0, 0};
     invoke([&data, this, value](const auto& pdi) {
-        // Update the error injection mask based on the PDI type.
-        // If the PDI type matches the current type, use the provided value.
-        // Otherwise, retain the current enabled state to ensure only the mask
-        // for the current type is updated, preserving the state of other types.
-        auto type = int(pdi.type());
+        // Update the error injection mask using EI enum bit positions (not
+        // D-Bus Type ordinals). Multiple D-Bus types map to the same EI enum
+        // bit (e.g. FatalErrors, PortRecoveryErrors -> EI_DEVICE_ERRORS).
+        if (pdi.type() == ErrorInjectionCapabilityIntf::Type::Unknown)
+        {
+            return;
+        }
+        auto bitPos = getErrorInjectionBitPosition(pdi.type());
         auto setValue = int(pdi.type() == this->type ? value : pdi.enabled());
-        data.mask[type / 8] |= setValue << (type % 8);
+        data.mask[bitPos / 8] |= setValue << (bitPos % 8);
     });
     auto rc = encode_set_current_error_injection_types_v1_req(0, &data,
                                                               requestPtr);
