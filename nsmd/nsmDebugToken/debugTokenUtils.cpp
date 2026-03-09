@@ -216,6 +216,19 @@ const std::unordered_map<uint32_t,
         {4, {{0, TokenSubtypeEnum::None}}}  // RAS
 };
 
+// NIC device token types (numeric to enum)
+constexpr std::array<std::pair<uint32_t, TokenTypeEnum>, 3> nicTokenTypes{
+    {{0, TokenTypeEnum::None},
+     {2, TokenTypeEnum::CRCS},
+     {3, TokenTypeEnum::CRDT}}};
+
+// NIC device token subtypes - no subtypes supported yet
+const std::unordered_map<uint32_t,
+                         std::vector<std::pair<uint32_t, TokenSubtypeEnum>>>
+    nicTokenSubtypesMap = {{0, {{0, TokenSubtypeEnum::None}}},
+                           {2, {{0, TokenSubtypeEnum::None}}},  // CRCS
+                           {3, {{0, TokenSubtypeEnum::None}}}}; // CRDT
+
 // Default/generic token types for other devices (numeric to enum)
 constexpr std::array<std::pair<uint32_t, TokenTypeEnum>, 4> defaultTokenTypes{
     {{0, TokenTypeEnum::None},
@@ -242,6 +255,10 @@ std::pair<const std::pair<uint32_t, TokenTypeEnum>*, size_t>
     {
         return {smaTokenTypes.data(), smaTokenTypes.size()};
     }
+    if (deviceType == "NIC")
+    {
+        return {nicTokenTypes.data(), nicTokenTypes.size()};
+    }
     return {defaultTokenTypes.data(), defaultTokenTypes.size()};
 }
 
@@ -264,6 +281,10 @@ const std::unordered_map<uint32_t,
     if (deviceType == "SMA")
     {
         return &smaTokenSubtypesMap;
+    }
+    if (deviceType == "NIC")
+    {
+        return &nicTokenSubtypesMap;
     }
     return nullptr;
 }
