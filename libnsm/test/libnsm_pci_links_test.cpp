@@ -435,37 +435,35 @@ TEST(queryScalarGroupTelemetryV1Group0, testBadDecodeResponse)
 	    15, // incorrect data size
 	    0	// data size
 	};
-	auto data =
-	    reinterpret_cast<nsm_query_scalar_group_telemetry_group_0 *>(
-		data_byte.data());
 	responseMsg.insert(responseMsg.end(), data_byte.begin(),
 			   data_byte.end());
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	size_t msg_len = responseMsg.size();
 
+	struct nsm_query_scalar_group_telemetry_group_0 data;
 	uint8_t cc = NSM_SUCCESS;
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
 	auto rc = decode_query_scalar_group_telemetry_v1_group0_resp(
-	    NULL, msg_len, &cc, &data_size, &reason_code, data);
+	    NULL, msg_len, &cc, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_query_scalar_group_telemetry_v1_group0_resp(
-	    response, msg_len, NULL, &data_size, &reason_code, data);
+	    response, msg_len, NULL, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_query_scalar_group_telemetry_v1_group0_resp(
-	    response, msg_len, &cc, NULL, &reason_code, data);
+	    response, msg_len, &cc, NULL, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_query_scalar_group_telemetry_v1_group0_resp(
 	    response, msg_len - data_byte.size(), &cc, &data_size, &reason_code,
-	    data);
+	    &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
 	rc = decode_query_scalar_group_telemetry_v1_group0_resp(
-	    response, msg_len, &cc, &data_size, &reason_code, data);
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -592,7 +590,7 @@ TEST(queryScalarGroupTelemetryV1Group1, testBadDecodeResponse)
 	    0,					 // completion code
 	    0,
 	    0,
-	    31, // incorrect data size (should be 32)
+	    31, // incorrect data size (not multiple of 4 = 32bits)
 	    0	// data size
 	};
 	auto data =
@@ -607,25 +605,132 @@ TEST(queryScalarGroupTelemetryV1Group1, testBadDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
+	// Test NULL msg pointer
 	auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
 	    NULL, msg_len, &cc, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL cc pointer
 	rc = decode_query_scalar_group_telemetry_v1_group1_resp(
 	    response, msg_len, NULL, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL data_size pointer
 	rc = decode_query_scalar_group_telemetry_v1_group1_resp(
 	    response, msg_len, &cc, NULL, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL data pointer
+	rc = decode_query_scalar_group_telemetry_v1_group1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test message too short
 	rc = decode_query_scalar_group_telemetry_v1_group1_resp(
 	    response, msg_len - data_byte.size(), &cc, &data_size, &reason_code,
 	    data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
+	// Test data_size not multiple of sizeof(uint32_t) - should fail
 	rc = decode_query_scalar_group_telemetry_v1_group1_resp(
 	    response, msg_len, &cc, &data_size, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(queryScalarGroupTelemetryV1Group1, testDecodePartialResponse)
+{
+	// Test valid response with fewer DSIDs (e.g., 5 DSIDs = 20 bytes)
+	std::vector<uint8_t> data_byte{
+	    0x05, 0x00, 0x00, 0x00, // negotiated_link_speed (Gen5)
+	    0x10, 0x00, 0x00, 0x00, // negotiated_link_width (x16)
+	    0x04, 0x00, 0x00, 0x00, // target_link_speed
+	    0x05, 0x00, 0x00, 0x00, // max_link_speed (Gen5)
+	    0x10, 0x00, 0x00, 0x00, // max_link_width (x16)
+	    // Missing: max_read_request_size_bytes, max_payload_size_bytes,
+	    // clock_mode
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    20, // 5 DSIDs = 20 bytes (less than full struct)
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_1 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_size, 20);
+	EXPECT_EQ(data.negotiated_link_speed, 5u);
+	EXPECT_EQ(data.negotiated_link_width, 16u);
+	EXPECT_EQ(data.target_link_speed, 4u);
+	EXPECT_EQ(data.max_link_speed, 5u);
+	EXPECT_EQ(data.max_link_width, 16u);
+	// Missing fields should be zero-initialized
+	EXPECT_EQ(data.max_read_request_size_bytes, 0u);
+	EXPECT_EQ(data.max_payload_size_bytes, 0u);
+	EXPECT_EQ(data.clock_mode, 0u);
+}
+
+TEST(queryScalarGroupTelemetryV1Group1, testDecodeOverflowResponse)
+{
+	// Test data_size > sizeof(struct) - should fail
+	std::vector<uint8_t> data_byte{
+	    0x05, 0x00, 0x00, 0x00, // negotiated_link_speed
+	    0x10, 0x00, 0x00, 0x00, // negotiated_link_width
+	    0x04, 0x00, 0x00, 0x00, // target_link_speed
+	    0x05, 0x00, 0x00, 0x00, // max_link_speed
+	    0x10, 0x00, 0x00, 0x00, // max_link_width
+	    0x00, 0x02, 0x00, 0x00, // max_read_request_size_bytes
+	    0x00, 0x01, 0x00, 0x00, // max_payload_size_bytes
+	    0x01, 0x00, 0x00, 0x00, // clock_mode
+	    0xFF, 0xFF, 0xFF, 0xFF, // extra data (overflow)
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    36, // 36 bytes > sizeof(struct) = 32
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_1 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -763,6 +868,91 @@ TEST(queryScalarGroupTelemetryV1Group2, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
+TEST(queryScalarGroupTelemetryV1Group2, testDecodePartialResponse)
+{
+	// Test valid response with fewer DSIDs (e.g., 2 DSIDs = 8 bytes)
+	std::vector<uint8_t> data_byte{
+	    0x57, 0x04, 0x00, 0x00, // non_fatal_errors (1111)
+	    0xAE, 0x08, 0x00, 0x00, // fatal_errors (2222)
+	    // Missing: unsupported_request_count, correctable_errors
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    8, // 2 DSIDs = 8 bytes (less than full struct of 16 bytes)
+	    0  // data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_2 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group2_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_size, 8);
+	EXPECT_EQ(data.non_fatal_errors, 1111u);
+	EXPECT_EQ(data.fatal_errors, 2222u);
+	// Missing fields should be zero-initialized
+	EXPECT_EQ(data.unsupported_request_count, 0u);
+	EXPECT_EQ(data.correctable_errors, 0u);
+}
+
+TEST(queryScalarGroupTelemetryV1Group2, testDecodeOverflowResponse)
+{
+	// Test data_size > sizeof(struct) - should fail
+	std::vector<uint8_t> data_byte{
+	    0x57, 0x04, 0x00, 0x00, // non_fatal_errors
+	    0xAE, 0x08, 0x00, 0x00, // fatal_errors
+	    0x05, 0x0D, 0x00, 0x00, // unsupported_request_count
+	    0x5C, 0x11, 0x00, 0x00, // correctable_errors
+	    0xFF, 0xFF, 0xFF, 0xFF, // extra data (overflow)
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    20, // 20 bytes > sizeof(struct) = 16
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_2 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group2_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
 TEST(queryScalarGroupTelemetryV1Group3, testGoodEncodeResponse)
 {
 	std::vector<uint8_t> responseMsg(
@@ -873,7 +1063,7 @@ TEST(queryScalarGroupTelemetryV1Group3, testBadDecodeResponse)
 	    0,					 // completion code
 	    0,
 	    0,
-	    19, // wrong data size (should be 20)
+	    19, // wrong data size (not multiple of 4)
 	    0	// data size
 	};
 	auto data =
@@ -889,25 +1079,123 @@ TEST(queryScalarGroupTelemetryV1Group3, testBadDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
+	// Test NULL msg pointer
 	auto rc = decode_query_scalar_group_telemetry_v1_group3_resp(
 	    NULL, msg_len, &cc, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL cc pointer
 	rc = decode_query_scalar_group_telemetry_v1_group3_resp(
 	    response, msg_len, NULL, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL data_size pointer
 	rc = decode_query_scalar_group_telemetry_v1_group3_resp(
 	    response, msg_len, &cc, NULL, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL data pointer
+	rc = decode_query_scalar_group_telemetry_v1_group3_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test message too short
 	rc = decode_query_scalar_group_telemetry_v1_group3_resp(
 	    response, msg_len - data_byte.size(), &cc, &data_size, &reason_code,
 	    data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
+	// Test data_size not multiple of sizeof(uint32_t) - should fail
 	rc = decode_query_scalar_group_telemetry_v1_group3_resp(
 	    response, msg_len, &cc, &data_size, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(queryScalarGroupTelemetryV1Group3, testDecodePartialResponse)
+{
+	// Test valid response with fewer DSIDs (e.g., 3 DSIDs = 12 bytes)
+	std::vector<uint8_t> data_byte{
+	    0x0A, 0x00, 0x00, 0x00, // L0ToRecoveryCount (10)
+	    0x05, 0x00, 0x00, 0x00, // eieos_timeout (5)
+	    0x03, 0x00, 0x00, 0x00, // training_seq_errors (3)
+				    // Missing: framing_errors, link_down_count
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    12, // 3 DSIDs = 12 bytes
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_3 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group3_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_size, 12);
+	EXPECT_EQ(data.L0ToRecoveryCount, 10u);
+	EXPECT_EQ(data.eieos_timeout, 5u);
+	EXPECT_EQ(data.training_seq_errors, 3u);
+	// Missing fields should be zero-initialized
+	EXPECT_EQ(data.framing_errors, 0u);
+	EXPECT_EQ(data.link_down_count, 0u);
+}
+
+TEST(queryScalarGroupTelemetryV1Group3, testDecodeOverflowResponse)
+{
+	// Test data_size > sizeof(struct) - should fail
+	std::vector<uint8_t> data_byte{
+	    0x0A, 0x00, 0x00, 0x00, // L0ToRecoveryCount
+	    0x05, 0x00, 0x00, 0x00, // eieos_timeout
+	    0x03, 0x00, 0x00, 0x00, // training_seq_errors
+	    0x02, 0x00, 0x00, 0x00, // framing_errors
+	    0x01, 0x00, 0x00, 0x00, // link_down_count
+	    0xFF, 0xFF, 0xFF, 0xFF, // extra data (overflow)
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    24, // 24 bytes > sizeof(struct) = 20
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_3 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group3_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -1032,7 +1320,7 @@ TEST(queryScalarGroupTelemetryV1Group4, testBadDecodeResponse)
 	    0,					 // completion code
 	    0,
 	    0,
-	    31, // wrong data size
+	    31, // wrong data size (not multiple of 4)
 	    0	// data size
 	};
 	auto data =
@@ -1047,25 +1335,131 @@ TEST(queryScalarGroupTelemetryV1Group4, testBadDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
+	// Test NULL msg pointer
 	auto rc = decode_query_scalar_group_telemetry_v1_group4_resp(
 	    NULL, msg_len, &cc, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL cc pointer
 	rc = decode_query_scalar_group_telemetry_v1_group4_resp(
 	    response, msg_len, NULL, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL data_size pointer
 	rc = decode_query_scalar_group_telemetry_v1_group4_resp(
 	    response, msg_len, &cc, NULL, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL data pointer
+	rc = decode_query_scalar_group_telemetry_v1_group4_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test message too short
 	rc = decode_query_scalar_group_telemetry_v1_group4_resp(
 	    response, msg_len - data_byte.size(), &cc, &data_size, &reason_code,
 	    data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
+	// Test data_size not multiple of sizeof(uint32_t) - should fail
 	rc = decode_query_scalar_group_telemetry_v1_group4_resp(
 	    response, msg_len, &cc, &data_size, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(queryScalarGroupTelemetryV1Group4, testDecodePartialResponse)
+{
+	// Test valid response with fewer DSIDs (e.g., 4 DSIDs = 16 bytes)
+	std::vector<uint8_t> data_byte{
+	    0x64, 0x00, 0x00, 0x00, // recv_err_cnt (100)
+	    0xC8, 0x00, 0x00, 0x00, // NAK_recv_cnt (200)
+	    0x2C, 0x01, 0x00, 0x00, // NAK_sent_cnt (300)
+	    0x90, 0x01, 0x00, 0x00, // bad_TLP_cnt (400)
+	    // Missing: replay_rollover_cnt, FC_timeout_err_cnt, replay_cnt,
+	    // dllp_crc_errors
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    16, // 4 DSIDs = 16 bytes
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_4 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group4_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_size, 16);
+	EXPECT_EQ(data.recv_err_cnt, 100u);
+	EXPECT_EQ(data.NAK_recv_cnt, 200u);
+	EXPECT_EQ(data.NAK_sent_cnt, 300u);
+	EXPECT_EQ(data.bad_TLP_cnt, 400u);
+	// Missing fields should be zero-initialized
+	EXPECT_EQ(data.replay_rollover_cnt, 0u);
+	EXPECT_EQ(data.FC_timeout_err_cnt, 0u);
+	EXPECT_EQ(data.replay_cnt, 0u);
+	EXPECT_EQ(data.dllp_crc_errors, 0u);
+}
+
+TEST(queryScalarGroupTelemetryV1Group4, testDecodeOverflowResponse)
+{
+	// Test data_size > sizeof(struct) - should fail
+	std::vector<uint8_t> data_byte{
+	    0x64, 0x00, 0x00, 0x00, // recv_err_cnt
+	    0xC8, 0x00, 0x00, 0x00, // NAK_recv_cnt
+	    0x2C, 0x01, 0x00, 0x00, // NAK_sent_cnt
+	    0x90, 0x01, 0x00, 0x00, // bad_TLP_cnt
+	    0xF4, 0x01, 0x00, 0x00, // replay_rollover_cnt
+	    0x58, 0x02, 0x00, 0x00, // FC_timeout_err_cnt
+	    0xBC, 0x02, 0x00, 0x00, // replay_cnt
+	    0x20, 0x03, 0x00, 0x00, // dllp_crc_errors
+	    0xFF, 0xFF, 0xFF, 0xFF, // extra data (overflow)
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    36, // 36 bytes > sizeof(struct) = 32
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_4 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group4_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -2199,39 +2593,306 @@ TEST(MultiportQueryScalarGroupTelemetry, testRequest)
 	EXPECT_EQ(GROUP_ID_10, req.data.group_index);
 }
 
-TEST(QueryScalarGroupTelemetryGroup10, testResponse)
+TEST(queryScalarGroupTelemetryV1Group10, testGoodEncodeResponse)
 {
-	const nsm_query_scalar_group_telemetry_group_10 data = {
-	    DS_ID_0, DS_ID_1, DS_ID_2, DS_ID_3, DS_ID_4,  DS_ID_5,
-	    DS_ID_6, DS_ID_7, DS_ID_8, DS_ID_9, DS_ID_10,
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(nsm_query_scalar_group_telemetry_v1_group_10_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	struct nsm_query_scalar_group_telemetry_group_10 data;
+	data.outbound_read_tlp_count = 1;
+	data.dwords_transferred_in_outbound_read_tlp_high = 2;
+	data.dwords_transferred_in_outbound_read_tlp_low = 3;
+	data.outbound_write_tlp_count = 4;
+	data.dwords_transferred_in_outbound_write_tlp_high = 5;
+	data.dwords_transferred_in_outbound_write_tlp_low = 6;
+	data.outbound_completion_tlp_count = 7;
+	data.dwords_transferred_in_outbound_completion = 8;
+	data.read_requests_dropped_tag_unavailable = 9;
+	data.read_requests_dropped_credit_exhaustion = 10;
+	data.read_requests_dropped_credit_not_posted = 11;
+
+	auto rc = encode_query_scalar_group_telemetry_v1_group10_resp(
+	    0, NSM_SUCCESS, reason_code, &data, response);
+
+	struct nsm_query_scalar_group_telemetry_v1_group_10_resp *resp =
+	    reinterpret_cast<
+		struct nsm_query_scalar_group_telemetry_v1_group_10_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, resp->hdr.command);
+	EXPECT_EQ(sizeof(nsm_query_scalar_group_telemetry_group_10),
+		  le16toh(resp->hdr.data_size));
+}
+
+TEST(queryScalarGroupTelemetryV1Group10, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x00,
+	    0x00, 0x00, // outbound_read_tlp_count
+	    0x02, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_high
+	    0x03, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_low
+	    0x04, 0x00,
+	    0x00, 0x00, // outbound_write_tlp_count
+	    0x05, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_high
+	    0x06, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_low
+	    0x07, 0x00,
+	    0x00, 0x00, // outbound_completion_tlp_count
+	    0x08, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_completion
+	    0x09, 0x00,
+	    0x00, 0x00, // read_requests_dropped_tag_unavailable
+	    0x0A, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_exhaustion
+	    0x0B, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_not_posted
 	};
-	nsm_query_scalar_group_telemetry_v1_group_10_resp resp;
 
-	testEncodeResponse<nsm_query_scalar_group_telemetry_group_10>(
-	    &encode_query_scalar_group_telemetry_v1_group10_resp,
-	    NSM_TYPE_PCI_LINK, NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, data,
-	    resp.data);
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    44, // 11 DSIDs = 44 bytes
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
 
-	testDecodeResponse<nsm_query_scalar_group_telemetry_group_10>(
-	    &decode_query_scalar_group_telemetry_v1_group10_resp,
-	    NSM_TYPE_PCI_LINK, NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, data,
-	    resp.data);
+	struct nsm_query_scalar_group_telemetry_group_10 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
 
-	EXPECT_EQ(DS_ID_0, resp.data.outbound_read_tlp_count);
-	EXPECT_EQ(DS_ID_1,
-		  resp.data.dwords_transferred_in_outbound_read_tlp_high);
-	EXPECT_EQ(DS_ID_2,
-		  resp.data.dwords_transferred_in_outbound_read_tlp_low);
-	EXPECT_EQ(DS_ID_3, resp.data.outbound_write_tlp_count);
-	EXPECT_EQ(DS_ID_4,
-		  resp.data.dwords_transferred_in_outbound_write_tlp_high);
-	EXPECT_EQ(DS_ID_5,
-		  resp.data.dwords_transferred_in_outbound_write_tlp_low);
-	EXPECT_EQ(DS_ID_6, resp.data.outbound_completion_tlp_count);
-	EXPECT_EQ(DS_ID_7, resp.data.dwords_transferred_in_outbound_completion);
-	EXPECT_EQ(DS_ID_8, resp.data.read_requests_dropped_tag_unavailable);
-	EXPECT_EQ(DS_ID_9, resp.data.read_requests_dropped_credit_exhaustion);
-	EXPECT_EQ(DS_ID_10, resp.data.read_requests_dropped_credit_not_posted);
+	auto rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+	    response, msg_len, &cc, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data.outbound_read_tlp_count, 1u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_read_tlp_high, 2u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_read_tlp_low, 3u);
+	EXPECT_EQ(data.outbound_write_tlp_count, 4u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_write_tlp_high, 5u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_write_tlp_low, 6u);
+	EXPECT_EQ(data.outbound_completion_tlp_count, 7u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_completion, 8u);
+	EXPECT_EQ(data.read_requests_dropped_tag_unavailable, 9u);
+	EXPECT_EQ(data.read_requests_dropped_credit_exhaustion, 10u);
+	EXPECT_EQ(data.read_requests_dropped_credit_not_posted, 11u);
+}
+
+TEST(queryScalarGroupTelemetryV1Group10, testBadDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x00,
+	    0x00, 0x00, // outbound_read_tlp_count
+	    0x02, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_high
+	    0x03, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_low
+	    0x04, 0x00,
+	    0x00, 0x00, // outbound_write_tlp_count
+	    0x05, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_high
+	    0x06, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_low
+	    0x07, 0x00,
+	    0x00, 0x00, // outbound_completion_tlp_count
+	    0x08, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_completion
+	    0x09, 0x00,
+	    0x00, 0x00, // read_requests_dropped_tag_unavailable
+	    0x0A, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_exhaustion
+	    0x0B, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_not_posted
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    43, // incorrect data size (not multiple of 4)
+	    0	// data size
+	};
+	auto data =
+	    reinterpret_cast<nsm_query_scalar_group_telemetry_group_10 *>(
+		data_byte.data());
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	// Test NULL msg pointer
+	auto rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+	    NULL, msg_len, &cc, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test NULL cc pointer
+	rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+	    response, msg_len, NULL, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test NULL data pointer
+	rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+	    response, msg_len, &cc, &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test message too short
+	rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+	    response, msg_len - data_byte.size(), &cc, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Test data_size not multiple of sizeof(uint32_t) - should fail
+	rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+	    response, msg_len, &cc, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(queryScalarGroupTelemetryV1Group10, testDecodePartialResponse)
+{
+	// Test valid response with fewer DSIDs (e.g., 6 DSIDs = 24 bytes)
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x00,
+	    0x00, 0x00, // outbound_read_tlp_count
+	    0x02, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_high
+	    0x03, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_low
+	    0x04, 0x00,
+	    0x00, 0x00, // outbound_write_tlp_count
+	    0x05, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_high
+	    0x06, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_low
+			// Missing: outbound_completion_tlp_count, etc.
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    24, // 6 DSIDs = 24 bytes (less than full struct)
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_10 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+	    response, msg_len, &cc, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data.outbound_read_tlp_count, 1u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_read_tlp_high, 2u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_read_tlp_low, 3u);
+	EXPECT_EQ(data.outbound_write_tlp_count, 4u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_write_tlp_high, 5u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_write_tlp_low, 6u);
+	// Missing fields should be zero-initialized
+	EXPECT_EQ(data.outbound_completion_tlp_count, 0u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_completion, 0u);
+	EXPECT_EQ(data.read_requests_dropped_tag_unavailable, 0u);
+	EXPECT_EQ(data.read_requests_dropped_credit_exhaustion, 0u);
+	EXPECT_EQ(data.read_requests_dropped_credit_not_posted, 0u);
+}
+
+TEST(queryScalarGroupTelemetryV1Group10, testDecodeOverflowResponse)
+{
+	// Test data_size > sizeof(struct) - should fail
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x00,
+	    0x00, 0x00, // outbound_read_tlp_count
+	    0x02, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_high
+	    0x03, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_low
+	    0x04, 0x00,
+	    0x00, 0x00, // outbound_write_tlp_count
+	    0x05, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_high
+	    0x06, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_low
+	    0x07, 0x00,
+	    0x00, 0x00, // outbound_completion_tlp_count
+	    0x08, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_completion
+	    0x09, 0x00,
+	    0x00, 0x00, // read_requests_dropped_tag_unavailable
+	    0x0A, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_exhaustion
+	    0x0B, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_not_posted
+	    0xFF, 0xFF,
+	    0xFF, 0xFF, // extra data (overflow)
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    48, // 48 bytes > sizeof(struct) = 44
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_10 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+	    response, msg_len, &cc, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(queryScalarGroupTelemetryV1Group7, testGoodEncodeResponse)
@@ -2348,7 +3009,7 @@ TEST(queryScalarGroupTelemetryV1Group7, testBadDecodeResponse)
 	    0,					 // completion code
 	    0,
 	    0,
-	    19, // incorrect data size
+	    19, // incorrect data size (not multiple of 4)
 	    0	// data size
 	};
 	auto data =
@@ -2363,64 +3024,459 @@ TEST(queryScalarGroupTelemetryV1Group7, testBadDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
+	// Test NULL msg pointer
 	auto rc = decode_query_scalar_group_telemetry_v1_group7_resp(
 	    NULL, msg_len, &cc, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL cc pointer
 	rc = decode_query_scalar_group_telemetry_v1_group7_resp(
 	    response, msg_len, NULL, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL data_size pointer
 	rc = decode_query_scalar_group_telemetry_v1_group7_resp(
 	    response, msg_len, &cc, NULL, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
+	// Test NULL data pointer
+	rc = decode_query_scalar_group_telemetry_v1_group7_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test message too short
 	rc = decode_query_scalar_group_telemetry_v1_group7_resp(
 	    response, msg_len - data_byte.size(), &cc, &data_size, &reason_code,
 	    data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
+	// Test data_size not multiple of sizeof(uint32_t) - should fail
 	rc = decode_query_scalar_group_telemetry_v1_group7_resp(
 	    response, msg_len, &cc, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
-TEST(QueryScalarGroupTelemetryGroup10Extended, testResponse)
+TEST(queryScalarGroupTelemetryV1Group7, testDecodePartialResponse)
 {
-	const nsm_query_scalar_group_telemetry_group_10_extended data = {
-	    DS_ID_0, DS_ID_1, DS_ID_2, DS_ID_3,	 DS_ID_4,  DS_ID_5,  DS_ID_6,
-	    DS_ID_7, DS_ID_8, DS_ID_9, DS_ID_10, DS_ID_11, DS_ID_12, DS_ID_13,
+	// Test valid response with fewer DSIDs (e.g., 3 DSIDs = 12 bytes)
+	std::vector<uint8_t> data_byte{
+	    0x78, 0x56, 0x34, 0x12, // bar0_base_addr_low
+	    0xF0, 0xDE, 0xBC, 0x9A, // bar0_base_addr_high
+	    0x00, 0x10, 0x00, 0x00, // bar0_size
+				    // Missing: port_type, pcie_bus_number
 	};
-	nsm_query_scalar_group_telemetry_v1_group_10_extended_resp resp;
 
-	testEncodeResponse<nsm_query_scalar_group_telemetry_group_10_extended>(
-	    &encode_query_scalar_group_telemetry_v1_group10_extended_resp,
-	    NSM_TYPE_PCI_LINK, NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, data,
-	    resp.data);
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    12, // 3 DSIDs = 12 bytes
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
 
-	testDecodeResponse<nsm_query_scalar_group_telemetry_group_10_extended>(
-	    &decode_query_scalar_group_telemetry_v1_group10_extended_resp,
-	    NSM_TYPE_PCI_LINK, NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, data,
-	    resp.data);
+	struct nsm_query_scalar_group_telemetry_group_7 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
 
-	EXPECT_EQ(DS_ID_0, resp.data.outbound_read_tlp_count);
-	EXPECT_EQ(DS_ID_1,
-		  resp.data.dwords_transferred_in_outbound_read_tlp_high);
-	EXPECT_EQ(DS_ID_2,
-		  resp.data.dwords_transferred_in_outbound_read_tlp_low);
-	EXPECT_EQ(DS_ID_3, resp.data.outbound_write_tlp_count);
-	EXPECT_EQ(DS_ID_4,
-		  resp.data.dwords_transferred_in_outbound_write_tlp_high);
-	EXPECT_EQ(DS_ID_5,
-		  resp.data.dwords_transferred_in_outbound_write_tlp_low);
-	EXPECT_EQ(DS_ID_6, resp.data.outbound_completion_tlp_count);
-	EXPECT_EQ(DS_ID_7, resp.data.dwords_transferred_in_outbound_completion);
-	EXPECT_EQ(DS_ID_8, resp.data.read_requests_dropped_tag_unavailable);
-	EXPECT_EQ(DS_ID_9, resp.data.read_requests_dropped_credit_exhaustion);
-	EXPECT_EQ(DS_ID_10, resp.data.read_requests_dropped_credit_not_posted);
-	EXPECT_EQ(DS_ID_11, resp.data.inbound_completion_tlp_count);
-	EXPECT_EQ(DS_ID_12, resp.data.inbound_completion_tlp_bytes_high);
-	EXPECT_EQ(DS_ID_13, resp.data.inbound_completion_tlp_bytes_low);
+	auto rc = decode_query_scalar_group_telemetry_v1_group7_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_size, 12);
+	EXPECT_EQ(data.bar0_base_addr_low, 0x12345678u);
+	EXPECT_EQ(data.bar0_base_addr_high, 0x9ABCDEF0u);
+	EXPECT_EQ(data.bar0_size, 0x1000u);
+	// Missing fields should be zero-initialized
+	EXPECT_EQ(data.port_type, 0u);
+	EXPECT_EQ(data.pcie_bus_number, 0u);
+}
+
+TEST(queryScalarGroupTelemetryV1Group7, testDecodeOverflowResponse)
+{
+	// Test data_size > sizeof(struct) - should fail
+	std::vector<uint8_t> data_byte{
+	    0x78, 0x56, 0x34, 0x12, // bar0_base_addr_low
+	    0xF0, 0xDE, 0xBC, 0x9A, // bar0_base_addr_high
+	    0x00, 0x10, 0x00, 0x00, // bar0_size
+	    0x05, 0x00, 0x00, 0x00, // port_type
+	    0x42, 0x00, 0x00, 0x00, // pcie_bus_number
+	    0xFF, 0xFF, 0xFF, 0xFF, // extra data (overflow)
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    24, // 24 bytes > sizeof(struct) = 20
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_7 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group7_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(queryScalarGroupTelemetryV1Group10Extended, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(
+		    nsm_query_scalar_group_telemetry_v1_group_10_extended_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	struct nsm_query_scalar_group_telemetry_group_10_extended data;
+	data.outbound_read_tlp_count = 1;
+	data.dwords_transferred_in_outbound_read_tlp_high = 2;
+	data.dwords_transferred_in_outbound_read_tlp_low = 3;
+	data.outbound_write_tlp_count = 4;
+	data.dwords_transferred_in_outbound_write_tlp_high = 5;
+	data.dwords_transferred_in_outbound_write_tlp_low = 6;
+	data.outbound_completion_tlp_count = 7;
+	data.dwords_transferred_in_outbound_completion = 8;
+	data.read_requests_dropped_tag_unavailable = 9;
+	data.read_requests_dropped_credit_exhaustion = 10;
+	data.read_requests_dropped_credit_not_posted = 11;
+	data.inbound_completion_tlp_count = 12;
+	data.inbound_completion_tlp_bytes_high = 13;
+	data.inbound_completion_tlp_bytes_low = 14;
+
+	auto rc = encode_query_scalar_group_telemetry_v1_group10_extended_resp(
+	    0, NSM_SUCCESS, reason_code, &data, response);
+
+	struct nsm_query_scalar_group_telemetry_v1_group_10_extended_resp
+	    *resp = reinterpret_cast<
+		struct
+		nsm_query_scalar_group_telemetry_v1_group_10_extended_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, resp->hdr.command);
+	EXPECT_EQ(sizeof(nsm_query_scalar_group_telemetry_group_10_extended),
+		  le16toh(resp->hdr.data_size));
+}
+
+TEST(queryScalarGroupTelemetryV1Group10Extended, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x00,
+	    0x00, 0x00, // outbound_read_tlp_count
+	    0x02, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_high
+	    0x03, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_low
+	    0x04, 0x00,
+	    0x00, 0x00, // outbound_write_tlp_count
+	    0x05, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_high
+	    0x06, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_low
+	    0x07, 0x00,
+	    0x00, 0x00, // outbound_completion_tlp_count
+	    0x08, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_completion
+	    0x09, 0x00,
+	    0x00, 0x00, // read_requests_dropped_tag_unavailable
+	    0x0A, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_exhaustion
+	    0x0B, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_not_posted
+	    0x0C, 0x00,
+	    0x00, 0x00, // inbound_completion_tlp_count
+	    0x0D, 0x00,
+	    0x00, 0x00, // inbound_completion_tlp_bytes_high
+	    0x0E, 0x00,
+	    0x00, 0x00, // inbound_completion_tlp_bytes_low
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    56, // 14 DSIDs = 56 bytes
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_10_extended data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+	    response, msg_len, &cc, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data.outbound_read_tlp_count, 1u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_read_tlp_high, 2u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_read_tlp_low, 3u);
+	EXPECT_EQ(data.outbound_write_tlp_count, 4u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_write_tlp_high, 5u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_write_tlp_low, 6u);
+	EXPECT_EQ(data.outbound_completion_tlp_count, 7u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_completion, 8u);
+	EXPECT_EQ(data.read_requests_dropped_tag_unavailable, 9u);
+	EXPECT_EQ(data.read_requests_dropped_credit_exhaustion, 10u);
+	EXPECT_EQ(data.read_requests_dropped_credit_not_posted, 11u);
+	EXPECT_EQ(data.inbound_completion_tlp_count, 12u);
+	EXPECT_EQ(data.inbound_completion_tlp_bytes_high, 13u);
+	EXPECT_EQ(data.inbound_completion_tlp_bytes_low, 14u);
+}
+
+TEST(queryScalarGroupTelemetryV1Group10Extended, testBadDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x00,
+	    0x00, 0x00, // outbound_read_tlp_count
+	    0x02, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_high
+	    0x03, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_low
+	    0x04, 0x00,
+	    0x00, 0x00, // outbound_write_tlp_count
+	    0x05, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_high
+	    0x06, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_low
+	    0x07, 0x00,
+	    0x00, 0x00, // outbound_completion_tlp_count
+	    0x08, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_completion
+	    0x09, 0x00,
+	    0x00, 0x00, // read_requests_dropped_tag_unavailable
+	    0x0A, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_exhaustion
+	    0x0B, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_not_posted
+	    0x0C, 0x00,
+	    0x00, 0x00, // inbound_completion_tlp_count
+	    0x0D, 0x00,
+	    0x00, 0x00, // inbound_completion_tlp_bytes_high
+	    0x0E, 0x00,
+	    0x00, 0x00, // inbound_completion_tlp_bytes_low
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    55, // incorrect data size (not multiple of 4)
+	    0	// data size
+	};
+	auto data = reinterpret_cast<
+	    nsm_query_scalar_group_telemetry_group_10_extended *>(
+	    data_byte.data());
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	// Test NULL msg pointer
+	auto rc = decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+	    NULL, msg_len, &cc, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test NULL cc pointer
+	rc = decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+	    response, msg_len, NULL, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test NULL data pointer
+	rc = decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+	    response, msg_len, &cc, &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test message too short
+	rc = decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+	    response, msg_len - data_byte.size(), &cc, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Test data_size not multiple of sizeof(uint32_t) - should fail
+	rc = decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+	    response, msg_len, &cc, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(queryScalarGroupTelemetryV1Group10Extended, testDecodePartialResponse)
+{
+	// Test valid response with fewer DSIDs (e.g., 8 DSIDs = 32 bytes)
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x00,
+	    0x00, 0x00, // outbound_read_tlp_count
+	    0x02, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_high
+	    0x03, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_low
+	    0x04, 0x00,
+	    0x00, 0x00, // outbound_write_tlp_count
+	    0x05, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_high
+	    0x06, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_low
+	    0x07, 0x00,
+	    0x00, 0x00, // outbound_completion_tlp_count
+	    0x08, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_completion
+	    // Missing: read_requests_dropped_*, inbound_completion_*
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    32, // 8 DSIDs = 32 bytes (less than full struct)
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_10_extended data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+	    response, msg_len, &cc, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data.outbound_read_tlp_count, 1u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_read_tlp_high, 2u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_read_tlp_low, 3u);
+	EXPECT_EQ(data.outbound_write_tlp_count, 4u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_write_tlp_high, 5u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_write_tlp_low, 6u);
+	EXPECT_EQ(data.outbound_completion_tlp_count, 7u);
+	EXPECT_EQ(data.dwords_transferred_in_outbound_completion, 8u);
+	// Missing fields should be zero-initialized
+	EXPECT_EQ(data.read_requests_dropped_tag_unavailable, 0u);
+	EXPECT_EQ(data.read_requests_dropped_credit_exhaustion, 0u);
+	EXPECT_EQ(data.read_requests_dropped_credit_not_posted, 0u);
+	EXPECT_EQ(data.inbound_completion_tlp_count, 0u);
+	EXPECT_EQ(data.inbound_completion_tlp_bytes_high, 0u);
+	EXPECT_EQ(data.inbound_completion_tlp_bytes_low, 0u);
+}
+
+TEST(queryScalarGroupTelemetryV1Group10Extended, testDecodeOverflowResponse)
+{
+	// Test data_size > sizeof(struct) - should fail
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x00,
+	    0x00, 0x00, // outbound_read_tlp_count
+	    0x02, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_high
+	    0x03, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_read_tlp_low
+	    0x04, 0x00,
+	    0x00, 0x00, // outbound_write_tlp_count
+	    0x05, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_high
+	    0x06, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_write_tlp_low
+	    0x07, 0x00,
+	    0x00, 0x00, // outbound_completion_tlp_count
+	    0x08, 0x00,
+	    0x00, 0x00, // dwords_transferred_in_outbound_completion
+	    0x09, 0x00,
+	    0x00, 0x00, // read_requests_dropped_tag_unavailable
+	    0x0A, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_exhaustion
+	    0x0B, 0x00,
+	    0x00, 0x00, // read_requests_dropped_credit_not_posted
+	    0x0C, 0x00,
+	    0x00, 0x00, // inbound_completion_tlp_count
+	    0x0D, 0x00,
+	    0x00, 0x00, // inbound_completion_tlp_bytes_high
+	    0x0E, 0x00,
+	    0x00, 0x00, // inbound_completion_tlp_bytes_low
+	    0xFF, 0xFF,
+	    0xFF, 0xFF, // extra data (overflow)
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    60, // 60 bytes > sizeof(struct) = 56
+	    0	// data size high byte
+	};
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	struct nsm_query_scalar_group_telemetry_group_10_extended data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+	    response, msg_len, &cc, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(queryVectorGroupTelemetryV2, testGoodEncodeRequest)
