@@ -170,12 +170,18 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
             convertEncodedWidthToActualWidth(data.max_link_width));
         portWidthIntf->activeWidth(
             convertEncodedWidthToActualWidth(data.negotiated_link_width));
-        portInfoIntf->maxReadRequestSizeBytes(
-            convertEncodedSizeToBytes(data.max_read_request_size_bytes));
-        portInfoIntf->maxPayloadSizeBytes(
-            convertEncodedSizeToBytes(data.max_payload_size_bytes));
-        pcieClockModeIntf->commonClockMode(
-            convertEncodedClockModeToEnum(data.clock_mode));
+        if (pcieClockModeIntf)
+        {
+            pcieClockModeIntf->commonClockMode(
+                convertEncodedClockModeToEnum(data.clock_mode));
+        }
+        if (portInfoIntf)
+        {
+            portInfoIntf->maxReadRequestSizeBytes(
+                convertEncodedSizeToBytes(data.max_read_request_size_bytes));
+            portInfoIntf->maxPayloadSizeBytes(
+                convertEncodedSizeToBytes(data.max_payload_size_bytes));
+        }
 
         updateMetricOnSharedMemory();
     }
