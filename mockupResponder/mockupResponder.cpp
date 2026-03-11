@@ -1040,6 +1040,9 @@ std::optional<std::vector<uint8_t>>
                       NSM_SET_ERROR_INJECTION_PAYLOAD,
                       NSM_ACTIVATE_ERROR_INJECTION,
                       NSM_GET_PROTECTION_OPTIONS,
+                      NSM_SET_DEVICE_MODE_SETTINGS_V2,
+                      NSM_GET_DEVICE_MODE_SETTINGS_V2,
+                      NSM_GET_SUPPORTED_DEVICE_MODES_V2,
                   }},
              }},
             {NSM_DEV_ID_CPU,
@@ -8036,6 +8039,32 @@ std::vector<uint8_t>
             memcpy(data.data(), &powerLimit, sizeof(uint32_t));
             break;
         }
+        case DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE:
+        {
+            uint32_t rampRate = htole32(doubleToNvUFXP8_24(25.0));
+            data.resize(sizeof(uint32_t));
+            memcpy(data.data(), &rampRate, sizeof(uint32_t));
+            break;
+        }
+        case DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED:
+        {
+            data.resize(1);
+            data[0] = 1;
+            break;
+        }
+        case DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX:
+        {
+            data.resize(2);
+            data[0] = 2;
+            data[1] = 0x07;
+            break;
+        }
+        case DEVICE_MODE_SOC_POWER_BRAKE_ENABLED:
+        {
+            data.resize(1);
+            data[0] = 1;
+            break;
+        }
         default:
         {
             uint32_t defaultValue = htole32(0);
@@ -8074,7 +8103,7 @@ std::optional<std::vector<uint8_t>>
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
-            currentModeData.size() + pendingModeData.size() - 2,
+            currentModeData.size() + pendingModeData.size() - 1,
         0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
@@ -8117,13 +8146,46 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
+    uint16_t expectedLen = 0;
+    switch (deviceModeIndex)
+    {
+        case DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE:
+        case DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT:
+        case DEVICE_MODE_PERSISTENT_GPU_BASE_POWER_LIMIT:
+        case DEVICE_MODE_ONE_SHOT_CPU_POWER_LIMIT_GPU_COPY:
+        case DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY:
+            expectedLen = sizeof(uint32_t);
+            break;
+        case DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED:
+        case DEVICE_MODE_SOC_POWER_BRAKE_ENABLED:
+            expectedLen = sizeof(uint8_t);
+            break;
+        case DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX:
+            expectedLen = sizeof(uint8_t);
+            break;
+        default:
+            expectedLen = deviceModeDataLength;
+            break;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+
+    if (deviceModeDataLength != expectedLen)
+    {
+        lg2::error(
+            "setDeviceModeSettingsV2Handler: invalid data length={LEN} expected={EXP} for modeIndex={IDX}",
+            "LEN", deviceModeDataLength, "EXP", expectedLen, "IDX",
+            deviceModeIndex);
+        cc = NSM_ERR_INVALID_DATA_LENGTH;
+    }
+
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
                                   0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
 
-    rc = encode_set_device_mode_settings_v2_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    rc = encode_set_device_mode_settings_v2_resp(requestMsg->hdr.instance_id,
+                                                 cc, reason_code, responseMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_set_device_mode_settings_v2_resp failed: rc={RC}",

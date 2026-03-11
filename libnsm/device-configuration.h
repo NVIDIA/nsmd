@@ -48,6 +48,7 @@ enum device_configuration_command {
 	NSM_GET_DEVICE_MODE_SETTING = 0x81,
 	NSM_SET_DEVICE_MODE_SETTINGS_V2 = 0x82,
 	NSM_GET_DEVICE_MODE_SETTINGS_V2 = 0x83,
+	NSM_GET_SUPPORTED_DEVICE_MODES_V2 = 0x84,
 };
 
 enum protection_mode {
@@ -582,6 +583,10 @@ struct nsm_set_EGM_mode_req {
 enum nsm_l1_prediction_mode_config { DISABLED = 0, ENABLED = 1 };
 
 enum device_mode_index {
+	DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE = 7,
+	DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED = 8,
+	DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX = 9,
+	DEVICE_MODE_SOC_POWER_BRAKE_ENABLED = 10,
 	DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT = 11,
 	DEVICE_MODE_PERSISTENT_GPU_BASE_POWER_LIMIT = 12,
 	DEVICE_MODE_ONE_SHOT_CPU_POWER_LIMIT_GPU_COPY = 13,
@@ -646,6 +651,17 @@ struct nsm_set_device_mode_settings_v2_req {
 	struct nsm_common_req hdr;
 	uint32_t device_mode_index;
 	uint8_t device_mode_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_get_supported_device_modes_resp
+ *
+ *  Structure representing Get Supported Device Modes response.
+ */
+struct nsm_get_supported_device_modes_resp {
+	struct nsm_common_resp hdr;
+	uint16_t handle;
+	uint16_t mode_count;
+	uint32_t supported_mode_list[1];
 } __attribute__((packed));
 
 /** @brief Encode a Set Protection Options request message
@@ -1864,6 +1880,60 @@ int encode_set_device_mode_settings_v2_resp(uint8_t instance_id, uint8_t cc,
 int decode_set_device_mode_settings_v2_resp(const struct nsm_msg *msg,
 					    size_t msg_len, uint8_t *cc,
 					    uint16_t *reason_code);
+
+/** @brief Encode a Get Supported Device Modes request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_supported_device_modes_req(uint8_t instance_id,
+					  struct nsm_msg *msg);
+
+/** @brief Decode a Get Supported Device Modes request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_supported_device_modes_req(const struct nsm_msg *msg,
+					  size_t msg_len);
+
+/** @brief Encode a Get Supported Device Modes response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] handle - handle value
+ *  @param[in] mode_count - number of supported modes
+ *  @param[in] supported_mode_list - array of supported mode indices
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_supported_device_modes_resp(uint8_t instance_id, uint8_t cc,
+					   uint16_t reason_code,
+					   uint16_t handle,
+					   uint16_t mode_count,
+					   const uint32_t *supported_mode_list,
+					   struct nsm_msg *msg);
+
+/** @brief Decode a Get Supported Device Modes response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - pointer to reason code
+ *  @param[out] handle - pointer to handle value
+ *  @param[out] mode_count - pointer to number of supported modes
+ *  @param[out] supported_mode_list - array to store supported mode indices
+ *  @return nsm_completion_codes
+ */
+int decode_get_supported_device_modes_resp(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *cc,
+					   uint16_t *reason_code,
+					   uint16_t *handle,
+					   uint16_t *mode_count,
+					   uint32_t *supported_mode_list);
 
 #ifdef __cplusplus
 }

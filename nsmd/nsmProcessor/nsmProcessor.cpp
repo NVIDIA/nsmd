@@ -50,6 +50,7 @@
 #include "nsmSetCpuOperatingConfig.hpp"
 #include "nsmSetECCMode.hpp"
 #include "nsmSetEgmMode.hpp"
+#include "nsmSoCPowerSmoothing.hpp"
 #include "nsmWorkloadPowerProfile.hpp"
 
 #include <stdint.h>
@@ -3660,6 +3661,13 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 allCurrentIfaceProperties.at("PowerSmoothingSupported")))
         {
             createPowerSmoothing(nsmDevice, bus, name, type, inventoryObjPath);
+        }
+        if (allCurrentIfaceProperties.count("SoCPowerSmoothingSupported") &&
+            std::get<bool>(
+                allCurrentIfaceProperties.at("SoCPowerSmoothingSupported")))
+        {
+            createSoCPowerSmoothing(nsmDevice, bus, name, type,
+                                    inventoryObjPath, SoCDeviceType::GPU);
         }
         if (allCurrentIfaceProperties.count("CpuOperatingConfigSupported") &&
             std::get<bool>(

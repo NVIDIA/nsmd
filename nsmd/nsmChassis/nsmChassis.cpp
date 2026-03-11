@@ -30,6 +30,7 @@
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSupplyStatus.hpp"
 #include "nsmProcessor/nsmOemResetStatistics.hpp"
+#include "nsmProcessor/nsmSoCPowerSmoothing.hpp"
 #include "nsmWriteProtectedJumper.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 
@@ -440,6 +441,20 @@ void createChassisAttributes(std::shared_ptr<NsmDevice> device,
             allCurrentIfaceProperties.at("DeviceDiagnosticsSupported")))
     {
         createDeviceDiagnostics(device, name, uuid, bus);
+    }
+    if (allCurrentIfaceProperties.count("SoCPowerSmoothingSupported") &&
+        std::get<bool>(
+            allCurrentIfaceProperties.at("SoCPowerSmoothingSupported")))
+    {
+        if (device->getDeviceType() == NSM_DEV_ID_MCTP_BRIDGE &&
+            device->getDeviceRole() == NSM_MCTP_BRIDGE_DEV_ROLE_SXM_SMA)
+        {
+            std::string type = "NSM_Chassis";
+            std::string inventoryObjPath = chassisInventoryBasePath.string() +
+                                           "/" + name;
+            createSoCPowerSmoothing(device, bus, name, type, inventoryObjPath,
+                                    SoCDeviceType::MCU);
+        }
     }
 }
 

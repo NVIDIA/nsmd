@@ -26,6 +26,7 @@
 
 #include "base.h"
 #include "device-configuration.h"
+#include "platform-environmental.h"
 
 #include "cmd_helper.hpp"
 #include "utils.hpp"
@@ -1448,6 +1449,10 @@ class GetDeviceModeSettingsV2 : public CommandInterface
         getDeviceModeSettingsV2Group->add_option(
             "-i, --deviceModeIndex", deviceModeIndex,
             "Device mode index (NvU32)\n"
+            "  7 - Max AC Power Ramp Rate Config (NvUFXP8_24)\n"
+            "  8 - SoC Power Smoothing Enabled (NvBool)\n"
+            "  9 - SoC Power Smoothing Preset Index (NvU8)\n"
+            " 10 - SoC Power Brake Enabled (NvBool)\n"
             " 11 - One Shot GPU Base Power Limit\n"
             " 12 - Persistent GPU Base Power Limit\n"
             " 13 - One Shot CPU Power Limit GPU Copy\n"
@@ -1498,7 +1503,15 @@ class GetDeviceModeSettingsV2 : public CommandInterface
         {
             uint32_t currentValue;
             memcpy(&currentValue, currentModeData, sizeof(uint32_t));
-            result["Current Mode Value"] = le32toh(currentValue);
+            currentValue = le32toh(currentValue);
+            if (deviceModeIndex == DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE)
+            {
+                result["Current Mode Value"] = NvUFXP8_24ToDouble(currentValue);
+            }
+            else
+            {
+                result["Current Mode Value"] = currentValue;
+            }
         }
         else if (currentModeLength > 0)
         {
@@ -1512,7 +1525,15 @@ class GetDeviceModeSettingsV2 : public CommandInterface
         {
             uint32_t pendingValue;
             memcpy(&pendingValue, pendingModeData, sizeof(uint32_t));
-            result["Pending Mode Value"] = le32toh(pendingValue);
+            pendingValue = le32toh(pendingValue);
+            if (deviceModeIndex == DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE)
+            {
+                result["Pending Mode Value"] = NvUFXP8_24ToDouble(pendingValue);
+            }
+            else
+            {
+                result["Pending Mode Value"] = pendingValue;
+            }
         }
         else if (pendingModeLength > 0)
         {
@@ -1549,27 +1570,62 @@ class SetDeviceModeSettingsV2 : public CommandInterface
         setDeviceModeSettingsV2Group->add_option(
             "-i, --deviceModeIndex", deviceModeIndex,
             "Device mode index (NvU32)\n"
+            "  7 - Max AC Power Ramp Rate Config (NvUFXP8_24)\n"
+            "  8 - SoC Power Smoothing Enabled (NvBool)\n"
+            "  9 - SoC Power Smoothing Preset Index (NvU8)\n"
+            " 10 - SoC Power Brake Enabled (NvBool)\n"
             " 11 - One Shot GPU Base Power Limit\n"
             " 12 - Persistent GPU Base Power Limit\n"
             " 13 - One Shot CPU Power Limit GPU Copy\n"
             " 14 - Persistent CPU Power Limit GPU Copy");
-        setDeviceModeSettingsV2Group->add_option("-l, --value", deviceModeValue,
-                                                 "Device mode value (NvU32)");
+        setDeviceModeSettingsV2Group->add_option(
+            "-l, --value", deviceModeValue,
+            "Device mode value\n"
+            "  index  7 - double (NvUFXP8_24, e.g. 25.0)\n"
+            "  others - uint32");
         setDeviceModeSettingsV2Group->require_option(2);
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
-        uint32_t deviceModeValueLE = htole32(deviceModeValue);
+        uint8_t payload[sizeof(uint32_t)] = {0};
+        uint16_t payloadLen = 0;
+
+        switch (deviceModeIndex)
+        {
+            case DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED:
+            case DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX:
+            case DEVICE_MODE_SOC_POWER_BRAKE_ENABLED:
+            {
+                payload[0] = static_cast<uint8_t>(
+                    static_cast<uint32_t>(deviceModeValue));
+                payloadLen = sizeof(uint8_t);
+                break;
+            }
+            case DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE:
+            {
+                uint32_t valueLE = htole32(doubleToNvUFXP8_24(deviceModeValue));
+                memcpy(payload, &valueLE, sizeof(uint32_t));
+                payloadLen = sizeof(uint32_t);
+                break;
+            }
+            default:
+            {
+                uint32_t valueLE =
+                    htole32(static_cast<uint32_t>(deviceModeValue));
+                memcpy(payload, &valueLE, sizeof(uint32_t));
+                payloadLen = sizeof(uint32_t);
+                break;
+            }
+        }
+
         std::vector<uint8_t> requestMsg(
             sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
-                sizeof(uint32_t) - 1,
+                payloadLen - 1,
             0);
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
         auto rc = encode_set_device_mode_settings_v2_req(
-            instanceId, deviceModeIndex,
-            reinterpret_cast<const uint8_t*>(&deviceModeValueLE),
-            sizeof(uint32_t), request);
+            instanceId, deviceModeIndex, payload, payloadLen, request);
         return {rc, requestMsg};
     }
 
@@ -1597,7 +1653,7 @@ class SetDeviceModeSettingsV2 : public CommandInterface
 
   private:
     uint32_t deviceModeIndex = 0;
-    uint32_t deviceModeValue = 0;
+    double deviceModeValue = 0;
 };
 
 void registerCommand(CLI::App& app)
