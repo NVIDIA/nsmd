@@ -149,12 +149,16 @@ enum nsm_rot_inband_update_policy {
 	NSM_ROT_INBAND_UPDATE_POLICY_ENABLE = 1,
 };
 
+#define NSM_ROT_INBAND_UPDATE_POLICY_ARGUMENT_LENGTH 2
+
 /** @brief NSM Image Copy Control types
  */
 enum nsm_image_copy_control_types {
 	NSM_IMAGE_COPY_QUERY_PROGRESS = 0,
 	NSM_IMAGE_COPY_INITIATE_IMAGE_COPY = 1,
 };
+
+#define NSM_ROT_IMAGE_COPY_POLICY_ARGUMENT_LENGTH 2
 
 /** @brief NSM EFUSE update method
  */
@@ -1576,6 +1580,27 @@ int decode_nsm_firmware_update_sec_ver_resp(
 int encode_nsm_firmware_set_rot_property_req(
     uint8_t instance_id, const struct nsm_firmware_set_rot_property_req *fw_req,
     struct nsm_msg *msg);
+
+/**
+ * @brief Encode nsm firmware set rot property req with explicit parameters
+ *
+ * Helper that populates a nsm_firmware_set_rot_property_req from individual
+ * parameters and delegates to encode_nsm_firmware_set_rot_property_req.
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] classification - component classification
+ * @param[in] identifier - component identifier
+ * @param[in] index - component classification index
+ * @param[in] property - RoT property identifier
+ * @param[in] argument_data - argument data bytes
+ * @param[in] argument_length - number of valid bytes in argument_data
+ * @param[out] msg - nsm message
+ * @return int
+ */
+int encode_nsm_firmware_set_rot_property_req_by_params(
+    uint8_t instance_id, uint16_t classification, uint16_t identifier,
+    uint8_t index, uint8_t property, const uint8_t *argument_data,
+    uint8_t argument_length, struct nsm_msg *msg);
 
 /**
  * @brief Decode nsm firmware set rot property resp

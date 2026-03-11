@@ -197,17 +197,13 @@ requester::Coroutine InbandUpdatePolicyHandler::updateInbandUpdatePolicy(
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_firmware_set_rot_property_req_command));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
-    struct ::nsm_firmware_set_rot_property_req nsm_req = {};
 
-    nsm_req.component_classification = classification;
-    nsm_req.component_classification_index = index;
-    nsm_req.component_identifier = identifier;
-    nsm_req.property = NSM_ROT_PROPERTY_INBAND_UPDATE_POLICY;
-    nsm_req.argument_data[0] = policyValue;
-    nsm_req.argument_data[1] = NSM_ROT_INBAND_UPDATE_POLICY_LIFESPAN_PERSISTENT;
-    nsm_req.argument_length = 2;
-
-    auto rc = encode_nsm_firmware_set_rot_property_req(0, &nsm_req, requestMsg);
+    uint8_t argumentData[] = {policyValue,
+                              NSM_ROT_INBAND_UPDATE_POLICY_LIFESPAN_PERSISTENT};
+    auto rc = encode_nsm_firmware_set_rot_property_req_by_params(
+        0, classification, identifier, index,
+        NSM_ROT_PROPERTY_INBAND_UPDATE_POLICY, argumentData,
+        NSM_ROT_INBAND_UPDATE_POLICY_ARGUMENT_LENGTH, requestMsg);
     if (shouldLog("encode_nsm_firmware_set_rot_property_req", uint16_t(0),
                   uint8_t(0), rc))
     {
@@ -417,16 +413,12 @@ requester::Coroutine FailoverPolicyHandler::updateFailoverPolicy(
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_firmware_set_rot_property_req_command));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
-    struct ::nsm_firmware_set_rot_property_req nsm_req = {};
 
-    nsm_req.component_classification = classification;
-    nsm_req.component_classification_index = index;
-    nsm_req.component_identifier = identifier;
-    nsm_req.property = NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY;
-    nsm_req.argument_length = 1;
-    nsm_req.argument_data[0] = policyValue;
-
-    auto rc = encode_nsm_firmware_set_rot_property_req(0, &nsm_req, requestMsg);
+    uint8_t argumentData[] = {policyValue};
+    auto rc = encode_nsm_firmware_set_rot_property_req_by_params(
+        0, classification, identifier, index,
+        NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY, argumentData,
+        NSM_ROT_GLOBAL_FAILOVER_POLICY_ARGUMENT_LENGTH, requestMsg);
     if (shouldLog("encode_nsm_firmware_set_rot_property_req", uint16_t(0),
                   uint8_t(0), rc))
     {
@@ -1004,17 +996,13 @@ requester::Coroutine ImageCopyPolicyHandler::updateImageCopyPolicy(
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_firmware_set_rot_property_req_command));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
-    struct ::nsm_firmware_set_rot_property_req nsm_req = {};
 
-    nsm_req.component_classification = htole16(classification);
-    nsm_req.component_classification_index = index;
-    nsm_req.component_identifier = htole16(identifier);
-    nsm_req.property = NSM_ROT_PROPERTY_REDUNDANCY_POLICY;
-    nsm_req.argument_data[0] = policyValue;
-    nsm_req.argument_data[1] = NSM_ROT_REDUNDANCY_POLICY_LIFESPAN_PERSISTENT;
-    nsm_req.argument_length = 2;
-
-    auto rc = encode_nsm_firmware_set_rot_property_req(0, &nsm_req, requestMsg);
+    uint8_t argumentData[] = {policyValue,
+                              NSM_ROT_REDUNDANCY_POLICY_LIFESPAN_PERSISTENT};
+    auto rc = encode_nsm_firmware_set_rot_property_req_by_params(
+        0, classification, identifier, index,
+        NSM_ROT_PROPERTY_REDUNDANCY_POLICY, argumentData,
+        NSM_ROT_IMAGE_COPY_POLICY_ARGUMENT_LENGTH, requestMsg);
     if (shouldLog("encode_nsm_firmware_set_rot_property_req", uint16_t(0),
                   uint8_t(0), rc))
     {

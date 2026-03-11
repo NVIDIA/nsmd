@@ -1799,6 +1799,32 @@ int encode_nsm_firmware_set_rot_property_req(
 	return NSM_SW_SUCCESS;
 }
 
+int encode_nsm_firmware_set_rot_property_req_by_params(
+    uint8_t instance_id, uint16_t classification, uint16_t identifier,
+    uint8_t index, uint8_t property, const uint8_t *argument_data,
+    uint8_t argument_length, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (argument_data == NULL || argument_length == 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	struct nsm_firmware_set_rot_property_req req = {0};
+	if (argument_length > sizeof(req.argument_data)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	req.component_classification = classification;
+	req.component_identifier = identifier;
+	req.component_classification_index = index;
+	req.property = property;
+	req.argument_length = argument_length;
+	memcpy(req.argument_data, argument_data, argument_length);
+	return encode_nsm_firmware_set_rot_property_req(instance_id, &req, msg);
+}
+
 int decode_nsm_firmware_set_rot_property_resp(const struct nsm_msg *msg,
 					      size_t msg_len, uint8_t *cc,
 					      uint16_t *reason_code)
