@@ -17,6 +17,7 @@
 
 #include "nsmChassis.hpp"
 
+#include "../../common/nsmPropertySupport.hpp"
 #include "../../common/utils.hpp"
 #include "nsmApSkuId.hpp"
 #include "nsmCommon.hpp"
@@ -33,13 +34,40 @@
 #include "requester/mctp_endpoint_discovery.hpp"
 
 #include <unordered_map>
+#include <unordered_set>
 
 namespace nsm
 {
 
-static void createAsset(std::shared_ptr<NsmDevice> device,
-                        const std::string& name,
-                        const dbus::PropertyMap& allCurrentIfaceProperties)
+static void markAssetPropertiesNotSupported(
+    NsmChassis<NsmAssetIntf>& asset,
+    const std::unordered_set<nsm_inventory_property_identifiers>& props)
+{
+    const std::string val(propertyNotSupported);
+    for (const auto& p : props)
+    {
+        switch (p)
+        {
+            case FRU_PART_NUMBER:
+                asset.invoke(pdiMethod(partNumber), val);
+                break;
+            case SERIAL_NUMBER:
+                asset.invoke(pdiMethod(serialNumber), val);
+                break;
+            case MARKETING_NAME:
+                asset.invoke(pdiMethod(model), val);
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+static void
+    createAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
+                const dbus::PropertyMap& allCurrentIfaceProperties,
+                const std::unordered_set<nsm_inventory_property_identifiers>&
+                    unsupported = {})
 {
     auto chassisAsset = std::make_shared<NsmChassis<NsmAssetIntf>>(name);
     std::string manufacturer = MANUFACTURER_NVIDIA;
@@ -50,16 +78,29 @@ static void createAsset(std::shared_ptr<NsmDevice> device,
     }
 
     chassisAsset->invoke(pdiMethod(manufacturer), manufacturer);
-    // create sensor
-    auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-        *chassisAsset, FRU_PART_NUMBER);
-    auto serialNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-        *chassisAsset, SERIAL_NUMBER);
-    auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-        *chassisAsset, MARKETING_NAME);
-    device->addStaticSensor(partNumber);
-    device->addStaticSensor(serialNumber);
-    device->addStaticSensor(model);
+
+    markAssetPropertiesNotSupported(*chassisAsset, unsupported);
+
+    static const std::vector<nsm_inventory_property_identifiers>
+        assetSensorProps = {FRU_PART_NUMBER, SERIAL_NUMBER, MARKETING_NAME};
+
+    bool anySensorAdded = false;
+    for (const auto& nsmProp : assetSensorProps)
+    {
+        if (unsupported.count(nsmProp))
+        {
+            continue;
+        }
+        device->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(*chassisAsset,
+                                                                 nsmProp));
+        anySensorAdded = true;
+    }
+
+    if (!anySensorAdded)
+    {
+        device->addStaticSensor(chassisAsset);
+    }
 }
 
 static void createSKU(std::shared_ptr<NsmDevice> device,
@@ -339,7 +380,9 @@ static void
         std::get<bool>(
             allCurrentIfaceProperties.at("AssetInformationAvailable")))
     {
-        createAsset(device, name, allCurrentIfaceProperties);
+        auto unsupported = getUnsupportedAssetProperties(
+            device->getDeviceType(), device->getDeviceRole());
+        createAsset(device, name, allCurrentIfaceProperties, unsupported);
     }
     createSKU(device, name);
     // Handle Location and LocationCode from ChassisAttributes
