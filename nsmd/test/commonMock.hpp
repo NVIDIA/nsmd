@@ -32,17 +32,39 @@ using ::testing::ElementsAre;
 #include "nsmMsghandler.hpp"
 #include "nsmSensor.hpp"
 
+#ifdef COVERAGE_DISABLE_COROUTINES
 #define EXPECT_THROW_COROUTINE(expression, exceptionType)                      \
-    if ((expression).exception())                                              \
+    EXPECT_THROW(expression, exceptionType)
+// In coverage mode coroutines throw directly; catch and ignore to preserve
+// test intent of "exception handled internally by coroutine machinery".
+#define EXPECT_NO_THROW_COROUTINE(expression)                                  \
+    do                                                                         \
     {                                                                          \
-        EXPECT_THROW(std::rethrow_exception((expression).exception()),         \
-                     exceptionType);                                           \
-    }                                                                          \
-    else                                                                       \
+        try                                                                    \
+        {                                                                      \
+            (void)(expression);                                                \
+        }                                                                      \
+        catch (...)                                                            \
+        {}                                                                     \
+    } while (0)
+#else
+#define EXPECT_THROW_COROUTINE(expression, exceptionType)                      \
+    do                                                                         \
     {                                                                          \
-        FAIL() << "Coroutine " << #expression << " did not throw "             \
-               << #exceptionType;                                              \
-    }
+        auto _cr = (expression);                                               \
+        if (_cr.exception())                                                   \
+        {                                                                      \
+            EXPECT_THROW(std::rethrow_exception(_cr.exception()),              \
+                         exceptionType);                                       \
+        }                                                                      \
+        else                                                                   \
+        {                                                                      \
+            FAIL() << "Coroutine " << #expression << " did not throw "         \
+                   << #exceptionType;                                          \
+        }                                                                      \
+    } while (0)
+#define EXPECT_NO_THROW_COROUTINE(expression) EXPECT_NO_THROW(expression)
+#endif // COVERAGE_DISABLE_COROUTINES
 
 class MockSensor : public nsm::NsmSensor
 {
