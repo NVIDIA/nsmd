@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "test/commonMock.hpp"
 #include "test/mockDBusHandler.hpp"
 #include "test/mockSensorManager.hpp"
 using namespace ::testing;
@@ -1606,18 +1607,22 @@ struct NsmChassisPCIeDeviceUpdateTest :
     }
 };
 
+// These tests verify that update() runs without throwing for non-UuidIntf
+// template specializations. The implementation simply co_returns NSM_SUCCESS
+// for these types, so no observable side-effects can be asserted beyond the
+// absence of a crash or exception.
 TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateNsmAssetIntf)
 {
     auto sensor = std::make_shared<NsmChassisPCIeDevice<NsmAssetIntf>>(
         chassisName, sensorName);
-    sensor->update(gpu);
+    EXPECT_NO_THROW_COROUTINE(sensor->update(gpu));
 }
 
 TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateHealthIntf)
 {
     auto sensor = std::make_shared<NsmChassisPCIeDevice<HealthIntf>>(
         chassisName, sensorName);
-    sensor->update(gpu);
+    EXPECT_NO_THROW_COROUTINE(sensor->update(gpu));
 }
 
 TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateAssociationDefinitionsIntf)
@@ -1625,14 +1630,14 @@ TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateAssociationDefinitionsIntf)
     auto sensor =
         std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsIntf>>(
             chassisName, sensorName);
-    sensor->update(gpu);
+    EXPECT_NO_THROW_COROUTINE(sensor->update(gpu));
 }
 
 TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdatePCIeDeviceIntf)
 {
     auto sensor = std::make_shared<NsmChassisPCIeDevice<PCIeDeviceIntf>>(
         chassisName, sensorName);
-    sensor->update(gpu);
+    EXPECT_NO_THROW_COROUTINE(sensor->update(gpu));
 }
 
 #if defined(ENABLE_CLOCK_OUTPUT_STATE)
@@ -1640,14 +1645,14 @@ TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdatePCIeRefClockIntf)
 {
     auto sensor = std::make_shared<NsmChassisPCIeDevice<PCIeRefClockIntf>>(
         chassisName, sensorName);
-    sensor->update(gpu);
+    EXPECT_NO_THROW_COROUTINE(sensor->update(gpu));
 }
 
 TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateNVLinkRefClockIntf)
 {
     auto sensor = std::make_shared<NsmChassisPCIeDevice<NVLinkRefClockIntf>>(
         chassisName, sensorName);
-    sensor->update(gpu);
+    EXPECT_NO_THROW_COROUTINE(sensor->update(gpu));
 }
 #endif
 
@@ -1656,6 +1661,6 @@ TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateLTSSMStateIntf)
 {
     auto sensor = std::make_shared<NsmChassisPCIeDevice<LTSSMStateIntf>>(
         chassisName, sensorName);
-    sensor->update(gpu);
+    EXPECT_NO_THROW_COROUTINE(sensor->update(gpu));
 }
 #endif

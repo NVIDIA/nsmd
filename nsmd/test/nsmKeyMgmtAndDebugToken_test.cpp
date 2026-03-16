@@ -461,12 +461,13 @@ TEST_F(NsmReconfigPermissionsFixture,
                                   ReconfigSettingsIntf::FeatureType::FusingMode,
                                   hostConfigIntf, doeConfigIntf);
 
-    // Build a valid-sized response with error CC (Valgrind-safe:
-    // buffer is fully allocated, decode returns early on error CC)
+    // Buffer sized for a full success response (Valgrind-safe); the handler
+    // checks completion_code before reading any data fields, so the oversized
+    // buffer does not affect the error-path behaviour being tested here.
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
     auto msg = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    auto* resp = reinterpret_cast<nsm_common_resp*>(msg->payload);
+    auto* resp = reinterpret_cast<nsm_common_non_success_resp*>(msg->payload);
     resp->completion_code = NSM_ERROR;
 
     // Act
@@ -655,12 +656,13 @@ TEST_F(NsmKeyMgmtFixture, HandleResponseMsg_ErrorCC_ReturnsNonSuccess)
     NsmKeyMgmt keyMgmt(testBus, chassisName, testSensorType, testUuid,
                        progressIntf, compClass, compId, compClassIdx);
 
-    // Build valid-sized response with error CC (Valgrind-safe:
-    // decode returns early on error CC without reading data fields)
+    // Buffer sized for a full success response (Valgrind-safe); the handler
+    // checks completion_code before reading any data fields, so the oversized
+    // buffer does not affect the error-path behaviour being tested here.
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
     auto msg = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    auto* resp = reinterpret_cast<nsm_common_resp*>(msg->payload);
+    auto* resp = reinterpret_cast<nsm_common_non_success_resp*>(msg->payload);
     resp->completion_code = NSM_ERROR;
 
     // Act

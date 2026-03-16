@@ -2064,8 +2064,8 @@ TEST_F(NsmSwitchDIPowerModePatchTest,
     auto rc = encode_set_power_mode_resp(0, ERR_NULL, respMsg);
     ASSERT_EQ(rc, NSM_SW_SUCCESS);
     // Override the cc byte in the response to be NSM_ERROR
-    auto* commonResp = reinterpret_cast<nsm_common_resp*>(respData.data() +
-                                                          sizeof(nsm_msg_hdr));
+    auto* commonResp = reinterpret_cast<nsm_common_non_success_resp*>(
+        respData.data() + sizeof(nsm_msg_hdr));
     commonResp->completion_code = NSM_ERROR;
 
     EXPECT_CALL(*nvswitch, postPatchIO(_, _, _, _))

@@ -511,7 +511,8 @@ TEST_F(NsmSwitchDIPowerModeUpdateTest,
     // Encode a success first then corrupt the CC
     encode_set_power_mode_resp(0, ERR_NULL, responseMsg);
     // Set completion code to error
-    auto* payload = reinterpret_cast<nsm_common_resp*>(responseMsg->payload);
+    auto* payload =
+        reinterpret_cast<nsm_common_non_success_resp*>(responseMsg->payload);
     payload->completion_code = NSM_ERROR;
 
     EXPECT_CALL(*nvswitch, postPatchIO(_, _, _, _))

@@ -648,17 +648,28 @@ TEST_F(NsmWorkLoadProfileStatusTest, UpdateReading_ValidData_UpdatesProperties)
 {
     // Arrange
     struct workload_power_profile_status data = {};
-    data.supported_profile_mask = {};
-    data.requested_profile_maks = {};
-    data.enforced_profile_mask = {};
-    // Set a specific bit to verify it gets passed through
-    data.supported_profile_mask.fields[0].byte = 0x03; // bits 0 and 1
+    data.supported_profile_mask.fields[0].byte = 0x03;
+    data.requested_profile_maks.fields[0].byte = 0x0A;
+    data.enforced_profile_mask.fields[0].byte = 0x05;
 
     // Act
     sensor->updateReading(&data);
 
-    // Assert - no crash; internally calls ProfileInfoIntf methods
-    SUCCEED();
+    // Assert - verify ProfileInfoIntf properties were updated
+    // bitfield256_tToBitArray stores fields[i].byte big-endian in
+    // bitmap[i*4..i*4+3] so fields[0].byte=0x03 → bitmap[3]=0x03
+    auto supportedMask =
+        profileStatusInfo->ProfileInfoIntf::supportedProfileMask();
+    auto requestedMask =
+        profileStatusInfo->ProfileInfoIntf::requestedProfileMask();
+    auto enforcedMask =
+        profileStatusInfo->ProfileInfoIntf::enforcedProfileMask();
+    ASSERT_EQ(supportedMask.size(), 32u);
+    ASSERT_EQ(requestedMask.size(), 32u);
+    ASSERT_EQ(enforcedMask.size(), 32u);
+    EXPECT_EQ(supportedMask[3], 0x03);
+    EXPECT_EQ(requestedMask[3], 0x0A);
+    EXPECT_EQ(enforcedMask[3], 0x05);
 }
 
 TEST_F(NsmWorkLoadProfileStatusTest, UpdateReading_AllZeros_NoErrors)
@@ -669,8 +680,12 @@ TEST_F(NsmWorkLoadProfileStatusTest, UpdateReading_AllZeros_NoErrors)
     // Act
     sensor->updateReading(&data);
 
-    // Assert
-    SUCCEED();
+    // Assert - all-zero input produces zero mask
+    auto supportedMask =
+        profileStatusInfo->ProfileInfoIntf::supportedProfileMask();
+    ASSERT_EQ(supportedMask.size(), 32u);
+    EXPECT_EQ(supportedMask[0], 0x00);
+    EXPECT_EQ(supportedMask[3], 0x00);
 }
 
 TEST_F(NsmWorkLoadProfileStatusTest, UpdateReading_AllOnes_NoErrors)
@@ -682,8 +697,12 @@ TEST_F(NsmWorkLoadProfileStatusTest, UpdateReading_AllOnes_NoErrors)
     // Act
     sensor->updateReading(&data);
 
-    // Assert
-    SUCCEED();
+    // Assert - all-ones input produces 0xFF in every mask byte
+    auto supportedMask =
+        profileStatusInfo->ProfileInfoIntf::supportedProfileMask();
+    ASSERT_EQ(supportedMask.size(), 32u);
+    EXPECT_EQ(supportedMask[0], 0xFF);
+    EXPECT_EQ(supportedMask[3], 0xFF);
 }
 
 // ---------------------------------------------------------------------------
