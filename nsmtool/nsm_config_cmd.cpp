@@ -315,8 +315,8 @@ class SetErrorInjectionPayload : public CommandInterface
 
   private:
     std::vector<uint8_t> rawData;
-    uint16_t errorInjectionType;
-    uint16_t errorInjectionSubtype;
+    uint16_t errorInjectionType{};
+    uint16_t errorInjectionSubtype{};
 };
 
 class GetErrorInjectionPayload : public CommandInterface
@@ -405,8 +405,8 @@ class GetErrorInjectionPayload : public CommandInterface
     }
 
   private:
-    uint16_t errorInjectionType;
-    uint16_t errorInjectionSubtype;
+    uint16_t errorInjectionType{};
+    uint16_t errorInjectionSubtype{};
 };
 
 class ActivateErrorInjectionPayload : public CommandInterface
@@ -481,8 +481,8 @@ class ActivateErrorInjectionPayload : public CommandInterface
     }
 
   private:
-    uint16_t errorInjectionType;
-    uint16_t errorInjectionSubtype;
+    uint16_t errorInjectionType{};
+    uint16_t errorInjectionSubtype{};
 };
 
 class SetCurrentErrorInjectionTypesV1 : public CommandInterface

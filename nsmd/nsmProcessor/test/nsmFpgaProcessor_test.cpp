@@ -20,8 +20,13 @@
 using namespace ::testing;
 
 #include "nsmFpgaProcessor.hpp"
+#include "nsmGpuOperationalStatus.hpp"
+#include "nsmNumericSensor/nsmAltitudePressure.hpp"
+#include "nsmNumericSensor/nsmThreshold.hpp"
 
 #include <sdbusplus/bus.hpp>
+
+#include <limits>
 
 #include <gtest/gtest.h>
 
@@ -297,4 +302,43 @@ TEST_F(NsmFpgaProcessorFactoryTest, CreateNsmFpgaProcessorSensorInvalidUUID)
 
     // Should have only the automatic first sensor
     EXPECT_EQ(1, fpga->deviceSensors.size());
+}
+
+// ============================================================================
+// addSensor<T> instantiation coverage
+// ============================================================================
+
+TEST_F(NsmFpgaProcessorFactoryTest, AddSensorNsmGpuOperationalStatus)
+{
+    auto& dbus = utils::DBusHandler::getBus();
+    std::string invPath = "/xyz/openbmc_project/inventory/test/gpu_op_status";
+    auto sensor = std::make_shared<NsmGpuOperationalStatus>(
+        dbus, "GpuOpStatus_AS", "NSM_Processor", invPath);
+    size_t before = fpga->deviceSensors.size();
+    fpga->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(fpga->deviceSensors.size(), before);
+}
+
+TEST_F(NsmFpgaProcessorFactoryTest, AddSensorNsmThreshold)
+{
+    auto sensorValue = std::make_shared<NsmNumericSensorValueAggregate>();
+    auto sensor = std::make_shared<NsmThreshold>(
+        "Threshold_AS", "NSM_Threshold", uint8_t(1), sensorValue);
+    size_t before = fpga->deviceSensors.size();
+    fpga->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(fpga->deviceSensors.size(), before);
+}
+
+TEST_F(NsmFpgaProcessorFactoryTest, AddSensorNsmAltitudePressure)
+{
+    auto& dbus = utils::DBusHandler::getBus();
+    std::vector<utils::Association> associations;
+    std::string physicalContext = "GPU";
+    auto sensor = std::make_shared<NsmAltitudePressure>(
+        dbus, "AltitudePressure_AS", "altitude", associations, physicalContext,
+        nullptr, 1000.0, std::numeric_limits<double>::quiet_NaN(),
+        std::numeric_limits<double>::quiet_NaN());
+    size_t before = fpga->deviceSensors.size();
+    fpga->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(fpga->deviceSensors.size(), before);
 }

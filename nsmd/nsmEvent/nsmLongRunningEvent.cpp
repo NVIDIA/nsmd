@@ -41,7 +41,7 @@ bool NsmLongRunningEvent::initAcceptInstanceId(uint8_t instanceId, uint8_t cc,
 int NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
                                        size_t eventLen)
 {
-    uint8_t instanceId;
+    uint8_t instanceId = 0xFF;
     auto rc = decode_long_running_event(event, eventLen, &instanceId, nullptr,
                                         nullptr);
 

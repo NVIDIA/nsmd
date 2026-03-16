@@ -24,3 +24,24 @@ foreach t : tests
         workdir: meson.current_source_dir(),
     )
 endforeach
+
+# parseResponseMsg / createRequestMsg tests — use #include trick to access
+# anonymous-namespace `commands` vector. The .cpp under test is included
+# directly by the test file, so only shared helpers go in sources here.
+parse_test_common_sources = [
+    '../cmd_helper.cpp',
+    '../../libnsm/requester/mctp.c',
+]
+
+test(
+    'nsm_diag_cmd_parse_test',
+    executable(
+        'nsm_diag_cmd_parse_test',
+        ['nsm_diag_cmd_parse_test.cpp'] + parse_test_common_sources,
+        implicit_include_directories: false,
+        include_directories: ['.', '..'],
+        link_args: dynamic_linker,
+        dependencies: tests_deps,
+    ),
+    workdir: meson.current_source_dir(),
+)

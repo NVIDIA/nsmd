@@ -1,6 +1,11 @@
 # common tests now use nsmd_test
 
-tests = ['common_utils_test', 'coroutineSemaphore_test', 'timer_test']
+tests = [
+    'common_utils_test',
+    'common_utils_coroutine_test',
+    'coroutineSemaphore_test',
+    'timer_test',
+]
 
 foreach t : tests
     test(

@@ -30,6 +30,7 @@
 
 #include "nsmAltitudePressure.hpp"
 #include "nsmEnergy.hpp"
+#include "nsmNumericSensorComposite.hpp"
 #include "nsmNumericSensorValue_mock.hpp"
 #include "nsmPeakPower.hpp"
 #include "nsmPower.hpp"
@@ -719,4 +720,182 @@ TEST(nsmThreshold, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     cc = sensor.handleResponseMsg(msg, msg_size);
     EXPECT_EQ(cc, NSM_ERR_NOT_READY);
+}
+
+// =============================================================================
+// NsmNumericSensorComposite Tests
+// =============================================================================
+
+static auto& compositeBus = utils::DBusHandler::getBus();
+static const std::string
+    compositePath("/xyz/openbmc_project/sensors/power/composite_test");
+static const std::string compositePhysicalContext("GPU");
+static const std::string compositeImplementation("PhysicalSensor");
+
+TEST(NsmNumericSensorComposite, Constructor_CreatesObject)
+{
+    std::string name = "composite_power";
+    std::string type = "NSM_Power";
+    std::vector<utils::Association> associations = {
+        {"chassis", "all_sensors",
+         "/xyz/openbmc_project/inventory/dummy_device"}};
+
+    nsm::NsmNumericSensorComposite sensor(
+        compositeBus, name, associations, type, compositePath,
+        compositePhysicalContext, compositeImplementation
+#ifdef NVIDIA_SHMEM
+        ,
+        nullptr
+#endif
+    );
+    EXPECT_EQ(sensor.getName(), name);
+    EXPECT_EQ(sensor.getType(), type);
+}
+
+TEST(NsmNumericSensorComposite, UpdateCompositeReading_SingleChild_SetsValue)
+{
+    std::string name = "composite_power2";
+    std::string type = "NSM_Power";
+    std::string path = "/xyz/openbmc_project/sensors/power/composite_test2";
+    std::vector<utils::Association> associations = {
+        {"chassis", "all_sensors",
+         "/xyz/openbmc_project/inventory/dummy_device"}};
+
+    nsm::NsmNumericSensorComposite sensor(compositeBus, name, associations,
+                                          type, path, compositePhysicalContext,
+                                          compositeImplementation
+#ifdef NVIDIA_SHMEM
+                                          ,
+                                          nullptr
+#endif
+    );
+    // Update with a single child value
+    sensor.updateCompositeReading("child1", 100.0);
+}
+
+TEST(NsmNumericSensorComposite,
+     UpdateCompositeReading_MultipleChildren_UpdatesAll)
+{
+    std::string name = "composite_power3";
+    std::string type = "NSM_Power";
+    std::string path = "/xyz/openbmc_project/sensors/power/composite_test3";
+    std::vector<utils::Association> associations;
+
+    nsm::NsmNumericSensorComposite sensor(compositeBus, name, associations,
+                                          type, path, compositePhysicalContext,
+                                          compositeImplementation
+#ifdef NVIDIA_SHMEM
+                                          ,
+                                          nullptr
+#endif
+    );
+    // Update multiple children
+    sensor.updateCompositeReading("child1", 50.0);
+    sensor.updateCompositeReading("child2", 75.0);
+    sensor.updateCompositeReading("child1", 60.0); // Update existing child
+}
+
+// =============================================================================
+// getSensorType() tests — covers inline virtual override in each hpp
+// =============================================================================
+
+TEST(nsmTemp, GetSensorType)
+{
+    nsm::NsmTemp sensor{bus,
+                        sensorName,
+                        sensorType,
+                        1,
+                        associations,
+                        associations[0].absolutePath,
+                        physicalContexnt,
+                        nullptr,
+                        maxAllowableValue,
+                        maxValue,
+                        minValue,
+                        &readingBasis,
+                        &description};
+    EXPECT_EQ(sensor.getSensorType(), "temperature");
+}
+
+TEST(nsmPower, GetSensorType)
+{
+    nsm::NsmPower sensor{bus,
+                         sensorName,
+                         sensorType,
+                         1,
+                         1,
+                         associations,
+                         associations[0].absolutePath,
+                         physicalContexnt,
+                         nullptr,
+                         maxAllowableValue,
+                         maxValue,
+                         minValue,
+                         &readingBasis,
+                         &description};
+    EXPECT_EQ(sensor.getSensorType(), "power");
+}
+
+TEST(nsmPeakPower, GetSensorType)
+{
+    nsm::NsmPeakPower sensor{bus, sensorName, sensorType, 1, 1};
+    EXPECT_EQ(sensor.getSensorType(), "peak_power");
+}
+
+TEST(nsmEnergy, GetSensorType)
+{
+    nsm::NsmEnergy sensor{bus,
+                          sensorName,
+                          sensorType,
+                          1,
+                          associations,
+                          associations[0].absolutePath,
+                          physicalContexnt,
+                          nullptr,
+                          maxAllowableValue,
+                          maxValue,
+                          minValue,
+                          &readingBasis,
+                          &description};
+    EXPECT_EQ(sensor.getSensorType(), "energy");
+}
+
+TEST(nsmVoltage, GetSensorType)
+{
+    nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
+                           1,        associations,      physicalContexnt,
+                           nullptr,  maxAllowableValue, maxValue,
+                           minValue, &readingBasis,     &description};
+    EXPECT_EQ(sensor.getSensorType(), "voltage");
+}
+
+TEST(nsmAltitudePressure, GetSensorType)
+{
+    nsm::NsmAltitudePressure sensor{
+        bus,     sensorName,        sensorType, associations, physicalContexnt,
+        nullptr, maxAllowableValue, maxValue,   minValue};
+    EXPECT_EQ(sensor.getSensorType(), "altitude");
+}
+
+TEST(nsmThreshold, GetSensorType)
+{
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
+    nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
+    EXPECT_EQ(sensor.getSensorType(), "threshold");
+}
+
+// =============================================================================
+// PeakPowerSensorBuilder::makeAggregator() — public builder in nsmPeakPower.hpp
+// =============================================================================
+
+TEST(nsmPeakPower, PeakPowerBuilder_MakeAggregator)
+{
+    nsm::PeakPowerSensorBuilder builder;
+    nsm::NumericSensorInfo info;
+    info.name = "test_peak_power";
+    info.type = "NSM_PeakPower";
+    info.priority = false;
+
+    auto aggregator = builder.makeAggregator(info);
+    EXPECT_NE(aggregator, nullptr);
 }

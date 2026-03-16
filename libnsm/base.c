@@ -105,8 +105,7 @@ uint8_t unpack_nsm_header(const struct nsm_msg_hdr *msg,
 	return NSM_SW_SUCCESS;
 }
 
-static void htoleArrayData(uint8_t *data, uint16_t num_of_element,
-			   uint8_t data_type)
+void htoleArrayData(uint8_t *data, uint16_t num_of_element, uint8_t data_type)
 {
 	switch (data_type) {
 	case NvU8:
@@ -192,8 +191,7 @@ static void htoleArrayData(uint8_t *data, uint16_t num_of_element,
 	}
 }
 
-static void letohArrayData(uint8_t *data, uint16_t num_of_element,
-			   uint8_t data_type)
+void letohArrayData(uint8_t *data, uint16_t num_of_element, uint8_t data_type)
 {
 	switch (data_type) {
 	case NvU8:
@@ -279,8 +277,8 @@ static void letohArrayData(uint8_t *data, uint16_t num_of_element,
 	}
 }
 
-static void dataCopy(uint8_t *srcData, uint8_t *destData, uint16_t numOfElement,
-		     uint8_t dataType)
+void dataCopy(uint8_t *srcData, uint8_t *destData, uint16_t numOfElement,
+	      uint8_t dataType)
 {
 	size_t dataSize = 0;
 	switch (dataType) {

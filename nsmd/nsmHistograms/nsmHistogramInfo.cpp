@@ -29,7 +29,7 @@
 namespace nsm
 {
 
-static double getMaxValueForType(uint8_t data_type)
+double getMaxValueForType(uint8_t data_type)
 {
     switch (data_type)
     {
@@ -56,10 +56,9 @@ static double getMaxValueForType(uint8_t data_type)
     }
 }
 
-static bool checkSizeOfBucketArrayIsValid(uint32_t total_size,
-                                          uint16_t num_of_buckets,
-                                          uint8_t bucket_data_type,
-                                          uint32_t& calculated_size)
+bool checkSizeOfBucketArrayIsValid(uint32_t total_size, uint16_t num_of_buckets,
+                                   uint8_t bucket_data_type,
+                                   uint32_t& calculated_size)
 {
     calculated_size = 0;
     switch (bucket_data_type)
@@ -98,8 +97,8 @@ static bool checkSizeOfBucketArrayIsValid(uint32_t total_size,
     return (calculated_size == total_size);
 }
 
-static double getValueFromBucketArray(uint8_t* data, BucketDataTypes data_type,
-                                      size_t index)
+double getValueFromBucketArray(uint8_t* data, BucketDataTypes data_type,
+                               size_t index)
 {
     switch (data_type)
     {
@@ -159,7 +158,7 @@ static double getValueFromBucketArray(uint8_t* data, BucketDataTypes data_type,
     }
 }
 
-static BucketDataTypes getDataTypeEnum(uint8_t data_type)
+BucketDataTypes getDataTypeEnum(uint8_t data_type)
 {
     switch (data_type)
     {

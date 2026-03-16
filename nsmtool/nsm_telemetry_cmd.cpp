@@ -1668,9 +1668,9 @@ class GetCurrentPowerDraw : public CommandInterface
     void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
     {
         const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
-        uint8_t cc;
-        uint16_t reason_code;
-        uint32_t reading;
+        uint8_t cc{};
+        uint16_t reason_code{};
+        uint32_t reading{};
 
         auto rc = decode_get_current_power_draw_resp(responsePtr, msg_len, &cc,
                                                      &reason_code, &reading);
@@ -1740,9 +1740,9 @@ class GetCurrentPowerDraw : public CommandInterface
     }
 
   private:
-    uint8_t sensorId;
+    uint8_t sensorId{};
     static constexpr uint8_t AggregateSensorId{255};
-    uint8_t averagingInterval;
+    uint8_t averagingInterval{};
 };
 
 class GetMaxObservedPower : public CommandInterface
@@ -1769,9 +1769,9 @@ class GetMaxObservedPower : public CommandInterface
     void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
     {
         const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
-        uint8_t cc;
-        uint16_t reason_code;
-        uint32_t reading;
+        uint8_t cc{};
+        uint16_t reason_code{};
+        uint32_t reading{};
 
         auto rc = decode_get_max_observed_power_resp(responsePtr, msg_len, &cc,
                                                      &reason_code, &reading);
@@ -1842,9 +1842,9 @@ class GetMaxObservedPower : public CommandInterface
     }
 
   private:
-    uint8_t sensorId;
+    uint8_t sensorId{};
     static constexpr uint8_t AggregateSensorId{255};
-    uint8_t averagingInterval;
+    uint8_t averagingInterval{};
 };
 
 class GetCurrentEnergyCount : public CommandInterface
@@ -3224,12 +3224,12 @@ class QueryVectorGroupTelemetry : public CommandInterface
     }
 
   private:
-    uint8_t portType;
-    uint8_t upstreamPortNumber;
-    uint8_t portIndex;
-    uint8_t groupId;
-    uint8_t speedCode;
-    uint8_t laneNumber;
+    uint8_t portType{};
+    uint8_t upstreamPortNumber{};
+    uint8_t portIndex{};
+    uint8_t groupId{};
+    uint8_t speedCode{};
+    uint8_t laneNumber{};
 };
 
 class QueryAvailableAndClearableScalarGroup : public CommandInterface
@@ -5127,11 +5127,11 @@ class QueryPerInstanceGPMMetrics : public CommandInterface
     }
 
   private:
-    uint8_t retrievalSource;
-    uint8_t gpuInstance;
-    uint8_t computeInstance;
-    uint8_t metricId;
-    uint32_t instanceBitfield;
+    uint8_t retrievalSource{};
+    uint8_t gpuInstance{};
+    uint8_t computeInstance{};
+    uint8_t metricId{};
+    uint32_t instanceBitfield{};
 };
 
 class QueryPerInstanceGPMMetricsV2 : public CommandInterface
@@ -5196,10 +5196,10 @@ class QueryPerInstanceGPMMetricsV2 : public CommandInterface
     }
 
   private:
-    uint8_t retrievalSource;
-    uint8_t gpuInstance;
-    uint8_t computeInstance;
-    uint8_t metricId;
+    uint8_t retrievalSource{};
+    uint8_t gpuInstance{};
+    uint8_t computeInstance{};
+    uint8_t metricId{};
     std::vector<uint8_t> instanceBitfieldInput;
 };
 
@@ -5301,9 +5301,9 @@ class GetPCIePortConfig : public CommandInterface
     }
 
   private:
-    uint8_t portNumber;
-    uint8_t portType;
-    uint8_t portIndex;
+    uint8_t portNumber{};
+    uint8_t portType{};
+    uint8_t portIndex{};
 };
 
 const std::unordered_map<uint8_t, std::string> GetPCIePortConfig::
@@ -5380,10 +5380,10 @@ class SetPCIePortConfig : public CommandInterface
     }
 
   private:
-    uint8_t portNumber;
-    uint8_t portType;
-    uint8_t portIndex;
-    uint16_t sampleCount;
+    uint8_t portNumber{};
+    uint8_t portType{};
+    uint8_t portIndex{};
+    uint16_t sampleCount{};
     std::vector<uint8_t> sampleData;
 };
 
@@ -6258,7 +6258,7 @@ class GetEthPortTelemetryCounter : public CommandInterface
         int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
                              ordered_json& sample_json) final
         {
-            nsm_ethernet_port_counter_data counter_reading;
+            nsm_ethernet_port_counter_data counter_reading{};
             int rc = decode_aggregate_eth_port_telemetry_data(
                 data, &data_len, tag, &counter_reading);
             if (rc != NSM_SW_SUCCESS)

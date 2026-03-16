@@ -564,12 +564,12 @@ class UpdateCodeAuthKeyPerm : public CommandInterface
     }
 
   private:
-    nsm_code_auth_key_perm_request_type requestType;
-    uint16_t classification;
-    uint16_t identifier;
-    uint8_t index;
-    uint64_t nonce;
-    uint32_t bitmapSize;
+    nsm_code_auth_key_perm_request_type requestType{};
+    uint16_t classification{};
+    uint16_t identifier{};
+    uint8_t index{};
+    uint64_t nonce{};
+    uint32_t bitmapSize{};
     std::string revokedKeysString;
 };
 

@@ -20,7 +20,6 @@
 #include "nsmDevice.hpp"
 #include "nsmEvent.hpp"
 
-class NsmDevice;
 namespace nsm
 {
 

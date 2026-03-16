@@ -54,10 +54,10 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
     sampleTags.clear();
     while (telemetryCount--)
     {
-        uint8_t tag;
-        bool valid;
-        const uint8_t* data;
-        size_t dataLen;
+        uint8_t tag = 0;
+        bool valid = false;
+        const uint8_t* data = nullptr;
+        size_t dataLen = 0;
 
         responseLen -= consumedLen;
         responseData += consumedLen;

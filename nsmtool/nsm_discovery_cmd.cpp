@@ -191,7 +191,7 @@ class GetSupportedCommandCodes : public CommandInterface
     }
 
   private:
-    uint8_t nvidiaMsgType;
+    uint8_t nvidiaMsgType{};
 };
 
 class QueryDeviceIdentification : public CommandInterface

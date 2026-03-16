@@ -34,6 +34,7 @@
 
 #include <CLI/CLI.hpp>
 
+#include <algorithm>
 #include <ctime>
 
 namespace nsmtool
@@ -412,9 +413,9 @@ class ProvideToken : public CommandInterface
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
-        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
-                                        sizeof(nsm_common_req_v2) +
-                                        tokenHexstring.size() / 2);
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_common_req_v2) +
+            std::max(tokenHexstring.size() / 2, size_t{1}));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
 
         std::vector<uint8_t> token;
