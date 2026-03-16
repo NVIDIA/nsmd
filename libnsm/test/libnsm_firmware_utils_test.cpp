@@ -4630,3 +4630,291 @@ TEST(DotGetStatus, testAllStatusValues)
 		EXPECT_EQ(status, decodedStatus);
 	}
 }
+
+// Simple DOT function tests
+TEST(DOT, EncodeCakBypassRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req_v2));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_nsm_dot_cak_bypass_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(DOT, EncodeGetInfoRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req_v2));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_nsm_dot_get_info_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(DOT, EncodeGetStatusRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req_v2));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_nsm_dot_get_status_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+// DOT decode tests (use nsm_common_req_v2 for DOT messages)
+TEST(DOT, DecodeCakBypassRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req_v2));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_nsm_dot_cak_bypass_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_nsm_dot_cak_bypass_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(DOT, DecodeGetInfoRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req_v2));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_nsm_dot_get_info_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_nsm_dot_get_info_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(DOT, DecodeGetStatusRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req_v2));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_nsm_dot_get_status_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_nsm_dot_get_status_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(FirmwareIrreversibleConfig, EncodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x1A;
+
+	// Test error response with reason code
+	int rc = encode_nsm_firmware_irreversible_config_request_1_resp(
+	    instance_id, NSM_ERR_INVALID_DATA, 0xBAD1, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_FIRMWARE);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_FW_IRREVERSABLE_CONFIGURATION);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD1);
+}
+
+TEST(FirmwareIrreversibleConfig, EncodeRequest2ResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x1B;
+
+	// Test error response with reason code for request_2 variant
+	int rc = encode_nsm_firmware_irreversible_config_request_2_resp(
+	    instance_id, NSM_ERR_INVALID_DATA, 0xBAD2, NULL, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_FIRMWARE);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_FW_IRREVERSABLE_CONFIGURATION);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD2);
+}
+
+TEST(FirmwareCodeAuthKeyPerm, EncodeQueryResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x1C;
+
+	// Test error response with reason code
+	// When cc != NSM_SUCCESS, bitmap parameters are not used
+	int rc = encode_nsm_code_auth_key_perm_query_resp(
+	    instance_id, NSM_ERR_INVALID_DATA, 0xBAD3, 0, 0, 0, NULL, NULL,
+	    NULL, NULL, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_FIRMWARE);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_FW_QUERY_CODE_AUTH_KEY_PERM);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD3);
+}
+
+TEST(FirmwareCodeAuthKeyPerm, EncodeUpdateResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x1D;
+
+	// Test error response with reason code
+	int rc = encode_nsm_code_auth_key_perm_update_resp(
+	    instance_id, NSM_ERR_INVALID_DATA, 0xBAD4, 0, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_FIRMWARE);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_FW_UPDATE_CODE_AUTH_KEY_PERM);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD4);
+}
+
+TEST(FirmwareSecurityVersion, EncodeUpdateResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x1E;
+
+	// Test error response with reason code
+	// When cc != NSM_SUCCESS, sec_resp parameter is not used
+	int rc = encode_nsm_firmware_update_sec_ver_resp(
+	    instance_id, NSM_ERR_INVALID_DATA, 0xBAD5, NULL, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_FIRMWARE);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD5);
+}
+
+TEST(FirmwareRotProperty, EncodeSetResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x1F;
+
+	// Test error response with reason code
+	int rc = encode_nsm_firmware_set_rot_property_resp(
+	    instance_id, NSM_ERR_INVALID_DATA, 0xBAD6, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_FIRMWARE);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_FW_SET_ROT_PROPERTY);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD6);
+}
+
+TEST(FirmwareDotDisable, EncodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x14; // Must be <= NSM_INSTANCE_MAX (31)
+
+	// Test error response with reason code
+	// When cc != NSM_SUCCESS, dot_blob parameter is not used
+	int rc = encode_nsm_dot_disable_resp(instance_id, NSM_ERR_INVALID_DATA,
+					     0xBAD7, NULL, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_FIRMWARE);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_FW_DOT_DISABLE);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD7);
+}
+
+TEST(FirmwareDotRecovery, EncodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x15; // Must be <= NSM_INSTANCE_MAX (31)
+
+	// Test error response with reason code
+	int rc = encode_nsm_dot_recovery_resp(instance_id, NSM_ERR_INVALID_DATA,
+					      0xBAD8, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_FIRMWARE);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_FW_DOT_RECOVERY);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD8);
+}

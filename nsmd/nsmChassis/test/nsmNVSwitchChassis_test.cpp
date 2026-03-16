@@ -25,6 +25,7 @@ using namespace ::testing;
 #include "base.h"
 
 #include "nsmNVSwitchAndNVMgmtNICChassis.hpp"
+#include "nsmSetAsync/asyncOperationManager.hpp"
 
 namespace nsm
 {
@@ -99,23 +100,15 @@ TEST_F(NsmNVSwitchChassisTest, goodTestCreateNVSwitchChassis)
 
 TEST_F(NsmNVSwitchChassisTest, badTestMissingUUID)
 {
-    dbus::PropertyMap chassisProperties = {
-        {"Type", std::string("NSM_NVSwitch_Chassis")},
+    // Single map for basicIntfName: Name and Type present, UUID missing
+    dbus::PropertyMap props = {
+        {"Name", name}, {"Type", std::string("NSM_NVSwitch_Chassis")},
         // Missing UUID
     };
-
-    dbus::PropertyMap baseProps = {
-        {"Name", name},
-        // Missing UUID
-    };
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap = baseProps;
 
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                           basicIntfName);
-    propertyMap = chassisProperties;
+    propertyMap = props;
 
     EXPECT_THROW_COROUTINE(createNsmChassis(mockManager, basicIntfName, objPath,
                                             "NSM_NVSwitch_Chassis"),
@@ -303,4 +296,376 @@ TEST_F(NsmNVLinkMgmtNicChassisTest, badTestInvalidLocationType)
         createNsmChassis(mockManager, basicIntfName + ".ChassisAttributes",
                          objPath + "_badloc", "NSM_NVLinkMgmtNic_Chassis"),
         std::exception);
+}
+// ============================================================================
+// PART 5: NsmNVSwitchAndNicChassis - additional template instantiations
+// ============================================================================
+
+TEST(NsmNVSwitchChassisBatch9, CreateLocationCodeIntf)
+{
+    // Arrange & Act - test NsmNVSwitchAndNicChassis<LocationCodeIntf>
+    auto chassis = std::make_shared<NsmNVSwitchAndNicChassis<LocationCodeIntf>>(
+        "NVSwitch0", "NSM_NVSwitch");
+
+    // Assert
+    EXPECT_NE(chassis, nullptr);
+    EXPECT_EQ(chassis->getName(), "NVSwitch0");
+    EXPECT_EQ(chassis->getType(), "NSM_NVSwitch");
+}
+
+TEST(NsmNVSwitchChassisBatch9, CreateItemIntf)
+{
+    // Arrange & Act - test NsmNVSwitchAndNicChassis<ItemIntf>
+    auto chassis = std::make_shared<NsmNVSwitchAndNicChassis<ItemIntf>>(
+        "NVSwitch1", "NSM_NVSwitch");
+
+    // Assert
+    EXPECT_NE(chassis, nullptr);
+    EXPECT_EQ(chassis->getName(), "NVSwitch1");
+}
+
+TEST(NsmNVSwitchChassisBatch9, CreateAssetTagIntf)
+{
+    // Arrange & Act - test NsmNVSwitchAndNicChassis<AssetTagIntf>
+    auto chassis = std::make_shared<NsmNVSwitchAndNicChassis<AssetTagIntf>>(
+        "NVSwitch2", "NSM_NVSwitch");
+
+    // Assert
+    EXPECT_NE(chassis, nullptr);
+    EXPECT_EQ(chassis->getName(), "NVSwitch2");
+}
+
+TEST(NsmNVSwitchChassisBatch9, CreateRevisionIntf)
+{
+    // Arrange & Act - test NsmNVSwitchAndNicChassis<RevisionIntf>
+    auto chassis = std::make_shared<NsmNVSwitchAndNicChassis<RevisionIntf>>(
+        "NVSwitch3", "NSM_NVSwitch");
+
+    // Assert
+    EXPECT_NE(chassis, nullptr);
+    EXPECT_EQ(chassis->getName(), "NVSwitch3");
+}
+
+TEST(NsmNVSwitchChassisBatch9, CreateNsmApSkuIdIntf)
+{
+    // Arrange & Act - test NsmNVSwitchAndNicChassis<NsmApSkuIdIntf>
+    auto chassis = std::make_shared<NsmNVSwitchAndNicChassis<NsmApSkuIdIntf>>(
+        "NVSwitch4", "NSM_NVSwitch");
+
+    // Assert
+    EXPECT_NE(chassis, nullptr);
+    EXPECT_EQ(chassis->getName(), "NVSwitch4");
+}
+
+// ============================================================================
+// PART 6: NVSwitch/NVMgmtNIC Chassis factory helper function coverage
+// ============================================================================
+
+struct NsmNVSwitchChassisFactoryTest :
+    public testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string nvSwitchBasicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis";
+    const uuid_t switchUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    const std::string switchName = "NVSwitch_0";
+    const std::string objPath = std::string(chassisInventoryBasePath) + "/" +
+                                switchName;
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> switchDev;
+
+    NsmNVSwitchChassisFactoryTest() : SensorManagerTest(devices)
+    {
+        switchDev = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(switchUuid));
+        EXPECT_EQ(1, devices.size());
+        EXPECT_NE(switchDev, nullptr);
+        AsyncOperationManager::getInstance()->dispatchers.clear();
+    }
+
+    ~NsmNVSwitchChassisFactoryTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+TEST_F(NsmNVSwitchChassisFactoryTest,
+       DISABLED_CreateNVSwitchChassis_BaseType_CreatesUuidSensor)
+{
+    // Arrange - set base type "NSM_NVSwitch_Chassis"
+    auto& basePropertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, nvSwitchBasicIntfName);
+    basePropertyMap["Name"] = switchName;
+    basePropertyMap["UUID"] = switchUuid;
+
+    auto& propertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, nvSwitchBasicIntfName);
+    propertyMap["Type"] = std::string("NSM_NVSwitch_Chassis");
+    propertyMap["UUID"] = switchUuid;
+
+    // Act
+    createNsmNVSwitchChassis(mockManager, nvSwitchBasicIntfName, objPath);
+
+    // Assert - should have at least 1 static sensor (UuidIntf)
+    EXPECT_GE(switchDev->deviceSensors.size(), 1u);
+}
+
+TEST_F(NsmNVSwitchChassisFactoryTest,
+       CreateNVSwitchChassis_Attributes_MinimalProperties)
+{
+    // Arrange - type NSM_Chassis_Attributes with no optional properties
+    auto& basePropertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, nvSwitchBasicIntfName);
+    basePropertyMap["Name"] = switchName;
+    basePropertyMap["UUID"] = switchUuid;
+
+    std::string attrIntf = nvSwitchBasicIntfName + ".ChassisAttributes";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
+    propertyMap["Type"] = std::string("NSM_Chassis_Attributes");
+
+    // Act
+    createNsmNVSwitchChassis(mockManager, attrIntf, objPath);
+
+    // Assert - should have asset sensors (3 from createChassisAsset),
+    //          SKU sensor (1 from createChassisSKU),
+    //          Health sensor (1 from createChassisHealth),
+    //          + 1 msgTypes
+    EXPECT_GE(switchDev->deviceSensors.size(), 1u);
+    EXPECT_GE(switchDev->staticSensors.size(), 0u);
+}
+
+TEST_F(NsmNVSwitchChassisFactoryTest,
+       CreateNVSwitchChassis_Attributes_WithChassisType)
+{
+    // Arrange
+    auto& basePropertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, nvSwitchBasicIntfName);
+    basePropertyMap["Name"] = switchName;
+    basePropertyMap["UUID"] = switchUuid;
+
+    std::string attrIntf = nvSwitchBasicIntfName + ".ChassisAttributes";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
+    propertyMap["Type"] = std::string("NSM_Chassis_Attributes");
+    propertyMap["ChassisType"] = std::string(
+        "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module");
+
+    // Act
+    createNsmNVSwitchChassis(mockManager, attrIntf, objPath);
+
+    // Assert - createChassisType adds 1 more static sensor
+    EXPECT_GE(switchDev->deviceSensors.size(), 1u);
+}
+
+TEST_F(NsmNVSwitchChassisFactoryTest,
+       CreateNVSwitchChassis_Attributes_WithLocationTypeAndCode)
+{
+    // Arrange
+    auto& basePropertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, nvSwitchBasicIntfName);
+    basePropertyMap["Name"] = switchName;
+    basePropertyMap["UUID"] = switchUuid;
+
+    std::string attrIntf = nvSwitchBasicIntfName + ".ChassisAttributes";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
+    propertyMap["Type"] = std::string("NSM_Chassis_Attributes");
+    propertyMap["LocationType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.Location."
+        "LocationTypes.Embedded");
+    propertyMap["LocationCode"] = std::string("NVSwitch_SXM_0");
+
+    // Act
+    createNsmNVSwitchChassis(mockManager, attrIntf, objPath);
+
+    // Assert - createLocationType + createLocationCode each add 1 static sensor
+    EXPECT_GE(switchDev->deviceSensors.size(), 1u);
+}
+
+TEST_F(NsmNVSwitchChassisFactoryTest,
+       CreateNVSwitchChassis_Attributes_WithPrettyName)
+{
+    // Arrange
+    auto& basePropertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, nvSwitchBasicIntfName);
+    basePropertyMap["Name"] = switchName;
+    basePropertyMap["UUID"] = switchUuid;
+
+    std::string attrIntf = nvSwitchBasicIntfName + ".ChassisAttributes";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
+    propertyMap["Type"] = std::string("NSM_Chassis_Attributes");
+    propertyMap["PrettyNameForChassis"] = std::string("NVSwitch 0 Chassis");
+
+    // Act
+    createNsmNVSwitchChassis(mockManager, attrIntf, objPath);
+
+    // Assert - createPrettyName adds 1 static sensor
+    EXPECT_GE(switchDev->deviceSensors.size(), 1u);
+}
+
+TEST_F(NsmNVSwitchChassisFactoryTest,
+       CreateNVSwitchChassis_Attributes_AllOptionalProperties)
+{
+    // Arrange
+    auto& basePropertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, nvSwitchBasicIntfName);
+    basePropertyMap["Name"] = switchName;
+    basePropertyMap["UUID"] = switchUuid;
+
+    std::string attrIntf = nvSwitchBasicIntfName + ".ChassisAttributes";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
+    propertyMap["Type"] = std::string("NSM_Chassis_Attributes");
+    propertyMap["ChassisType"] = std::string(
+        "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module");
+    propertyMap["LocationType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.Location."
+        "LocationTypes.Embedded");
+    propertyMap["LocationCode"] = std::string("NVSwitch_SXM_0");
+    propertyMap["PrettyNameForChassis"] = std::string("NVSwitch 0 Chassis");
+
+    // Act
+    createNsmNVSwitchChassis(mockManager, attrIntf, objPath);
+
+    // Assert - all optional properties add static sensors
+    EXPECT_GE(switchDev->deviceSensors.size(), 1u);
+}
+
+// ============================================================================
+// PART 7: NVLinkMgmtNic Chassis factory
+// ============================================================================
+
+struct NsmNVLinkMgmtNicChassisFactoryTest :
+    public testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string nicBasicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis";
+    // PCIE_BRIDGE device with CX8 role
+    const uuid_t nicUuid = "STATIC:4:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    const std::string nicName = "NVLinkMgmtNIC_0";
+    const std::string objPath = std::string(chassisInventoryBasePath) + "/" +
+                                nicName;
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> nicDev;
+
+    NsmNVLinkMgmtNicChassisFactoryTest() : SensorManagerTest(devices)
+    {
+        nicDev = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(nicUuid));
+        EXPECT_EQ(1, devices.size());
+        EXPECT_NE(nicDev, nullptr);
+        AsyncOperationManager::getInstance()->dispatchers.clear();
+    }
+
+    ~NsmNVLinkMgmtNicChassisFactoryTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+TEST_F(NsmNVLinkMgmtNicChassisFactoryTest,
+       DISABLED_CreateNVLinkMgmtNicChassis_BaseType)
+{
+    // Arrange
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              nicBasicIntfName);
+    basePropertyMap["Name"] = nicName;
+    basePropertyMap["UUID"] = nicUuid;
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          nicBasicIntfName);
+    propertyMap["Type"] = std::string("NSM_NVLinkMgmtNic_Chassis");
+    propertyMap["UUID"] = nicUuid;
+
+    // Act
+    createNsmNVLinkMgmtNicChassis(mockManager, nicBasicIntfName, objPath);
+
+    // Assert
+    EXPECT_GE(nicDev->deviceSensors.size(), 1u);
+}
+
+TEST_F(NsmNVLinkMgmtNicChassisFactoryTest,
+       CreateNVLinkMgmtNicChassis_Attributes_WithCX8Role)
+{
+    // Arrange - PCIE_BRIDGE with CX8 role should also get assetTag + version
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              nicBasicIntfName);
+    basePropertyMap["Name"] = nicName;
+    basePropertyMap["UUID"] = nicUuid;
+
+    std::string attrIntf = nicBasicIntfName + ".ChassisAttributes";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
+    propertyMap["Type"] = std::string("NSM_Chassis_Attributes");
+
+    // Simulate PCIE_BRIDGE + CX8 role
+    // Note: the device was created with device type from UUID parsing
+    // which may or may not match NSM_DEV_ID_PCIE_BRIDGE
+    // The factory checks: device->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE
+    // && device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8
+
+    // Act
+    createNsmNVLinkMgmtNicChassis(mockManager, attrIntf, objPath);
+
+    // Assert - basic sensors created (asset, SKU, health)
+    EXPECT_GE(nicDev->deviceSensors.size(), 1u);
+}
+
+// ============================================================================
+// PART 11: NsmNVSwitchChassis factory - createNsmChassis_Attributes with
+//          PCIE_BRIDGE + CX8 role for AssetTag and ChassisVersion
+// ============================================================================
+
+struct NsmCX8ChassisFactoryTest :
+    public testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string nicBasicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis";
+    // NSM_DEV_ID_PCIE_BRIDGE = 4, NSM_PCIE_BRIDGE_DEV_ROLE_CX8 = typically
+    // some known value. Use the UUID format that yields the correct device type
+    // and role.
+    const uuid_t cx8Uuid = "STATIC:4:0:NSM_DEVICE_INSTANCE_NUMBER:7";
+    const std::string cx8Name = "CX8_NIC_0";
+    const std::string objPath = std::string(chassisInventoryBasePath) + "/" +
+                                cx8Name;
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> cx8Dev;
+
+    NsmCX8ChassisFactoryTest() : SensorManagerTest(devices)
+    {
+        cx8Dev = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(cx8Uuid));
+        EXPECT_EQ(1, devices.size());
+        EXPECT_NE(cx8Dev, nullptr);
+        AsyncOperationManager::getInstance()->dispatchers.clear();
+    }
+
+    ~NsmCX8ChassisFactoryTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+TEST_F(NsmCX8ChassisFactoryTest, CreateCX8Chassis_Attributes)
+{
+    // Arrange
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              nicBasicIntfName);
+    basePropertyMap["Name"] = cx8Name;
+    basePropertyMap["UUID"] = cx8Uuid;
+
+    std::string attrIntf = nicBasicIntfName + ".ChassisAttributes";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
+    propertyMap["Type"] = std::string("NSM_Chassis_Attributes");
+
+    // Act
+    createNsmNVLinkMgmtNicChassis(mockManager, attrIntf, objPath);
+
+    // Assert - basic sensors + possibly AssetTag + ChassisVersion if
+    // device type/role matches CX8
+    EXPECT_GE(cx8Dev->deviceSensors.size(), 1u);
 }

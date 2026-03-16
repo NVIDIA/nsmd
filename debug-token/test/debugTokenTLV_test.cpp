@@ -306,6 +306,38 @@ TEST_F(TlvDecoderItemTest, GetTypeName)
     EXPECT_EQ(tlv_decoder::Item::getTypeName(0x4000), "GPUFeatureMask");
     EXPECT_EQ(tlv_decoder::Item::getTypeName(0x4400), "NBUKeypairUUID");
     EXPECT_EQ(tlv_decoder::Item::getTypeName(0x4801), "BMCIRoTTokenVersion");
+    // Additional Common types
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0004),
+              "DeviceSerialNumberArray");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0005), "FirmwareVersion");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0006), "AgentVersion");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0007), "LifecycleState");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0008), "TokenIdentifier");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0009), "TokenType");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x000A), "TokenConfig");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x000B), "NvidiaSignature");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x000C), "OemSignature");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x000D), "InstallationStatus");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x000E), "ProcessingStatus");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x000F), "SkuInformation");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0010), "NvidiaRatchet");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0011), "OemRatchet");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0012), "ValidityCounter");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0013), "CertificateChain");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0014), "MeasurementTranscript");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0015), "DeviceId");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0016), "TokenTypeSubtypeList");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0017), "Payload");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x0018), "LegacyToken");
+    // Additional GPU types
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x4001), "GPUChipId");
+    // Additional NBU types
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x4401), "NBUPSID");
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x4402), "NBUFileDeviceUnique");
+    // Additional BMC IRoT types
+    EXPECT_EQ(tlv_decoder::Item::getTypeName(0x4802),
+              "BMCIRoTNvidiaSignatureAlgorithm");
+    // Default case (unknown type)
     EXPECT_EQ(tlv_decoder::Item::getTypeName(0x9999), "UnknownType(0x9999)");
 }
 
@@ -1063,4 +1095,28 @@ TEST_F(TlvIntegrationTest, MaxSizeValueRoundTrip)
     EXPECT_EQ(std::memcmp(item.getValue<std::vector<uint8_t>>().data(),
                           maxValue.data(), maxValue.size()),
               0);
+}
+
+TEST_F(TlvEncoderStructureTest, AddVectorUint32Duplicate)
+{
+    // Test duplicate type detection in add(vector<uint32_t>) - lines 96-97
+    tlv_encoder::Structure structure;
+    uint16_t type = 0x1234;
+    std::vector<uint32_t> value1 = {0x01, 0x02};
+    std::vector<uint32_t> value2 = {0x03, 0x04};
+
+    structure.add(type, value1);
+    EXPECT_THROW({ structure.add(type, value2); }, std::runtime_error);
+}
+
+TEST_F(TlvEncoderStructureTest, AddVectorUint32ValueTooLarge)
+{
+    // Test exception handling in add(vector<uint32_t>) - lines 111-116
+    tlv_encoder::Structure structure;
+    uint16_t type = 0x1234;
+    // Create vector that will exceed uint16_t max when converted to bytes
+    // uint16_t max is 65535, so 16384 uint32_t values = 65536 bytes (too large)
+    std::vector<uint32_t> largeValue(16384, 0x12345678);
+
+    EXPECT_THROW({ structure.add(type, largeValue); }, std::runtime_error);
 }

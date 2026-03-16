@@ -70,10 +70,57 @@ TEST(DecodeHexTest, InvalidHexCharacters)
     EXPECT_FALSE(decodeHex(hexInput, output, 8));
 }
 
+// Test to cover line 146 in nsmDotUtils.cpp (hex parsing error with correct
+// length)
+TEST(DecodeHexTest, InvalidHexCharactersCorrectLength)
+{
+    // String has correct length (16 chars for 8 bytes) but contains invalid hex
+    std::string hexInput = "0123456789abcdgz"; // 'g' and 'z' are invalid hex
+    uint8_t output[8] = {0};
+    EXPECT_FALSE(decodeHex(hexInput, output, 8));
+}
+
 TEST(DecodeBase64Test, EmptyInputReturnsfalse)
 {
     uint8_t output[96] = {0};
     EXPECT_FALSE(decodeBase64("", output, 96));
+}
+
+TEST(DecodeBase64Test, ValidBase64Decoding)
+{
+    // Test successful base64 decoding to cover lines 117-120
+    // "SGVsbG8gV29ybGQh" is base64 for "Hello World!"
+    std::string base64Input = "SGVsbG8gV29ybGQh";
+    uint8_t output[12] = {0};
+
+    EXPECT_TRUE(decodeBase64(base64Input, output, 12));
+
+    // Verify decoded content
+    const char* expected = "Hello World!";
+    EXPECT_EQ(std::memcmp(output, expected, 12), 0);
+}
+
+TEST(DecodeBase64Test, InvalidBase64Length)
+{
+    // Test when decoded length doesn't match expected size
+    std::string base64Input = "SGVsbG8="; // "Hello" in base64
+    uint8_t output[10] = {0};
+
+    // Expecting 10 bytes but will only decode 5
+    EXPECT_FALSE(decodeBase64(base64Input, output, 10));
+}
+
+TEST(DecodeBase64Test, NullOutputPointer)
+{
+    std::string base64Input = "SGVsbG8=";
+    EXPECT_FALSE(decodeBase64(base64Input, nullptr, 5));
+}
+
+TEST(DecodeBase64Test, ZeroExpectedSize)
+{
+    std::string base64Input = "SGVsbG8=";
+    uint8_t output[10] = {0};
+    EXPECT_FALSE(decodeBase64(base64Input, output, 0));
 }
 
 TEST(BuildKeyAuthDataTest, ValidInput)

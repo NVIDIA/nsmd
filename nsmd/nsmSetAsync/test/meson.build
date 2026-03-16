@@ -2,7 +2,13 @@
 # nsmSetAsync subdir is ALWAYS compiled into nsmd_test (core functionality)
 # All sources already compiled into nsmd_test, no need to recompile
 
-tests = ['nsmSetWriteProtected_test', 'asyncOperationManager_test']
+tests = [
+    'nsmSetWriteProtected_test',
+    'asyncOperationManager_test',
+    'nsmSetECCMode_test',
+    'nsmSetErrorInjection_test',
+    'nsmSetMigMode_test',
+]
 foreach t : tests
     test(
         t,

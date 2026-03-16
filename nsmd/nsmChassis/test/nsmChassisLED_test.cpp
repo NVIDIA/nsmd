@@ -76,7 +76,6 @@ TEST_F(NsmChassisLEDTest, goodTestCreateSensor)
 {
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                           basicIntfName);
-    propertyMap.clear();
 
     propertyMap["Type"] = chassisLED["Type"];
     propertyMap["Name"] = chassisLED["Name"];
@@ -84,6 +83,8 @@ TEST_F(NsmChassisLEDTest, goodTestCreateSensor)
     propertyMap["InventoryObjPath"] = chassisLED["InventoryObjPath"];
 
     size_t initialSensorCount = gpu->deviceSensors.size();
+    // Mock D-Bus resolves co_await synchronously, so the coroutine completes
+    // before return and assertions below see the final state.
     createNsmChassisLEDSensor(mockManager, basicIntfName, objPath);
 
     EXPECT_EQ(1, devices.size());
@@ -122,7 +123,7 @@ TEST_F(NsmNvlinkLedIntfTest, goodTestConstructor)
 TEST_F(NsmNvlinkLedIntfTest, goodTestRequest)
 {
     EXPECT_CALL(*gpu, sensorIO).Times(1).WillOnce(mockSensorIO());
-    sensor->update(gpu).detach();
+    sensor->update(gpu);
 }
 
 // Note: encode_get_nvlink_agg_led_status_resp is not available in libnsm,

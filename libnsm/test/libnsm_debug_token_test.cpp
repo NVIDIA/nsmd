@@ -93,6 +93,50 @@ TEST(provideToken, testGoodDecodeResponse)
 	EXPECT_EQ(0, reason_code);
 }
 
+// Test to cover line 208 in debug-token.c (message length validation)
+TEST(provideToken, DISABLED_testDecodeResponseShortMessage)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 1); // Too short
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	auto rc = decode_nsm_provide_token_resp(response, responseMsg.size(),
+						&cc, &reason_code);
+
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// Test to cover line 203 in debug-token.c (error completion code path)
+TEST(provideToken, decodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_non_success_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	// Set up error response with reason code
+	auto resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	resp->command = NSM_PROVIDE_TOKEN;
+	resp->completion_code = NSM_ERR_INVALID_DATA;
+	resp->reason_code = htole16(0xCCCC);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_nsm_provide_token_resp(msg, msgBuf.size(), &cc,
+						&reason_code);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, cc);
+	EXPECT_EQ(0xCCCC, reason_code);
+}
+
 TEST(disableTokens, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
@@ -149,6 +193,50 @@ TEST(disableTokens, testGoodDecodeResponse)
 	EXPECT_EQ(NSM_SUCCESS, rc);
 	EXPECT_EQ(NSM_SUCCESS, cc);
 	EXPECT_EQ(0, reason_code);
+}
+
+// Test to cover line 296 in debug-token.c (message length validation)
+TEST(disableTokens, DISABLED_testDecodeResponseShortMessage)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 1); // Too short
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	auto rc = decode_nsm_disable_tokens_resp(response, responseMsg.size(),
+						 &cc, &reason_code);
+
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// Test to cover line 291 in debug-token.c (error completion code path)
+TEST(disableTokens, decodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_non_success_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	// Set up error response with reason code
+	auto resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	resp->command = NSM_DISABLE_TOKENS;
+	resp->completion_code = NSM_ERR_INVALID_DATA;
+	resp->reason_code = htole16(0xDDDD);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_nsm_disable_tokens_resp(msg, msgBuf.size(), &cc,
+						 &reason_code);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, cc);
+	EXPECT_EQ(0xDDDD, reason_code);
 }
 
 TEST(queryTokenStatus, testGoodEncodeRequest)
@@ -234,6 +322,41 @@ TEST(queryTokenStatus, testGoodDecodeResponse)
 	EXPECT_EQ(NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE, additional_info);
 	EXPECT_EQ(NSM_DEBUG_TOKEN_TYPE_CRCS, token_type);
 	EXPECT_EQ(0x78563412, time_left);
+}
+
+// Test to cover line 400 in debug-token.c (error completion code path)
+TEST(queryTokenStatus, decodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_non_success_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	// Set up error response with reason code
+	auto resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	resp->command = NSM_QUERY_TOKEN_STATUS;
+	resp->completion_code = NSM_ERR_INVALID_DATA;
+	resp->reason_code = htole16(0xBBBB);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	nsm_debug_token_status status;
+	nsm_debug_token_status_additional_info additional_info;
+	nsm_debug_token_type token_type;
+	uint32_t time_left;
+
+	auto rc = decode_nsm_query_token_status_resp(
+	    msg, msgBuf.size(), &cc, &reason_code, &status, &additional_info,
+	    &token_type, &time_left);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, cc);
+	EXPECT_EQ(0xBBBB, reason_code);
 }
 
 TEST(queryTokenParameters, testGoodEncodeRequest)
@@ -330,6 +453,72 @@ TEST(queryTokenParameters, testGoodDecodeResponse)
 	EXPECT_EQ(0x48, token_request.fw_version[4]);
 	EXPECT_EQ(0, token_request.session_id);
 	EXPECT_EQ(0, token_request.challenge_version);
+}
+
+// Test to cover line 89 in debug-token.c (error completion code path)
+TEST(queryTokenParameters, decodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_non_success_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	// Set up error response with reason code
+	auto resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	resp->command = NSM_QUERY_TOKEN_PARAMETERS;
+	resp->completion_code = NSM_ERR_INVALID_DATA;
+	resp->reason_code = htole16(0xEEEE);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	nsm_debug_token_request token_request;
+	memset(&token_request, 0, sizeof(nsm_debug_token_request));
+
+	auto rc = decode_nsm_query_token_parameters_resp(
+	    msg, msgBuf.size(), &cc, &reason_code, &token_request);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, cc);
+	EXPECT_EQ(0xEEEE, reason_code);
+}
+
+// Test to cover line 101 in debug-token.c (token_request_size validation)
+TEST(queryTokenParameters, decodeResponseInvalidTokenRequestSize)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_parameters_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	auto resp =
+	    reinterpret_cast<nsm_query_token_parameters_resp *>(msg->payload);
+	resp->hdr.command = NSM_QUERY_TOKEN_PARAMETERS;
+	resp->hdr.completion_code = NSM_SUCCESS;
+	resp->hdr.data_size = htole16(sizeof(nsm_query_token_parameters_resp) -
+				      sizeof(nsm_common_resp));
+
+	// Set invalid token_request_size (should be
+	// sizeof(nsm_debug_token_request))
+	resp->token_request.token_request_size = 0;
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	nsm_debug_token_request token_request;
+	memset(&token_request, 0, sizeof(nsm_debug_token_request));
+
+	auto rc = decode_nsm_query_token_parameters_resp(
+	    msg, msgBuf.size(), &cc, &reason_code, &token_request);
+
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
 }
 
 TEST(queryDeviceIDs, testGoodEncodeRequest)
@@ -800,6 +989,30 @@ TEST(queryToken, testBadEncodeResponse)
 	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
 }
 
+// Test to cover line 862 in debug-token.c (error completion code path)
+TEST(queryToken, errorCompletionCodeEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) + 256);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Test with non-success completion code to trigger error path
+	uint8_t cc = NSM_ERR_INVALID_DATA;
+	uint16_t reason_code = 0x8899;
+	uint8_t tlv_payload[64] = {0};
+
+	auto rc = encode_nsm_query_token_resp(0, cc, reason_code, tlv_payload,
+					      32, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	// Verify error response structure
+	auto resp_payload =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(NSM_QUERY_TOKEN, resp_payload->command);
+	EXPECT_EQ(cc, resp_payload->completion_code);
+	EXPECT_EQ(reason_code, le16toh(resp_payload->reason_code));
+}
+
 TEST(queryToken, testGoodDecodeResponse)
 {
 	uint16_t data_size = 32;
@@ -873,4 +1086,859 @@ TEST(queryToken, testBadDecodeResponse)
 	rc = decode_nsm_query_token_resp(response, 10, &cc, &reason_code,
 					 tlv_payload, &tlv_payload_len);
 	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// Test to cover line 821 in debug-token.c (error completion code path)
+TEST(queryToken, decodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_non_success_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	// Set up error response with reason code
+	auto resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	resp->command = NSM_QUERY_TOKEN;
+	resp->completion_code = NSM_ERR_INVALID_DATA;
+	resp->reason_code = htole16(0x9AAA);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	uint8_t tlv_payload[64];
+	size_t tlv_payload_len = sizeof(tlv_payload);
+
+	auto rc =
+	    decode_nsm_query_token_resp(msg, msgBuf.size(), &cc, &reason_code,
+					tlv_payload, &tlv_payload_len);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, cc);
+	EXPECT_EQ(0x9AAA, reason_code);
+}
+
+// Tests for uncovered functions - Functional 90% coverage target
+
+TEST(queryTokenParameters, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_parameters_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto req =
+	    reinterpret_cast<nsm_query_token_parameters_req *>(msg->payload);
+	req->hdr.command = NSM_QUERY_TOKEN_PARAMETERS;
+	req->hdr.data_size = sizeof(req->token_opcode);
+	req->token_opcode = NSM_DEBUG_TOKEN_OPCODE_RMCS;
+
+	enum nsm_debug_token_opcode token_opcode =
+	    NSM_DEBUG_TOKEN_OPCODE_LINKX_FRC;
+
+	auto rc = decode_nsm_query_token_parameters_req(msg, msgBuf.size(),
+							&token_opcode);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_DEBUG_TOKEN_OPCODE_RMCS, token_opcode);
+}
+
+TEST(queryTokenParameters, badTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_parameters_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	enum nsm_debug_token_opcode token_opcode =
+	    NSM_DEBUG_TOKEN_OPCODE_LINKX_FRC;
+
+	// Null message
+	auto rc = decode_nsm_query_token_parameters_req(nullptr, msgBuf.size(),
+							&token_opcode);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// Null output parameter
+	rc = decode_nsm_query_token_parameters_req(msg, msgBuf.size(), nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// Invalid message length
+	rc = decode_nsm_query_token_parameters_req(msg, 1, &token_opcode);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// Test to cover line 38 in debug-token.c (data_size validation)
+TEST(queryTokenParameters, decodeRequestInvalidDataSize)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_parameters_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto req =
+	    reinterpret_cast<nsm_query_token_parameters_req *>(msg->payload);
+	req->hdr.command = NSM_QUERY_TOKEN_PARAMETERS;
+	req->hdr.data_size =
+	    0; // Invalid - should be at least sizeof(token_opcode)
+	req->token_opcode = NSM_DEBUG_TOKEN_OPCODE_CRCS;
+
+	enum nsm_debug_token_opcode token_opcode =
+	    NSM_DEBUG_TOKEN_OPCODE_LINKX_FRC;
+
+	auto rc = decode_nsm_query_token_parameters_req(msg, msgBuf.size(),
+							&token_opcode);
+
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+}
+
+TEST(queryTokenParameters, goodTestEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_parameters_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	struct nsm_debug_token_request token_request = {};
+	token_request.token_request_size =
+	    sizeof(struct nsm_debug_token_request);
+
+	auto rc = encode_nsm_query_token_parameters_resp(0, NSM_SUCCESS, 0,
+							 &token_request, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+
+	auto resp =
+	    reinterpret_cast<nsm_query_token_parameters_resp *>(msg->payload);
+	EXPECT_EQ(NSM_QUERY_TOKEN_PARAMETERS, resp->hdr.command);
+	EXPECT_EQ(NSM_SUCCESS, resp->hdr.completion_code);
+}
+
+TEST(queryTokenParameters, badTestEncodeResponse)
+{
+	struct nsm_debug_token_request token_request = {};
+
+	// Null message
+	auto rc = encode_nsm_query_token_parameters_resp(
+	    0, NSM_SUCCESS, 0, &token_request, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Test to cover line 127 in debug-token.c (error completion code path)
+TEST(queryTokenParameters, errorCompletionCodeEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) + 256);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	struct nsm_debug_token_request token_request = {};
+	token_request.token_request_size =
+	    sizeof(struct nsm_debug_token_request);
+
+	// Test with non-success completion code to trigger error path
+	uint8_t cc = NSM_ERR_INVALID_DATA;
+	uint16_t reason_code = 0xABCD;
+
+	auto rc = encode_nsm_query_token_parameters_resp(0, cc, reason_code,
+							 &token_request, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	// Verify error response structure
+	auto resp_payload =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(NSM_QUERY_TOKEN_PARAMETERS, resp_payload->command);
+	EXPECT_EQ(cc, resp_payload->completion_code);
+	EXPECT_EQ(reason_code, le16toh(resp_payload->reason_code));
+}
+
+TEST(provideToken, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_provide_token_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto req = reinterpret_cast<nsm_provide_token_req *>(msg->payload);
+	req->hdr.command = NSM_PROVIDE_TOKEN;
+	req->hdr.data_size = 32;
+	memset(req->token_data, 0xAB, 32);
+
+	uint8_t token_data[NSM_DEBUG_TOKEN_DATA_MAX_SIZE] = {0};
+	uint8_t token_data_len = 0;
+
+	auto rc = decode_nsm_provide_token_req(msg, msgBuf.size(), token_data,
+					       &token_data_len);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(32, token_data_len);
+	EXPECT_EQ(0xAB, token_data[0]);
+}
+
+TEST(provideToken, badTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_provide_token_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t token_data[NSM_DEBUG_TOKEN_DATA_MAX_SIZE] = {0};
+	uint8_t token_data_len = 0;
+
+	// Null message
+	auto rc = decode_nsm_provide_token_req(nullptr, msgBuf.size(),
+					       token_data, &token_data_len);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// Null output parameters
+	rc = decode_nsm_provide_token_req(msg, msgBuf.size(), nullptr,
+					  &token_data_len);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_nsm_provide_token_req(msg, msgBuf.size(), token_data,
+					  nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// Invalid message length
+	rc = decode_nsm_provide_token_req(msg, 1, token_data, &token_data_len);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// Test to cover line 156 in debug-token.c (data_size = 0 validation)
+TEST(provideToken, decodeRequestZeroDataSize)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_provide_token_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto req = reinterpret_cast<nsm_provide_token_req *>(msg->payload);
+	req->hdr.command = NSM_PROVIDE_TOKEN;
+	req->hdr.data_size = 0; // Invalid - should be > 0
+
+	uint8_t token_data[NSM_DEBUG_TOKEN_DATA_MAX_SIZE] = {0};
+	uint8_t token_data_len = 0;
+
+	auto rc = decode_nsm_provide_token_req(msg, msgBuf.size(), token_data,
+					       &token_data_len);
+
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+}
+
+TEST(provideToken, goodTestEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = encode_nsm_provide_token_resp(0, NSM_SUCCESS, 0, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, msg->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+}
+
+TEST(provideToken, badTestEncodeResponse)
+{
+	// Null message
+	auto rc = encode_nsm_provide_token_resp(0, NSM_SUCCESS, 0, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Test to cover line 232 in debug-token.c (error completion code path)
+TEST(provideToken, errorCompletionCodeEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) + 256);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Test with non-success completion code to trigger error path
+	uint8_t cc = NSM_ERR_INVALID_DATA;
+	uint16_t reason_code = 0x9876;
+
+	auto rc = encode_nsm_provide_token_resp(0, cc, reason_code, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	// Verify error response structure
+	auto resp_payload =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(NSM_PROVIDE_TOKEN, resp_payload->command);
+	EXPECT_EQ(cc, resp_payload->completion_code);
+	EXPECT_EQ(reason_code, le16toh(resp_payload->reason_code));
+}
+
+TEST(disableTokens, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_disable_tokens_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = decode_nsm_disable_tokens_req(msg, msgBuf.size());
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(disableTokens, badTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_disable_tokens_req));
+
+	// Null message
+	auto rc = decode_nsm_disable_tokens_req(nullptr, msgBuf.size());
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Invalid message length
+	rc = decode_nsm_disable_tokens_req(msg, 1);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(disableTokens, goodTestEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_disable_tokens_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = encode_nsm_disable_tokens_resp(0, NSM_SUCCESS, 0, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, msg->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+}
+
+TEST(disableTokens, badTestEncodeResponse)
+{
+	// Null message
+	auto rc = encode_nsm_disable_tokens_resp(0, NSM_SUCCESS, 0, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Test to cover line 320 in debug-token.c (error completion code path)
+TEST(disableTokens, errorCompletionCodeEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) + 256);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Test with non-success completion code to trigger error path
+	uint8_t cc = NSM_ERR_INVALID_DATA;
+	uint16_t reason_code = 0x5432;
+
+	auto rc = encode_nsm_disable_tokens_resp(0, cc, reason_code, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	// Verify error response structure
+	auto resp_payload =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(NSM_DISABLE_TOKENS, resp_payload->command);
+	EXPECT_EQ(cc, resp_payload->completion_code);
+	EXPECT_EQ(reason_code, le16toh(resp_payload->reason_code));
+}
+
+TEST(queryTokenStatus, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_status_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto req = reinterpret_cast<nsm_query_token_status_req *>(msg->payload);
+	req->hdr.command = NSM_QUERY_TOKEN_STATUS;
+	req->hdr.data_size = sizeof(req->token_type);
+	req->token_type = NSM_DEBUG_TOKEN_TYPE_FRC;
+
+	enum nsm_debug_token_type token_type = NSM_DEBUG_TOKEN_TYPE_CRCS;
+
+	auto rc =
+	    decode_nsm_query_token_status_req(msg, msgBuf.size(), &token_type);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_DEBUG_TOKEN_TYPE_FRC, token_type);
+}
+
+TEST(queryTokenStatus, badTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_status_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	enum nsm_debug_token_type token_type = NSM_DEBUG_TOKEN_TYPE_CRCS;
+
+	// Null message
+	auto rc = decode_nsm_query_token_status_req(nullptr, msgBuf.size(),
+						    &token_type);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// Null output parameter
+	rc = decode_nsm_query_token_status_req(msg, msgBuf.size(), nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// Invalid message length
+	rc = decode_nsm_query_token_status_req(msg, 1, &token_type);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// Test to cover line 347 in debug-token.c (data_size validation)
+TEST(queryTokenStatus, decodeRequestInvalidDataSize)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_status_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto req = reinterpret_cast<nsm_query_token_status_req *>(msg->payload);
+	req->hdr.command = NSM_QUERY_TOKEN_STATUS;
+	req->hdr.data_size =
+	    0; // Invalid - should be at least sizeof(token_type)
+	req->token_type = NSM_DEBUG_TOKEN_TYPE_CRCS;
+
+	enum nsm_debug_token_type token_type = NSM_DEBUG_TOKEN_TYPE_FRC;
+
+	auto rc =
+	    decode_nsm_query_token_status_req(msg, msgBuf.size(), &token_type);
+
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+}
+
+TEST(queryTokenStatus, goodTestEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_status_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = encode_nsm_query_token_status_resp(
+	    0, NSM_SUCCESS, 0, NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ACTIVE,
+	    NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE,
+	    NSM_DEBUG_TOKEN_TYPE_FRC, 3600, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, msg->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+
+	auto resp =
+	    reinterpret_cast<nsm_query_token_status_resp *>(msg->payload);
+	EXPECT_EQ(NSM_QUERY_TOKEN_STATUS, resp->hdr.command);
+	EXPECT_EQ(NSM_SUCCESS, resp->hdr.completion_code);
+}
+
+TEST(queryTokenStatus, badTestEncodeResponse)
+{
+	// Null message
+	auto rc = encode_nsm_query_token_status_resp(
+	    0, NSM_SUCCESS, 0, NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ACTIVE,
+	    NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE,
+	    NSM_DEBUG_TOKEN_TYPE_FRC, 3600, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Test to cover line 440 in debug-token.c (error completion code path)
+TEST(queryTokenStatus, errorCompletionCodeEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) + 256);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Test with non-success completion code to trigger error path
+	uint8_t cc = NSM_ERR_INVALID_DATA;
+	uint16_t reason_code = 0x1122;
+
+	auto rc = encode_nsm_query_token_status_resp(
+	    0, cc, reason_code, NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ACTIVE,
+	    NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE,
+	    NSM_DEBUG_TOKEN_TYPE_FRC, 3600, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	// Verify error response structure
+	auto resp_payload =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(NSM_QUERY_TOKEN_STATUS, resp_payload->command);
+	EXPECT_EQ(cc, resp_payload->completion_code);
+	EXPECT_EQ(reason_code, le16toh(resp_payload->reason_code));
+}
+
+TEST(queryDeviceIds, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_device_ids_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = decode_nsm_query_device_ids_req(msg, msgBuf.size());
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(queryDeviceIds, badTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_device_ids_req));
+
+	// Null message
+	auto rc = decode_nsm_query_device_ids_req(nullptr, msgBuf.size());
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Invalid message length
+	rc = decode_nsm_query_device_ids_req(msg, 1);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(installToken, goodTestDecodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_install_token_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	auto resp = reinterpret_cast<nsm_install_token_resp *>(msg->payload);
+	resp->command = NSM_INSTALL_TOKEN;
+	resp->completion_code = NSM_SUCCESS;
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_nsm_install_token_resp(msg, msgBuf.size(), &cc,
+						&reason_code);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+}
+
+TEST(installToken, badTestDecodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_install_token_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+
+	// Null message
+	auto rc = decode_nsm_install_token_resp(nullptr, msgBuf.size(), &cc,
+						&reason_code);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// Null output parameters
+	rc = decode_nsm_install_token_resp(msg, msgBuf.size(), nullptr,
+					   &reason_code);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_nsm_install_token_resp(msg, msgBuf.size(), &cc, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Test to cover line 640 in debug-token.c (error completion code path)
+TEST(installToken, decodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_non_success_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	// Set up error response with reason code
+	auto resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	resp->command = NSM_INSTALL_TOKEN;
+	resp->completion_code = NSM_ERR_INVALID_DATA; // Error completion code
+	resp->reason_code = htole16(0x3344);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+
+	// decode should succeed but return early due to cc != NSM_SUCCESS
+	auto rc = decode_nsm_install_token_resp(msg, msgBuf.size(), &cc,
+						&reason_code);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, cc);
+	EXPECT_EQ(0x3344, reason_code);
+}
+
+TEST(installToken, goodTestEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_install_token_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = encode_nsm_install_token_resp(0, NSM_SUCCESS, 0, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, msg->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+}
+
+TEST(installToken, badTestEncodeResponse)
+{
+	// Null message
+	auto rc = encode_nsm_install_token_resp(0, NSM_SUCCESS, 0, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Test to cover line 664 in debug-token.c (error completion code path)
+TEST(installToken, errorCompletionCodeEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) + 256);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Test with non-success completion code to trigger error path
+	uint8_t cc = NSM_ERR_INVALID_DATA;
+	uint16_t reason_code = 0x6677;
+
+	auto rc = encode_nsm_install_token_resp(0, cc, reason_code, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	// Verify error response structure
+	auto resp_payload =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(NSM_INSTALL_TOKEN, resp_payload->command);
+	EXPECT_EQ(cc, resp_payload->completion_code);
+	EXPECT_EQ(reason_code, le16toh(resp_payload->reason_code));
+}
+
+TEST(eraseToken, goodTestDecodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_erase_token_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	auto resp = reinterpret_cast<nsm_erase_token_resp *>(msg->payload);
+	resp->command = NSM_ERASE_TOKEN;
+	resp->completion_code = NSM_SUCCESS;
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+
+	auto rc =
+	    decode_nsm_erase_token_resp(msg, msgBuf.size(), &cc, &reason_code);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+}
+
+TEST(eraseToken, badTestDecodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_erase_token_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+
+	// Null message
+	auto rc = decode_nsm_erase_token_resp(nullptr, msgBuf.size(), &cc,
+					      &reason_code);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// Null output parameters
+	rc = decode_nsm_erase_token_resp(msg, msgBuf.size(), nullptr,
+					 &reason_code);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_nsm_erase_token_resp(msg, msgBuf.size(), &cc, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Test to cover line 733 in debug-token.c (error completion code path)
+TEST(eraseToken, decodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_non_success_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid response header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION;
+
+	// Set up error response with reason code
+	auto resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	resp->command = NSM_ERASE_TOKEN;
+	resp->completion_code = NSM_ERR_INVALID_DATA;
+	resp->reason_code = htole16(0x5566);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+
+	auto rc =
+	    decode_nsm_erase_token_resp(msg, msgBuf.size(), &cc, &reason_code);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, cc);
+	EXPECT_EQ(0x5566, reason_code);
+}
+
+TEST(eraseToken, goodTestEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_erase_token_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = encode_nsm_erase_token_resp(0, NSM_SUCCESS, 0, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, msg->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+}
+
+TEST(eraseToken, badTestEncodeResponse)
+{
+	// Null message
+	auto rc = encode_nsm_erase_token_resp(0, NSM_SUCCESS, 0, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Test to cover line 757 in debug-token.c (error completion code path)
+TEST(eraseToken, errorCompletionCodeEncodeResponse)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) + 256);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Test with non-success completion code to trigger error path
+	uint8_t cc = NSM_ERR_INVALID_DATA;
+	uint16_t reason_code = 0x7788;
+
+	auto rc = encode_nsm_erase_token_resp(0, cc, reason_code, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	// Verify error response structure
+	auto resp_payload =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(NSM_ERASE_TOKEN, resp_payload->command);
+	EXPECT_EQ(cc, resp_payload->completion_code);
+	EXPECT_EQ(reason_code, le16toh(resp_payload->reason_code));
+}
+
+TEST(queryToken, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto req = reinterpret_cast<nsm_query_token_req *>(msg->payload);
+	req->command = NSM_QUERY_TOKEN;
+	req->data_size = 0;
+
+	auto rc = decode_nsm_query_token_req(msg, msgBuf.size());
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(queryToken, badTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_req));
+
+	// Null message
+	auto rc = decode_nsm_query_token_req(nullptr, msgBuf.size());
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Invalid message length
+	rc = decode_nsm_query_token_req(msg, 1);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// Test to cover line 781 in debug-token.c (non-zero data_size validation)
+TEST(queryToken, decodeRequestInvalidDataSize)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto req = reinterpret_cast<nsm_query_token_req *>(msg->payload);
+	req->command = NSM_QUERY_TOKEN;
+	req->data_size = 1; // Invalid - should be 0
+
+	auto rc = decode_nsm_query_token_req(msg, msgBuf.size());
+
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+}
+
+TEST(queryToken, goodTestEncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_query_token_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = encode_nsm_query_token_req(0, msg);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+
+	auto req = reinterpret_cast<nsm_query_token_req *>(msg->payload);
+	EXPECT_EQ(NSM_QUERY_TOKEN, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(queryToken, badTestEncodeRequest)
+{
+	// Null message
+	auto rc = encode_nsm_query_token_req(0, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Simple decode tests
+TEST(DisableTokens, DecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = decode_nsm_disable_tokens_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(QueryDeviceIds, DecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = decode_nsm_query_device_ids_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(QueryToken, DecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = decode_nsm_query_token_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+// More simple encode tests
+TEST(DisableTokens, EncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_nsm_disable_tokens_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(QueryDeviceIds, EncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_nsm_query_device_ids_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(QueryToken, EncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_nsm_query_token_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
 }

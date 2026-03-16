@@ -1,7 +1,10 @@
 tests = [
+    'debugTokenUtils_test',
+    'nsmDebugToken_test',
     'nsmDebugTokenObjectFactory_test',
     'nsmDebugTokenNIC_test',
     'nsmDebugTokenUnified_test',
+    'nsmDebugTokenAggregation_test',
 ]
 
 foreach t : tests

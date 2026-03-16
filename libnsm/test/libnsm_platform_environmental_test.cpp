@@ -6763,3 +6763,250 @@ TEST(getSupportedGPMMetrics, testBadDecodeResponse)
 	    &max_metrics_per_command, bitmask.data(), nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
+
+// Simple decode request tests for uncovered functions
+TEST(LeakDetection, DecodeGetInfoRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = decode_get_leak_detection_info_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(InventoryInformation, DecodeGetRequest)
+{
+	uint8_t property_identifier = 1;
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_inventory_information_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc =
+	    encode_get_inventory_information_req(0, property_identifier, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_inventory_information_req(msg, msgBuf.size(),
+						  &property_identifier);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(TemperatureReading, DecodeGetRequest)
+{
+	uint8_t sensor_id = 1;
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_temperature_reading_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_temperature_reading_req(0, sensor_id, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_temperature_reading_req(msg, msgBuf.size(), &sensor_id);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(CurrentPowerDraw, DecodeGetRequest)
+{
+	uint8_t sensor_id = 1, averaging_interval = 0;
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_current_power_draw_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_current_power_draw_req(0, sensor_id,
+						    averaging_interval, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_current_power_draw_req(msg, msgBuf.size(), &sensor_id,
+					       &averaging_interval);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(MaxObservedPower, DecodeGetRequest)
+{
+	uint8_t sensor_id = 1, averaging_interval = 0;
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_max_observed_power_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_max_observed_power_req(0, sensor_id,
+						    averaging_interval, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_max_observed_power_req(msg, msgBuf.size(), &sensor_id,
+					       &averaging_interval);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(CurrentEnergyCount, DecodeGetRequest)
+{
+	uint8_t sensor_id = 1;
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_current_energy_count_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_current_energy_count_req(0, sensor_id, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc =
+	    decode_get_current_energy_count_req(msg, msgBuf.size(), &sensor_id);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(ClockLimit, DecodeGetRequest)
+{
+	uint8_t clock_id = 1;
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_clock_limit_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_clock_limit_req(0, clock_id, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_clock_limit_req(msg, msgBuf.size(), &clock_id);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(CurrentClockFreq, DecodeGetRequest)
+{
+	uint8_t clock_id = 1;
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_curr_clock_freq_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_curr_clock_freq_req(0, clock_id, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_curr_clock_freq_req(msg, msgBuf.size(), &clock_id);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(CurrentClockEventReasonCode, DecodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_current_clock_event_reason_code_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_current_clock_event_reason_code_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(PowerLimit, DecodeGetRequest)
+{
+	uint32_t power_limit_id = 1;
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_power_limit_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_power_limit_req(0, power_limit_id, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_power_limit_req(msg, msgBuf.size(), &power_limit_id);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(ClockOutputEnableState, DecodeGetRequest)
+{
+	uint8_t clock_id = 1;
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_get_clock_output_enabled_state_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_clock_output_enable_state_req(0, clock_id, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_clock_output_enable_state_req(msg, msgBuf.size(),
+						      &clock_id);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+// More simple encode request tests
+TEST(DriverInfo, EncodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_get_driver_info_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(AltitudePressure, EncodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_get_altitude_pressure_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(MIGMode, EncodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_get_MIG_mode_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(ECCMode, EncodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_get_ECC_mode_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(ECCErrorCounts, EncodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_get_ECC_error_counts_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(RowRemapState, EncodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_get_row_remap_state_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(ViolationDuration, EncodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_get_violation_duration_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+// More simple decode tests
+TEST(DriverInfo, DecodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = decode_get_driver_info_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(RowRemapState, DecodeGetRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_get_row_remap_state_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_get_row_remap_state_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(EGMMode, DecodeGetRequest) {}

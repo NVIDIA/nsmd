@@ -8,6 +8,13 @@ tests = [
     'nsmNumericSensors_test',
     'nsmNumericAggregatorSensors_test',
     'nsmNumericSensorValueAggregate_test',
+    'nsmThresholdValue_test',
+    'nsmThresholdAggregator_test',
+    'nsmPeakPowerAggregator_test',
+    'nsmPowerAggregator_test',
+    'nsmEnergyAggregator_test',
+    'nsmVoltageAggregator_test',
+    'nsmNumericSensorFactory_test',
 ]
 
 foreach t : tests

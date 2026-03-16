@@ -208,3 +208,23 @@ TEST_F(DotErrorHandlerTest, testAllReasonCodes)
         EXPECT_FALSE(message.empty());
     }
 }
+
+/**
+ * Test formatDotDeviceError with an unknown/invalid operation
+ * This covers the default case in dotOperationToString (lines 76-77 in
+ * dotErrorHandler.cpp)
+ */
+TEST_F(DotErrorHandlerTest, testUnknownOperation)
+{
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = 0;
+    // Cast an invalid value to nsm_firmware_commands to trigger default case
+    nsm_firmware_commands operation = static_cast<nsm_firmware_commands>(0xFF);
+
+    auto [code, message] = formatDotDeviceError(cc, reasonCode, operation);
+
+    EXPECT_EQ(code, 0);
+    // The message should contain "DOT Unknown Operation" from the default case
+    EXPECT_NE(message.find("DOT Unknown Operation"), std::string::npos);
+    EXPECT_NE(message.find("completed successfully"), std::string::npos);
+}

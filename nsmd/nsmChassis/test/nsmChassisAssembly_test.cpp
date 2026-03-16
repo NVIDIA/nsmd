@@ -440,3 +440,100 @@ TEST_F(NsmChassisAssemblyTest, testCreateMultipleChassisAssemblies)
     // Should have created multiple assembly sensors
     EXPECT_GE(gpu->staticSensors.size(), 3);
 }
+
+TEST_F(NsmChassisAssemblyTest, goodTestAssemblyTypeBoardPartNumber)
+{
+    // Clear any previous sensors to start fresh
+    gpu->deviceSensors.clear();
+    gpu->staticSensors.clear();
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap["ChassisName"] = chassisName;
+    propertyMap["Name"] = name;
+    propertyMap["UUID"] = gpuUuid;
+    propertyMap["AssemblyType"] = "Board"; // Test Board assembly type
+    propertyMap["Type"] = "NSM_ChassisAssembly";
+
+    // First call with base interface
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
+
+    // Second call with ChassisAttributes interface
+    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
+    propertyMapAttributes["Name"] = "Board Assembly";
+
+    nsmChassisAssemblyCreateSensors(
+        mockManager, basicIntfName + ".ChassisAttributes", objPath);
+
+    // Verify sensors were created (should have asset sensors including
+    // partNumber with BOARD_PART_NUMBER)
+    EXPECT_GE(gpu->staticSensors.size(),
+              4); // partNumber, serialNumber, model, buildDate
+}
+
+TEST_F(NsmChassisAssemblyTest, goodTestAssemblyTypeFRUPartNumber)
+{
+    // Clear any previous sensors to start fresh
+    gpu->deviceSensors.clear();
+    gpu->staticSensors.clear();
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap["ChassisName"] = chassisName;
+    propertyMap["Name"] = name;
+    propertyMap["UUID"] = gpuUuid;
+    propertyMap["AssemblyType"] = "FRU"; // Test FRU assembly type
+    propertyMap["Type"] = "NSM_ChassisAssembly";
+
+    // First call with base interface
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
+
+    // Second call with ChassisAttributes interface
+    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
+    propertyMapAttributes["Name"] = "FRU Assembly";
+
+    nsmChassisAssemblyCreateSensors(
+        mockManager, basicIntfName + ".ChassisAttributes", objPath);
+
+    // Verify sensors were created (should have asset sensors including
+    // partNumber with FRU_PART_NUMBER)
+    EXPECT_GE(gpu->staticSensors.size(),
+              4); // partNumber, serialNumber, model, buildDate
+}
+
+TEST_F(NsmChassisAssemblyTest, goodTestAssemblyTypeInvalidDefaultsToBoard)
+{
+    // Clear any previous sensors to start fresh
+    gpu->deviceSensors.clear();
+    gpu->staticSensors.clear();
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap["ChassisName"] = chassisName;
+    propertyMap["Name"] = name;
+    propertyMap["UUID"] = gpuUuid;
+    propertyMap["AssemblyType"] =
+        "InvalidType"; // Test invalid type - should hit else branch and log
+    propertyMap["Type"] = "NSM_ChassisAssembly";
+
+    // First call with base interface
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
+
+    // Second call with ChassisAttributes interface
+    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
+    propertyMapAttributes["Name"] = "Invalid Assembly";
+
+    nsmChassisAssemblyCreateSensors(
+        mockManager, basicIntfName + ".ChassisAttributes", objPath);
+
+    // Verify sensors were created (defaults to BOARD_PART_NUMBER for invalid
+    // type)
+    EXPECT_GE(gpu->staticSensors.size(),
+              4); // partNumber, serialNumber, model, buildDate
+}

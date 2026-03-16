@@ -1,6 +1,6 @@
 # debug-token tests now use nsmd_test
 
-tests = ['debugTokenTLV_test']
+tests = ['debugTokenTLV_test', 'debugTokenError_test']
 
 foreach t : tests
     test(

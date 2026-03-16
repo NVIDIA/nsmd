@@ -378,3 +378,85 @@ TEST_F(NsmXIDEventTest, testHandleXIDEventWithLongMessageText)
                          NSM_XID_EVENT, msg, eventMsg.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
+
+TEST_F(NsmXIDEventTest, testHandleXIDEventWithInvalidFormatSpecifier)
+{
+    // Test exception handling in fmt::vformat (lines 89-95)
+    NsmEventInfo info;
+    info.uuid = gpuUuid;
+    info.originOfCondition =
+        "/xyz/openbmc_project/inventory/system/chassis/GPU_1";
+    info.messageId = "NVIDIAGPUDiagnostics.1.0.XIDError";
+    info.loggingNamespace = "GPU_XID";
+    info.resolution = "Check GPU logs";
+    // Invalid format specifier that will cause fmt::vformat to throw
+    info.messageArgs = {"{InvalidSpecifier}", "{AnotherInvalid}"};
+    info.severity = Level::Critical;
+
+    NsmXIDEvent xidEvent(name, "NSM_Event_XID", info);
+
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_xid_event_payload) + 100);
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+
+    nsm_xid_event_payload payload;
+    payload.sequence_number = 1;
+    payload.flag = 1;
+    payload.reason = 79;
+    payload.timestamp = 1234567890000000;
+
+    const char* messageText = "Test message";
+    size_t messageTextSize = strlen(messageText);
+
+    auto rc = encode_nsm_xid_event(0, false, payload, messageText,
+                                   messageTextSize, msg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Should handle exception gracefully and still return success
+    rc = xidEvent.handle(gpu->getEid(), NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                         NSM_XID_EVENT, msg, eventMsg.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmXIDEventTest, testHandleXIDEventWithErrorIdAndImpactedComponent)
+{
+    // Test lines 122 and 126 - setting EventId and DEVICE_NAME
+    NsmEventInfo info;
+    info.uuid = gpuUuid;
+    info.originOfCondition =
+        "/xyz/openbmc_project/inventory/system/chassis/GPU_1";
+    info.messageId = "NVIDIAGPUDiagnostics.1.0.XIDError";
+    info.loggingNamespace = "GPU_XID";
+    info.resolution = "Check GPU logs";
+    info.messageArgs = {"{EventMessageReason}"};
+    info.severity = Level::Warning;
+    // Set errorId list with XID 79 to ensure getEventErrorId returns non-empty
+    // Format: key-value pairs where key="XID 79" (with space), value=error ID
+    info.errorId = {"XID 79", "GPU_ERROR_79"};
+    // Set impacted component to trigger line 126
+    info.impactedComponent = "GPU_Module_1";
+
+    NsmXIDEvent xidEvent(name, "NSM_Event_XID", info);
+
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_xid_event_payload) + 100);
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+
+    nsm_xid_event_payload payload;
+    payload.sequence_number = 42;
+    payload.flag = 1;
+    payload.reason = 79; // Matches XID_79 in errorId
+    payload.timestamp = 1234567890000000;
+
+    const char* messageText = "XID 79 error";
+    size_t messageTextSize = strlen(messageText);
+
+    auto rc = encode_nsm_xid_event(0, false, payload, messageText,
+                                   messageTextSize, msg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    // This should cover lines 122 and 126
+    rc = xidEvent.handle(gpu->getEid(), NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                         NSM_XID_EVENT, msg, eventMsg.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}

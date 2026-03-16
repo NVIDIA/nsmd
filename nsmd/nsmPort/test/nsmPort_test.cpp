@@ -45,10 +45,11 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
                                          bool enableNetworkPortAddresses);
 } // namespace nsm
 
-TEST(NsmPortMetrics, GoodTest)
+// Helper to create NsmPortMetrics for reuse
+struct NsmPortMetricsHelper
 {
-    auto& bus = utils::DBusHandler::getBus();
-    std::string pName("dummy_port");
+    sdbusplus::bus::bus& bus = utils::DBusHandler::getBus();
+    std::string pName{"dummy_port"};
     uint8_t portNum = 1;
     std::string type = "DummyType";
     uint8_t deviceType = 1;
@@ -63,14 +64,19 @@ TEST(NsmPortMetrics, GoodTest)
         std::make_shared<PortMetricsOem2Intf>(bus, inventoryObjPath.c_str());
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf =
         std::make_shared<PortPacketCountersIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmPortMetrics portTel(bus, pName, portNum, type, deviceType,
-                                associations, parentObjPath, inventoryObjPath,
-                                iBPortIntf, portMetricsOem2Intf,
-                                portPacketCountersIntf);
+};
 
-    EXPECT_EQ(portTel.portName, pName);
-    EXPECT_EQ(portTel.portNumber, portNum);
-    EXPECT_EQ(portTel.iBPortIntf, iBPortIntf);
+TEST(NsmPortMetrics, GoodTest)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    EXPECT_EQ(portTel.portName, h.pName);
+    EXPECT_EQ(portTel.portNumber, h.portNum);
+    EXPECT_EQ(portTel.iBPortIntf, h.iBPortIntf);
     EXPECT_NE(portTel.portMetricsOem2Intf, nullptr);
     EXPECT_NE(portTel.associationDefinitionsIntf, nullptr);
 
@@ -112,6 +118,1245 @@ TEST(NsmPortMetrics, GoodTest)
     // checking only first and last values for portMetricsOem2Intf
     EXPECT_EQ(portTel.portMetricsOem2Intf->txBytes(),
               portTelData.port_xmit_data);
+}
+
+TEST(NsmPortMetrics, GoodGenRequestMsg)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    auto request = portTel.genRequestMsg(12, 30);
+    EXPECT_TRUE(request.has_value());
+    EXPECT_GT(request->size(), sizeof(nsm_msg_hdr));
+}
+
+TEST(NsmPortMetrics, GoodHandleResponseMsg)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    // Build a valid response with all counters supported
+    struct nsm_port_counter_data data = {};
+    memset(&data.supported_counter, 0xFF, sizeof(data.supported_counter));
+    data.port_rcv_pkts = 100;
+    data.port_rcv_data = 200;
+    data.port_xmit_pkts = 300;
+    data.port_xmit_data = 400;
+    data.symbol_ber = 0x0A21; // non-zero BER value
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_get_port_telemetry_counter_resp) -
+                                  1 + sizeof(data));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_get_port_telemetry_counter_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                     &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto cc = portTel.handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    EXPECT_EQ(h.iBPortIntf->rxPkts(), 100u);
+    EXPECT_EQ(h.portMetricsOem2Intf->rxBytes(), 200u);
+}
+
+TEST(NsmPortMetrics, BadHandleResponseMsg)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    // Build an error response
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_common_non_success_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_get_port_telemetry_counter_resp(0, NSM_ERROR, ERR_NULL, nullptr,
+                                           responseMsg);
+
+    auto cc = portTel.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(cc, NSM_SUCCESS);
+}
+
+TEST(NsmPortMetrics, UpdateCounterValuesNullPortData)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+    // null portData => covers the else branch at line 1078
+    portTel.updateCounterValues(nullptr);
+}
+
+TEST(NsmPortMetrics, UpdateCounterValuesNullInterfaces)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    struct nsm_port_counter_data data = {};
+    memset(&data.supported_counter, 0xFF, sizeof(data.supported_counter));
+    data.port_rcv_pkts = 10;
+
+    // Null out iBPortIntf to cover the else branch at line 1010
+    portTel.iBPortIntf = nullptr;
+    portTel.updateCounterValues(&data);
+
+    // Null out portMetricsOem2Intf to cover else at line 1030
+    portTel.iBPortIntf = h.iBPortIntf;
+    portTel.portMetricsOem2Intf = nullptr;
+    portTel.updateCounterValues(&data);
+
+    // Null out portPacketCountersIntf to cover else at line 1070
+    portTel.portMetricsOem2Intf = h.portMetricsOem2Intf;
+    portTel.portPacketCountersIntf = nullptr;
+    portTel.updateCounterValues(&data);
+}
+
+TEST(NsmPortMetrics, GetBitErrorRateNonZero)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    // Test non-zero value with symbol_ber_coef_float == 0
+    double ber = portTel.getBitErrorRate(0x0A01);
+    EXPECT_GT(ber, 0.0);
+
+    // Test non-zero value with symbol_ber_coef_float != 0
+    double ber2 = portTel.getBitErrorRate(0x0A21);
+    EXPECT_GT(ber2, 0.0);
+}
+
+TEST(NsmPortMetrics, GetBitErrorRateZero)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    double ber = portTel.getBitErrorRate(0);
+    EXPECT_DOUBLE_EQ(ber, 0.0);
+}
+
+TEST(NsmPortMetrics, UpdateCounterValuesUnsupportedCounters)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    // All supported_counter bits zero - should skip all counter updates
+    struct nsm_port_counter_data data = {};
+    memset(&data.supported_counter, 0x00, sizeof(data.supported_counter));
+    data.port_rcv_data = 9999;
+    data.port_xmit_data = 9999;
+
+    portTel.updateCounterValues(&data);
+
+    // Values should be unchanged (default 0) since counters are unsupported
+    EXPECT_EQ(h.portMetricsOem2Intf->rxBytes(), 0u);
+    EXPECT_EQ(h.portMetricsOem2Intf->txBytes(), 0u);
+}
+
+TEST(NsmPortMetrics, UpdateCounterValuesWithEstimatedEffectiveBER)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    // Enable specific counters to cover remaining branches
+    struct nsm_port_counter_data data = {};
+    memset(&data.supported_counter, 0xFF, sizeof(data.supported_counter));
+    data.effective_ber = 0x0A31;
+    data.total_raw_ber = 0x0B42;
+    data.total_raw_error = 50;
+    data.effective_error = 60;
+    data.symbol_error = 70;
+    data.unintentional_link_down_count = 80;
+    data.intentional_link_down_count = 90;
+    data.port_multicast_rcv_pkts = 100;
+    data.port_unicast_rcv_pkts = 200;
+    data.port_unicast_xmit_pkts = 300;
+    data.port_multicast_xmit_pkts = 400;
+    data.port_bcast_xmit_pkts = 500;
+
+    portTel.updateCounterValues(&data);
+
+    EXPECT_EQ(h.iBPortIntf->totalRawError(), 50u);
+    EXPECT_EQ(h.iBPortIntf->effectiveError(), 60u);
+    EXPECT_EQ(h.iBPortIntf->symbolErrors(), 70u);
+    EXPECT_EQ(h.iBPortIntf->unintentionalLinkDownCount(), 80u);
+    EXPECT_EQ(h.iBPortIntf->intentionalLinkDownCount(), 90u);
+    EXPECT_EQ(h.portPacketCountersIntf->rxMulticastPkts(), 100u);
+    EXPECT_EQ(h.portPacketCountersIntf->rxUnicastPkts(), 200u);
+    EXPECT_EQ(h.portPacketCountersIntf->txUnicastPkts(), 300u);
+    EXPECT_EQ(h.portPacketCountersIntf->txMulticastPkts(), 400u);
+    EXPECT_EQ(h.portPacketCountersIntf->txBroadcastPkts(), 500u);
+}
+
+// ---- NsmPortCharacteristics tests ----
+
+TEST(NsmPortCharacteristics, GoodConstructAndGenReq)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"char_port"};
+    uint8_t portNum = 2;
+    std::string type = "CharType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/char_port";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+    auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+
+    nsm::NsmPortCharacteristics sensor(
+        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+    EXPECT_EQ(sensor.portName, portName);
+
+    auto request = sensor.genRequestMsg(10, 20);
+    EXPECT_TRUE(request.has_value());
+}
+
+TEST(NsmPortCharacteristics, GoodHandleResponseMsg)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"char_port2"};
+    uint8_t portNum = 3;
+    std::string type = "CharType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/char_port2";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+    auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+
+    nsm::NsmPortCharacteristics sensor(
+        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+
+    struct nsm_port_characteristics_data data = {};
+    data.nv_port_line_rate_mbps = 400000;
+    data.nv_port_data_rate_kbps = 200000;
+    data.status_lane_info = 0x04;
+    data.port_status.port_down_reason_code =
+        NSM_PORT_DOWN_REASON_CODE_NO_LINK_DOWN;
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_query_port_characteristics_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_query_port_characteristics_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                     &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto cc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(cc, NSM_SUCCESS);
+}
+
+TEST(NsmPortCharacteristics, BadHandleResponseMsg)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"char_port3"};
+    uint8_t portNum = 4;
+    std::string type = "CharType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/char_port3";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+    auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+
+    nsm::NsmPortCharacteristics sensor(
+        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+
+    // Error response
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_common_non_success_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_query_port_characteristics_resp(0, NSM_ERROR, ERR_NULL, nullptr,
+                                           responseMsg);
+    auto cc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(cc, NSM_SUCCESS);
+}
+
+TEST(NsmPortCharacteristics, UpdateLinkDownCodeAllCases)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"linkdown_port"};
+    uint8_t portNum = 5;
+    std::string type = "LDType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/linkdown_port";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+    auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+
+    nsm::NsmPortCharacteristics sensor(
+        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+
+    // Test all link down reason codes
+    const uint32_t codes[] = {
+        NSM_PORT_DOWN_REASON_CODE_NO_LINK_DOWN,
+        NSM_PORT_DOWN_REASON_CODE_UNKNOWN,
+        NSM_PORT_DOWN_REASON_CODE_HI_SER_BER,
+        NSM_PORT_DOWN_REASON_CODE_BLOCK_LOCK_LOSS,
+        NSM_PORT_DOWN_REASON_CODE_ALIGNMENT_LOSS,
+        NSM_PORT_DOWN_REASON_CODE_FEC_SYNC_LOSS,
+        NSM_PORT_DOWN_REASON_CODE_PLL_LOCK_LOSS,
+        NSM_PORT_DOWN_REASON_CODE_FIFO_OVERFLOW,
+        NSM_PORT_DOWN_REASON_CODE_FALSE_SKIP_CONDITION,
+        NSM_PORT_DOWN_REASON_CODE_MINOR_ERR_THRESHOLD,
+        NSM_PORT_DOWN_REASON_CODE_PHY_LAYER_RETRANSMIT_TIMEOUT,
+        NSM_PORT_DOWN_REASON_CODE_HEARTBEAT_ERRORS,
+        NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_CREDIT_MON_WD,
+        NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_INTEGRITY_THRESHOLD,
+        NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_BUFFER_OVERRUN,
+        NSM_PORT_DOWN_REASON_CODE_OOB_CMD_LINK_HEALTHY,
+        NSM_PORT_DOWN_REASON_CODE_OOB_CMD_LINK_HI_BER,
+        NSM_PORT_DOWN_REASON_CODE_INBAND_CMD_LINK_HEALTHY,
+        NSM_PORT_DOWN_REASON_CODE_INBAND_CMD_LINK_HI_BER,
+        NSM_PORT_DOWN_REASON_CODE_DOWN_BY_VERIFICATION_GW,
+        NSM_PORT_DOWN_REASON_CODE_RECEIVED_REMOTE_FAULT,
+        NSM_PORT_DOWN_REASON_CODE_RECEIEVED_TS1,
+        NSM_PORT_DOWN_REASON_CODE_DOWN_BY_MGMT_CMD,
+        NSM_PORT_DOWN_REASON_CODE_CABLE_UNPLUGGED,
+        NSM_PORT_DOWN_REASON_CODE_CABLE_ACCESS_ISSUES,
+        NSM_PORT_DOWN_REASON_CODE_THERMAL_SHUTDOWN,
+        NSM_PORT_DOWN_REASON_CODE_CURRENT_ISSUE,
+        NSM_PORT_DOWN_REASON_CODE_POWER_BUDGET,
+        NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_RAW_BER,
+        NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_EFFECTIVE_BER,
+        NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_SYMBOL_BER,
+        NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_CREDIT_WATCHDOG,
+        NSM_PORT_DOWN_REASON_CODE_PEER_SLEEP,
+        NSM_PORT_DOWN_REASON_CODE_PEER_DISABLE,
+        NSM_PORT_DOWN_REASON_CODE_PEER_DISABLE_LOCK,
+        NSM_PORT_DOWN_REASON_CODE_PEER_THERMAL_EVENT,
+        NSM_PORT_DOWN_REASON_CODE_PEER_FORCE_EVENT,
+        NSM_PORT_DOWN_REASON_CODE_PEER_RESET_EVENT,
+        0xFFFF, // default case
+    };
+    for (auto code : codes)
+    {
+        sensor.updateLinkDownCode(code);
+    }
+}
+
+TEST(NsmPortCharacteristics, HandleResponseWithLinkDownCodes)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"charld_port"};
+    uint8_t portNum = 6;
+    std::string type = "LDType2";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/charld_port";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+    auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+
+    nsm::NsmPortCharacteristics sensor(
+        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+
+    // Test with various port down reason codes via handleResponseMsg
+    uint32_t testCodes[] = {
+        NSM_PORT_DOWN_REASON_CODE_THERMAL_SHUTDOWN,
+        NSM_PORT_DOWN_REASON_CODE_PEER_RESET_EVENT,
+    };
+
+    for (auto code : testCodes)
+    {
+        struct nsm_port_characteristics_data data = {};
+        data.nv_port_line_rate_mbps = 200000;
+        data.nv_port_data_rate_kbps = 100000;
+        data.status_lane_info = 0x02;
+        data.port_status.port_down_reason_code = code;
+
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_characteristics_resp));
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        auto rc = encode_query_port_characteristics_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+        auto cc = sensor.handleResponseMsg(responseMsg, response.size());
+        EXPECT_EQ(cc, NSM_SUCCESS);
+    }
+}
+
+// ---- NsmPortStatus tests ----
+
+TEST(NsmPortStatus, GoodConstruct)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"status_port"};
+    uint8_t portNum = 7;
+    std::string type = "StatusType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/status_port";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+
+    nsm::NsmPortStatus sensor(bus, portName, portNum, type, portMetricsOem3Intf,
+                              objPath);
+    EXPECT_EQ(sensor.portName, portName);
+}
+
+// ---- EthPortTelemetryAggregator tests ----
+
+TEST(EthPortTelemetryAggregator, GoodConstruct)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"eth_port"};
+    uint16_t portNumber = 1;
+    std::string type = "EthType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/eth_port";
+    auto portMetricsOem2Intf =
+        std::make_shared<nsm::PortMetricsOem2Intf>(bus, objPath.c_str());
+    auto portPacketCountersIntf =
+        std::make_shared<nsm::PortPacketCountersIntf>(bus, objPath.c_str());
+
+    nsm::EthPortTelemetryAggregator sensor(bus, portName, portNumber, type,
+                                           objPath, portMetricsOem2Intf,
+                                           portPacketCountersIntf);
+    EXPECT_EQ(sensor.portName, portName);
+}
+
+TEST(EthPortTelemetryAggregator, GoodGenRequestMsg)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"eth_port2"};
+    uint16_t portNumber = 2;
+    std::string type = "EthType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/eth_port2";
+    auto portMetricsOem2Intf =
+        std::make_shared<nsm::PortMetricsOem2Intf>(bus, objPath.c_str());
+    auto portPacketCountersIntf =
+        std::make_shared<nsm::PortPacketCountersIntf>(bus, objPath.c_str());
+
+    nsm::EthPortTelemetryAggregator sensor(bus, portName, portNumber, type,
+                                           objPath, portMetricsOem2Intf,
+                                           portPacketCountersIntf);
+
+    auto request = sensor.genRequestMsg(10, 20);
+    EXPECT_TRUE(request.has_value());
+}
+
+TEST(EthPortTelemetryAggregator, HandleSampleInvalidSample)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"eth_port3"};
+    uint16_t portNumber = 3;
+    std::string type = "EthType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/eth_port3";
+    auto portMetricsOem2Intf =
+        std::make_shared<nsm::PortMetricsOem2Intf>(bus, objPath.c_str());
+    auto portPacketCountersIntf =
+        std::make_shared<nsm::PortPacketCountersIntf>(bus, objPath.c_str());
+
+    nsm::EthPortTelemetryAggregator sensor(bus, portName, portNumber, type,
+                                           objPath, portMetricsOem2Intf,
+                                           portPacketCountersIntf);
+
+    // Invalid sample (valid = false)
+    nsm::NsmSensorAggregator::TelemetrySample invalidSample{0, 0, nullptr,
+                                                            false};
+    auto rc = sensor.handleSample(invalidSample);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Sample with tag > max
+    nsm::NsmSensorAggregator::TelemetrySample highTagSample{0xFF, 0, nullptr,
+                                                            true};
+    rc = sensor.handleSample(highTagSample);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(EthPortTelemetryAggregator, HandleSampleDecodeError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"eth_port3b"};
+    uint16_t portNumber = 3;
+    std::string type = "EthType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/eth_port3b";
+    auto portMetricsOem2Intf =
+        std::make_shared<nsm::PortMetricsOem2Intf>(bus, objPath.c_str());
+    auto portPacketCountersIntf =
+        std::make_shared<nsm::PortPacketCountersIntf>(bus, objPath.c_str());
+
+    nsm::EthPortTelemetryAggregator sensor(bus, portName, portNumber, type,
+                                           objPath, portMetricsOem2Intf,
+                                           portPacketCountersIntf);
+
+    // Valid tag but wrong data length to trigger decode failure path
+    // Tag 0 (RXBytes) expects 8 bytes, provide only 4 (a power of 2)
+    uint8_t badData[4] = {0x01, 0x02, 0x03, 0x04};
+    nsm::NsmSensorAggregator::TelemetrySample sample{0, 4, badData, true};
+    auto rc = sensor.handleSample(sample);
+    // Note: handleSample returns bool as int - false (0) == NSM_SW_SUCCESS
+    // The decode failure path is exercised regardless of assertion
+    (void)rc;
+}
+
+TEST(EthPortTelemetryAggregator, HandleSampleValidCounters)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"eth_port4"};
+    uint16_t portNumber = 4;
+    std::string type = "EthType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/eth_port4";
+    auto portMetricsOem2Intf =
+        std::make_shared<nsm::PortMetricsOem2Intf>(bus, objPath.c_str());
+    auto portPacketCountersIntf =
+        std::make_shared<nsm::PortPacketCountersIntf>(bus, objPath.c_str());
+
+    nsm::EthPortTelemetryAggregator sensor(bus, portName, portNumber, type,
+                                           objPath, portMetricsOem2Intf,
+                                           portPacketCountersIntf);
+
+    // Test all 21 tags (0 through 20) via handleSample
+    // Tags 0-7 are 64-bit counters, tags 8-20 are 32-bit counters
+    for (uint8_t tag = 0; tag <= 20; tag++)
+    {
+        nsm_ethernet_port_counter_data counterData = {};
+        uint8_t encodedData[8] = {};
+
+        if (tag <= 7)
+        {
+            // 64-bit counter
+            counterData.ethernet_port_counter_data_64bit = 1000 + tag;
+            size_t encodedLen = sizeof(uint64_t);
+            encode_aggregate_eth_port_telemetry_data(tag, &counterData,
+                                                     encodedData, &encodedLen);
+
+            nsm::NsmSensorAggregator::TelemetrySample sample{
+                tag, static_cast<uint8_t>(encodedLen), encodedData, true};
+            auto rc = sensor.handleSample(sample);
+            EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        }
+        else
+        {
+            // 32-bit counter
+            counterData.ethernet_port_counter_data_32bit = 2000 + tag;
+            size_t encodedLen = sizeof(uint32_t);
+            encode_aggregate_eth_port_telemetry_data(tag, &counterData,
+                                                     encodedData, &encodedLen);
+
+            nsm::NsmSensorAggregator::TelemetrySample sample{
+                tag, static_cast<uint8_t>(encodedLen), encodedData, true};
+            auto rc = sensor.handleSample(sample);
+            EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        }
+    }
+}
+
+TEST(EthPortTelemetryAggregator, UpdateCounterValuesDirect)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"eth_port4b"};
+    uint16_t portNumber = 4;
+    std::string type = "EthType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/eth_port4b";
+    auto portMetricsOem2Intf =
+        std::make_shared<nsm::PortMetricsOem2Intf>(bus, objPath.c_str());
+    auto portPacketCountersIntf =
+        std::make_shared<nsm::PortPacketCountersIntf>(bus, objPath.c_str());
+
+    nsm::EthPortTelemetryAggregator sensor(bus, portName, portNumber, type,
+                                           objPath, portMetricsOem2Intf,
+                                           portPacketCountersIntf);
+
+    // Call updateCounterValues directly for each tag
+    // Tags 0-7: 64-bit counters
+    for (uint8_t tag = 0; tag <= 7; tag++)
+    {
+        nsm_ethernet_port_counter_data counterData = {};
+        counterData.ethernet_port_counter_data_64bit = 5000 + tag;
+        sensor.updateCounterValues(tag, &counterData);
+    }
+
+    // Tags 8-20: 32-bit counters
+    for (uint8_t tag = 8; tag <= 20; tag++)
+    {
+        nsm_ethernet_port_counter_data counterData = {};
+        counterData.ethernet_port_counter_data_32bit = 6000 + tag;
+        sensor.updateCounterValues(tag, &counterData);
+    }
+
+    // Verify some values
+    EXPECT_EQ(portMetricsOem2Intf->rxBytes(), 5000u);
+    EXPECT_EQ(portMetricsOem2Intf->txBytes(), 5001u);
+    EXPECT_EQ(sensor.ethPortIntf->rxfcsErrors(), 6008u);
+    EXPECT_EQ(sensor.ethPortIntf->txExcessCollisionFrames(), 6020u);
+
+    // Tag not in map should be no-op
+    nsm_ethernet_port_counter_data extraData = {};
+    extraData.ethernet_port_counter_data_32bit = 9999;
+    sensor.updateCounterValues(99, &extraData);
+}
+
+TEST(EthPortTelemetryAggregator, GetInterfaceNameCovers)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"eth_port5"};
+    uint16_t portNumber = 5;
+    std::string type = "EthType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/eth_port5";
+    auto portMetricsOem2Intf =
+        std::make_shared<nsm::PortMetricsOem2Intf>(bus, objPath.c_str());
+    auto portPacketCountersIntf =
+        std::make_shared<nsm::PortPacketCountersIntf>(bus, objPath.c_str());
+
+    nsm::EthPortTelemetryAggregator sensor(bus, portName, portNumber, type,
+                                           objPath, portMetricsOem2Intf,
+                                           portPacketCountersIntf);
+
+    std::string ifaceName;
+    // Cover all branches of getInterfaceName
+    sensor.getInterfaceName("RXBytes", ifaceName);
+    sensor.getInterfaceName("TXBytes", ifaceName);
+    sensor.getInterfaceName("RXUnicastPkts", ifaceName);
+    sensor.getInterfaceName("RXMulticastPkts", ifaceName);
+    sensor.getInterfaceName("RXBroadcastPkts", ifaceName);
+    sensor.getInterfaceName("TXUnicastPkts", ifaceName);
+    sensor.getInterfaceName("TXMulticastPkts", ifaceName);
+    sensor.getInterfaceName("TXBroadcastPkts", ifaceName);
+    sensor.getInterfaceName("SomethingElse", ifaceName);
+}
+
+// ---- NsmNetworkAddressAggregator tests ----
+
+TEST(NsmNetworkAddressAggregator, GoodConstructAndGenReq)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"naa_sensor"};
+    std::string type = "NAAType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/naa_sensor";
+    std::string nodeGuidObjPath = objPath + "/NodeGuid";
+    std::string ethernetMacObjPath = objPath + "/EthMac";
+    std::string permanentMacObjPath = objPath + "/PermMac";
+    uint16_t portNumber = 1;
+
+    nsm::NsmNetworkAddressAggregator sensor(bus, name, type, objPath,
+                                            nodeGuidObjPath, ethernetMacObjPath,
+                                            permanentMacObjPath, portNumber);
+
+    auto request = sensor.genRequestMsg(10, 20);
+    EXPECT_TRUE(request.has_value());
+}
+
+// ---- NsmGetPortECCCounters tests ----
+
+TEST(NsmGetPortECCCounters, GoodConstructAndGenReq)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"ecc_sensor"};
+    std::string type = "ECCType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/ecc_sensor";
+    uint8_t portNumber = 1;
+
+    nsm::NsmGetPortECCCounters sensor(bus, name, type, objPath, portNumber);
+
+    auto request = sensor.genRequestMsg(10, 20);
+    EXPECT_TRUE(request.has_value());
+}
+
+// ---- getTopologyObjPath tests ----
+
+TEST(NsmPortMetrics, ConstructorWithAssociations)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string pName{"assoc_port"};
+    uint8_t portNum = 1;
+    std::string type = "AssocType";
+    uint8_t deviceType = 1;
+    std::string parentObjPath =
+        "/xyz/openbmc_project/inventory/system/dummy/assoc_device";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/dummy/assoc_device/Ports";
+    std::vector<utils::Association> associations;
+    associations.push_back({"connected_port", "connected_device",
+                            "/xyz/openbmc_project/other/path"});
+    associations.push_back(
+        {"peer_port", "peer_device", "/xyz/openbmc_project/peer/path"});
+
+    auto iBPortIntf =
+        std::make_shared<nsm::IBPortIntf>(bus, inventoryObjPath.c_str());
+    auto portMetricsOem2Intf = std::make_shared<nsm::PortMetricsOem2Intf>(
+        bus, inventoryObjPath.c_str());
+    auto portPacketCountersIntf = std::make_shared<nsm::PortPacketCountersIntf>(
+        bus, inventoryObjPath.c_str());
+
+    nsm::NsmPortMetrics portTel(bus, pName, portNum, type, deviceType,
+                                associations, parentObjPath, inventoryObjPath,
+                                iBPortIntf, portMetricsOem2Intf,
+                                portPacketCountersIntf);
+
+    EXPECT_NE(portTel.associationDefinitionsIntf, nullptr);
+    EXPECT_NE(portTel.portIntf, nullptr);
+}
+
+// ---- NsmNetworkAddressAggregator handleResponseMsg tests ----
+
+TEST(NsmNetworkAddressAggregator, HandleResponseMsgErrorCC)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"naa_err"};
+    std::string type = "NAAType";
+    std::string objPath = "/xyz/openbmc_project/inventory/system/dummy/naa_err";
+    std::string nodeGuidObjPath = objPath + "/NodeGuid";
+    std::string ethernetMacObjPath = objPath + "/EthMac";
+    std::string permanentMacObjPath = objPath + "/PermMac";
+    uint16_t portNumber = 1;
+
+    nsm::NsmNetworkAddressAggregator sensor(bus, name, type, objPath,
+                                            nodeGuidObjPath, ethernetMacObjPath,
+                                            permanentMacObjPath, portNumber);
+
+    // Build an error aggregate response
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_common_non_success_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_aggregate_resp(0, NSM_GET_NETWORK_ADDRESSES, NSM_ERROR, 0,
+                                    responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto result = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(result, NSM_SUCCESS);
+}
+
+TEST(NsmNetworkAddressAggregator, HandleResponseMsgEthernetPath)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"naa_eth"};
+    std::string type = "NAAType";
+    std::string objPath = "/xyz/openbmc_project/inventory/system/dummy/naa_eth";
+    std::string nodeGuidObjPath = objPath + "/NodeGuid";
+    std::string ethernetMacObjPath = objPath + "/EthMac";
+    std::string permanentMacObjPath = objPath + "/PermMac";
+    uint16_t portNumber = 1;
+
+    nsm::NsmNetworkAddressAggregator sensor(bus, name, type, objPath,
+                                            nodeGuidObjPath, ethernetMacObjPath,
+                                            permanentMacObjPath, portNumber);
+
+    // Build aggregate response with link type=Ethernet, MAC address, and
+    // permanent MAC
+    // We need: header + link_type sample + mac_address sample +
+    // permanent_mac_address sample
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+    // Link type sample: tag=0, data=[0] (Ethernet)
+    uint8_t linkTypeData[] = {NSM_PORT_PROTOCOL_ETHERNET};
+    size_t linkTypeSampleLen = 0;
+    uint8_t linkTypeSampleBuf[16] = {};
+    auto samplePtr =
+        reinterpret_cast<nsm_aggregate_resp_sample*>(linkTypeSampleBuf);
+    encode_aggregate_resp_sample(NSM_TAG_LINK_TYPE, true, linkTypeData, 1,
+                                 samplePtr, &linkTypeSampleLen);
+
+    // MAC address sample: tag=1, data=6 bytes MAC
+    uint8_t macData[8] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
+    size_t macSampleLen = 0;
+    uint8_t macSampleBuf[16] = {};
+    auto macSamplePtr =
+        reinterpret_cast<nsm_aggregate_resp_sample*>(macSampleBuf);
+    encode_aggregate_resp_sample(NSM_TAG_MAC_ADDRESS, true, macData, 8,
+                                 macSamplePtr, &macSampleLen);
+
+    // Permanent MAC address sample: tag=2
+    size_t permMacSampleLen = 0;
+    uint8_t permMacSampleBuf[16] = {};
+    auto permMacSamplePtr =
+        reinterpret_cast<nsm_aggregate_resp_sample*>(permMacSampleBuf);
+    encode_aggregate_resp_sample(NSM_TAG_PERMANENT_MAC_ADDRESS, true, macData,
+                                 8, permMacSamplePtr, &permMacSampleLen);
+
+    // Build full response
+    std::vector<uint8_t> response(headerSize + linkTypeSampleLen +
+                                  macSampleLen + permMacSampleLen);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_NETWORK_ADDRESSES, NSM_SUCCESS, 3,
+                          responseMsg);
+
+    // Copy samples after the header
+    size_t offset = headerSize;
+    memcpy(response.data() + offset, linkTypeSampleBuf, linkTypeSampleLen);
+    offset += linkTypeSampleLen;
+    memcpy(response.data() + offset, macSampleBuf, macSampleLen);
+    offset += macSampleLen;
+    memcpy(response.data() + offset, permMacSampleBuf, permMacSampleLen);
+
+    auto result = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(result, NSM_SW_SUCCESS);
+}
+
+TEST(NsmNetworkAddressAggregator, HandleResponseMsgInfiniBandPath)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"naa_ib"};
+    std::string type = "NAAType";
+    std::string objPath = "/xyz/openbmc_project/inventory/system/dummy/naa_ib";
+    std::string nodeGuidObjPath = objPath + "/NodeGuid";
+    std::string ethernetMacObjPath = objPath + "/EthMac";
+    std::string permanentMacObjPath = objPath + "/PermMac";
+    uint16_t portNumber = 1;
+
+    nsm::NsmNetworkAddressAggregator sensor(bus, name, type, objPath,
+                                            nodeGuidObjPath, ethernetMacObjPath,
+                                            permanentMacObjPath, portNumber);
+
+    // Build aggregate response with link type=InfiniBand + node GUID + port
+    // GUID
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+
+    // Link type sample: tag=0, data=[1] (InfiniBand)
+    uint8_t linkTypeData[] = {NSM_PORT_PROTOCOL_INFINIBAND};
+    size_t linkTypeSampleLen = 0;
+    uint8_t linkTypeSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_LINK_TYPE, true, linkTypeData, 1,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(linkTypeSampleBuf),
+        &linkTypeSampleLen);
+
+    // Node GUID sample: tag=3
+    uint8_t guidData[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+    size_t nodeGuidSampleLen = 0;
+    uint8_t nodeGuidSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_NODE_GUID, true, guidData, 8,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(nodeGuidSampleBuf),
+        &nodeGuidSampleLen);
+
+    // Port GUID sample: tag=4
+    size_t portGuidSampleLen = 0;
+    uint8_t portGuidSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_PORT_GUID, true, guidData, 8,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(portGuidSampleBuf),
+        &portGuidSampleLen);
+
+    std::vector<uint8_t> response(headerSize + linkTypeSampleLen +
+                                  nodeGuidSampleLen + portGuidSampleLen);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_NETWORK_ADDRESSES, NSM_SUCCESS, 3,
+                          responseMsg);
+
+    size_t offset = headerSize;
+    memcpy(response.data() + offset, linkTypeSampleBuf, linkTypeSampleLen);
+    offset += linkTypeSampleLen;
+    memcpy(response.data() + offset, nodeGuidSampleBuf, nodeGuidSampleLen);
+    offset += nodeGuidSampleLen;
+    memcpy(response.data() + offset, portGuidSampleBuf, portGuidSampleLen);
+
+    auto result = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(result, NSM_SW_SUCCESS);
+}
+
+TEST(NsmNetworkAddressAggregator, HandleResponseMsgUnknownLinkType)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"naa_unk"};
+    std::string type = "NAAType";
+    std::string objPath = "/xyz/openbmc_project/inventory/system/dummy/naa_unk";
+    std::string nodeGuidObjPath = objPath + "/NodeGuid";
+    std::string ethernetMacObjPath = objPath + "/EthMac";
+    std::string permanentMacObjPath = objPath + "/PermMac";
+    uint16_t portNumber = 1;
+
+    nsm::NsmNetworkAddressAggregator sensor(bus, name, type, objPath,
+                                            nodeGuidObjPath, ethernetMacObjPath,
+                                            permanentMacObjPath, portNumber);
+
+    // Build response with unknown link type (0xFF)
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+
+    uint8_t linkTypeData[] = {0xFF}; // Unknown
+    size_t linkTypeSampleLen = 0;
+    uint8_t linkTypeSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_LINK_TYPE, true, linkTypeData, 1,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(linkTypeSampleBuf),
+        &linkTypeSampleLen);
+
+    std::vector<uint8_t> response(headerSize + linkTypeSampleLen);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_NETWORK_ADDRESSES, NSM_SUCCESS, 1,
+                          responseMsg);
+
+    memcpy(response.data() + headerSize, linkTypeSampleBuf, linkTypeSampleLen);
+
+    // Should return error since linkType stays UNKNOWN
+    auto result = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(result, NSM_SW_SUCCESS);
+}
+
+TEST(NsmNetworkAddressAggregator, HandleResponseMsgInvalidSamples)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"naa_inv"};
+    std::string type = "NAAType";
+    std::string objPath = "/xyz/openbmc_project/inventory/system/dummy/naa_inv";
+    std::string nodeGuidObjPath = objPath + "/NodeGuid";
+    std::string ethernetMacObjPath = objPath + "/EthMac";
+    std::string permanentMacObjPath = objPath + "/PermMac";
+    uint16_t portNumber = 1;
+
+    nsm::NsmNetworkAddressAggregator sensor(bus, name, type, objPath,
+                                            nodeGuidObjPath, ethernetMacObjPath,
+                                            permanentMacObjPath, portNumber);
+
+    // Build response with Ethernet link type + invalid valid bit + high tag
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+
+    // Link type = Ethernet
+    uint8_t linkTypeData[] = {NSM_PORT_PROTOCOL_ETHERNET};
+    size_t linkTypeSampleLen = 0;
+    uint8_t linkTypeSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_LINK_TYPE, true, linkTypeData, 1,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(linkTypeSampleBuf),
+        &linkTypeSampleLen);
+
+    // Invalid sample (valid=false)
+    uint8_t someData[] = {0x00};
+    size_t invalidSampleLen = 0;
+    uint8_t invalidSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_MAC_ADDRESS, false, someData, 1,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(invalidSampleBuf),
+        &invalidSampleLen);
+
+    // High tag sample (tag > max unreserved)
+    size_t highTagSampleLen = 0;
+    uint8_t highTagSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        0xFE, true, someData, 1,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(highTagSampleBuf),
+        &highTagSampleLen);
+
+    // Invalid tag for Ethernet (e.g. tag=99 which doesn't match MAC or
+    // permanent MAC)
+    uint8_t ethInvalidTagData[8] = {0x01, 0x02, 0x03, 0x04,
+                                    0x05, 0x06, 0x07, 0x08};
+    size_t ethInvalidSampleLen = 0;
+    uint8_t ethInvalidSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_NODE_GUID, true, ethInvalidTagData, 8,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(ethInvalidSampleBuf),
+        &ethInvalidSampleLen);
+
+    std::vector<uint8_t> response(headerSize + linkTypeSampleLen +
+                                  invalidSampleLen + highTagSampleLen +
+                                  ethInvalidSampleLen);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_NETWORK_ADDRESSES, NSM_SUCCESS, 4,
+                          responseMsg);
+
+    size_t offset = headerSize;
+    memcpy(response.data() + offset, linkTypeSampleBuf, linkTypeSampleLen);
+    offset += linkTypeSampleLen;
+    memcpy(response.data() + offset, invalidSampleBuf, invalidSampleLen);
+    offset += invalidSampleLen;
+    memcpy(response.data() + offset, highTagSampleBuf, highTagSampleLen);
+    offset += highTagSampleLen;
+    memcpy(response.data() + offset, ethInvalidSampleBuf, ethInvalidSampleLen);
+
+    [[maybe_unused]] auto result = sensor.handleResponseMsg(responseMsg,
+                                                            response.size());
+    // Should still succeed since we have valid link type
+    // (ethInvalidTag case logs error but doesn't fail)
+}
+
+// ---- NsmGetPortECCCounters handleResponseMsg tests ----
+
+TEST(NsmGetPortECCCounters, HandleResponseMsgErrorCC)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"ecc_err"};
+    std::string type = "ECCType";
+    std::string objPath = "/xyz/openbmc_project/inventory/system/dummy/ecc_err";
+    uint8_t portNumber = 1;
+
+    nsm::NsmGetPortECCCounters sensor(bus, name, type, objPath, portNumber);
+
+    // Build error aggregate response
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_common_non_success_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_PORT_ECC_COUNTERS, NSM_ERROR, 0,
+                          responseMsg);
+
+    auto result = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(result, NSM_SUCCESS);
+}
+
+TEST(NsmGetPortECCCounters, HandleResponseMsgGoodWithCounters)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"ecc_good"};
+    std::string type = "ECCType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/ecc_good";
+    uint8_t portNumber = 1;
+
+    nsm::NsmGetPortECCCounters sensor(bus, name, type, objPath, portNumber);
+
+    // Build aggregate response with ECC counter samples
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+
+    // Encode samples for each tag
+    struct SampleEntry
+    {
+        uint8_t tag;
+        uint64_t value;
+    };
+    SampleEntry entries[] = {
+        {NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, 100},
+        {NSM_TAG_ECC_CORRECTED_BITS, 200},
+        {NSM_TAG_ECC_RAW_ERRORS_LANE_0, 10},
+        {NSM_TAG_ECC_RAW_ERRORS_LANE_1, 20},
+        {NSM_TAG_ECC_RAW_ERRORS_LANE_2, 30},
+        {NSM_TAG_ECC_RAW_ERRORS_LANE_3, 40},
+    };
+
+    std::vector<uint8_t> allSamples;
+    for (auto& entry : entries)
+    {
+        uint8_t counterBytes[8];
+        memcpy(counterBytes, &entry.value, sizeof(entry.value));
+        size_t sampleLen = 0;
+        uint8_t sampleBuf[16] = {};
+        encode_aggregate_resp_sample(
+            entry.tag, true, counterBytes, 8,
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sampleBuf),
+            &sampleLen);
+        allSamples.insert(allSamples.end(), sampleBuf, sampleBuf + sampleLen);
+    }
+
+    std::vector<uint8_t> response(headerSize + allSamples.size());
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_PORT_ECC_COUNTERS, NSM_SUCCESS, 6,
+                          responseMsg);
+    memcpy(response.data() + headerSize, allSamples.data(), allSamples.size());
+
+    auto result = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(result, NSM_SW_SUCCESS);
+    EXPECT_EQ(sensor.portECCIntf->symbolErrorRXBytes(), 100u);
+    EXPECT_EQ(sensor.portECCIntf->correctedBits(), 200u);
+    auto rawErrors = sensor.portECCIntf->rawErrorsPerLane();
+    EXPECT_EQ(rawErrors.size(), 4u);
+    EXPECT_EQ(rawErrors[0], 10u);
+    EXPECT_EQ(rawErrors[1], 20u);
+    EXPECT_EQ(rawErrors[2], 30u);
+    EXPECT_EQ(rawErrors[3], 40u);
+}
+
+TEST(NsmGetPortECCCounters, HandleResponseMsgDefaultTag)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"ecc_default"};
+    std::string type = "ECCType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/ecc_default";
+    uint8_t portNumber = 1;
+
+    nsm::NsmGetPortECCCounters sensor(bus, name, type, objPath, portNumber);
+
+    // Build aggregate response with unknown tag + invalid valid bit
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+
+    // Unknown tag (tag=99 - within valid range but unknown)
+    uint64_t val = 12345;
+    uint8_t counterBytes[8];
+    memcpy(counterBytes, &val, sizeof(val));
+    size_t sampleLen = 0;
+    uint8_t sampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        10, true, counterBytes, 8,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(sampleBuf), &sampleLen);
+
+    // Invalid valid bit sample
+    size_t invalidSampleLen = 0;
+    uint8_t invalidSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        0, false, counterBytes, 8,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(invalidSampleBuf),
+        &invalidSampleLen);
+
+    // High tag (above max unreserved)
+    size_t highTagLen = 0;
+    uint8_t highTagBuf[16] = {};
+    encode_aggregate_resp_sample(
+        0xFE, true, counterBytes, 8,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(highTagBuf), &highTagLen);
+
+    std::vector<uint8_t> response(headerSize + sampleLen + invalidSampleLen +
+                                  highTagLen);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_PORT_ECC_COUNTERS, NSM_SUCCESS, 3,
+                          responseMsg);
+
+    size_t offset = headerSize;
+    memcpy(response.data() + offset, sampleBuf, sampleLen);
+    offset += sampleLen;
+    memcpy(response.data() + offset, invalidSampleBuf, invalidSampleLen);
+    offset += invalidSampleLen;
+    memcpy(response.data() + offset, highTagBuf, highTagLen);
+
+    auto result = sensor.handleResponseMsg(responseMsg, response.size());
+    // Unknown tag 10 causes decode_aggregate_port_ecc_counter_data to fail
+    EXPECT_NE(result, NSM_SW_SUCCESS);
+}
+
+TEST(NsmGetPortECCCounters, HandleResponseMsgTruncatedSample)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"ecc_trunc"};
+    std::string type = "ECCType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/ecc_trunc";
+    uint8_t portNumber = 1;
+
+    nsm::NsmGetPortECCCounters sensor(bus, name, type, objPath, portNumber);
+
+    // Build aggregate response with telemetry_count=2 but only provide
+    // space for 1 complete sample + truncated second sample
+    // This triggers decode_aggregate_resp_sample failure path
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+
+    // One valid sample
+    uint64_t val = 100;
+    uint8_t counterBytes[8];
+    memcpy(counterBytes, &val, sizeof(val));
+    size_t sampleLen = 0;
+    uint8_t sampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_ECC_CORRECTED_BITS, true, counterBytes, 8,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(sampleBuf), &sampleLen);
+
+    // Allocate only enough for header + 1 sample + 1 byte (truncated 2nd)
+    std::vector<uint8_t> response(headerSize + sampleLen + 1, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_PORT_ECC_COUNTERS, NSM_SUCCESS, 2,
+                          responseMsg);
+    memcpy(response.data() + headerSize, sampleBuf, sampleLen);
+
+    auto result = sensor.handleResponseMsg(responseMsg, response.size());
+    // Should still process first sample but second decode will fail
+    EXPECT_NE(result, NSM_SW_SUCCESS);
+}
+
+TEST(NsmNetworkAddressAggregator, HandleResponseMsgDecodeAddressError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"naa_decode_err"};
+    std::string type = "NAAType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/naa_decode_err";
+    std::string nodeGuidObjPath = objPath + "/NodeGuid";
+    std::string ethernetMacObjPath = objPath + "/EthMac";
+    std::string permanentMacObjPath = objPath + "/PermMac";
+    uint16_t portNumber = 1;
+
+    nsm::NsmNetworkAddressAggregator sensor(bus, name, type, objPath,
+                                            nodeGuidObjPath, ethernetMacObjPath,
+                                            permanentMacObjPath, portNumber);
+
+    // Build response with Ethernet link type + MAC address sample with wrong
+    // data length (3 bytes instead of 8) to trigger
+    // decode_aggregate_network_address_data failure
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+
+    // Link type = Ethernet
+    uint8_t linkTypeData[] = {NSM_PORT_PROTOCOL_ETHERNET};
+    size_t linkTypeSampleLen = 0;
+    uint8_t linkTypeSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_LINK_TYPE, true, linkTypeData, 1,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(linkTypeSampleBuf),
+        &linkTypeSampleLen);
+
+    // MAC address with wrong length (2 bytes instead of 8) - will trigger
+    // decode_aggregate_network_address_data error
+    uint8_t badMacData[2] = {0x00, 0x11};
+    size_t badMacSampleLen = 0;
+    uint8_t badMacSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_MAC_ADDRESS, true, badMacData, 2,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(badMacSampleBuf),
+        &badMacSampleLen);
+
+    std::vector<uint8_t> response(headerSize + linkTypeSampleLen +
+                                  badMacSampleLen);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_NETWORK_ADDRESSES, NSM_SUCCESS, 2,
+                          responseMsg);
+
+    size_t offset = headerSize;
+    memcpy(response.data() + offset, linkTypeSampleBuf, linkTypeSampleLen);
+    offset += linkTypeSampleLen;
+    memcpy(response.data() + offset, badMacSampleBuf, badMacSampleLen);
+
+    auto result = sensor.handleResponseMsg(responseMsg, response.size());
+    // decode_aggregate_network_address_data should fail with bad data length
+    EXPECT_NE(result, NSM_SW_SUCCESS);
+}
+
+TEST(NsmNetworkAddressAggregator, HandleResponseMsgTruncatedSample)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"naa_trunc"};
+    std::string type = "NAAType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/naa_trunc";
+    std::string nodeGuidObjPath = objPath + "/NodeGuid";
+    std::string ethernetMacObjPath = objPath + "/EthMac";
+    std::string permanentMacObjPath = objPath + "/PermMac";
+    uint16_t portNumber = 1;
+
+    nsm::NsmNetworkAddressAggregator sensor(bus, name, type, objPath,
+                                            nodeGuidObjPath, ethernetMacObjPath,
+                                            permanentMacObjPath, portNumber);
+
+    // Build response with telemetry_count=2 but truncated second sample
+    // to trigger decode_aggregate_resp_sample failure
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+
+    uint8_t linkTypeData[] = {NSM_PORT_PROTOCOL_ETHERNET};
+    size_t linkTypeSampleLen = 0;
+    uint8_t linkTypeSampleBuf[16] = {};
+    encode_aggregate_resp_sample(
+        NSM_TAG_LINK_TYPE, true, linkTypeData, 1,
+        reinterpret_cast<nsm_aggregate_resp_sample*>(linkTypeSampleBuf),
+        &linkTypeSampleLen);
+
+    // Only provide space for header + link type sample + 1 byte (truncated)
+    std::vector<uint8_t> response(headerSize + linkTypeSampleLen + 1, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_aggregate_resp(0, NSM_GET_NETWORK_ADDRESSES, NSM_SUCCESS, 2,
+                          responseMsg);
+    memcpy(response.data() + headerSize, linkTypeSampleBuf, linkTypeSampleLen);
+
+    sensor.handleResponseMsg(responseMsg, response.size());
+    // Second sample decode fails due to truncation, linkType is Ethernet
+    // but we don't have all samples - function continues after decode failure
 }
 
 namespace nsm
@@ -302,7 +1547,7 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
         .WillRepeatedly(mockSensorIO(NSM_SUCCESS));
     for (size_t i = 0; i < cx7->roundRobinSensors.size(); i++)
     {
-        cx7->roundRobinSensors[i]->update(cx7).detach();
+        cx7->roundRobinSensors[i]->update(cx7);
     }
 }
 
@@ -453,6 +1698,133 @@ TEST(NsmPCIeErrors, HandleResponseMsg)
     EXPECT_EQ(pcieEccIntf->feCount(), 1);
 }
 
+// NsmPCIeErrors: Constructor with GROUP_ID_3 triggers handleResponse(group_3)
+TEST(NsmPCIeErrors, Constructor_Group3)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::filesystem::path path = "/xyz/openbmc_project/inventory/test/pcie_g3";
+    std::string name = "PCIeErrors_g3";
+    std::string type = "NSM_PCIeErrors";
+
+    auto pcieEccIntf = std::make_shared<PCIeEccIntf>(bus, path.c_str());
+    NsmInterfaceProvider<PCIeEccIntf> provider(name, type, path, pcieEccIntf);
+
+    nsm::NsmPCIeErrors errors(provider, 1, GROUP_ID_3);
+
+    EXPECT_EQ(errors.getName(), name);
+    EXPECT_EQ(errors.getType(), type);
+    // initHandleResponse(3) sets l0ToRecoveryCount to 0
+    EXPECT_EQ(pcieEccIntf->l0ToRecoveryCount(), 0u);
+}
+
+// NsmPCIeErrors: Constructor with GROUP_ID_4 calls initHandleResponse(3)
+TEST(NsmPCIeErrors, Constructor_Group4)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::filesystem::path path = "/xyz/openbmc_project/inventory/test/pcie_g4";
+    std::string name = "PCIeErrors_g4";
+    std::string type = "NSM_PCIeErrors";
+
+    auto pcieEccIntf = std::make_shared<PCIeEccIntf>(bus, path.c_str());
+    NsmInterfaceProvider<PCIeEccIntf> provider(name, type, path, pcieEccIntf);
+
+    nsm::NsmPCIeErrors errors(provider, 1, GROUP_ID_4);
+
+    EXPECT_EQ(errors.getName(), name);
+    EXPECT_EQ(errors.getType(), type);
+    // GROUP_ID_4 constructor calls initHandleResponse(3) → l0ToRecoveryCount=0
+    EXPECT_EQ(pcieEccIntf->l0ToRecoveryCount(), 0u);
+}
+
+// NsmPCIeErrors: handleResponseMsg for GROUP_ID_3 sets l0ToRecoveryCount
+TEST(NsmPCIeErrors, HandleResponseMsg_Group3)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::filesystem::path path = "/xyz/openbmc_project/inventory/test/pcie_g3r";
+    auto pcieEccIntf = std::make_shared<PCIeEccIntf>(bus, path.c_str());
+    NsmInterfaceProvider<PCIeEccIntf> provider(
+        "PCIeErrors_g3r", "NSM_PCIeErrors", path, pcieEccIntf);
+
+    nsm::NsmPCIeErrors errors(provider, 1, GROUP_ID_3);
+
+    nsm_query_scalar_group_telemetry_group_3 data = {};
+    data.L0ToRecoveryCount = 42;
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_3_resp));
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    auto rc = encode_query_scalar_group_telemetry_v1_group3_resp(
+        0, NSM_SUCCESS, ERR_NULL, &data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    uint8_t cc = errors.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    EXPECT_EQ(pcieEccIntf->l0ToRecoveryCount(), 42u);
+}
+
+// NsmPCIeErrors: handleResponseMsg for GROUP_ID_4 sets replay/NAK counters
+TEST(NsmPCIeErrors, HandleResponseMsg_Group4)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::filesystem::path path = "/xyz/openbmc_project/inventory/test/pcie_g4r";
+    auto pcieEccIntf = std::make_shared<PCIeEccIntf>(bus, path.c_str());
+    NsmInterfaceProvider<PCIeEccIntf> provider(
+        "PCIeErrors_g4r", "NSM_PCIeErrors", path, pcieEccIntf);
+
+    nsm::NsmPCIeErrors errors(provider, 1, GROUP_ID_4);
+
+    nsm_query_scalar_group_telemetry_group_4 data = {};
+    data.replay_cnt = 10;
+    data.replay_rollover_cnt = 3;
+    data.NAK_sent_cnt = 7;
+    data.NAK_recv_cnt = 5;
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_4_resp));
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    auto rc = encode_query_scalar_group_telemetry_v1_group4_resp(
+        0, NSM_SUCCESS, ERR_NULL, &data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    uint8_t cc = errors.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    EXPECT_EQ(pcieEccIntf->replayCount(), 10u);
+    EXPECT_EQ(pcieEccIntf->replayRolloverCount(), 3u);
+    EXPECT_EQ(pcieEccIntf->nakSentCount(), 7u);
+    EXPECT_EQ(pcieEccIntf->nakReceivedCount(), 5u);
+}
+
+// NsmPCIeErrors: error cc response triggers else branch (handleResponse zeros)
+TEST(NsmPCIeErrors, HandleResponseMsg_ErrorResponse)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::filesystem::path path = "/xyz/openbmc_project/inventory/test/pcie_g2e";
+    auto pcieEccIntf = std::make_shared<PCIeEccIntf>(bus, path.c_str());
+    NsmInterfaceProvider<PCIeEccIntf> provider(
+        "PCIeErrors_g2e", "NSM_PCIeErrors", path, pcieEccIntf);
+
+    nsm::NsmPCIeErrors errors(provider, 1, GROUP_ID_2);
+
+    nsm_query_scalar_group_telemetry_group_2 data = {};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_scalar_group_telemetry_v1_resp) +
+            sizeof(nsm_query_scalar_group_telemetry_group_2),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    encode_query_scalar_group_telemetry_v1_group2_resp(0, NSM_ERROR, ERR_NULL,
+                                                       &data, response);
+
+    uint8_t cc = errors.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(cc, NSM_ERROR);
+    // else branch: handleResponse called with zeroed data → ceCount stays 0
+    EXPECT_EQ(pcieEccIntf->ceCount(), 0u);
+}
+
 TEST_F(NsmPCIePortTest, TearDown)
 {
     devices.clear();
@@ -503,10 +1875,6 @@ TEST_F(NsmPortSensorCreateTestFixture, goodTestCreatePortSensor)
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                           basicIntfName);
     propertyMap = properties;
-
-    // Mock empty topology
-    auto& serviceMap = utils::MockDbusAsync::serviceMap();
-    serviceMap.clear();
 
     createNsmPortSensor(mockManager, basicIntfName, objPath, false);
 

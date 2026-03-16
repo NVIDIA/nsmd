@@ -1228,3 +1228,615 @@ TEST_F(NsmGPMMetricsTestFixture, badTestCreateGPMMetricsMissingFields)
                                                objPath + "_incomplete"),
                            std::bad_optional_access);
 }
+
+// ========== New Branch Coverage Tests ==========
+
+// Internal updator classes (GPMMetricUpdator, NVLinkMetricUpdator, etc.)
+// are not directly testable - coverage comes from integration tests below
+
+// DRAMUsageMetricUpdator, GPMMetricInstanceUpdator,
+// PortMetricPerInstanceUpdator are internal classes - coverage comes from
+// integration tests
+
+// NsmGPMInterfaceCreator addGpmIntfProperty - null gpmIntf (bitfield version)
+TEST(NsmGPMInterfaceCreator, testAddGpmIntfPropertyNullInterface)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    sdbusplus::asio::object_server objServer(systemBus);
+
+    nsm::NsmGPMInterfaceCreator creator(objServer, "/test/path");
+    creator.gpmIntf.reset();
+
+    std::vector<uint8_t> metricsBitfield{0x01};
+    creator.addGpmIntfProperty(metricsBitfield);
+
+    EXPECT_FALSE(creator.gpmIntf);
+}
+
+// NsmGPMInterfaceCreator addGpmIntfProperty - empty bitfield
+TEST(NsmGPMInterfaceCreator, testAddGpmIntfPropertyEmptyBitfield)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    sdbusplus::asio::object_server objServer(systemBus);
+
+    nsm::NsmGPMInterfaceCreator creator(objServer, "/test/path");
+
+    std::vector<uint8_t> metricsBitfield{};
+    creator.addGpmIntfProperty(metricsBitfield);
+
+    EXPECT_TRUE(creator.gpmIntf != nullptr);
+}
+
+// NsmGPMInterfaceCreator addGpmIntfProperty - unsupported metric ID
+TEST(NsmGPMInterfaceCreator, testAddGpmIntfPropertyUnsupportedMetric)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    sdbusplus::asio::object_server objServer(systemBus);
+
+    nsm::NsmGPMInterfaceCreator creator(objServer, "/test/path");
+
+    // Bit 4 is not in GPMIntfMetricsTable
+    std::vector<uint8_t> metricsBitfield{0x10};
+    creator.addGpmIntfProperty(metricsBitfield);
+
+    EXPECT_TRUE(creator.gpmIntf != nullptr);
+}
+
+// NsmGPMInterfaceCreator addGpmIntfProperty - VectorDouble type
+TEST(NsmGPMInterfaceCreator, testAddGpmIntfPropertyVectorDouble)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    sdbusplus::asio::object_server objServer(systemBus);
+
+    nsm::NsmGPMInterfaceCreator creator(objServer, "/test/path");
+
+    creator.addGpmIntfProperty("VectorProperty", nsm::DataType::VectorDouble);
+
+    EXPECT_TRUE(creator.gpmIntf != nullptr);
+}
+
+// NsmGPMInterfaceCreator addGpmIntfProperty - null gpmIntf (name version)
+TEST(NsmGPMInterfaceCreator, testAddGpmIntfPropertyByNameNullInterface)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    sdbusplus::asio::object_server objServer(systemBus);
+
+    nsm::NsmGPMInterfaceCreator creator(objServer, "/test/path");
+    creator.gpmIntf.reset();
+
+    creator.addGpmIntfProperty("TestProperty", nsm::DataType::Double);
+
+    EXPECT_FALSE(creator.gpmIntf);
+}
+
+// NsmGPMAggregated constructor - multiple metrics in bitfield
+TEST(NsmGPMAggregated, testConstructorMultipleMetrics)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
+                                                               "/test/gpm");
+
+    // Multiple bits set for different metric IDs
+    std::vector<uint8_t> metricsBitfield{0xFF, 0xFF};
+
+    nsm::NsmGPMAggregated gpm("test", "AggregatedGPMMetrics", "/test/gpm", 1, 0,
+                              0, metricsBitfield, gpmIntf, nvlinkIntf);
+
+    EXPECT_FALSE(gpm.metricsTable.empty());
+}
+
+// NsmGPMAggregated constructor - single metric
+TEST(NsmGPMAggregated, testConstructorSingleMetric)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
+                                                               "/test/gpm");
+
+    std::vector<uint8_t> metricsBitfield{0x01};
+
+    nsm::NsmGPMAggregated gpm("test", "AggregatedGPMMetrics", "/test/gpm", 1, 0,
+                              0, metricsBitfield, gpmIntf, nvlinkIntf);
+
+    EXPECT_FALSE(gpm.metricsTable.empty());
+}
+
+// NsmGPMAggregated handleSample - tag > metricsTable.size()
+TEST(NsmGPMAggregated, testHandleSampleInvalidTag)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
+                                                               "/test/gpm");
+
+    std::vector<uint8_t> metricsBitfield{0x01};
+
+    nsm::NsmGPMAggregated gpm("test", "AggregatedGPMMetrics", "/test/gpm", 1, 0,
+                              0, metricsBitfield, gpmIntf, nvlinkIntf);
+
+    uint8_t data[8] = {0};
+    nsm::NsmSensorAggregator::TelemetrySample sample{255, 8, data, true};
+
+    auto rc = gpm.handleSample(sample);
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// NsmGPMAggregated handleSample - null decodeFunc
+TEST(NsmGPMAggregated, testHandleSampleNullDecodeFunc)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
+                                                               "/test/gpm");
+
+    std::vector<uint8_t> metricsBitfield{0x01};
+
+    nsm::NsmGPMAggregated gpm("test", "AggregatedGPMMetrics", "/test/gpm", 1, 0,
+                              0, metricsBitfield, gpmIntf, nvlinkIntf);
+
+    gpm.metricsTable[5].emplace_back(nsm::MetricInfo{nullptr, nullptr});
+
+    uint8_t data[8] = {0};
+    nsm::NsmSensorAggregator::TelemetrySample sample{5, 8, data, true};
+
+    auto rc = gpm.handleSample(sample);
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// NsmGPMAggregated handleSample - null updater
+TEST(NsmGPMAggregated, testHandleSampleNullUpdater)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
+                                                               "/test/gpm");
+
+    std::vector<uint8_t> metricsBitfield{0x01};
+
+    nsm::NsmGPMAggregated gpm("test", "AggregatedGPMMetrics", "/test/gpm", 1, 0,
+                              0, metricsBitfield, gpmIntf, nvlinkIntf);
+
+    gpm.metricsTable[5].emplace_back(
+        nsm::MetricInfo{nsm::decodePercentage, nullptr});
+
+    uint8_t data[8] = {0};
+    nsm::NsmSensorAggregator::TelemetrySample sample{5, 8, data, true};
+
+    auto rc = gpm.handleSample(sample);
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// NsmGPMPerInstance constructor tests are covered by existing
+// nsmGPMPerIntance GoodGenReq and GoodHandleResp tests
+
+// NsmGPMPerInstance handleResponseMsg - completion code error
+TEST(NsmGPMPerInstance, testHandleResponseMsgCompletionCodeError)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+
+    std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
+
+    nsm::NsmGPMPerInstance gpm(
+        "test", "PerInstanceMetrics", 1, 0, 0, 10, instanceBitfield,
+        nsm::GPMMetricsUnit::PERCENTAGE,
+        nsm::makeGPMPerInstanceUpdator("Property", "/test/gpm", gpmIntf));
+
+    std::vector<uint8_t> responseBuffer(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_aggregate_resp));
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_ERROR;
+    payload->telemetry_count = 0;
+
+    auto rc = gpm.handleResponseMsg(responseMsg, responseBuffer.size());
+
+    EXPECT_EQ(rc, NSM_ERROR);
+}
+
+// NsmGPMPerInstance handleResponseMsg - telemetryCount == 0
+TEST(NsmGPMPerInstance, testHandleResponseMsgZeroTelemetryCount)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+
+    std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
+
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    nsm::NsmGPMPerInstance gpm("test", "PerInstanceMetrics", 1, 0, 0, 10,
+                               instanceBitfield,
+                               nsm::GPMMetricsUnit::PERCENTAGE, updator);
+
+    EXPECT_CALL(*updator, updateMetric(std::vector<double>{})).Times(1);
+
+    std::vector<uint8_t> responseBuffer(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_aggregate_resp));
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 0;
+
+    auto rc = gpm.handleResponseMsg(responseMsg, responseBuffer.size());
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// NsmGPMPerInstance handleResponseMsg - invalid sample (valid bit false)
+TEST(NsmGPMPerInstance, testHandleResponseMsgInvalidSample)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+
+    std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
+
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    nsm::NsmGPMPerInstance gpm("test", "PerInstanceMetrics", 1, 0, 0, 10,
+                               instanceBitfield,
+                               nsm::GPMMetricsUnit::PERCENTAGE, updator);
+
+    const size_t data_len = 8;
+    std::array<uint8_t, data_len> data = {0};
+
+    std::vector<uint8_t> responseBuffer(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp) +
+        sizeof(nsm_aggregate_resp_sample) - 1 + data_len);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 1;
+
+    auto sample_ptr = reinterpret_cast<uint8_t*>(payload + 1);
+    auto sample = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+    sample->tag = 1;
+    sample->valid = 0; // Invalid sample
+    sample->length = std::log2(data_len);
+    memcpy(sample->data, data.data(), data_len);
+
+    EXPECT_CALL(*updator, updateMetric(testing::_)).Times(1);
+
+    auto rc = gpm.handleResponseMsg(responseMsg, responseBuffer.size());
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// NsmGPMPerInstance handleResponseMsg - tag > MAX
+TEST(NsmGPMPerInstance, testHandleResponseMsgTagTooLarge)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+
+    std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
+
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    nsm::NsmGPMPerInstance gpm("test", "PerInstanceMetrics", 1, 0, 0, 10,
+                               instanceBitfield,
+                               nsm::GPMMetricsUnit::PERCENTAGE, updator);
+
+    const size_t data_len = 8;
+    std::array<uint8_t, data_len> data = {0};
+
+    std::vector<uint8_t> responseBuffer(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp) +
+        sizeof(nsm_aggregate_resp_sample) - 1 + data_len);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 1;
+
+    auto sample_ptr = reinterpret_cast<uint8_t*>(payload + 1);
+    auto sample = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+    sample->tag = NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE + 1;
+    sample->valid = 1;
+    sample->length = std::log2(data_len);
+    memcpy(sample->data, data.data(), data_len);
+
+    EXPECT_CALL(*updator, updateMetric(testing::_)).Times(1);
+
+    auto rc = gpm.handleResponseMsg(responseMsg, responseBuffer.size());
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// NsmGPMPerInstance handleResponseMsg - tag >= metrics.size() (resize)
+TEST(NsmGPMPerInstance, testHandleResponseMsgResizeMetrics)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+
+    std::vector<bitfield8_t> instanceBitfield{{.byte = 0xFF}};
+
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    nsm::NsmGPMPerInstance gpm("test", "PerInstanceMetrics", 1, 0, 0, 10,
+                               instanceBitfield, nsm::GPMMetricsUnit::BANDWIDTH,
+                               updator);
+
+    const double bandwidth = 500000000;
+    const size_t data_len = 8;
+    std::array<uint8_t, data_len> data = {};
+    size_t encoded_len = 0;
+
+    auto rc_encode = encode_aggregate_gpm_metric_bandwidth_data(
+        bandwidth, data.data(), &encoded_len);
+    EXPECT_EQ(rc_encode, NSM_SW_SUCCESS);
+
+    std::vector<uint8_t> responseBuffer(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp) +
+        sizeof(nsm_aggregate_resp_sample) - 1 + data_len);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 1;
+
+    auto sample_ptr = reinterpret_cast<uint8_t*>(payload + 1);
+    auto sample = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+    sample->tag = 10; // Large tag to trigger resize
+    sample->valid = 1;
+    sample->length = std::log2(data_len);
+    memcpy(sample->data, data.data(), data_len);
+
+    EXPECT_CALL(*updator, updateMetric(testing::_)).Times(1);
+
+    auto rc = gpm.handleResponseMsg(responseMsg, responseBuffer.size());
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// makeGPMPerInstanceUpdator test
+TEST(MakeUpdators, testMakeGPMPerInstanceUpdator)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+
+    auto updator = nsm::makeGPMPerInstanceUpdator("TestProperty", "/test/gpm",
+                                                  gpmIntf);
+
+    EXPECT_NE(updator, nullptr);
+}
+
+// makeNVLinkRawRxPerInstanceUpdator test
+TEST(MakeUpdators, testMakeNVLinkRawRxPerInstanceUpdator)
+{
+    auto bus = sdbusplus::bus::new_default();
+    std::vector<nsm::NVLinkMetricsUpdatorInfo> updatorInfos;
+
+    for (int i = 0; i < 2; ++i)
+    {
+        auto intf = std::make_shared<nsm::NVLinkMetricsIntf>(
+            bus, ("/test/nvlink" + std::to_string(i)).c_str());
+        updatorInfos.push_back({"/test/nvlink" + std::to_string(i), intf});
+    }
+
+    auto updator = nsm::makeNVLinkRawRxPerInstanceUpdator(updatorInfos);
+
+    EXPECT_NE(updator, nullptr);
+}
+
+// makeNVLinkRawTxPerInstanceUpdator test
+TEST(MakeUpdators, testMakeNVLinkRawTxPerInstanceUpdator)
+{
+    auto bus = sdbusplus::bus::new_default();
+    std::vector<nsm::NVLinkMetricsUpdatorInfo> updatorInfos;
+
+    for (int i = 0; i < 2; ++i)
+    {
+        auto intf = std::make_shared<nsm::NVLinkMetricsIntf>(
+            bus, ("/test/nvlink" + std::to_string(i)).c_str());
+        updatorInfos.push_back({"/test/nvlink" + std::to_string(i), intf});
+    }
+
+    auto updator = nsm::makeNVLinkRawTxPerInstanceUpdator(updatorInfos);
+
+    EXPECT_NE(updator, nullptr);
+}
+
+// makeNVLinkDataRxPerInstanceUpdator test
+TEST(MakeUpdators, testMakeNVLinkDataRxPerInstanceUpdator)
+{
+    auto bus = sdbusplus::bus::new_default();
+    std::vector<nsm::NVLinkMetricsUpdatorInfo> updatorInfos;
+
+    for (int i = 0; i < 2; ++i)
+    {
+        auto intf = std::make_shared<nsm::NVLinkMetricsIntf>(
+            bus, ("/test/nvlink" + std::to_string(i)).c_str());
+        updatorInfos.push_back({"/test/nvlink" + std::to_string(i), intf});
+    }
+
+    auto updator = nsm::makeNVLinkDataRxPerInstanceUpdator(updatorInfos);
+
+    EXPECT_NE(updator, nullptr);
+}
+
+// makeNVLinkDataTxPerInstanceUpdator test
+TEST(MakeUpdators, testMakeNVLinkDataTxPerInstanceUpdator)
+{
+    auto bus = sdbusplus::bus::new_default();
+    std::vector<nsm::NVLinkMetricsUpdatorInfo> updatorInfos;
+
+    for (int i = 0; i < 2; ++i)
+    {
+        auto intf = std::make_shared<nsm::NVLinkMetricsIntf>(
+            bus, ("/test/nvlink" + std::to_string(i)).c_str());
+        updatorInfos.push_back({"/test/nvlink" + std::to_string(i), intf});
+    }
+
+    auto updator = nsm::makeNVLinkDataTxPerInstanceUpdator(updatorInfos);
+
+    EXPECT_NE(updator, nullptr);
+}
+
+// decodePercentage test
+TEST(DecodeFunctions, testDecodePercentage)
+{
+    const double percentage = 87.654;
+    std::array<uint8_t, sizeof(double)> data = {};
+    size_t data_len = 0;
+
+    auto rc_encode = encode_aggregate_gpm_metric_percentage_data(
+        percentage, data.data(), &data_len);
+    EXPECT_EQ(rc_encode, NSM_SW_SUCCESS);
+
+    auto [rc, decoded_val] = nsm::decodePercentage(data.data(), data_len);
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_NEAR(decoded_val, percentage, 0.01);
+}
+
+// decodeBandwidth test
+TEST(DecodeFunctions, testDecodeBandwidth)
+{
+    const uint64_t bandwidth = 12345678900;
+    std::array<uint8_t, sizeof(uint64_t)> data = {};
+    size_t data_len = 0;
+
+    auto rc_encode = encode_aggregate_gpm_metric_bandwidth_data(
+        bandwidth, data.data(), &data_len);
+    EXPECT_EQ(rc_encode, NSM_SW_SUCCESS);
+
+    auto [rc, decoded_val] = nsm::decodeBandwidth(data.data(), data_len);
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    static constexpr uint64_t conversionFactor = 1024 * 1024 * 128;
+    double expected = bandwidth / static_cast<double>(conversionFactor);
+    EXPECT_NEAR(decoded_val, expected, 0.001);
+}
+
+// ========== Coverage Tests for Private Updator updateMetric() ==========
+
+// NVLinkMetricUpdator::updateMetric() is triggered via
+// NsmGPMAggregated::handleSample() with NVLink tags (10-13).
+// The constructor always populates metricsTable[10..13] regardless of
+// metricsBitfield.
+TEST(NsmGPMAggregated, testHandleSampleNVLinkTag10TriggersNVLinkUpdator)
+{
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/test/gpm_nvlink10", "com.nvidia.GPMMetrics");
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf =
+        std::make_shared<nsm::NVLinkMetricsIntf>(bus, "/test/gpm_nvlink10");
+
+    std::vector<uint8_t> metricsBitfield{0x01};
+    nsm::NsmGPMAggregated gpm("test_nvlink10", "AggregatedGPMMetrics",
+                              "/test/gpm_nvlink10", 1, 0, 0, metricsBitfield,
+                              gpmIntf, nvlinkIntf);
+
+    // Encode bandwidth for tag 10 (NVLinkRawTxBandwidthGbps)
+    const uint64_t bandwidth = 500000000ULL;
+    std::array<uint8_t, sizeof(uint64_t)> data = {};
+    size_t data_len = 0;
+    auto rc_encode = encode_aggregate_gpm_metric_bandwidth_data(
+        bandwidth, data.data(), &data_len);
+    EXPECT_EQ(rc_encode, NSM_SW_SUCCESS);
+
+    // First call: previousValue(NaN) != val → calls nvLinkRawTxBandwidthGbps
+    nsm::NsmSensorAggregator::TelemetrySample sample{
+        10, static_cast<uint8_t>(data_len), data.data(), true};
+    auto rc = gpm.handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Second call with same data: previousValue == val → no-op branch
+    rc = gpm.handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// GPMMetricInstanceUpdator::updateMetric() - covered via factory + direct call
+// with null gpmIntf (covers the if-false branch without needing set_property)
+TEST(MakeUpdators, testGPMPerInstanceUpdatorUpdateMetricNullIntf)
+{
+    // Null gpmIntf: condition (previousMetrics != metrics && gpmIntf) → false
+    auto updator = nsm::makeGPMPerInstanceUpdator("TestProp", "/test/gpm_upd",
+                                                  nullptr);
+    EXPECT_NE(updator, nullptr);
+
+    // First call: previousMetrics({}) != metrics({1,2,3}) && nullptr → false
+    updator->updateMetric({1.0, 2.0, 3.0});
+
+    // Second call with same values: same evaluation path
+    updator->updateMetric({1.0, 2.0, 3.0});
+
+    // Call with empty vector: previousMetrics({}) == metrics({}) → false
+    auto updator2 = nsm::makeGPMPerInstanceUpdator("TestProp2",
+                                                   "/test/gpm_upd2", nullptr);
+    updator2->updateMetric({});
+    updator2->updateMetric({});
+}
+
+// PortMetricPerInstanceUpdator::updateMetric() - triggered by calling
+// makeNVLinkRawTxPerInstanceUpdator then updateMetric with real NVLink intfs
+TEST(MakeUpdators, testPortMetricPerInstanceUpdatorUpdateMetric)
+{
+    auto bus = sdbusplus::bus::new_default();
+    std::vector<nsm::NVLinkMetricsUpdatorInfo> updatorInfos;
+    for (int i = 0; i < 3; ++i)
+    {
+        auto intf = std::make_shared<nsm::NVLinkMetricsIntf>(
+            bus, ("/test/nvlink_ppu_" + std::to_string(i)).c_str());
+        updatorInfos.push_back({"/test/nvlink_ppu_" + std::to_string(i), intf});
+    }
+
+    auto updator = nsm::makeNVLinkRawTxPerInstanceUpdator(updatorInfos);
+    EXPECT_NE(updator, nullptr);
+
+    // First call: previousMetrics empty → resize → update each interface
+    updator->updateMetric({1.0, 2.0, 3.0});
+
+    // Second call same values: previousMetrics[i] == metrics[i] → no update
+    updator->updateMetric({1.0, 2.0, 3.0});
+
+    // Third call with different values → update each interface again
+    updator->updateMetric({4.0, 5.0, 6.0});
+
+    // Call with fewer values than updatorInfos: min(1, 3) = 1 update
+    updator->updateMetric({7.0});
+
+    // Call with empty vector: length = 0, loop not entered
+    updator->updateMetric({});
+}

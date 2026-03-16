@@ -210,3 +210,136 @@ TEST_F(NsmGPIOStateTest, testHandleResponseMsgMultipleGPIOs)
 
     EXPECT_EQ(result, NSM_SUCCESS);
 }
+
+// Test handleResponseMsg with offset
+TEST_F(NsmGPIOStateTest, HandleResponseMsg_WithOffset)
+{
+    std::string name = "TestGPIO";
+    std::string type = "GPIO";
+    std::string inventoryObjPath = "/xyz/openbmc_project/gpio/test";
+    std::vector<std::tuple<std::string, std::string, std::string>> associations;
+
+    auto gpioStateIntf = std::make_shared<GPIOStateIntf>(
+        utils::DBusHandler::getBus(), inventoryObjPath.c_str());
+
+    auto gpioStateSensor = std::make_shared<NsmGPIOState>(
+        utils::DBusHandler::getBus(), type, name, inventoryObjPath,
+        associations, gpioStateIntf);
+
+    uint8_t instanceId = 1;
+    uint16_t offset = 16;                   // Start at GPIO 16
+    uint16_t length = 1;                    // 1 byte = 8 GPIO pins
+    std::vector<uint8_t> gpioData = {0xFF}; // All high
+
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+                                     sizeof(nsm_get_gpio_state_resp) - 1 +
+                                     gpioData.size());
+    auto responseMsgPtr = reinterpret_cast<struct nsm_msg*>(responseMsg.data());
+
+    auto rc = encode_get_gpio_state_resp(instanceId, NSM_SUCCESS, ERR_NULL,
+                                         offset, length, gpioData.data(),
+                                         gpioData.size(), responseMsgPtr);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto result = gpioStateSensor->handleResponseMsg(responseMsgPtr,
+                                                     responseMsg.size());
+
+    EXPECT_EQ(result, NSM_SUCCESS);
+
+    auto states = gpioStateIntf->lineStates();
+
+    // Check that GPIOs 16-23 are all true (offset + 0-7)
+    for (int i = 0; i < 8; i++)
+    {
+        EXPECT_EQ(states[16 + i], true)
+            << "GPIO " << (16 + i) << " should be true";
+    }
+}
+
+// Test GPIO bit extraction logic - all zeros
+TEST_F(NsmGPIOStateTest, HandleResponseMsg_AllZeros)
+{
+    std::string name = "TestGPIO";
+    std::string type = "GPIO";
+    std::string inventoryObjPath = "/xyz/openbmc_project/gpio/test";
+    std::vector<std::tuple<std::string, std::string, std::string>> associations;
+
+    auto gpioStateIntf = std::make_shared<GPIOStateIntf>(
+        utils::DBusHandler::getBus(), inventoryObjPath.c_str());
+
+    auto gpioStateSensor = std::make_shared<NsmGPIOState>(
+        utils::DBusHandler::getBus(), type, name, inventoryObjPath,
+        associations, gpioStateIntf);
+
+    uint8_t instanceId = 1;
+    uint16_t offset = 0;
+    uint16_t length = 1;
+    std::vector<uint8_t> gpioData = {0x00};
+
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+                                     sizeof(nsm_get_gpio_state_resp) - 1 +
+                                     gpioData.size());
+    auto responseMsgPtr = reinterpret_cast<struct nsm_msg*>(responseMsg.data());
+
+    auto rc = encode_get_gpio_state_resp(instanceId, NSM_SUCCESS, ERR_NULL,
+                                         offset, length, gpioData.data(),
+                                         gpioData.size(), responseMsgPtr);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto result = gpioStateSensor->handleResponseMsg(responseMsgPtr,
+                                                     responseMsg.size());
+
+    EXPECT_EQ(result, NSM_SUCCESS);
+
+    auto states = gpioStateIntf->lineStates();
+
+    // All 8 bits should be false
+    for (int i = 0; i < 8; i++)
+    {
+        EXPECT_EQ(states[i], false) << "GPIO " << i << " should be false";
+    }
+}
+
+// Test GPIO bit extraction logic - all ones
+TEST_F(NsmGPIOStateTest, HandleResponseMsg_AllOnes)
+{
+    std::string name = "TestGPIO";
+    std::string type = "GPIO";
+    std::string inventoryObjPath = "/xyz/openbmc_project/gpio/test";
+    std::vector<std::tuple<std::string, std::string, std::string>> associations;
+
+    auto gpioStateIntf = std::make_shared<GPIOStateIntf>(
+        utils::DBusHandler::getBus(), inventoryObjPath.c_str());
+
+    auto gpioStateSensor = std::make_shared<NsmGPIOState>(
+        utils::DBusHandler::getBus(), type, name, inventoryObjPath,
+        associations, gpioStateIntf);
+
+    uint8_t instanceId = 1;
+    uint16_t offset = 0;
+    uint16_t length = 1;
+    std::vector<uint8_t> gpioData = {0xFF};
+
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+                                     sizeof(nsm_get_gpio_state_resp) - 1 +
+                                     gpioData.size());
+    auto responseMsgPtr = reinterpret_cast<struct nsm_msg*>(responseMsg.data());
+
+    auto rc = encode_get_gpio_state_resp(instanceId, NSM_SUCCESS, ERR_NULL,
+                                         offset, length, gpioData.data(),
+                                         gpioData.size(), responseMsgPtr);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto result = gpioStateSensor->handleResponseMsg(responseMsgPtr,
+                                                     responseMsg.size());
+
+    EXPECT_EQ(result, NSM_SUCCESS);
+
+    auto states = gpioStateIntf->lineStates();
+
+    // All 8 bits should be true
+    for (int i = 0; i < 8; i++)
+    {
+        EXPECT_EQ(states[i], true) << "GPIO " << i << " should be true";
+    }
+}

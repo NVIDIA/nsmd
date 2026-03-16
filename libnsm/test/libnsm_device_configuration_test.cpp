@@ -1863,6 +1863,36 @@ TEST(getConfidentialComputeMode, testGoodEncodeResponse)
 	EXPECT_EQ(resp->pending_mode, 1);
 }
 
+TEST(getConfidentialComputeMode, testEncodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x17;
+	uint8_t current_mode = 3;
+	uint8_t pending_mode = 2;
+
+	// Test error response with reason code
+	int rc = encode_get_confidential_compute_mode_v1_resp(
+	    instance_id, NSM_ERR_INVALID_DATA, 0xBEEF, current_mode,
+	    pending_mode, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_DEVICE_CONFIGURATION);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xBEEF);
+}
+
 TEST(getConfidentialComputeMode, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
@@ -2180,6 +2210,35 @@ TEST(getEGMMode, testGoodEncodeResponse)
 	EXPECT_EQ(1, resp->flags.byte);
 }
 
+TEST(getEGMMode, testEncodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x18;
+	bitfield8_t flags;
+	flags.byte = 3;
+
+	// Test error response with reason code
+	int rc = encode_get_EGM_mode_resp(instance_id, NSM_ERR_INVALID_DATA,
+					  0xCAFE, &flags, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_DEVICE_CONFIGURATION);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_GET_EGM_MODE);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xCAFE);
+}
+
 TEST(getEGMMode, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
@@ -2325,6 +2384,34 @@ TEST(getDeviceModeSettings, testBadEncodeResponse)
 	auto rc = encode_get_device_mode_settings_resp(
 	    0, NSM_SUCCESS, reason_code, device_mode, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getDeviceModeSettings, testEncodeResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x19;
+	uint8_t device_mode = 5;
+
+	// Test error response with reason code
+	int rc = encode_get_device_mode_settings_resp(
+	    instance_id, NSM_ERR_INVALID_DATA, 0xFACE, device_mode, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header fields
+	EXPECT_EQ(msg->hdr.request, 0); // Response message
+	EXPECT_EQ(msg->hdr.datagram, 0);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_DEVICE_CONFIGURATION);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto *resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(msg->payload);
+	EXPECT_EQ(resp->command, NSM_GET_DEVICE_MODE_SETTING);
+	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(le16toh(resp->reason_code), 0xFACE);
 }
 
 TEST(getDeviceModeSettings, testGoodDecodeResponse)

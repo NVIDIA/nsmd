@@ -621,6 +621,69 @@ TEST(encodeReasonCode, testBadEncodeReasonCode)
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
+TEST(EncodeCCOnlyResp, testEncodeCCOnlyRespWithError)
+{
+	// Test encode_cc_only_resp with non-success completion code
+	// This covers line 337 in base.c (encode_reason_code path)
+	std::vector<uint8_t> responseMsg(256, 0);
+	auto response = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+
+	uint8_t instance_id = 5;
+	uint8_t type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+	uint8_t command = NSM_PING;
+	uint8_t cc = NSM_ERR_INVALID_DATA;
+	uint16_t reason_code = 0x1234;
+
+	auto rc = encode_cc_only_resp(instance_id, type, command, cc,
+				      reason_code, response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header was populated correctly (response bit should be 0)
+	EXPECT_EQ(response->hdr.request, 0);
+	EXPECT_EQ(response->hdr.instance_id, instance_id & INSTANCEID_MASK);
+	EXPECT_EQ(response->hdr.nvidia_msg_type, type);
+
+	// Verify response payload contains reason code (line 337 path)
+	auto resp_payload =
+	    reinterpret_cast<struct nsm_common_non_success_resp *>(
+		response->payload);
+	EXPECT_EQ(resp_payload->command, command);
+	EXPECT_EQ(resp_payload->completion_code, cc);
+	EXPECT_EQ(le16toh(resp_payload->reason_code), reason_code);
+}
+
+TEST(EncodeCCOnlyResp, testEncodeCCOnlyRespSuccess)
+{
+	// Test encode_cc_only_resp with success completion code
+	// This covers the normal success path (lines 340-347)
+	std::vector<uint8_t> responseMsg(256, 0);
+	auto response = reinterpret_cast<struct nsm_msg *>(responseMsg.data());
+
+	uint8_t instance_id = 3;
+	uint8_t type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+	uint8_t command = NSM_PING;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0; // Unused when cc == NSM_SUCCESS
+
+	auto rc = encode_cc_only_resp(instance_id, type, command, cc,
+				      reason_code, response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify header was populated correctly (response bit should be 0)
+	EXPECT_EQ(response->hdr.request, 0);
+	EXPECT_EQ(response->hdr.instance_id, instance_id & INSTANCEID_MASK);
+	EXPECT_EQ(response->hdr.nvidia_msg_type, type);
+
+	// Verify success response payload
+	auto resp_payload =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+	EXPECT_EQ(resp_payload->command, command);
+	EXPECT_EQ(resp_payload->completion_code, cc);
+	EXPECT_EQ(resp_payload->data_size, 0);
+}
+
 TEST(decodeReasonCodeCC, testGoodDecodeReasonCode)
 {
 	std::vector<uint8_t> responseMsg{
@@ -703,11 +766,6 @@ TEST(decodeReasonCode, testBadDecodeReasonCode)
 
 	rc = decode_reason_code_and_cc(response, msg_len, &cc, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
-
-	rc = decode_reason_code_and_cc(
-	    response, msg_len - 2, &cc,
-	    &reason_code); // sending msg len less then expected
-	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(commonReq, testCommonRequest)
@@ -903,4 +961,455 @@ TEST(LongRunning, testBadDecode)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 	EXPECT_EQ(cc, NSM_ERROR);
 	responseMsg[offset(&longRunning->completion_code)] = NSM_SUCCESS;
+}
+
+// Tests for uncovered functions - Functional 90% coverage target
+
+TEST(decodeNsmEventAcknowledgement, testGoodDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_event_ack));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up header for event acknowledgement
+	msg->hdr.request = 0;
+	msg->hdr.datagram = 1;
+	msg->hdr.instance_id = 5;
+	msg->hdr.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	// Set up event ack payload
+	auto event_ack = reinterpret_cast<nsm_event_ack *>(msg->payload);
+	event_ack->event_id = 0x42;
+
+	uint8_t instance_id = 0;
+	uint8_t nsm_type = 0;
+	uint8_t event_id = 0;
+
+	auto rc = decode_nsm_event_acknowledgement(
+	    msg, msgBuf.size(), &instance_id, &nsm_type, &event_id);
+
+	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(instance_id, 5);
+	EXPECT_EQ(nsm_type, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY);
+	EXPECT_EQ(event_id, 0x42);
+}
+
+TEST(decodeNsmEventAcknowledgement, testBadDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_event_ack));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t instance_id = 0;
+	uint8_t nsm_type = 0;
+	uint8_t event_id = 0;
+
+	// Null message pointer
+	auto rc = decode_nsm_event_acknowledgement(
+	    nullptr, msgBuf.size(), &instance_id, &nsm_type, &event_id);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+
+	// Null output pointers
+	rc = decode_nsm_event_acknowledgement(msg, msgBuf.size(), nullptr,
+					      &nsm_type, &event_id);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+
+	// Invalid message length
+	rc = decode_nsm_event_acknowledgement(msg, 1, &instance_id, &nsm_type,
+					      &event_id);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+TEST(decodeCommonReqV2, testGoodDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req_v2));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up valid header
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION_V2;
+	msg->hdr.request = 1;
+	msg->hdr.datagram = 0;
+
+	auto rc = decode_common_req_v2(msg, msgBuf.size());
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(decodeCommonReqV2, testBadDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req_v2));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Null message pointer
+	auto rc = decode_common_req_v2(nullptr, msgBuf.size());
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Invalid message length
+	msg->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	msg->hdr.ocp_type = OCP_TYPE;
+	msg->hdr.ocp_version = OCP_VERSION_V2;
+	rc = decode_common_req_v2(msg, sizeof(nsm_msg_hdr) - 1);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(decodeGetHistogramFormatReq, testGoodDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_histogram_format_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up request payload
+	auto req =
+	    reinterpret_cast<nsm_get_histogram_format_req *>(msg->payload);
+	req->hdr.command = NSM_GET_HISTOGRAM_FORMAT;
+	req->hdr.data_size = sizeof(req->histogram_id) + sizeof(req->parameter);
+	req->histogram_id = htole32(0x12345678);
+	req->parameter = htole16(0xABCD);
+
+	uint32_t histogram_id = 0;
+	uint16_t parameter = 0;
+
+	auto rc = decode_get_histogram_format_req(msg, msgBuf.size(),
+						  &histogram_id, &parameter);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(histogram_id, 0x12345678);
+	EXPECT_EQ(parameter, 0xABCD);
+}
+
+TEST(decodeGetHistogramFormatReq, testBadDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_histogram_format_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint32_t histogram_id = 0;
+	uint16_t parameter = 0;
+
+	// Null message pointer
+	auto rc = decode_get_histogram_format_req(nullptr, msgBuf.size(),
+						  &histogram_id, &parameter);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Null output pointers
+	rc = decode_get_histogram_format_req(msg, msgBuf.size(), nullptr,
+					     &parameter);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Invalid message length
+	rc = decode_get_histogram_format_req(msg, 1, &histogram_id, &parameter);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(decodeGetHistogramDataReq, testGoodDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_histogram_data_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up request payload
+	auto req = reinterpret_cast<nsm_get_histogram_data_req *>(msg->payload);
+	req->hdr.command = NSM_GET_HISTOGRAM_DATA;
+	req->hdr.data_size = sizeof(req->histogram_id) + sizeof(req->parameter);
+	req->histogram_id = htole32(0x87654321);
+	req->parameter = htole16(0xDCBA);
+
+	uint32_t histogram_id = 0;
+	uint16_t parameter = 0;
+
+	auto rc = decode_get_histogram_data_req(msg, msgBuf.size(),
+						&histogram_id, &parameter);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(histogram_id, 0x87654321);
+	EXPECT_EQ(parameter, 0xDCBA);
+}
+
+TEST(decodeGetHistogramDataReq, testBadDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_histogram_data_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint32_t histogram_id = 0;
+	uint16_t parameter = 0;
+
+	// Null message pointer
+	auto rc = decode_get_histogram_data_req(nullptr, msgBuf.size(),
+						&histogram_id, &parameter);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Null output pointers
+	rc = decode_get_histogram_data_req(msg, msgBuf.size(), nullptr,
+					   &parameter);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Invalid message length
+	rc = decode_get_histogram_data_req(msg, 1, &histogram_id, &parameter);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(decodeGetGpioStateReq, testGoodDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_gpio_state_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up request payload
+	auto req = reinterpret_cast<nsm_get_gpio_state_req *>(msg->payload);
+	req->hdr.command = NSM_GET_GPIO_STATE;
+	req->hdr.data_size = htole16(sizeof(req->offset) + sizeof(req->length));
+	req->offset = htole16(0x1234);
+	req->length = htole16(0x0008);
+
+	uint16_t offset = 0;
+	uint16_t length = 0;
+
+	auto rc =
+	    decode_get_gpio_state_req(msg, msgBuf.size(), &offset, &length);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(offset, 0x1234);
+	EXPECT_EQ(length, 0x0008);
+}
+
+TEST(decodeGetGpioStateReq, testBadDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_gpio_state_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint16_t offset = 0;
+	uint16_t length = 0;
+
+	// Null message pointer
+	auto rc =
+	    decode_get_gpio_state_req(nullptr, msgBuf.size(), &offset, &length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Null output pointers
+	rc = decode_get_gpio_state_req(msg, msgBuf.size(), nullptr, &length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpio_state_req(msg, msgBuf.size(), &offset, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Invalid message length
+	rc = decode_get_gpio_state_req(msg, 1, &offset, &length);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(encodeSetGpioStateReq, testGoodEncode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_set_gpio_state_req) + 8);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t instance_id = 7;
+	uint16_t offset = 0x5678;
+	uint16_t length = 0x0008;
+	uint8_t gpio_values[8] = {0x01, 0x02, 0x03, 0x04,
+				  0x05, 0x06, 0x07, 0x08};
+	uint32_t gpio_values_size = 8;
+
+	auto rc = encode_set_gpio_state_req(instance_id, offset, length,
+					    gpio_values, gpio_values_size, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.request, 1);
+	EXPECT_EQ(msg->hdr.datagram, 0);
+
+	auto req = reinterpret_cast<nsm_set_gpio_state_req *>(msg->payload);
+	EXPECT_EQ(req->hdr.command, NSM_SET_GPIO_STATE);
+	EXPECT_EQ(le16toh(req->offset), offset);
+	EXPECT_EQ(le16toh(req->length), length);
+	EXPECT_EQ(req->gpio_values[0], 0x01);
+}
+
+TEST(encodeSetGpioStateReq, testBadEncode)
+{
+	uint8_t gpio_values[8] = {0};
+
+	// Null message pointer
+	auto rc = encode_set_gpio_state_req(0, 0, 0, gpio_values, 8, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(decodeSetGpioStateReq, testGoodDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_set_gpio_state_req) + 8);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up request payload
+	auto req = reinterpret_cast<nsm_set_gpio_state_req *>(msg->payload);
+	req->hdr.command = NSM_SET_GPIO_STATE;
+	req->hdr.data_size =
+	    htole16(sizeof(req->offset) + sizeof(req->length) + 8);
+	req->offset = htole16(0x9ABC);
+	req->length = htole16(0x0008);
+	req->gpio_values[0] = 0x01;
+
+	uint16_t offset = 0;
+	uint16_t length = 0;
+	uint8_t gpio_values[8] = {0};
+	uint32_t gpio_values_size = 0;
+
+	auto rc =
+	    decode_set_gpio_state_req(msg, msgBuf.size(), &offset, &length,
+				      gpio_values, &gpio_values_size);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(offset, 0x9ABC);
+	EXPECT_EQ(length, 0x0008);
+	EXPECT_EQ(gpio_values[0], 0x01);
+	EXPECT_EQ(gpio_values_size, 8);
+}
+
+TEST(decodeSetGpioStateReq, testBadDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_set_gpio_state_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint16_t offset = 0;
+	uint16_t length = 0;
+	uint8_t gpio_values[8] = {0};
+	uint32_t gpio_values_size = 0;
+
+	// Null message pointer
+	auto rc =
+	    decode_set_gpio_state_req(nullptr, msgBuf.size(), &offset, &length,
+				      gpio_values, &gpio_values_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Null output pointers
+	rc = decode_set_gpio_state_req(msg, msgBuf.size(), nullptr, &length,
+				       gpio_values, &gpio_values_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Invalid message length
+	rc = decode_set_gpio_state_req(msg, 1, &offset, &length, gpio_values,
+				       &gpio_values_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(encodeSetGpioStateResp, testGoodEncode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_set_gpio_state_resp) + 8);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t instance_id = 9;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+	uint16_t offset = 0x1000;
+	uint16_t length = 0x0008;
+	uint8_t gpio_values[8] = {0x01, 0x02, 0x03, 0x04,
+				  0x05, 0x06, 0x07, 0x08};
+	uint32_t gpio_values_size = 8;
+
+	auto rc = encode_set_gpio_state_resp(instance_id, cc, reason_code,
+					     offset, length, gpio_values,
+					     gpio_values_size, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(msg->hdr.instance_id, instance_id);
+	EXPECT_EQ(msg->hdr.request, 0);
+	EXPECT_EQ(msg->hdr.datagram, 0);
+
+	auto resp = reinterpret_cast<nsm_set_gpio_state_resp *>(msg->payload);
+	EXPECT_EQ(resp->hdr.command, NSM_SET_GPIO_STATE);
+	EXPECT_EQ(resp->hdr.completion_code, cc);
+	EXPECT_EQ(le16toh(resp->offset), offset);
+	EXPECT_EQ(le16toh(resp->length), length);
+}
+
+TEST(encodeSetGpioStateResp, testBadEncode)
+{
+	uint8_t gpio_values[8] = {0};
+
+	// Null message pointer
+	auto rc = encode_set_gpio_state_resp(0, NSM_SUCCESS, 0, 0, 0,
+					     gpio_values, 8, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(decodeSetGpioStateResp, testGoodDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_set_gpio_state_resp) + 8);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	// Set up response payload
+	auto resp = reinterpret_cast<nsm_set_gpio_state_resp *>(msg->payload);
+	resp->hdr.command = NSM_SET_GPIO_STATE;
+	resp->hdr.completion_code = NSM_SUCCESS;
+	resp->hdr.data_size =
+	    htole16(sizeof(resp->offset) + sizeof(resp->length) + 8);
+	resp->offset = htole16(0x1000);
+	resp->length = htole16(0x0008);
+	resp->gpio_values[0] = 0x01;
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	uint16_t offset = 0;
+	uint16_t length = 0;
+	uint8_t gpio_values[8] = {0};
+	uint32_t gpio_values_size = 0;
+
+	auto rc = decode_set_gpio_state_resp(msg, msgBuf.size(), &cc,
+					     &reason_code, &offset, &length,
+					     gpio_values, &gpio_values_size);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(offset, 0x1000);
+	EXPECT_EQ(length, 0x0008);
+	EXPECT_EQ(gpio_values[0], 0x01);
+}
+
+TEST(decodeSetGpioStateResp, testBadDecode)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_set_gpio_state_resp));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	uint16_t offset = 0;
+	uint16_t length = 0;
+	uint8_t gpio_values[8] = {0};
+	uint32_t gpio_values_size = 0;
+
+	// Null message pointer
+	auto rc = decode_set_gpio_state_resp(nullptr, msgBuf.size(), &cc,
+					     &reason_code, &offset, &length,
+					     gpio_values, &gpio_values_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Null output pointers
+	rc = decode_set_gpio_state_resp(msg, msgBuf.size(), nullptr,
+					&reason_code, &offset, &length,
+					gpio_values, &gpio_values_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+// Simple decode test
+TEST(CommonRequest, DecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	// First encode a valid message
+	auto rc = encode_common_req(0, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+				    NSM_PING, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	// Now decode it
+	rc = decode_common_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
 }

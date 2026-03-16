@@ -178,7 +178,7 @@ TEST_F(NsmPowerPowerSupplyTest, testcreatePowerSubSystemNoDevice)
 
     createPowerSubSystem(mockManager, interfaceName, objPath);
 
-    // Should handle missing Name gracefully
+    // UUID does not match any device; createPowerSubSystem runs without throw
 }
 
 TEST_F(NsmPowerPowerSupplyTest, testcreatePowerSubSystemSuccess)

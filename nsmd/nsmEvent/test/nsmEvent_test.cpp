@@ -24,6 +24,7 @@ using namespace ::testing;
 
 #include "network-ports.h"
 
+#include "nsmLongRunningEventHandler.hpp"
 #include "nsmThresholdEvent.hpp"
 #include "test/mockDBusHandler.hpp"
 #include "test/mockSensorManager.hpp"
@@ -110,6 +111,19 @@ TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
         std::invalid_argument);
 }
 
+TEST_F(NsmThresholdEventTest, badTestInvalidMessageId)
+{
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+
+    propertyMap = basic;
+    propertyMap["MessageId"] = std::string("InvalidMessageId");
+
+    EXPECT_THROW_COROUTINE(
+        createNsmThresholdEvent(mockManager, basicIntfName, objPath),
+        std::invalid_argument);
+}
+
 TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
 {
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
@@ -145,4 +159,65 @@ TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
                                      NSM_THRESHOLD_EVENT, msg,
                                      eventMsg.size() - 3);
     EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST_F(NsmThresholdEventTest, goodTestCreateEventWithDeviceToPortMap)
+{
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+
+    propertyMap = basic;
+
+    // Setup deviceToPortMap with port mapping
+    uint8_t portNumber = 5;
+    std::string portName = "Port_5";
+    mockManager.deviceToPortMap[gpu][portNumber] = portName;
+
+    createNsmThresholdEvent(mockManager, basicIntfName, objPath);
+
+    EXPECT_EQ(2, gpu->deviceEvents.size());
+    EXPECT_EQ(2, gpu->eventDispatcher.eventsMap.size());
+
+    auto event =
+        dynamic_pointer_cast<NsmThresholdEvent>(gpu->deviceEvents.back());
+    EXPECT_NE(nullptr, event);
+
+    // Create payload with the specific port number to trigger deviceToPortMap
+    // lookup
+    const nsm_health_event_payload payload{portNumber, 0, 1, 1, 1,
+                                           1,          1, 1, 1, 0};
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                  sizeof(nsm_health_event_payload));
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_health_event(eid, true, &payload, msg);
+    EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+    // This should trigger the deviceToPortMap code path (lines 114-121)
+    rc = gpu->eventDispatcher.handle(eid, NSM_TYPE_NETWORK_PORT,
+                                     NSM_THRESHOLD_EVENT, msg, eventMsg.size());
+    EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+// =============================================================================
+// NsmLongRunningEventHandler Tests
+// =============================================================================
+
+TEST(NsmLongRunningEventHandler, Constructor_CreatesObjectWithCorrectNameType)
+{
+    NsmLongRunningEventHandler handler;
+    EXPECT_EQ(handler.getName(), "NsmLongRunningEventHandler");
+    EXPECT_EQ(handler.getType(), "NSM_LONG_RUNNING_EVENT_HANDLER");
+}
+
+TEST(NsmLongRunningEventHandler, Handle_NoDeviceForEid_ReturnsErrorData)
+{
+    NsmLongRunningEventHandler handler;
+    eid_t eid = 255;
+    std::vector<uint8_t> eventData(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(eventData.data());
+    // MctpDiscovery singleton is not initialized in unit tests, so handle()
+    // throws std::runtime_error before looking up the device
+    EXPECT_THROW(handler.handle(eid, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                NSM_LONG_RUNNING_EVENT, msg, eventData.size()),
+                 std::runtime_error);
 }

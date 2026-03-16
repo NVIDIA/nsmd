@@ -36,9 +36,6 @@ using namespace nsm;
 using namespace ::testing;
 using sdbusplus::message::unix_fd;
 
-NsmDeviceTable devices;
-std::shared_ptr<MockNsmDeviceBase> mockDevice;
-
 /**
  * @brief Creates a temporary file with the given data and returns its file
  * descriptor

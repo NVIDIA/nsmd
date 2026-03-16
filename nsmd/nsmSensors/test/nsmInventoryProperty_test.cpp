@@ -230,3 +230,25 @@ TEST(NsmInventoryProperty, HandleResponseError)
     rc = invProp.handleResponseMsg(response, responseMsg.size());
     EXPECT_EQ(rc, NSM_ERROR);
 }
+
+TEST(NsmInventoryPropertyBase, ConstructorWithVariousProperties)
+{
+    // Test to explicitly cover base class constructor lines 25-28
+    std::filesystem::path path = "/xyz/openbmc_project/inventory/test/device";
+    std::string name = "TestInventoryProperty";
+    std::string type = "NSM_InventoryProperty";
+
+    auto assetIntf = std::make_shared<NsmAssetIntf>(bus, path.c_str());
+    NsmInterfaceProvider<NsmAssetIntf> provider(name, type, path, assetIntf);
+
+    // Test with different property identifiers to ensure constructor is covered
+    std::vector<nsm_inventory_property_identifiers> properties = {
+        SERIAL_NUMBER, MARKETING_NAME, DEVICE_PART_NUMBER, BOARD_PART_NUMBER};
+
+    for (const auto& prop : properties)
+    {
+        NsmInventoryProperty<NsmAssetIntf> invProp(provider, prop);
+        EXPECT_EQ(invProp.property, prop);
+        EXPECT_EQ(invProp.getName(), name);
+    }
+}

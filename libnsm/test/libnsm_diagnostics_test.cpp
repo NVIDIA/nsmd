@@ -1467,6 +1467,36 @@ TEST(getDiagnostics, testErrorEncodeDeviceDiagnosticsResponse)
 	EXPECT_EQ(NSM_ERROR, resp->hdr.completion_code);
 }
 
+TEST(getDiagnostics, encodeDeviceDiagnosticsResponseErrorCompletionCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x12;
+	std::vector<uint8_t> segment_data{0x01, 0x02, 0x03};
+	uint8_t next_segment_id = 0x05;
+
+	// Test error response with reason code
+	auto rc = encode_get_device_diagnostics_resp(
+	    instance_id, NSM_ERR_INVALID_DATA, 0x1234, segment_data.data(),
+	    segment_data.size(), next_segment_id, response);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	// Verify header fields
+	EXPECT_EQ(0, response->hdr.request); // Response message
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(instance_id, response->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, response->hdr.nvidia_msg_type);
+
+	// Error responses use nsm_common_non_success_resp structure
+	auto resp =
+	    reinterpret_cast<nsm_common_non_success_resp *>(response->payload);
+	EXPECT_EQ(NSM_GET_DEVICE_DIAGNOSTICS, resp->command);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, resp->completion_code);
+	EXPECT_EQ(0x1234, le16toh(resp->reason_code));
+}
+
 TEST(getDiagnostics, testGoodDecodeDeviceDiagnosticsResponse)
 {
 	// Create response message
@@ -1575,4 +1605,1725 @@ TEST(getDiagnostics, testBadDecodeDeviceDiagnosticsResponse)
 	    response, msg_len, &cc, &reason_code, decoded_data.data(),
 	    &decoded_size, &decoded_next_segment_id);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// Tests for encode_get_device_reset_statistics_req
+TEST(getDeviceResetStatistics, goodTestEncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x05;
+
+	auto rc = encode_get_device_reset_statistics_req(instance_id, msg);
+
+	auto req = reinterpret_cast<nsm_common_req *>(msg->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(instance_id, msg->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_DEVICE_RESET_STATISTICS, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getDeviceResetStatistics, badTestEncodeRequest)
+{
+	uint8_t instance_id = 0x05;
+	auto rc = encode_get_device_reset_statistics_req(instance_id, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Tests for decode_get_device_reset_statistics_req
+TEST(getDeviceResetStatistics, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	     // NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_RESET_STATISTICS, // command
+	    0x00			     // data size
+	};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = decode_get_device_reset_statistics_req(msg, msgBuf.size());
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(getDeviceResetStatistics, badTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	     // NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_RESET_STATISTICS, // command
+	    0x01			     // data size (should be 0)
+	};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc =
+	    decode_get_device_reset_statistics_req(nullptr, msgBuf.size());
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_reset_statistics_req(msg, msgBuf.size() - 2);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+
+	rc = decode_get_device_reset_statistics_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+}
+
+// Tests for decode_get_network_device_log_info_resp
+TEST(getNetworkDeviceLogInfo, goodTestDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	     // NVIDIA_MSG_TYPE
+	    NSM_GET_NETWORK_DEVICE_LOG_INFO, // command
+	    0x00,			     // completion code
+	    0x00,
+	    0x00,
+	    0x20, // data size (32 bytes)
+	    0x00,
+	    0x02, // next_record_handle
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x03, // log_info.lost_events_and_synced_time
+	    0x00, // reserved1
+	    0x00, // reserved2
+	    0x01,
+	    0x00,
+	    0x00,
+	    0x00, // time_low
+	    0x02,
+	    0x00,
+	    0x00,
+	    0x00, // time_high
+	    0x04,
+	    0x00,
+	    0x00,
+	    0x00, // entry_prefix_and_length
+	    0x05,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00, // entry_suffix
+	    0xAA,
+	    0xBB,
+	    0xCC,
+	    0xDD // log_data
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+	uint32_t next_handle = 0;
+	struct nsm_device_log_info_breakdown log_info = {};
+	std::vector<uint8_t> log_data(65535, 0);
+	uint16_t log_data_size = 0;
+
+	auto rc = decode_get_network_device_log_info_resp(
+	    response, msg_len, &cc, &reason_code, &next_handle, &log_info,
+	    log_data.data(), &log_data_size);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(2, next_handle);
+	EXPECT_EQ(4, log_data_size);
+}
+
+TEST(getNetworkDeviceLogInfo, badTestDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	     // NVIDIA_MSG_TYPE
+	    NSM_GET_NETWORK_DEVICE_LOG_INFO, // command
+	    0x00,			     // completion code
+	    0x00,
+	    0x00,
+	    0x20, // data size
+	    0x00,
+	    0x02, // next_record_handle
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x03, // log_info
+	    0x00,
+	    0x00,
+	    0x01,
+	    0x00,
+	    0x00,
+	    0x00, // time_low
+	    0x02,
+	    0x00,
+	    0x00,
+	    0x00, // time_high
+	    0x04,
+	    0x00,
+	    0x00,
+	    0x00, // entry_prefix_and_length
+	    0x05,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00, // entry_suffix
+	    0xAA,
+	    0xBB,
+	    0xCC,
+	    0xDD};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+	uint32_t next_handle = 0;
+	struct nsm_device_log_info_breakdown log_info = {};
+	std::vector<uint8_t> log_data(65535, 0);
+	uint16_t log_data_size = 0;
+
+	auto rc = decode_get_network_device_log_info_resp(
+	    nullptr, msg_len, &cc, &reason_code, &next_handle, &log_info,
+	    log_data.data(), &log_data_size);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_log_info_resp(
+	    response, msg_len, &cc, &reason_code, nullptr, &log_info,
+	    log_data.data(), &log_data_size);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_log_info_resp(
+	    response, msg_len, &cc, &reason_code, &next_handle, nullptr,
+	    log_data.data(), &log_data_size);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_log_info_resp(
+	    response, msg_len, &cc, &reason_code, &next_handle, &log_info,
+	    nullptr, &log_data_size);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_log_info_resp(
+	    response, msg_len, &cc, &reason_code, &next_handle, &log_info,
+	    log_data.data(), nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_log_info_resp(
+	    response, msg_len - 20, &cc, &reason_code, &next_handle, &log_info,
+	    log_data.data(), &log_data_size);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// Tests for encode_get_device_debug_parameters_req
+TEST(getDeviceDebugParameters, goodTestEncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_debug_parameters_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x07;
+	uint8_t debug_configuration_type = 0x02;
+	struct nsm_debug_parameter_id parameter_id = {};
+	parameter_id.port_number = 0x1234;
+	parameter_id.index = 0x56;
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {};
+	parameter_sub_id.value = 0xABCDEF00;
+
+	auto rc = encode_get_device_debug_parameters_req(
+	    instance_id, debug_configuration_type, parameter_id,
+	    parameter_sub_id, msg);
+
+	auto req = reinterpret_cast<nsm_get_device_debug_parameters_req *>(
+	    msg->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(instance_id, msg->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_DEVICE_DEBUG_PARAMETERS, req->hdr.command);
+	EXPECT_EQ(debug_configuration_type, req->debug_configuration_type);
+	EXPECT_EQ(0x1234, le16toh(req->parameter_id.port_number));
+	EXPECT_EQ(0x56, req->parameter_id.index);
+	EXPECT_EQ(0xABCDEF00, le32toh(req->parameter_sub_id.value));
+}
+
+TEST(getDeviceDebugParameters, badTestEncodeRequest)
+{
+	uint8_t instance_id = 0x07;
+	uint8_t debug_configuration_type = 0x02;
+	struct nsm_debug_parameter_id parameter_id = {};
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {};
+
+	auto rc = encode_get_device_debug_parameters_req(
+	    instance_id, debug_configuration_type, parameter_id,
+	    parameter_sub_id, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Tests for decode_get_device_debug_parameters_req
+TEST(getDeviceDebugParameters, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	     // NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_DEBUG_PARAMETERS, // command
+	    0x00,			     // reserved1
+	    0x0B,
+	    0x00, // data_size (11 bytes, little-endian uint16_t)
+	    0x00,
+	    0x00, // reserved2
+	    0x02, // debug_configuration_type
+	    0x00,
+	    0x00,
+	    0x00, // reserved[3]
+	    0x34,
+	    0x12, // port_number (little-endian)
+	    0x00, // reserved
+	    0x56, // index
+	    0x00,
+	    0xEF,
+	    0xCD,
+	    0xAB // parameter_sub_id (little-endian)
+	};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t debug_configuration_type = 0;
+	struct nsm_debug_parameter_id parameter_id = {};
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {};
+
+	auto rc = decode_get_device_debug_parameters_req(
+	    msg, msgBuf.size(), &debug_configuration_type, &parameter_id,
+	    &parameter_sub_id);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0x02, debug_configuration_type);
+	EXPECT_EQ(0x1234, parameter_id.port_number);
+	EXPECT_EQ(0x56, parameter_id.index);
+	EXPECT_EQ(0xABCDEF00, parameter_sub_id.value);
+}
+
+TEST(getDeviceDebugParameters, badTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf{0x10,
+				    0xDE, // PCI VID: NVIDIA 0x10DE
+				    0x80, // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+				    0x89, // OCP_TYPE=8, OCP_VER=9
+				    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+				    NSM_GET_DEVICE_DEBUG_PARAMETERS, // command
+				    0x00, // reserved1
+				    0x0B,
+				    0x00, // data_size (little-endian uint16_t)
+				    0x00,
+				    0x00, // reserved2
+				    0x02, // debug_configuration_type
+				    0x01,
+				    0x00,
+				    0x00, // reserved[3] - non-zero!
+				    0x34,
+				    0x12,
+				    0x00,
+				    0x56,
+				    0x00,
+				    0xEF,
+				    0xCD,
+				    0xAB};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t debug_configuration_type = 0;
+	struct nsm_debug_parameter_id parameter_id = {};
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {};
+
+	auto rc = decode_get_device_debug_parameters_req(
+	    nullptr, msgBuf.size(), &debug_configuration_type, &parameter_id,
+	    &parameter_sub_id);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_debug_parameters_req(
+	    msg, msgBuf.size(), nullptr, &parameter_id, &parameter_sub_id);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_debug_parameters_req(msg, msgBuf.size(),
+						    &debug_configuration_type,
+						    nullptr, &parameter_sub_id);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_debug_parameters_req(msg, msgBuf.size(),
+						    &debug_configuration_type,
+						    &parameter_id, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_debug_parameters_req(
+	    msg, msgBuf.size(), &debug_configuration_type, &parameter_id,
+	    &parameter_sub_id);
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+}
+
+// Tests for encode_get_device_debug_parameters_resp
+TEST(getDeviceDebugParameters, goodTestEncodeResponse)
+{
+	std::vector<uint8_t> data{0x01, 0x02, 0x03, 0x04};
+	uint16_t data_size = data.size();
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_debug_parameters_resp) +
+	    data_size);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x08;
+	uint16_t reason_code = 0;
+
+	auto rc = encode_get_device_debug_parameters_resp(
+	    instance_id, NSM_SUCCESS, reason_code, &data_size, data.data(),
+	    msg);
+
+	auto resp = reinterpret_cast<nsm_get_device_debug_parameters_resp *>(
+	    msg->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(instance_id, msg->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_DEVICE_DEBUG_PARAMETERS, resp->hdr.command);
+	EXPECT_EQ(NSM_SUCCESS, resp->hdr.completion_code);
+	EXPECT_EQ(data_size, le16toh(resp->hdr.data_size));
+}
+
+TEST(getDeviceDebugParameters, badTestEncodeResponse)
+{
+	std::vector<uint8_t> data{0x01, 0x02};
+	uint16_t data_size = data.size();
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_debug_parameters_resp) +
+	    data_size);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x08;
+	uint16_t reason_code = 0;
+
+	auto rc = encode_get_device_debug_parameters_resp(
+	    instance_id, NSM_SUCCESS, reason_code, &data_size, data.data(),
+	    nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = encode_get_device_debug_parameters_resp(
+	    instance_id, NSM_SUCCESS, reason_code, &data_size, nullptr, msg);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = encode_get_device_debug_parameters_resp(
+	    instance_id, NSM_SUCCESS, reason_code, nullptr, data.data(), msg);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Tests for decode_get_device_debug_parameters_resp
+TEST(getDeviceDebugParameters, goodTestDecodeResponse)
+{
+	std::vector<uint8_t> msgBuf{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	     // NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_DEBUG_PARAMETERS, // command
+	    NSM_SUCCESS,		     // completion_code
+	    0x00,
+	    0x00,
+	    0x04, // data_size
+	    0x00,
+	    0xAA,
+	    0xBB,
+	    0xCC,
+	    0xDD // data
+	};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t data_size = 0;
+	std::vector<uint8_t> data(65535, 0);
+
+	auto rc = decode_get_device_debug_parameters_resp(
+	    msg, msgBuf.size(), &cc, &data_size, data.data());
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(4, data_size);
+	EXPECT_EQ(0xAA, data[0]);
+	EXPECT_EQ(0xBB, data[1]);
+	EXPECT_EQ(0xCC, data[2]);
+	EXPECT_EQ(0xDD, data[3]);
+}
+
+TEST(getDeviceDebugParameters, badTestDecodeResponse)
+{
+	std::vector<uint8_t> msgBuf{0x10,
+				    0xDE, // PCI VID: NVIDIA 0x10DE
+				    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+				    0x89, // OCP_TYPE=8, OCP_VER=9
+				    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+				    NSM_GET_DEVICE_DEBUG_PARAMETERS, // command
+				    NSM_SUCCESS, // completion_code
+				    0x00,
+				    0x00,
+				    0x04, // data_size
+				    0x00,
+				    0xAA,
+				    0xBB,
+				    0xCC,
+				    0xDD};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t data_size = 0;
+	std::vector<uint8_t> data(65535, 0);
+
+	auto rc = decode_get_device_debug_parameters_resp(
+	    nullptr, msgBuf.size(), &cc, &data_size, data.data());
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_debug_parameters_resp(
+	    msg, msgBuf.size(), nullptr, &data_size, data.data());
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_debug_parameters_resp(msg, msgBuf.size(), &cc,
+						     nullptr, data.data());
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_debug_parameters_resp(msg, msgBuf.size(), &cc,
+						     &data_size, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_debug_parameters_resp(
+	    msg, msgBuf.size() - 10, &cc, &data_size, data.data());
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// Tests for encode_set_device_debug_parameters_req
+TEST(setDeviceDebugParameters, goodTestEncodeRequest)
+{
+	std::vector<uint8_t> data{0x11, 0x22, 0x33, 0x44};
+	uint8_t data_size = data.size();
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_debug_parameters_req) +
+	    data_size);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x09;
+	uint8_t debug_configuration_type = 0x03;
+	struct nsm_debug_parameter_id parameter_id = {};
+	parameter_id.port_number = 0x5678;
+	parameter_id.index = 0x9A;
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {};
+	parameter_sub_id.value = 0x12345678;
+
+	auto rc = encode_set_device_debug_parameters_req(
+	    instance_id, debug_configuration_type, parameter_id,
+	    parameter_sub_id, data_size, data.data(), msg);
+
+	auto req = reinterpret_cast<nsm_set_device_debug_parameters_req *>(
+	    msg->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(instance_id, msg->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_SET_DEVICE_DEBUG_PARAMETERS, req->hdr.command);
+	EXPECT_EQ(debug_configuration_type, req->debug_configuration_type);
+	EXPECT_EQ(data_size, req->data_size);
+	EXPECT_EQ(0x5678, le16toh(req->parameter_id.port_number));
+	EXPECT_EQ(0x9A, req->parameter_id.index);
+	EXPECT_EQ(0x12345678, le32toh(req->parameter_sub_id.value));
+}
+
+TEST(setDeviceDebugParameters, badTestEncodeRequest)
+{
+	std::vector<uint8_t> data{0x11, 0x22};
+	uint8_t data_size = data.size();
+	uint8_t instance_id = 0x09;
+	uint8_t debug_configuration_type = 0x03;
+	struct nsm_debug_parameter_id parameter_id = {};
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {};
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_debug_parameters_req) +
+	    data_size);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = encode_set_device_debug_parameters_req(
+	    instance_id, debug_configuration_type, parameter_id,
+	    parameter_sub_id, data_size, data.data(), nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = encode_set_device_debug_parameters_req(
+	    instance_id, debug_configuration_type, parameter_id,
+	    parameter_sub_id, data_size, nullptr, msg);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Tests for decode_set_device_debug_parameters_req
+TEST(setDeviceDebugParameters, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	     // NVIDIA_MSG_TYPE
+	    NSM_SET_DEVICE_DEBUG_PARAMETERS, // command
+	    0x0F,			     // data_size (15 bytes)
+	    0x03,			     // debug_configuration_type
+	    0x04,			     // data_size
+	    0x00,
+	    0x00, // reserved[2]
+	    0x78,
+	    0x56, // port_number (little-endian)
+	    0x00, // reserved
+	    0x9A, // index
+	    0x78,
+	    0x56,
+	    0x34,
+	    0x12, // parameter_sub_id (little-endian)
+	    0x11,
+	    0x22,
+	    0x33,
+	    0x44 // data[4]
+	};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t debug_configuration_type = 0;
+	struct nsm_debug_parameter_id parameter_id = {};
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {};
+	uint8_t data_size = 0;
+	std::vector<uint8_t> data(65535, 0);
+	uint8_t *data_ptr = data.data();
+
+	auto rc = decode_set_device_debug_parameters_req(
+	    msg, msgBuf.size(), &debug_configuration_type, &parameter_id,
+	    &parameter_sub_id, &data_size, &data_ptr);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0x03, debug_configuration_type);
+	EXPECT_EQ(0x5678, parameter_id.port_number);
+	EXPECT_EQ(0x9A, parameter_id.index);
+	EXPECT_EQ(0x12345678, parameter_sub_id.value);
+	EXPECT_EQ(0x04, data_size);
+}
+
+TEST(setDeviceDebugParameters, badTestDecodeRequest)
+{
+	std::vector<uint8_t> msgBuf{0x10,
+				    0xDE, // PCI VID: NVIDIA 0x10DE
+				    0x80, // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+				    0x89, // OCP_TYPE=8, OCP_VER=9
+				    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+				    NSM_SET_DEVICE_DEBUG_PARAMETERS, // command
+				    0x0F, // data_size
+				    0x03,
+				    0x04,
+				    0x01,
+				    0x00, // reserved[2] - non-zero!
+				    0x78,
+				    0x56,
+				    0x00,
+				    0x9A,
+				    0x78,
+				    0x56,
+				    0x34,
+				    0x12,
+				    0x11,
+				    0x22,
+				    0x33,
+				    0x44};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t debug_configuration_type = 0;
+	struct nsm_debug_parameter_id parameter_id = {};
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {};
+	uint8_t data_size = 0;
+	std::vector<uint8_t> data(65535, 0);
+	uint8_t *data_ptr = data.data();
+
+	auto rc = decode_set_device_debug_parameters_req(
+	    nullptr, msgBuf.size(), &debug_configuration_type, &parameter_id,
+	    &parameter_sub_id, &data_size, &data_ptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_set_device_debug_parameters_req(
+	    msg, msgBuf.size(), nullptr, &parameter_id, &parameter_sub_id,
+	    &data_size, &data_ptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_set_device_debug_parameters_req(
+	    msg, msgBuf.size(), &debug_configuration_type, nullptr,
+	    &parameter_sub_id, &data_size, &data_ptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_set_device_debug_parameters_req(
+	    msg, msgBuf.size(), &debug_configuration_type, &parameter_id,
+	    nullptr, &data_size, &data_ptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_set_device_debug_parameters_req(
+	    msg, msgBuf.size(), &debug_configuration_type, &parameter_id,
+	    &parameter_sub_id, nullptr, &data_ptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_set_device_debug_parameters_req(
+	    msg, msgBuf.size(), &debug_configuration_type, &parameter_id,
+	    &parameter_sub_id, &data_size, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_set_device_debug_parameters_req(
+	    msg, msgBuf.size(), &debug_configuration_type, &parameter_id,
+	    &parameter_sub_id, &data_size, &data_ptr);
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+}
+
+// Tests for decode_set_device_debug_parameters_resp
+TEST(setDeviceDebugParameters, goodTestDecodeResponse)
+{
+	std::vector<uint8_t> msgBuf{0x10,
+				    0xDE, // PCI VID: NVIDIA 0x10DE
+				    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+				    0x89, // OCP_TYPE=8, OCP_VER=9
+				    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+				    NSM_SET_DEVICE_DEBUG_PARAMETERS, // command
+				    NSM_SUCCESS, // completion_code
+				    0x00,
+				    0x00,
+				    0x00, // data_size
+				    0x00};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t cc = NSM_ERROR;
+
+	auto rc =
+	    decode_set_device_debug_parameters_resp(msg, msgBuf.size(), &cc);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+}
+
+TEST(setDeviceDebugParameters, badTestDecodeResponse)
+{
+	std::vector<uint8_t> msgBuf{0x10,
+				    0xDE, // PCI VID: NVIDIA 0x10DE
+				    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+				    0x89, // OCP_TYPE=8, OCP_VER=9
+				    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+				    NSM_SET_DEVICE_DEBUG_PARAMETERS, // command
+				    NSM_SUCCESS, // completion_code
+				    0x00,
+				    0x00,
+				    0x00,
+				    0x00};
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	uint8_t cc = NSM_ERROR;
+
+	auto rc = decode_set_device_debug_parameters_resp(nullptr,
+							  msgBuf.size(), &cc);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_set_device_debug_parameters_resp(msg, msgBuf.size(),
+						     nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_set_device_debug_parameters_resp(msg, msgBuf.size() - 3,
+						     &cc);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// ===================================================================
+// Tests for Erase Debug Info
+// ===================================================================
+
+TEST(EraseDebugInfo, goodTestEncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_erase_debug_info_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x10;
+	uint8_t info_type = INFO_TYPE_FW_SAVED_DUMP_INFO;
+
+	auto rc = encode_erase_debug_info_req(instance_id, info_type, msg);
+
+	auto req = reinterpret_cast<nsm_erase_debug_info_req *>(msg->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(instance_id, msg->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_ERASE_DEBUG_INFO, req->hdr.command);
+	EXPECT_EQ(info_type, req->debug_info_type);
+}
+
+TEST(EraseDebugInfo, badTestEncodeRequest)
+{
+	uint8_t instance_id = 0x10;
+	uint8_t info_type = INFO_TYPE_FW_SAVED_DUMP_INFO;
+
+	auto rc = encode_erase_debug_info_req(instance_id, info_type, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+TEST(EraseDebugInfo, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			  // PCI VID: NVIDIA 0x10DE
+	    0x80,			  // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			  // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	  // NVIDIA_MSG_TYPE
+	    NSM_ERASE_DEBUG_INFO,	  // command
+	    2,				  // data size
+	    INFO_TYPE_FW_SAVED_DUMP_INFO, // info type
+	    0x00			  // reserved
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t info_type = 0;
+
+	auto rc = decode_erase_debug_info_req(request, msg_len, &info_type);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(INFO_TYPE_FW_SAVED_DUMP_INFO, info_type);
+}
+
+TEST(EraseDebugInfo, badTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			  // PCI VID: NVIDIA 0x10DE
+	    0x80,			  // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			  // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	  // NVIDIA_MSG_TYPE
+	    NSM_ERASE_DEBUG_INFO,	  // command
+	    2,				  // data size
+	    INFO_TYPE_FW_SAVED_DUMP_INFO, // info type
+	    0x00			  // reserved
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t info_type = 0;
+
+	auto rc = decode_erase_debug_info_req(nullptr, msg_len, &info_type);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_debug_info_req(request, msg_len, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_debug_info_req(request, msg_len - 3, &info_type);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(EraseDebugInfo, goodTestEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_erase_debug_info_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x11;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+	uint8_t result_status = ERASE_TRACE_DATA_ERASED;
+
+	auto rc = encode_erase_debug_info_resp(instance_id, cc, reason_code,
+					       result_status, response);
+
+	auto resp =
+	    reinterpret_cast<nsm_erase_debug_info_resp *>(response->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(instance_id, response->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_ERASE_DEBUG_INFO, resp->hdr.command);
+	EXPECT_EQ(result_status, resp->result_status);
+}
+
+TEST(EraseDebugInfo, badTestEncodeResponse)
+{
+	uint8_t instance_id = 0x11;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+	uint8_t result_status = ERASE_TRACE_DATA_ERASED;
+
+	auto rc = encode_erase_debug_info_resp(instance_id, cc, reason_code,
+					       result_status, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+TEST(EraseDebugInfo, goodTestDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		  // PCI VID: NVIDIA 0x10DE
+	    0x00,		  // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		  // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,  // NVIDIA_MSG_TYPE
+	    NSM_ERASE_DEBUG_INFO, // command
+	    NSM_SUCCESS,	  // completion code
+	    0x00,
+	    0x00,
+	    0x02, // data size
+	    0x00,
+	    ERASE_TRACE_DATA_ERASED, // result status
+	    0x00		     // reserved
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t result_status = 0;
+
+	auto rc = decode_erase_debug_info_resp(response, msg_len, &cc,
+					       &reason_code, &result_status);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERASE_TRACE_DATA_ERASED, result_status);
+}
+
+TEST(EraseDebugInfo, badTestDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		  // PCI VID: NVIDIA 0x10DE
+	    0x00,		  // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		  // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,  // NVIDIA_MSG_TYPE
+	    NSM_ERASE_DEBUG_INFO, // command
+	    NSM_SUCCESS,	  // completion code
+	    0x00,
+	    0x00,
+	    0x02, // data size
+	    0x00,
+	    ERASE_TRACE_DATA_ERASED, // result status
+	    0x00		     // reserved
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t result_status = 0;
+
+	auto rc = decode_erase_debug_info_resp(nullptr, msg_len, &cc,
+					       &reason_code, &result_status);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_debug_info_resp(response, msg_len, nullptr,
+					  &reason_code, &result_status);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_debug_info_resp(response, msg_len, &cc, nullptr,
+					  &result_status);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_debug_info_resp(response, msg_len, &cc, &reason_code,
+					  nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_debug_info_resp(response, msg_len - 5, &cc,
+					  &reason_code, &result_status);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// ===================================================================
+// Tests for Erase Trace
+// ===================================================================
+
+TEST(EraseTrace, goodTestEncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_erase_trace_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x12;
+
+	auto rc = encode_erase_trace_req(instance_id, msg);
+
+	auto req = reinterpret_cast<nsm_erase_trace_req *>(msg->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(instance_id, msg->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_ERASE_TRACE, req->hdr.command);
+	EXPECT_EQ(0, req->hdr.data_size);
+}
+
+TEST(EraseTrace, badTestEncodeRequest)
+{
+	uint8_t instance_id = 0x12;
+
+	auto rc = encode_erase_trace_req(instance_id, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+TEST(EraseTrace, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x80,		 // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+	    NSM_ERASE_TRACE,	 // command
+	    0			 // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	auto rc = decode_erase_trace_req(request, msg_len);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(EraseTrace, badTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x80,		 // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+	    NSM_ERASE_TRACE,	 // command
+	    0			 // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	auto rc = decode_erase_trace_req(nullptr, msg_len);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_trace_req(request, msg_len - 3);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(EraseTrace, goodTestEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_erase_trace_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x13;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+	uint8_t result_status = ERASE_TRACE_DATA_ERASED;
+
+	auto rc = encode_erase_trace_resp(instance_id, cc, reason_code,
+					  result_status, response);
+
+	auto resp = reinterpret_cast<nsm_erase_trace_resp *>(response->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(instance_id, response->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_ERASE_TRACE, resp->hdr.command);
+	EXPECT_EQ(result_status, resp->result_status);
+}
+
+TEST(EraseTrace, badTestEncodeResponse)
+{
+	uint8_t instance_id = 0x13;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+	uint8_t result_status = ERASE_TRACE_DATA_ERASED;
+
+	auto rc = encode_erase_trace_resp(instance_id, cc, reason_code,
+					  result_status, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+TEST(EraseTrace, goodTestDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x00,		 // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+	    NSM_ERASE_TRACE,	 // command
+	    NSM_SUCCESS,	 // completion code
+	    0x00,
+	    0x00,
+	    0x01, // data size
+	    0x00,
+	    ERASE_TRACE_DATA_ERASED // result status
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t result_status = 0;
+
+	auto rc = decode_erase_trace_resp(response, msg_len, &cc, &reason_code,
+					  &result_status);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERASE_TRACE_DATA_ERASED, result_status);
+}
+
+TEST(EraseTrace, badTestDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x00,		 // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+	    NSM_ERASE_TRACE,	 // command
+	    NSM_SUCCESS,	 // completion code
+	    0x00,
+	    0x00,
+	    0x01, // data size
+	    0x00,
+	    ERASE_TRACE_DATA_ERASED // result status
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t result_status = 0;
+
+	auto rc = decode_erase_trace_resp(nullptr, msg_len, &cc, &reason_code,
+					  &result_status);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_trace_resp(response, msg_len, nullptr, &reason_code,
+				     &result_status);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_trace_resp(response, msg_len, &cc, nullptr,
+				     &result_status);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_trace_resp(response, msg_len, &cc, &reason_code,
+				     nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_erase_trace_resp(response, msg_len - 4, &cc, &reason_code,
+				     &result_status);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// ===================================================================
+// Tests for Get Device Diagnostics
+// ===================================================================
+
+TEST(GetDeviceDiagnostics, goodTestEncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_get_device_diagnostics_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x14;
+	uint8_t segment_id = 0x05;
+
+	auto rc =
+	    encode_get_device_diagnostics_req(instance_id, segment_id, msg);
+
+	auto req =
+	    reinterpret_cast<nsm_get_device_diagnostics_req *>(msg->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(instance_id, msg->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_DEVICE_DIAGNOSTICS, req->hdr.command);
+	EXPECT_EQ(segment_id, req->segment_id);
+}
+
+TEST(GetDeviceDiagnostics, badTestEncodeRequest)
+{
+	uint8_t instance_id = 0x14;
+	uint8_t segment_id = 0x05;
+
+	auto rc =
+	    encode_get_device_diagnostics_req(instance_id, segment_id, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+TEST(GetDeviceDiagnostics, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			// PCI VID: NVIDIA 0x10DE
+	    0x80,			// RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			// OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	// NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_DIAGNOSTICS, // command
+	    1,				// data size
+	    0x03			// segment id
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t segment_id = 0;
+
+	auto rc =
+	    decode_get_device_diagnostics_req(request, msg_len, &segment_id);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0x03, segment_id);
+}
+
+TEST(GetDeviceDiagnostics, badTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			// PCI VID: NVIDIA 0x10DE
+	    0x80,			// RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			// OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	// NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_DIAGNOSTICS, // command
+	    1,				// data size
+	    0x03			// segment id
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t segment_id = 0;
+
+	auto rc =
+	    decode_get_device_diagnostics_req(nullptr, msg_len, &segment_id);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_diagnostics_req(request, msg_len, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_device_diagnostics_req(request, msg_len - 3,
+					       &segment_id);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(GetDeviceDiagnostics, goodTestEncodeResponse)
+{
+	uint8_t seg_data[] = {0x01, 0x02, 0x03, 0x04};
+	uint16_t seg_data_size = 4;
+	uint8_t next_segment_id = 0x05;
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_diagnostics_resp) +
+	    seg_data_size - 1);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x15;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+
+	auto rc = encode_get_device_diagnostics_resp(
+	    instance_id, cc, reason_code, seg_data, seg_data_size,
+	    next_segment_id, response);
+
+	auto resp = reinterpret_cast<nsm_get_device_diagnostics_resp *>(
+	    response->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(instance_id, response->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_DEVICE_DIAGNOSTICS, resp->hdr.command);
+	EXPECT_EQ(next_segment_id, resp->next_segment_id);
+}
+
+TEST(GetDeviceDiagnostics, badTestEncodeResponse)
+{
+	uint8_t seg_data[] = {0x01, 0x02, 0x03, 0x04};
+	uint16_t seg_data_size = 4;
+	uint8_t next_segment_id = 0x05;
+	uint8_t instance_id = 0x15;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+
+	auto rc = encode_get_device_diagnostics_resp(
+	    instance_id, cc, reason_code, seg_data, seg_data_size,
+	    next_segment_id, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_diagnostics_resp) +
+	    seg_data_size - 1);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	rc = encode_get_device_diagnostics_resp(instance_id, cc, reason_code,
+						nullptr, seg_data_size,
+						next_segment_id, response);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// ===================================================================
+// Tests for Get Network Device Debug Info
+// ===================================================================
+
+TEST(GetNetworkDeviceDebugInfo, goodTestEncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_get_network_device_debug_info_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x16;
+	uint8_t debug_type = INFO_TYPE_DEVICE_INFO;
+	uint32_t handle = 0x12345678;
+
+	auto rc = encode_get_network_device_debug_info_req(
+	    instance_id, debug_type, handle, msg);
+
+	auto req = reinterpret_cast<nsm_get_network_device_debug_info_req *>(
+	    msg->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(instance_id, msg->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_NETWORK_DEVICE_DEBUG_INFO, req->hdr.command);
+	EXPECT_EQ(debug_type, req->debug_info_type);
+	EXPECT_EQ(handle, le32toh(req->record_handle));
+}
+
+TEST(GetNetworkDeviceDebugInfo, badTestEncodeRequest)
+{
+	uint8_t instance_id = 0x16;
+	uint8_t debug_type = INFO_TYPE_DEVICE_INFO;
+	uint32_t handle = 0x12345678;
+
+	auto rc = encode_get_network_device_debug_info_req(
+	    instance_id, debug_type, handle, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+TEST(GetNetworkDeviceDebugInfo, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x80,		 // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+	    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, // command
+	    6,				       // data size
+	    INFO_TYPE_FW_RUNTIME_INFO,	       // debug type
+	    0x00,			       // reserved
+	    0x78,			       // record handle (little-endian)
+	    0x56,
+	    0x34,
+	    0x12};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t debug_type = 0;
+	uint32_t handle = 0;
+
+	auto rc = decode_get_network_device_debug_info_req(
+	    request, msg_len, &debug_type, &handle);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(INFO_TYPE_FW_RUNTIME_INFO, debug_type);
+	EXPECT_EQ(0x12345678, handle);
+}
+
+TEST(GetNetworkDeviceDebugInfo, badTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x80,		 // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+	    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, // command
+	    6,				       // data size
+	    INFO_TYPE_FW_RUNTIME_INFO,	       // debug type
+	    0x00,			       // reserved
+	    0x78,			       // record handle
+	    0x56,
+	    0x34,
+	    0x12};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t debug_type = 0;
+	uint32_t handle = 0;
+
+	auto rc = decode_get_network_device_debug_info_req(
+	    nullptr, msg_len, &debug_type, &handle);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_debug_info_req(request, msg_len, nullptr,
+						      &handle);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_debug_info_req(request, msg_len,
+						      &debug_type, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_debug_info_req(request, msg_len - 4,
+						      &debug_type, &handle);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(GetNetworkDeviceDebugInfo, goodTestEncodeResponse)
+{
+	uint8_t seg_data[] = {0xAA, 0xBB, 0xCC, 0xDD};
+	uint16_t seg_data_size = 4;
+	uint32_t next_handle = 0x87654321;
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_get_network_device_debug_info_resp) + seg_data_size - 1);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x17;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+
+	auto rc = encode_get_network_device_debug_info_resp(
+	    instance_id, cc, reason_code, seg_data, seg_data_size, next_handle,
+	    response);
+
+	auto resp = reinterpret_cast<nsm_get_network_device_debug_info_resp *>(
+	    response->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(instance_id, response->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_NETWORK_DEVICE_DEBUG_INFO, resp->hdr.command);
+	EXPECT_EQ(next_handle, le32toh(resp->next_record_handle));
+}
+
+TEST(GetNetworkDeviceDebugInfo, badTestEncodeResponse)
+{
+	uint8_t seg_data[] = {0xAA, 0xBB, 0xCC, 0xDD};
+	uint16_t seg_data_size = 4;
+	uint32_t next_handle = 0x87654321;
+	uint8_t instance_id = 0x17;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+
+	auto rc = encode_get_network_device_debug_info_resp(
+	    instance_id, cc, reason_code, seg_data, seg_data_size, next_handle,
+	    nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_get_network_device_debug_info_resp) + seg_data_size - 1);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	rc = encode_get_network_device_debug_info_resp(
+	    instance_id, cc, reason_code, nullptr, seg_data_size, next_handle,
+	    response);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+TEST(GetNetworkDeviceDebugInfo, goodTestDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x00,		 // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+	    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, // command
+	    NSM_SUCCESS,		       // completion code
+	    0x00,
+	    0x00,
+	    0x08, // data size
+	    0x00,
+	    0x21, // next_record_handle (little-endian)
+	    0x43,
+	    0x65,
+	    0x87,
+	    0xAA, // segment data
+	    0xBB,
+	    0xCC,
+	    0xDD};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t seg_data_size = 0;
+	std::vector<uint8_t> seg_data(65535, 0);
+	uint32_t next_handle = 0;
+
+	auto rc = decode_get_network_device_debug_info_resp(
+	    response, msg_len, &cc, &reason_code, &seg_data_size,
+	    seg_data.data(), &next_handle);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(4, seg_data_size);
+	EXPECT_EQ(0x87654321, next_handle);
+	EXPECT_EQ(0xAA, seg_data[0]);
+	EXPECT_EQ(0xBB, seg_data[1]);
+	EXPECT_EQ(0xCC, seg_data[2]);
+	EXPECT_EQ(0xDD, seg_data[3]);
+}
+
+TEST(GetNetworkDeviceDebugInfo, badTestDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    0x00,		 // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
+	    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, // command
+	    NSM_SUCCESS,		       // completion code
+	    0x00,
+	    0x00,
+	    0x08, // data size
+	    0x00,
+	    0x21, // next_record_handle
+	    0x43,
+	    0x65,
+	    0x87,
+	    0xAA, // segment data
+	    0xBB,
+	    0xCC,
+	    0xDD};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t seg_data_size = 0;
+	std::vector<uint8_t> seg_data(65535, 0);
+	uint32_t next_handle = 0;
+
+	auto rc = decode_get_network_device_debug_info_resp(
+	    nullptr, msg_len, &cc, &reason_code, &seg_data_size,
+	    seg_data.data(), &next_handle);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_debug_info_resp(
+	    response, msg_len, nullptr, &reason_code, &seg_data_size,
+	    seg_data.data(), &next_handle);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_debug_info_resp(
+	    response, msg_len, &cc, &reason_code, nullptr, seg_data.data(),
+	    &next_handle);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_debug_info_resp(
+	    response, msg_len, &cc, &reason_code, &seg_data_size, nullptr,
+	    &next_handle);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_debug_info_resp(
+	    response, msg_len, &cc, &reason_code, &seg_data_size,
+	    seg_data.data(), nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_debug_info_resp(
+	    response, msg_len - 8, &cc, &reason_code, &seg_data_size,
+	    seg_data.data(), &next_handle);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+// ===================================================================
+// Tests for Get Network Device Log Info
+// ===================================================================
+
+TEST(GetNetworkDeviceLogInfo, goodTestEncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_network_device_log_info_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t instance_id = 0x18;
+	uint32_t record_handle = 0xABCDEF01;
+
+	auto rc = encode_get_network_device_log_info_req(instance_id,
+							 record_handle, msg);
+
+	auto req = reinterpret_cast<nsm_get_network_device_log_info_req *>(
+	    msg->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, msg->hdr.request);
+	EXPECT_EQ(0, msg->hdr.datagram);
+	EXPECT_EQ(instance_id, msg->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_NETWORK_DEVICE_LOG_INFO, req->hdr.command);
+	EXPECT_EQ(record_handle, le32toh(req->record_handle));
+}
+
+TEST(GetNetworkDeviceLogInfo, badTestEncodeRequest)
+{
+	uint8_t instance_id = 0x18;
+	uint32_t record_handle = 0xABCDEF01;
+
+	auto rc = encode_get_network_device_log_info_req(
+	    instance_id, record_handle, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+TEST(GetNetworkDeviceLogInfo, goodTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	     // NVIDIA_MSG_TYPE
+	    NSM_GET_NETWORK_DEVICE_LOG_INFO, // command
+	    4,				     // data size
+	    0x01,			     // record handle (little-endian)
+	    0xEF,
+	    0xCD,
+	    0xAB};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint32_t record_handle = 0;
+
+	auto rc = decode_get_network_device_log_info_req(request, msg_len,
+							 &record_handle);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0xABCDEF01, record_handle);
+}
+
+TEST(GetNetworkDeviceLogInfo, badTestDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,	     // NVIDIA_MSG_TYPE
+	    NSM_GET_NETWORK_DEVICE_LOG_INFO, // command
+	    4,				     // data size
+	    0x01,			     // record handle
+	    0xEF,
+	    0xCD,
+	    0xAB};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint32_t record_handle = 0;
+
+	auto rc = decode_get_network_device_log_info_req(nullptr, msg_len,
+							 &record_handle);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_log_info_req(request, msg_len, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_get_network_device_log_info_req(request, msg_len - 3,
+						    &record_handle);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(GetNetworkDeviceLogInfo, goodTestEncodeResponse)
+{
+	uint8_t log_data[] = {0x11, 0x22, 0x33, 0x44};
+	uint16_t log_data_size = 4;
+	uint32_t next_handle = 0xFEDCBA98;
+	struct nsm_device_log_info_breakdown log_info = {};
+	log_info.lost_events = 2;
+	log_info.synced_time = 1;
+	log_info.time_low = 0x12345678;
+	log_info.time_high = 0x9ABCDEF0;
+	log_info.entry_prefix = 0xABCDEF;
+	log_info.length = 20;
+	log_info.entry_suffix = 0x1122334455667788;
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_network_device_log_info_resp) +
+	    log_data_size - 1);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t instance_id = 0x19;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+
+	auto rc = encode_get_network_device_log_info_resp(
+	    instance_id, cc, reason_code, next_handle, log_info, log_data,
+	    log_data_size, response);
+
+	auto resp = reinterpret_cast<nsm_get_network_device_log_info_resp *>(
+	    response->payload);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(instance_id, response->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_NETWORK_DEVICE_LOG_INFO, resp->hdr.command);
+	EXPECT_EQ(next_handle, le32toh(resp->next_record_handle));
+}
+
+TEST(GetNetworkDeviceLogInfo, badTestEncodeResponse)
+{
+	uint8_t log_data[] = {0x11, 0x22, 0x33, 0x44};
+	uint16_t log_data_size = 4;
+	uint32_t next_handle = 0xFEDCBA98;
+	struct nsm_device_log_info_breakdown log_info = {};
+	uint8_t instance_id = 0x19;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+
+	auto rc = encode_get_network_device_log_info_resp(
+	    instance_id, cc, reason_code, next_handle, log_info, log_data,
+	    log_data_size, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_network_device_log_info_resp) +
+	    log_data_size - 1);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	rc = encode_get_network_device_log_info_resp(
+	    instance_id, cc, reason_code, next_handle, log_info, nullptr,
+	    log_data_size, response);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+}
+
+// Simple tests for uncovered functions
+TEST(EraseTrace, EncodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_erase_trace_req(0, msg);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+TEST(EraseTrace, DecodeRequest)
+{
+	std::vector<uint8_t> msgBuf(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = decode_erase_trace_req(msg, msgBuf.size());
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
 }

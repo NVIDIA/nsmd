@@ -456,3 +456,37 @@ TEST_F(NsmIRoTResponderTest, testUpdateAssetIntfSendError)
 
     irotResponder->update(fpga);
 }
+
+TEST_F(NsmIRoTResponderTest, testUpdateAssetIntfSecondDecodeFailure)
+{
+    // Test to cover line 91 - second decode with error completion code
+    auto irotResponder = std::make_shared<NsmIRoTResponder<NsmAssetIntf>>(name,
+                                                                          type);
+
+    // Create a malformed response: header indicates large deviceId but data is
+    // corrupted This will pass first decode (gets length) but fail second
+    // decode
+    std::vector<uint8_t> deviceId = {0x01, 0x02, 0x03, 0x04};
+
+    // Create response with corrupted data - set completion code to error after
+    // encoding
+    Response corruptResp(sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_query_device_ids_resp) +
+                             deviceId.size(),
+                         0);
+    auto queryMsg = reinterpret_cast<nsm_msg*>(corruptResp.data());
+
+    // First encode correctly to get structure
+    encode_nsm_query_device_ids_resp(0, NSM_SUCCESS, ERR_NULL, deviceId.data(),
+                                     deviceId.size(), queryMsg);
+
+    // Then corrupt the response by making the buffer shorter than claimed
+    // This simulates a truncated response
+    corruptResp.resize(sizeof(nsm_msg_hdr) +
+                       sizeof(nsm_common_resp)); // Too short for deviceId data
+
+    EXPECT_CALL(*fpga, sensorIO)
+        .WillOnce(mockSensorIO(corruptResp, Response{}));
+
+    irotResponder->update(fpga);
+}

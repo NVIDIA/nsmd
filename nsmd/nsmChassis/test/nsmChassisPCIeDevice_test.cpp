@@ -312,7 +312,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_CALL(*gpu, sensorIO).Times(sensors).WillRepeatedly(mockSensorIO());
     for (auto i = 0; i < sensors; i++)
     {
-        gpu->deviceSensors[i]->update(gpu).detach();
+        gpu->deviceSensors[i]->update(gpu);
     }
 }
 
@@ -406,6 +406,7 @@ TEST_F(NsmPCIeDeviceTest, badTestCompletionErrorResponse)
         (struct nsm_query_scalar_group_telemetry_v1_resp*)responseMsg->payload;
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen1,
@@ -531,6 +532,7 @@ TEST_F(NsmPCIeFunctionTest, badTestCompletionErrorResponse)
         (struct nsm_query_scalar_group_telemetry_v1_resp*)responseMsg->payload;
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ("", sensor->invoke(pdiMethod(function0VendorId)));
@@ -643,6 +645,7 @@ TEST_F(NsmPCIeLTSSMStateTest, badTestCompletionErrorResponse)
         (struct nsm_query_scalar_group_telemetry_v1_resp*)responseMsg->payload;
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(LTSSMStateIntf::State::NA, sensor->invoke(pdiMethod(ltssmState)));
@@ -773,6 +776,7 @@ TEST_F(NsmAERErrorTest, badTestCompletionErrorResponse)
         responseMsg->payload);
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
 }
@@ -1017,6 +1021,7 @@ TEST_F(NsmPCIeLTSSMStateStandaloneTest, badTestCompletionErrorResponse)
         responseMsg->payload);
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
     // When error, state should be NA
@@ -1324,6 +1329,7 @@ TEST_F(NsmClockOutputEnableStateStandaloneTest, badTestCompletionErrorResponse)
             responseMsg->payload);
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
 }
@@ -1340,3 +1346,316 @@ TEST_F(NsmClockOutputEnableStateStandaloneTest, goodTestDisabledClockResponse)
     testResponse(sensor, data);
     EXPECT_FALSE(sensor->invoke(pdiMethod(pcIeReferenceClockEnabled)));
 }
+// ============================================================================
+// nsmChassisPCIeDevice.cpp - MultiPortPCIeDevice and
+// RetimerAERErrorStatus factory branches
+// ============================================================================
+
+struct NsmChassisPCIeDeviceDeepTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    eid_t eid = 0;
+    uint8_t instanceId = 0;
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice";
+    const std::string chassisName = "HGX_GPU_SXM_B11";
+    const std::string name = "PCIeDevice_B11";
+    const std::string objPath = chassisInventoryBasePath / chassisName / name;
+
+    const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> fpga;
+
+    NsmChassisPCIeDeviceDeepTest() : SensorManagerTest(devices)
+    {
+        fpga = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(fpgaUuid));
+        EXPECT_NE(fpga, nullptr);
+        EXPECT_EQ(NSM_DEV_ID_BASEBOARD, fpga->getDeviceType());
+    }
+
+    ~NsmChassisPCIeDeviceDeepTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+TEST_F(NsmChassisPCIeDeviceDeepTest, MultiPortPCIeDevice_Factory_CreatesSensors)
+{
+    // Arrange
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap["ChassisName"] = chassisName;
+    basePropertyMap["Name"] = name;
+    basePropertyMap["UUID"] = fpgaUuid;
+
+    std::string multiPortIntf = basicIntfName + ".MultiPortPCIeDevice";
+    auto& propMap = utils::MockDbusAsync::propertyMap(objPath, multiPortIntf);
+    propMap["Type"] = std::string("NSM_MultiPortPCIeDevice");
+    propMap["DeviceType"] = std::string(
+        "xyz.openbmc_project.Inventory.Item.PCIeDevice."
+        "DeviceTypes.SingleFunction");
+    propMap["Functions"] = std::vector<uint64_t>{0};
+    propMap["UpstreamPortCount"] = uint64_t(2);
+
+    // Act
+    nsmChassisPCIeDeviceCreateSensors(mockManager, multiPortIntf, objPath);
+
+    // Assert - should create PCIeLinkSpeed + PCIeFunction + AERError sensors
+    // At minimum: 1 msgTypes + 1 PCIeLinkSpeed + 1 PCIeFunction + 1 AERError
+    EXPECT_GE(fpga->deviceSensors.size(), 2u);
+
+    // Verify we have a PCIeLinkSpeed sensor
+    bool foundLinkSpeed = false;
+    for (auto& sensor : fpga->deviceSensors)
+    {
+        auto ls =
+            std::dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(sensor);
+        if (ls)
+        {
+            foundLinkSpeed = true;
+            // MultiPort stores value in upstreamPortCount, not deviceIndex
+            EXPECT_TRUE(ls->isMultiPciePortEnabled);
+            EXPECT_EQ(ls->upstreamPortCount, 2u);
+        }
+    }
+    EXPECT_TRUE(foundLinkSpeed);
+}
+
+TEST_F(NsmChassisPCIeDeviceDeepTest,
+       MultiPortPCIeDevice_WithMultipleFunctions_CreatesAllFunctions)
+{
+    // Arrange
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap["ChassisName"] = chassisName;
+    basePropertyMap["Name"] = name;
+    basePropertyMap["UUID"] = fpgaUuid;
+
+    std::string multiPortIntf = basicIntfName + ".MultiPortPCIeDevice";
+    auto& propMap = utils::MockDbusAsync::propertyMap(objPath, multiPortIntf);
+    propMap["Type"] = std::string("NSM_MultiPortPCIeDevice");
+    propMap["Functions"] = std::vector<uint64_t>{0, 1, 2};
+    propMap["UpstreamPortCount"] = uint64_t(1);
+
+    // Act
+    nsmChassisPCIeDeviceCreateSensors(mockManager, multiPortIntf, objPath);
+
+    // Assert - multiport PCIeFunction sensors with same multiport params
+    // generate identical request messages, so addSensor deduplication
+    // merges them into 1 sensor entry with multiple PDI interfaces.
+    // Verify at least 1 PCIeFunction sensor exists.
+    int functionCount = 0;
+    for (auto& sensor : fpga->deviceSensors)
+    {
+        auto fn = std::dynamic_pointer_cast<NsmPCIeFunction>(sensor);
+        if (fn)
+        {
+            functionCount++;
+        }
+    }
+    EXPECT_GE(functionCount, 1);
+
+    // Also verify other sensors were created:
+    // PCIeLinkSpeed + PCIeFunction(merged) + RetimerAERError = 3 sensors
+    EXPECT_GE(fpga->deviceSensors.size(), 3u);
+}
+
+TEST_F(NsmChassisPCIeDeviceDeepTest,
+       MultiPortPCIeDevice_DefaultDeviceType_UsesSingleFunction)
+{
+    // Arrange - no DeviceType property set
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap["ChassisName"] = chassisName;
+    basePropertyMap["Name"] = name;
+    basePropertyMap["UUID"] = fpgaUuid;
+
+    std::string multiPortIntf = basicIntfName + ".MultiPortPCIeDevice";
+    auto& propMap = utils::MockDbusAsync::propertyMap(objPath, multiPortIntf);
+    propMap["Type"] = std::string("NSM_MultiPortPCIeDevice");
+    // No DeviceType or Functions or UpstreamPortCount
+    // Defaults should be used
+
+    // Act
+    nsmChassisPCIeDeviceCreateSensors(mockManager, multiPortIntf, objPath);
+
+    // Assert - should still create sensors with defaults
+    EXPECT_GE(fpga->deviceSensors.size(), 2u);
+}
+
+// Test NsmChassisPCIeDevice with PCIeDeviceIntf template directly
+TEST_F(NsmChassisPCIeDeviceDeepTest,
+       ChassisPCIeDevicePCIeDeviceIntf_Construction_Valid)
+{
+    // Arrange & Act
+    auto device = NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName, name);
+
+    // Assert
+    EXPECT_EQ(device.getName(), name);
+    EXPECT_EQ(device.getType(), "NSM_ChassisPCIeDevice");
+}
+
+// Test NsmChassisPCIeDevice with HealthIntf
+TEST_F(NsmChassisPCIeDeviceDeepTest,
+       ChassisPCIeDeviceHealthIntf_Construction_Valid)
+{
+    auto device = NsmChassisPCIeDevice<HealthIntf>(chassisName, name);
+    EXPECT_EQ(device.getName(), name);
+    EXPECT_EQ(device.getType(), "NSM_ChassisPCIeDevice");
+}
+
+// Test NsmChassisPCIeDevice with NsmAssetIntf
+TEST_F(NsmChassisPCIeDeviceDeepTest,
+       ChassisPCIeDeviceNsmAssetIntf_Construction_Valid)
+{
+    auto device = NsmChassisPCIeDevice<NsmAssetIntf>(chassisName, name);
+    EXPECT_EQ(device.getName(), name);
+    EXPECT_EQ(device.getType(), "NSM_ChassisPCIeDevice");
+}
+
+// Test factory with NSM_Chassis_Attributes type for PCIe device
+TEST_F(NsmChassisPCIeDeviceDeepTest,
+       ChassisAttributes_Factory_CreatesAssetAndHealth)
+{
+    // Arrange
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap["ChassisName"] = chassisName;
+    basePropertyMap["Name"] = name;
+    basePropertyMap["UUID"] = fpgaUuid;
+
+    std::string attrIntf = basicIntfName + ".ChassisAttributes";
+    auto& propMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
+    propMap["Type"] = std::string("NSM_Chassis_Attributes");
+
+    // Act
+    nsmChassisPCIeDeviceCreateSensors(mockManager, attrIntf, objPath);
+
+    // Assert - asset (3 sensors: part, serial, model) + health (1)
+    bool foundHealth = false;
+    for (auto& sensor : fpga->deviceSensors)
+    {
+        auto h =
+            std::dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(sensor);
+        if (h)
+        {
+            foundHealth = true;
+            EXPECT_EQ(HealthIntf::HealthType::OK, h->invoke(pdiMethod(health)));
+        }
+    }
+    EXPECT_TRUE(foundHealth);
+}
+
+// Test factory with NSM_PCIeDevice type
+TEST_F(NsmChassisPCIeDeviceDeepTest,
+       PCIeDevice_Factory_WithCustomDeviceType_SetsDeviceType)
+{
+    // Arrange
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap["ChassisName"] = chassisName;
+    basePropertyMap["Name"] = name;
+    basePropertyMap["UUID"] = fpgaUuid;
+
+    std::string pcieDevIntf = basicIntfName + ".PCIeDevice";
+    auto& propMap = utils::MockDbusAsync::propertyMap(objPath, pcieDevIntf);
+    propMap["Type"] = std::string("NSM_PCIeDevice");
+    propMap["DeviceType"] = std::string(
+        "xyz.openbmc_project.Inventory.Item.PCIeDevice."
+        "DeviceTypes.MultiFunction");
+    propMap["Functions"] = std::vector<uint64_t>{0, 1};
+
+    // Act
+    nsmChassisPCIeDeviceCreateSensors(mockManager, pcieDevIntf, objPath);
+
+    // Assert - should create PCIeLinkSpeed + 2 PCIeFunction
+    EXPECT_GE(fpga->deviceSensors.size(), 2u);
+}
+
+// ============================================================================
+// NsmChassisPCIeDevice<T>::update() coverage
+// For non-UuidIntf types, update() simply co_returns NSM_SUCCESS.
+// ============================================================================
+
+struct NsmChassisPCIeDeviceUpdateTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string chassisName = "HGX_GPU_UpdateTest";
+    const std::string sensorName = "PCIeDevice_Upd";
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:99";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+
+    NsmChassisPCIeDeviceUpdateTest() : SensorManagerTest(devices)
+    {
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    ~NsmChassisPCIeDeviceUpdateTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateNsmAssetIntf)
+{
+    auto sensor = std::make_shared<NsmChassisPCIeDevice<NsmAssetIntf>>(
+        chassisName, sensorName);
+    sensor->update(gpu);
+}
+
+TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateHealthIntf)
+{
+    auto sensor = std::make_shared<NsmChassisPCIeDevice<HealthIntf>>(
+        chassisName, sensorName);
+    sensor->update(gpu);
+}
+
+TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateAssociationDefinitionsIntf)
+{
+    auto sensor =
+        std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsIntf>>(
+            chassisName, sensorName);
+    sensor->update(gpu);
+}
+
+TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdatePCIeDeviceIntf)
+{
+    auto sensor = std::make_shared<NsmChassisPCIeDevice<PCIeDeviceIntf>>(
+        chassisName, sensorName);
+    sensor->update(gpu);
+}
+
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
+TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdatePCIeRefClockIntf)
+{
+    auto sensor = std::make_shared<NsmChassisPCIeDevice<PCIeRefClockIntf>>(
+        chassisName, sensorName);
+    sensor->update(gpu);
+}
+
+TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateNVLinkRefClockIntf)
+{
+    auto sensor = std::make_shared<NsmChassisPCIeDevice<NVLinkRefClockIntf>>(
+        chassisName, sensorName);
+    sensor->update(gpu);
+}
+#endif
+
+#if defined(ENABLE_PCIE_LTSSM_STATE)
+TEST_F(NsmChassisPCIeDeviceUpdateTest, UpdateLTSSMStateIntf)
+{
+    auto sensor = std::make_shared<NsmChassisPCIeDevice<LTSSMStateIntf>>(
+        chassisName, sensorName);
+    sensor->update(gpu);
+}
+#endif

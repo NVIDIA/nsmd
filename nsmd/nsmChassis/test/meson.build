@@ -23,8 +23,31 @@ tests = [
     'nsmRoTProperty_test',
     'nsmSecurityRBP_test',
     'nsmUpdateApSkuId_test',
+    'nsmRoT_workload_test',
+    'nsmWriteProtectedJumper_test',
+    'nsmPowerSupplyStatus_test',
+    'nsmPCIeLTSSMState_test',
+    'nsmGpuPcieBranch_test',
+    'nsmDeviceBranch_test',
+    'nsmNVSwitchChassisFactory_test',
+    'nsmPowerSmoothingV1_test',
+    'nsmPowerControlBranch_test',
+    'nsmMemoryBranch_test',
+    'nsmSecurityRBPBranch_test',
+    'nsmPCIeRetimerSwitchDI_test',
+    'nsmNVSwitchChassisAssemblyBranch_test',
+    'nsmPowerSmoothingBranch_test',
+    'nsmWorkloadPowerProfile_test',
+    'nsmOemResetStatistics_test',
+    'nsmProcessorFactoryBranch_test',
+    'nsmPowerSmoothingV2_test',
+    'nsmIRoTResponderBranch_test',
+    'nsmSwitchBranch_test',
+    'nsmAERErrorAndChassisBranch_test',
+    'nsmClockOutputEnableState_test',
+    # 'nsmPCIeFunction_test',  # DISABLED: NsmInterfaceProvider has deleted constructor - requires architectural refactoring
+    # 'nsmPCIeSlot_test',  # DISABLED: deleted constructor (NsmInterfaceProvider) - same as nsmPCIeFunction
 ]
-
 
 foreach t : tests
     test(

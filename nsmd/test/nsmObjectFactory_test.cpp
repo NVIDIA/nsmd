@@ -128,3 +128,37 @@ TEST_F(NsmObjectFactoryTest, goodTestMultipleRegistrations)
     EXPECT_TRUE(factory.creationFunctions.find("test.func2") !=
                 factory.creationFunctions.end());
 }
+
+TEST_F(NsmObjectFactoryTest, goodTestCreateObjects)
+{
+    auto& factory = NsmObjectFactory::instance();
+
+    bool functionCalled = false;
+    auto testFunc =
+        [&functionCalled](SensorManager&, const std::string&,
+                          const std::string&) -> requester::Coroutine {
+        functionCalled = true;
+        co_return NSM_SUCCESS;
+    };
+
+    std::string interfaceName = "test.CreateObjects";
+    factory.registerCreationFunction(testFunc, interfaceName);
+
+    // Call createObjects to cover line 31
+    factory.createObjects(mockManager, interfaceName, "/test/object/path");
+
+    EXPECT_TRUE(functionCalled);
+}
+
+TEST_F(NsmObjectFactoryTest, goodTestCreateObjectsUnknownInterface)
+{
+    auto& factory = NsmObjectFactory::instance();
+
+    // Call createObjects with an unregistered interface
+    // This should return NSM_SUCCESS without calling any creation function
+    factory.createObjects(mockManager, "unknown.interface",
+                          "/test/object/path");
+
+    // Should complete without error even for unknown interface
+    // (no assertion needed, just ensuring it doesn't crash)
+}

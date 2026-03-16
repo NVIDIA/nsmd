@@ -5,7 +5,12 @@
 # nsmDot is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
 # All sources already compiled into nsmd_test, no need to recompile
 
-tests = ['nsmDot_test', 'nsmDotBlob_test', 'nsmDotStatusObject_test']
+tests = [
+    'nsmDot_test',
+    'nsmDotBlob_test',
+    'nsmDotBlobUtils_test',
+    'nsmDotStatusObject_test',
+]
 
 foreach t : tests
     test(

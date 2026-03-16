@@ -2,7 +2,7 @@
 # nsmMemory is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
 # All sources already compiled into nsmd_test, no need to recompile
 
-tests = ['nsmMemory_test']
+tests = ['nsmMemory_test', 'nsmMemory_extended_test']
 
 foreach t : tests
     test(

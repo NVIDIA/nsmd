@@ -263,7 +263,6 @@ TEST_F(NsmErotTest, badTestNonRoTChassis)
 {
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                           basicIntfName);
-    propertyMap.clear();
 
     // Use a non-RoT chassis name (without "RoT_" in the name)
     propertyMap["Type"] = std::string("NSM_Chassis");
@@ -531,7 +530,6 @@ TEST_F(NsmErotTest, goodTestCreateErotSensorsWithSlots)
 
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                           basicIntfName);
-    propertyMap.clear();
 
     propertyMap["Type"] = chassisRoT["Type"];
     propertyMap["Name"] = chassisRoT["Name"];
@@ -589,7 +587,6 @@ TEST_F(NsmErotTest, goodTestCreateErotSensorsWithImageCopy)
 
     auto& propertyMap = utils::MockDbusAsync::propertyMap(uniqueObjPath,
                                                           basicIntfName);
-    propertyMap.clear();
 
     propertyMap["Type"] = chassisRoT["Type"];
     propertyMap["Name"] = uniqueChassisName;
@@ -634,7 +631,6 @@ TEST_F(NsmErotTest, goodTestCreateErotSensorsWithUpdateSKU)
 
     auto& propertyMap = utils::MockDbusAsync::propertyMap(uniqueObjPath,
                                                           basicIntfName);
-    propertyMap.clear();
 
     propertyMap["Type"] = chassisRoT["Type"];
     propertyMap["Name"] = uniqueChassisName;
@@ -679,7 +675,6 @@ TEST_F(NsmErotTest, goodTestCreateErotSensorsECFirmware)
 
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                           basicIntfName);
-    propertyMap.clear();
 
     propertyMap["Type"] = chassisRoT["Type"];
     propertyMap["Name"] = chassisRoT["Name"];
@@ -835,7 +830,6 @@ TEST_F(NsmErotTest, goodTestCreateErotSensorsNoSlots)
 {
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                           basicIntfName);
-    propertyMap.clear();
 
     propertyMap["Type"] = chassisRoT["Type"];
     propertyMap["Name"] = chassisRoT["Name"];
@@ -854,7 +848,6 @@ TEST_F(NsmErotTest, badTestInvalidUUID)
 {
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                           basicIntfName);
-    propertyMap.clear();
 
     propertyMap["Type"] = chassisRoT["Type"];
     propertyMap["Name"] = chassisRoT["Name"];
@@ -868,4 +861,49 @@ TEST_F(NsmErotTest, badTestInvalidUUID)
 
     // Should fail to create sensors with invalid UUID
     EXPECT_EQ(fpga->deviceSensors.size(), initialSensorCount);
+}
+
+TEST_F(NsmBuildTypeObjectTest, goodTestHandleResponseMsgWithSlots)
+{
+    // Add slots to match the response
+    auto& bus = utils::DBusHandler::getBus();
+    std::string path = "/test/slot/path";
+    std::vector<utils::Association> associations;
+
+    auto slot1 = std::make_shared<NsmFirmwareSlot>(
+        bus, path + "/0", associations, 0, SlotIntf::FirmwareType::AP,
+        chassisName);
+    auto slot2 = std::make_shared<NsmFirmwareSlot>(
+        bus, path + "/1", associations, 1, SlotIntf::FirmwareType::AP,
+        chassisName);
+
+    buildTypeObj->addSlotObject(slot1);
+    buildTypeObj->addSlotObject(slot2);
+    EXPECT_EQ(buildTypeObj->fwSlotObjects.size(), 2);
+
+    // Create response with matching slot count
+    uint8_t instanceId = 0;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_erot_state_info_hdr_resp) +
+            2 * sizeof(nsm_firmware_slot_info),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    // Create slot info array
+    std::vector<nsm_firmware_slot_info> slotInfoArray(2);
+    slotInfoArray[0] = {}; // Initialize with default values
+    slotInfoArray[1] = {};
+
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.fq_resp_hdr.firmware_slot_count =
+        2; // Matches fwSlotObjects.size()
+    erotInfo.slot_info = slotInfoArray.data();
+
+    auto rc = encode_nsm_query_get_erot_state_parameters_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, &erotInfo, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    // This should succeed and cover lines 92, 96
+    rc = buildTypeObj->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
 }

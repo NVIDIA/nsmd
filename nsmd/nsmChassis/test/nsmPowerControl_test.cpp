@@ -79,16 +79,14 @@ TEST_F(NsmPowerControlTest, goodTestPowerCapEnable)
 
 TEST_F(NsmPowerControlTest, goodTestGetMaxPowerCapValue)
 {
-    // maxPowerCapValue is a getter only
-    uint32_t maxValue = powerControl->maxPowerCapValue();
-    EXPECT_GE(maxValue, 0);
+    // Verify getter is callable (no throw)
+    (void)powerControl->maxPowerCapValue();
 }
 
 TEST_F(NsmPowerControlTest, goodTestGetMinPowerCapValue)
 {
-    // minPowerCapValue is a getter only
-    uint32_t minValue = powerControl->minPowerCapValue();
-    EXPECT_GE(minValue, 0);
+    // Verify getter is callable (no throw)
+    (void)powerControl->minPowerCapValue();
 }
 
 TEST_F(NsmPowerControlTest, goodTestSetPowerCap)
@@ -124,7 +122,6 @@ TEST_F(NsmPowerControlTest, goodTestCreateControlGpuPower)
 
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                           basicIntfName);
-    propertyMap.clear();
 
     propertyMap["Name"] = controlName;
     propertyMap["UUID"] = fpgaUuid;
