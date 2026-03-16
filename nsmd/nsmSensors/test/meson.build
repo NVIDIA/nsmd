@@ -1,4 +1,9 @@
-tests = ['nsmPCIeLinkSpeed_test', 'nsmInventoryProperty_test']
+tests = [
+    'nsmPCIeLinkSpeed_test',
+    'nsmInventoryProperty_test',
+    'nsmDeepCoverage_test',
+    'nsmSensors_test',
+]
 
 foreach t : tests
     test(

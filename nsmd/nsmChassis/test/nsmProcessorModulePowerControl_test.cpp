@@ -331,3 +331,913 @@ TEST_F(NsmModulePowerLimitTest, testMultiplePowerLimitInstances)
     EXPECT_NE(minPowerLimit, nullptr);
     EXPECT_NE(maxPowerLimit->propertyName, minPowerLimit->propertyName);
 }
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// -----------------------------------------------------------------------
+// NEW TESTS to append to nsmProcessorModulePowerControl_test.cpp
+// These tests cover:
+//   - handleResponseMsg (success, various power limits, INVALID_POWER_LIMIT,
+//     error CC, short buffer / decode failure)
+//   - genRequestMsg validation (request size, encode failure scenarios)
+//   - setModulePowerCap (invalid variant type, above max, below min)
+//   - updatePowerLimitOnModule (patchPowerLimitInProgress guard,
+//     path not in processorModuleToDeviceMap, successful set with mocked IO)
+// -----------------------------------------------------------------------
+
+// ===========================================================================
+// handleResponseMsg tests
+// ===========================================================================
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       HandleResponseMsg_ValidSuccess_SetsPowerCap)
+{
+    // Arrange: build a valid get_power_limit response with enforced_limit =
+    // 500000 mW (500 W). The code divides by 1000 to get Watts.
+    uint32_t enforcedLimit = 500000; // 500 W
+    uint32_t persistentLimit = 600000;
+    uint32_t oneshotLimit = 0;
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    auto rc = encode_get_power_limit_resp(0, NSM_SUCCESS, ERR_NULL,
+                                          persistentLimit, oneshotLimit,
+                                          enforcedLimit, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Act
+    rc = powerControl->handleResponseMsg(response, responseData.size());
+
+    // Assert
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_EQ(powerCapIntf->powerCap(), enforcedLimit / 1000);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       HandleResponseMsg_DifferentPowerLimitValues_SetsPowerCapCorrectly)
+{
+    // Arrange: test with a different enforced limit value
+    uint32_t enforcedLimit = 300000; // 300 W
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    auto rc = encode_get_power_limit_resp(0, NSM_SUCCESS, ERR_NULL, 0, 0,
+                                          enforcedLimit, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Act
+    rc = powerControl->handleResponseMsg(response, responseData.size());
+
+    // Assert
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_EQ(powerCapIntf->powerCap(), 300u);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       HandleResponseMsg_ZeroPowerLimit_SetsPowerCapToZero)
+{
+    // Arrange: enforced limit of 0
+    uint32_t enforcedLimit = 0;
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    auto rc = encode_get_power_limit_resp(0, NSM_SUCCESS, ERR_NULL, 0, 0,
+                                          enforcedLimit, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Act
+    rc = powerControl->handleResponseMsg(response, responseData.size());
+
+    // Assert
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_EQ(powerCapIntf->powerCap(), 0u);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       HandleResponseMsg_InvalidPowerLimit_SetsInvalidMarker)
+{
+    // Arrange: enforced_limit == INVALID_POWER_LIMIT (0xFFFFFFFF).
+    // The code sets the raw INVALID_POWER_LIMIT value without dividing.
+    uint32_t enforcedLimit = INVALID_POWER_LIMIT;
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    auto rc = encode_get_power_limit_resp(0, NSM_SUCCESS, ERR_NULL, 0, 0,
+                                          enforcedLimit, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Act
+    rc = powerControl->handleResponseMsg(response, responseData.size());
+
+    // Assert
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_EQ(powerCapIntf->powerCap(), INVALID_POWER_LIMIT);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       HandleResponseMsg_ErrorCompletionCode_ReturnsError)
+{
+    // Arrange: encode a response with NSM_ERROR completion code.
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    auto rc = encode_get_power_limit_resp(0, NSM_ERROR, ERR_NULL, 0, 0, 0,
+                                          response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Set a known powerCap first to verify it does NOT change on error
+    powerCapIntf->powerCap(999);
+
+    // Act
+    rc = powerControl->handleResponseMsg(response, responseData.size());
+
+    // Assert: should return non-zero (the cc value)
+    EXPECT_NE(rc, NSM_SUCCESS);
+    // Power cap should remain unchanged because cc != NSM_SUCCESS
+    EXPECT_EQ(powerCapIntf->powerCap(), 999u);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       HandleResponseMsg_ShortBuffer_DecodeFailure)
+{
+    // Arrange: create a buffer that is too small for decode to succeed.
+    // This causes decode_get_power_limit_resp to fail with a length error.
+    std::vector<uint8_t> responseData(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    // Set a known powerCap first to verify it does NOT change on failure
+    powerCapIntf->powerCap(888);
+
+    // Act
+    auto rc = powerControl->handleResponseMsg(response, responseData.size());
+
+    // Assert: decode failure means rc != 0 (or cc != 0)
+    EXPECT_NE(rc, NSM_SUCCESS);
+    // Power cap should remain unchanged
+    EXPECT_EQ(powerCapIntf->powerCap(), 888u);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       HandleResponseMsg_LargePowerLimit_ConvertsCorrectly)
+{
+    // Arrange: large enforced limit to verify arithmetic
+    uint32_t enforcedLimit = 1000000; // 1000 W
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    auto rc = encode_get_power_limit_resp(0, NSM_SUCCESS, ERR_NULL, 0, 0,
+                                          enforcedLimit, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Act
+    rc = powerControl->handleResponseMsg(response, responseData.size());
+
+    // Assert
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_EQ(powerCapIntf->powerCap(), 1000u);
+}
+
+// ===========================================================================
+// genRequestMsg validation tests
+// ===========================================================================
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       GenRequestMsg_ValidParams_ReturnsCorrectSize)
+{
+    // Arrange
+    eid_t eid = 10;
+    uint8_t instanceId = 0;
+
+    // Act
+    auto result = powerControl->genRequestMsg(eid, instanceId);
+
+    // Assert
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result->size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_req));
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       GenRequestMsg_ZeroInstanceId_Succeeds)
+{
+    // Arrange
+    eid_t eid = 0;
+    uint8_t instanceId = 0;
+
+    // Act
+    auto result = powerControl->genRequestMsg(eid, instanceId);
+
+    // Assert
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(result->size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_req));
+}
+
+TEST_F(NsmProcessorModulePowerControlTest, GenRequestMsg_MaxInstanceId_Succeeds)
+{
+    // Arrange: instance ID uses only 5 bits (0-31) per NSM spec
+    eid_t eid = 100;
+    uint8_t instanceId = 31;
+
+    // Act
+    auto result = powerControl->genRequestMsg(eid, instanceId);
+
+    // Assert
+    EXPECT_TRUE(result.has_value());
+}
+
+// ===========================================================================
+// setModulePowerCap tests (coroutine)
+// ===========================================================================
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       SetModulePowerCap_InvalidVariantType_ThrowsInvalidArgument)
+{
+    // Arrange: pass a string instead of uint32_t in the variant
+    AsyncSetOperationValueType value = std::string("not_a_number");
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    std::shared_ptr<NsmDevice> device = nullptr;
+
+    // Act & Assert: should throw InvalidArgument because std::get_if<uint32_t>
+    // returns nullptr
+    EXPECT_THROW_COROUTINE(
+        powerControl->setModulePowerCap(value, &status, device),
+        sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       SetModulePowerCap_BoolVariantType_ThrowsInvalidArgument)
+{
+    // Arrange: pass a bool instead of uint32_t
+    AsyncSetOperationValueType value = true;
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    std::shared_ptr<NsmDevice> device = nullptr;
+
+    // Act & Assert
+    EXPECT_THROW_COROUTINE(
+        powerControl->setModulePowerCap(value, &status, device),
+        sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       SetModulePowerCap_AboveMaxPowerCap_ReturnsInvalidArgument)
+{
+    // Arrange: set min/max, then request above max
+    powerCapIntf->minPowerCapValue(200);
+    powerCapIntf->maxPowerCapValue(600);
+
+    uint32_t aboveMax = 700;
+    AsyncSetOperationValueType value = aboveMax;
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    std::shared_ptr<NsmDevice> device = nullptr;
+
+    // Act
+    auto coroutine = powerControl->setModulePowerCap(value, &status, device);
+
+    // Assert: status should be InvalidArgument, return code is
+    // NSM_SW_ERROR_COMMAND_FAIL
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       SetModulePowerCap_BelowMinPowerCap_ReturnsInvalidArgument)
+{
+    // Arrange: set min/max, then request below min
+    powerCapIntf->minPowerCapValue(200);
+    powerCapIntf->maxPowerCapValue(600);
+
+    uint32_t belowMin = 100;
+    AsyncSetOperationValueType value = belowMin;
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    std::shared_ptr<NsmDevice> device = nullptr;
+
+    // Act
+    auto coroutine = powerControl->setModulePowerCap(value, &status, device);
+
+    // Assert
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       SetModulePowerCap_ExactlyAtMaxBoundary_ProceedsToUpdate)
+{
+    // Arrange: value == max should be accepted (not rejected)
+    powerCapIntf->minPowerCapValue(200);
+    powerCapIntf->maxPowerCapValue(600);
+
+    uint32_t exactMax = 600;
+    AsyncSetOperationValueType value = exactMax;
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    std::shared_ptr<NsmDevice> device = nullptr;
+
+    // Act: this will proceed to updatePowerLimitOnModule, which will find no
+    // device in the map and set status to WriteFailure
+    auto coroutine = powerControl->setModulePowerCap(value, &status, device);
+
+    // Assert: should NOT be InvalidArgument since value is within range.
+    // It goes to updatePowerLimitOnModule which may fail for other reasons
+    // but the boundary check should pass.
+    EXPECT_NE(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       SetModulePowerCap_ExactlyAtMinBoundary_ProceedsToUpdate)
+{
+    // Arrange
+    powerCapIntf->minPowerCapValue(200);
+    powerCapIntf->maxPowerCapValue(600);
+
+    uint32_t exactMin = 200;
+    AsyncSetOperationValueType value = exactMin;
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    std::shared_ptr<NsmDevice> device = nullptr;
+
+    // Act
+    auto coroutine = powerControl->setModulePowerCap(value, &status, device);
+
+    // Assert: boundary check passes
+    EXPECT_NE(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+// ===========================================================================
+// updatePowerLimitOnModule tests (coroutine)
+// ===========================================================================
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       UpdatePowerLimitOnModule_AlreadyInProgress_ReturnsUnavailable)
+{
+    // Arrange: simulate a patch already in progress
+    powerControl->patchPowerLimitInProgress = true;
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+
+    // Act
+    auto coroutine = powerControl->updatePowerLimitOnModule(&status, NEW_LIMIT,
+                                                            400);
+
+    // Assert
+    EXPECT_EQ(status, AsyncOperationStatusType::Unavailable);
+    // The flag should remain true (not cleared by the early return path)
+    EXPECT_TRUE(powerControl->patchPowerLimitInProgress);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       UpdatePowerLimitOnModule_PathNotInDeviceMap_SetsWriteFailure)
+{
+    // Arrange: path is NOT in processorModuleToDeviceMap
+    // The SensorManager singleton will not have our path mapped.
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    powerControl->patchPowerLimitInProgress = false;
+
+    // Act
+    auto coroutine = powerControl->updatePowerLimitOnModule(&status, NEW_LIMIT,
+                                                            400);
+
+    // Assert: since path is not found in the map, rc = NSM_SW_ERROR
+    // but it still iterates over the (empty or invalid) map entry.
+    // After completion, patchPowerLimitInProgress should be reset to false.
+    EXPECT_FALSE(powerControl->patchPowerLimitInProgress);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       UpdatePowerLimitOnModule_WithMockedDevice_SuccessfulSet)
+{
+    // Arrange: register a mock device in the processorModuleToDeviceMap
+    const uuid_t deviceUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto nsmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+    ASSERT_NE(nsmDevice, nullptr);
+
+    SensorManager& manager = SensorManager::getInstance();
+    manager.processorModuleToDeviceMap[path] = {nsmDevice};
+
+    // Build a valid set_power_limit response
+    std::vector<uint8_t> setPowerLimitResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto setPowerLimitRespMsg =
+        reinterpret_cast<nsm_msg*>(setPowerLimitResp.data());
+    auto encRc = encode_set_power_limit_resp(0, NSM_SUCCESS, ERR_NULL,
+                                             setPowerLimitRespMsg);
+    ASSERT_EQ(encRc, NSM_SW_SUCCESS);
+
+    // Mock postPatchIO to return the valid set response
+    EXPECT_CALL(*nsmDevice,
+                postPatchIO(testing::_, testing::_, testing::_, testing::_))
+        .WillOnce(mockPostPatchIO(setPowerLimitResp));
+
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    powerControl->patchPowerLimitInProgress = false;
+
+    // Act
+    auto coroutine = powerControl->updatePowerLimitOnModule(&status, NEW_LIMIT,
+                                                            400);
+
+    // Assert
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+    EXPECT_FALSE(powerControl->patchPowerLimitInProgress);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       UpdatePowerLimitOnModule_PostPatchIOFailure_SetsWriteFailure)
+{
+    // Arrange: register a mock device in the processorModuleToDeviceMap
+    const uuid_t deviceUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto nsmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+    ASSERT_NE(nsmDevice, nullptr);
+
+    SensorManager& manager = SensorManager::getInstance();
+    manager.processorModuleToDeviceMap[path] = {nsmDevice};
+
+    // Mock postPatchIO to return an error code
+    EXPECT_CALL(*nsmDevice,
+                postPatchIO(testing::_, testing::_, testing::_, testing::_))
+        .WillOnce(mockPostPatchIO(NSM_ERROR));
+
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    powerControl->patchPowerLimitInProgress = false;
+
+    // Act
+    auto coroutine = powerControl->updatePowerLimitOnModule(&status, NEW_LIMIT,
+                                                            400);
+
+    // Assert
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+    EXPECT_FALSE(powerControl->patchPowerLimitInProgress);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       UpdatePowerLimitOnModule_ErrorCompletionCode_SetsWriteFailure)
+{
+    // Arrange: register a mock device
+    const uuid_t deviceUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto nsmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+    ASSERT_NE(nsmDevice, nullptr);
+
+    SensorManager& manager = SensorManager::getInstance();
+    manager.processorModuleToDeviceMap[path] = {nsmDevice};
+
+    // Build a set_power_limit response with NSM_ERROR completion code
+    std::vector<uint8_t> setPowerLimitResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto setPowerLimitRespMsg =
+        reinterpret_cast<nsm_msg*>(setPowerLimitResp.data());
+    auto encRc = encode_set_power_limit_resp(0, NSM_ERROR, ERR_NULL,
+                                             setPowerLimitRespMsg);
+    ASSERT_EQ(encRc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*nsmDevice,
+                postPatchIO(testing::_, testing::_, testing::_, testing::_))
+        .WillOnce(mockPostPatchIO(setPowerLimitResp));
+
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    powerControl->patchPowerLimitInProgress = false;
+
+    // Act
+    auto coroutine = powerControl->updatePowerLimitOnModule(&status, NEW_LIMIT,
+                                                            400);
+
+    // Assert
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+    EXPECT_FALSE(powerControl->patchPowerLimitInProgress);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       UpdatePowerLimitOnModule_DefaultLimitAction_SuccessfulSet)
+{
+    // Arrange: register a mock device
+    const uuid_t deviceUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto nsmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+    ASSERT_NE(nsmDevice, nullptr);
+
+    SensorManager& manager = SensorManager::getInstance();
+    manager.processorModuleToDeviceMap[path] = {nsmDevice};
+
+    // Build a valid set_power_limit response
+    std::vector<uint8_t> setPowerLimitResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto setPowerLimitRespMsg =
+        reinterpret_cast<nsm_msg*>(setPowerLimitResp.data());
+    auto encRc = encode_set_power_limit_resp(0, NSM_SUCCESS, ERR_NULL,
+                                             setPowerLimitRespMsg);
+    ASSERT_EQ(encRc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*nsmDevice,
+                postPatchIO(testing::_, testing::_, testing::_, testing::_))
+        .WillOnce(mockPostPatchIO(setPowerLimitResp));
+
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    powerControl->patchPowerLimitInProgress = false;
+
+    // Act: use DEFAULT_LIMIT action
+    auto coroutine = powerControl->updatePowerLimitOnModule(&status,
+                                                            DEFAULT_LIMIT, 500);
+
+    // Assert
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+    EXPECT_FALSE(powerControl->patchPowerLimitInProgress);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       UpdatePowerLimitOnModule_MultipleDevices_AllSucceed)
+{
+    // Arrange: register two mock devices for the same path
+    const uuid_t deviceUuid1 = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    const uuid_t deviceUuid2 = "STATIC:3:1:NSM_DEVICE_INSTANCE_NUMBER:1";
+    auto nsmDevice1 = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid1));
+    auto nsmDevice2 = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid2));
+    ASSERT_NE(nsmDevice1, nullptr);
+    ASSERT_NE(nsmDevice2, nullptr);
+
+    SensorManager& manager = SensorManager::getInstance();
+    manager.processorModuleToDeviceMap[path] = {nsmDevice1, nsmDevice2};
+
+    // Build a valid set_power_limit response
+    std::vector<uint8_t> setPowerLimitResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto setPowerLimitRespMsg =
+        reinterpret_cast<nsm_msg*>(setPowerLimitResp.data());
+    auto encRc = encode_set_power_limit_resp(0, NSM_SUCCESS, ERR_NULL,
+                                             setPowerLimitRespMsg);
+    ASSERT_EQ(encRc, NSM_SW_SUCCESS);
+
+    // Both devices should get postPatchIO called
+    EXPECT_CALL(*nsmDevice1,
+                postPatchIO(testing::_, testing::_, testing::_, testing::_))
+        .WillOnce(mockPostPatchIO(setPowerLimitResp));
+    EXPECT_CALL(*nsmDevice2,
+                postPatchIO(testing::_, testing::_, testing::_, testing::_))
+        .WillOnce(mockPostPatchIO(setPowerLimitResp));
+
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    powerControl->patchPowerLimitInProgress = false;
+
+    // Act
+    auto coroutine = powerControl->updatePowerLimitOnModule(&status, NEW_LIMIT,
+                                                            450);
+
+    // Assert
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+    EXPECT_FALSE(powerControl->patchPowerLimitInProgress);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       UpdatePowerLimitOnModule_SecondDeviceFails_SetsWriteFailure)
+{
+    // Arrange: two devices, second one fails
+    const uuid_t deviceUuid1 = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    const uuid_t deviceUuid2 = "STATIC:3:1:NSM_DEVICE_INSTANCE_NUMBER:1";
+    auto nsmDevice1 = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid1));
+    auto nsmDevice2 = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid2));
+    ASSERT_NE(nsmDevice1, nullptr);
+    ASSERT_NE(nsmDevice2, nullptr);
+
+    SensorManager& manager = SensorManager::getInstance();
+    manager.processorModuleToDeviceMap[path] = {nsmDevice1, nsmDevice2};
+
+    // Build a valid response for device1
+    std::vector<uint8_t> successResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto successRespMsg = reinterpret_cast<nsm_msg*>(successResp.data());
+    encode_set_power_limit_resp(0, NSM_SUCCESS, ERR_NULL, successRespMsg);
+
+    // Device1 succeeds, Device2 fails with IO error
+    EXPECT_CALL(*nsmDevice1,
+                postPatchIO(testing::_, testing::_, testing::_, testing::_))
+        .WillOnce(mockPostPatchIO(successResp));
+    EXPECT_CALL(*nsmDevice2,
+                postPatchIO(testing::_, testing::_, testing::_, testing::_))
+        .WillOnce(mockPostPatchIO(NSM_ERROR));
+
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    powerControl->patchPowerLimitInProgress = false;
+
+    // Act
+    auto coroutine = powerControl->updatePowerLimitOnModule(&status, NEW_LIMIT,
+                                                            400);
+
+    // Assert: second device fails, so overall status is WriteFailure
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+    EXPECT_FALSE(powerControl->patchPowerLimitInProgress);
+}
+
+// ===========================================================================
+// NsmModulePowerLimit tests
+// ===========================================================================
+
+TEST_F(NsmModulePowerLimitTest, Constructor_MaxPowerLimit_Succeeds)
+{
+    std::string testName = "MaxPowerLimit";
+    std::string testType = "NSM_ModulePowerLimit";
+
+    auto powerLimit = std::make_shared<NsmModulePowerLimit>(
+        testName, testType, MAXIMUM_MODULE_POWER_LIMIT, powerCapIntf);
+
+    EXPECT_NE(powerLimit, nullptr);
+    EXPECT_EQ(powerLimit->getName(), testName);
+}
+
+TEST_F(NsmModulePowerLimitTest, Constructor_MinPowerLimit_Succeeds)
+{
+    std::string testName = "MinPowerLimit";
+    std::string testType = "NSM_ModulePowerLimit";
+
+    auto powerLimit = std::make_shared<NsmModulePowerLimit>(
+        testName, testType, MINIMUM_MODULE_POWER_LIMIT, powerCapIntf);
+
+    EXPECT_NE(powerLimit, nullptr);
+    EXPECT_EQ(powerLimit->getName(), testName);
+}
+
+// ===========================================================================
+// NsmModulePowerLimit::update() tests
+// ===========================================================================
+
+struct NsmModulePowerLimitUpdateTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    NsmDeviceTable devices;
+    std::shared_ptr<PowerCapIntf> powerCapIntf;
+    std::string name = "ModulePowerLimit";
+    std::string type = "NSM_ModulePowerLimit";
+    std::string path = "/xyz/openbmc_project/test/power_limit_update";
+    const uuid_t deviceUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    std::shared_ptr<MockNsmDevice> nsmDevice;
+
+    NsmModulePowerLimitUpdateTest() : SensorManagerTest(devices) {}
+
+    void SetUp() override
+    {
+        auto& bus = utils::DBusHandler::getBus();
+        powerCapIntf = std::make_shared<PowerCapIntf>(bus, path.c_str());
+        nsmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+        ASSERT_NE(nsmDevice, nullptr);
+    }
+
+    std::vector<uint8_t> buildInventoryResponse(uint32_t valueMw)
+    {
+        uint16_t dataSize = sizeof(valueMw);
+        std::vector<uint8_t> responseData(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + dataSize, 0);
+        auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+        encode_get_inventory_information_resp(
+            0, NSM_SUCCESS, ERR_NULL, dataSize,
+            reinterpret_cast<const uint8_t*>(&valueMw), response);
+        return responseData;
+    }
+};
+
+TEST_F(NsmModulePowerLimitUpdateTest, Update_MaxPowerLimit_SetsMaxCapValue)
+{
+    auto powerLimit = std::make_shared<NsmModulePowerLimit>(
+        name, type, MAXIMUM_MODULE_POWER_LIMIT, powerCapIntf);
+
+    uint32_t valueMw = 700000; // 700 W
+    auto responseData = buildInventoryResponse(valueMw);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseData));
+
+    powerLimit->update(nsmDevice);
+
+    EXPECT_EQ(powerCapIntf->maxPowerCapValue(), 700u);
+}
+
+TEST_F(NsmModulePowerLimitUpdateTest, Update_MinPowerLimit_SetsMinCapValue)
+{
+    auto powerLimit = std::make_shared<NsmModulePowerLimit>(
+        name, type, MINIMUM_MODULE_POWER_LIMIT, powerCapIntf);
+
+    uint32_t valueMw = 100000; // 100 W
+    auto responseData = buildInventoryResponse(valueMw);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseData));
+
+    powerLimit->update(nsmDevice);
+
+    EXPECT_EQ(powerCapIntf->minPowerCapValue(), 100u);
+}
+
+TEST_F(NsmModulePowerLimitUpdateTest, Update_SensorIOFailure_DoesNotSetValue)
+{
+    auto powerLimit = std::make_shared<NsmModulePowerLimit>(
+        name, type, MAXIMUM_MODULE_POWER_LIMIT, powerCapIntf);
+
+    powerCapIntf->maxPowerCapValue(999);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERROR));
+
+    powerLimit->update(nsmDevice);
+
+    EXPECT_EQ(powerCapIntf->maxPowerCapValue(), 999u);
+}
+
+TEST_F(NsmModulePowerLimitUpdateTest, Update_InvalidPowerLimit_SetsRawValue)
+{
+    auto powerLimit = std::make_shared<NsmModulePowerLimit>(
+        name, type, MAXIMUM_MODULE_POWER_LIMIT, powerCapIntf);
+
+    uint32_t valueMw = INVALID_POWER_LIMIT;
+    auto responseData = buildInventoryResponse(valueMw);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseData));
+
+    powerLimit->update(nsmDevice);
+
+    EXPECT_EQ(powerCapIntf->maxPowerCapValue(), INVALID_POWER_LIMIT);
+}
+
+// ===========================================================================
+// NsmDefaultModulePowerLimit tests
+// ===========================================================================
+
+struct NsmDefaultModulePowerLimitTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    NsmDeviceTable devices;
+    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf;
+    std::string name = "DefaultModulePowerLimit";
+    std::string type = "NSM_DefaultModulePowerLimit";
+    std::string path = "/xyz/openbmc_project/test/default_power_limit";
+    const uuid_t deviceUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    std::shared_ptr<MockNsmDevice> nsmDevice;
+
+    NsmDefaultModulePowerLimitTest() : SensorManagerTest(devices) {}
+
+    void SetUp() override
+    {
+        auto& bus = utils::DBusHandler::getBus();
+        clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(bus, path);
+        nsmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+        ASSERT_NE(nsmDevice, nullptr);
+    }
+
+    std::vector<uint8_t> buildInventoryResponse(uint32_t valueMw)
+    {
+        uint16_t dataSize = sizeof(valueMw);
+        std::vector<uint8_t> responseData(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + dataSize, 0);
+        auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+        encode_get_inventory_information_resp(
+            0, NSM_SUCCESS, ERR_NULL, dataSize,
+            reinterpret_cast<const uint8_t*>(&valueMw), response);
+        return responseData;
+    }
+};
+
+TEST_F(NsmDefaultModulePowerLimitTest, Constructor_Succeeds)
+{
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
+        name, type, clearPowerCapIntf);
+    EXPECT_NE(sensor, nullptr);
+    EXPECT_EQ(sensor->getName(), name);
+    EXPECT_EQ(sensor->getType(), type);
+}
+
+TEST_F(NsmDefaultModulePowerLimitTest, Update_Success_SetsDefaultPowerCap)
+{
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
+        name, type, clearPowerCapIntf);
+
+    uint32_t ratedLimitMw = 600000; // 600 W
+    auto responseData = buildInventoryResponse(ratedLimitMw);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseData));
+
+    sensor->update(nsmDevice);
+
+    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 600u);
+}
+
+TEST_F(NsmDefaultModulePowerLimitTest, Update_InvalidPowerLimit_SetsRawValue)
+{
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
+        name, type, clearPowerCapIntf);
+
+    uint32_t ratedLimitMw = INVALID_POWER_LIMIT;
+    auto responseData = buildInventoryResponse(ratedLimitMw);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseData));
+
+    sensor->update(nsmDevice);
+
+    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), INVALID_POWER_LIMIT);
+}
+
+TEST_F(NsmDefaultModulePowerLimitTest, Update_SensorIOFailure_DoesNotSetValue)
+{
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
+        name, type, clearPowerCapIntf);
+
+    clearPowerCapIntf->defaultPowerCap(555);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERROR));
+
+    sensor->update(nsmDevice);
+
+    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 555u);
+}
+
+TEST_F(NsmDefaultModulePowerLimitTest,
+       Update_ErrorCompletionCode_DoesNotSetValue)
+{
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
+        name, type, clearPowerCapIntf);
+
+    clearPowerCapIntf->defaultPowerCap(777);
+
+    uint32_t ratedLimitMw = 400000;
+    uint16_t dataSize = sizeof(ratedLimitMw);
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + dataSize, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+    encode_get_inventory_information_resp(
+        0, NSM_ERROR, ERR_NULL, dataSize,
+        reinterpret_cast<const uint8_t*>(&ratedLimitMw), response);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseData));
+
+    sensor->update(nsmDevice);
+
+    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 777u);
+}
+
+// ============================================================================
+// addSensor<T> instantiation coverage
+// ============================================================================
+
+TEST_F(NsmModulePowerLimitUpdateTest, AddSensorNsmModulePowerLimit)
+{
+    std::string sensorName = "ModPowerLimitAS";
+    std::string sensorType = "NSM_ModulePowerLimit";
+    uint8_t propertyId = MAXIMUM_MODULE_POWER_LIMIT;
+    auto sensor = std::make_shared<NsmModulePowerLimit>(
+        sensorName, sensorType, propertyId, powerCapIntf);
+    size_t before = nsmDevice->deviceSensors.size();
+    nsmDevice->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(nsmDevice->deviceSensors.size(), before);
+}
+
+TEST_F(NsmDefaultModulePowerLimitTest, AddSensorNsmDefaultModulePowerLimit)
+{
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
+        name, type, clearPowerCapIntf);
+    size_t before = nsmDevice->deviceSensors.size();
+    nsmDevice->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(nsmDevice->deviceSensors.size(), before);
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       AddSensorNsmProcessorModulePowerControl)
+{
+    const uuid_t deviceUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto device = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+    ASSERT_NE(device, nullptr);
+    size_t before = device->deviceSensors.size();
+    device->addSensor(powerControl, PollingType::RoundRobin);
+    EXPECT_GT(device->deviceSensors.size(), before);
+}

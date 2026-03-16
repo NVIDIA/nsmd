@@ -1,4 +1,9 @@
-tests = ['nsmNetworkAdapter_test']
+tests = [
+    'nsmDeviceInventory_test',
+    'nsmNetworkAdapter_test',
+    'nsmSwitch_extended_test',
+    'nsmPCIeRetimerFabricsDI_test',
+]
 
 foreach t : tests
     test(

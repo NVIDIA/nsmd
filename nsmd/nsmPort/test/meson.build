@@ -7,9 +7,13 @@ tests = [
     'nsmEndpoint_test',
     'nsmFpgaPort_test',
     'nsmGpuPciePort_test',
+    'nsmRetimerPort_test',
+    'nsmPortConfig_test',
     'nsmZone_test',
     'nsmNetworkAddressAggregator_test',
     'nsmEthPortTelemetryAggregator_test',
+    'nsmPCIeErrors_test',
+    'nsmPortAddSensor_test',
 ]
 
 foreach t : tests

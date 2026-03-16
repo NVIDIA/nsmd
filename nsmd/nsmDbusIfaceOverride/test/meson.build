@@ -3,6 +3,7 @@ tests = [
     'nsmResetIface_test',
     'nsmWorkloadPowerProfileInfoIface_test',
     'nsmResetEdppAsyncIface_test',
+    'nsmPowerSmoothing_v2_test',
 ]
 
 foreach t : tests
