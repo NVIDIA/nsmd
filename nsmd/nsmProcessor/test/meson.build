@@ -8,6 +8,8 @@ tests = [
     'nsmWorkloadPowerProfile_test',
     'nsmFpgaProcessor_test',
     'nsmReset_test',
+    'nsmOemResetStatistics_test',
+    'nsmReconfigPermissions_test',
 ]
 
 foreach t : tests

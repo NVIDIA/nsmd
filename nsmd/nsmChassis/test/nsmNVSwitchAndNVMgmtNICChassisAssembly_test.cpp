@@ -124,3 +124,74 @@ TEST_F(NsmNVSwitchChassisAssemblyTest, goodTestWithLocationIntf)
     EXPECT_NE(assembly, nullptr);
     EXPECT_EQ(assembly->getName(), name);
 }
+
+namespace nsm
+{
+requester::Coroutine
+    createNsmNVLinkMgmtNicChassisAssembly(SensorManager& manager,
+                                          const std::string& interface,
+                                          const std::string& objPath);
+} // namespace nsm
+
+// ============================================================================
+// Factory tests: createNsmNVLinkMgmtNicChassisAssembly
+// These tests cover createAssemblyAsset, createAssemblyHealth,
+// createPhysicalContext, createLocationType, and the top-level factory.
+// ============================================================================
+
+struct NsmNVLinkMgmtNicChassisAssemblyFactoryTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string baseIntfName =
+        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/nvlink_asm_factory";
+    const uuid_t deviceUuid = "STATIC:2:0:NSM_DEVICE_INSTANCE_NUMBER:10";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> device;
+
+    NsmNVLinkMgmtNicChassisAssemblyFactoryTest() : SensorManagerTest(devices)
+    {
+        device = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+        EXPECT_NE(device, nullptr);
+    }
+
+    ~NsmNVLinkMgmtNicChassisAssemblyFactoryTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+TEST_F(NsmNVLinkMgmtNicChassisAssemblyFactoryTest,
+       CreateChassisAttributes_WithPhysicalContextAndLocationType)
+{
+    const std::string currentIntf = baseIntfName + ".ChassisAttributes";
+
+    // Set up base properties
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              baseIntfName);
+    basePropertyMap["Name"] = std::string("NVLinkMgmtNic0_Asm");
+    basePropertyMap["UUID"] = deviceUuid;
+    basePropertyMap["ChassisName"] = std::string("HGX_NVLinkMgmt_0");
+
+    // Set up attributes properties
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, currentIntf);
+    propertyMap["Type"] = std::string("NSM_Chassis_Attributes");
+    propertyMap["Name"] = std::string("NVLinkMgmtNic0_Asm");
+    propertyMap["PhysicalContext"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.Area."
+        "PhysicalContextType.Backplane");
+    propertyMap["LocationType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.Location."
+        "LocationTypes.Embedded");
+
+    size_t staticBefore = device->staticSensors.size();
+    createNsmNVLinkMgmtNicChassisAssembly(mockManager, currentIntf, objPath);
+
+    // Should have created Health + Asset sensors + PhysicalContext + Location
+    EXPECT_GT(device->staticSensors.size(), staticBefore);
+}

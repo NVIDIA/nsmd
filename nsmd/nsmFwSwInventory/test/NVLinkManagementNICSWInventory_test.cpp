@@ -15,9 +15,13 @@
  * limitations under the License.
  */
 
+#include "test/mockDBusHandler.hpp"
+#include "test/mockSensorManager.hpp"
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 using ::testing::ElementsAre;
+using namespace ::testing;
 
 #include "base.h"
 #include "platform-environmental.h"
@@ -159,4 +163,40 @@ TEST(NsmSWInventoryDriverVersionAndStatus, ExceedinglyLongDriverVersion)
         reinterpret_cast<nsm_msg*>(responseMsg.data()), responseMsg.size());
 
     EXPECT_EQ(result, NSM_SW_ERROR_LENGTH);
+}
+
+// ============================================================================
+// addSensor<T> instantiation coverage
+// ============================================================================
+
+struct NsmSWInventoryAddSensorTest :
+    public ::testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    NsmDeviceTable devices;
+
+    NsmSWInventoryAddSensorTest() : SensorManagerTest(devices) {}
+
+    ~NsmSWInventoryAddSensorTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+
+    std::shared_ptr<MockNsmDevice> makeDevice()
+    {
+        return std::make_shared<MockNsmDevice>(NSM_DEV_ID_PCIE_BRIDGE, 0,
+                                               "MCTP_EID", "12", 0);
+    }
+};
+
+TEST_F(NsmSWInventoryAddSensorTest,
+       AddSensorNsmSWInventoryDriverVersionAndStatus)
+{
+    auto device = makeDevice();
+    auto sensor = std::make_shared<nsm::NsmSWInventoryDriverVersionAndStatus>(
+        bus, sensorName, associations, sensorType, manufacturer);
+    size_t before = device->deviceSensors.size();
+    device->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(device->deviceSensors.size(), before);
 }

@@ -1,0 +1,414 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "test/mockDBusHandler.hpp"
+#include "test/mockSensorManager.hpp"
+
+using namespace ::testing;
+
+#define private public
+#define protected public
+
+#include "base.h"
+#include "platform-environmental.h"
+
+#include "nsmAssetIntf.hpp"
+#include "nsmIRoTResponder.hpp"
+#include "nsmInventoryProperty.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
+
+#include <libnsm/debug-token.h>
+
+#undef private
+#undef protected
+
+namespace nsm
+{
+requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
+                                            const std::string& interface,
+                                            const std::string& objPath);
+} // namespace nsm
+
+using namespace nsm;
+
+// =============================================================================
+// PART 4: NsmIRoTResponder -- createNsmIRoTResponder edge cases
+// =============================================================================
+
+struct Batch12DIRoTResponderTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string name = "IRoTB12D";
+    const std::string type = "NSM_IRoTResponder";
+    const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> fpga;
+
+    Batch12DIRoTResponderTest() : SensorManagerTest(devices)
+    {
+        fpga = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(fpgaUuid));
+        EXPECT_NE(fpga, nullptr);
+    }
+
+    ~Batch12DIRoTResponderTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+// ---------------------------------------------------------------------------
+// createNsmIRoTResponder: NSM_Chassis_Attributes with NO LocationType/Chassis
+// This exercises the path where LocationType and ChassisType are absent,
+// so createIRoTResponderLocation and createIRoTResponderChassis are skipped.
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_AttributesNoLocationNoChassis_CreatesMinimal)
+{
+    // Arrange
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_b12d_min";
+
+    dbus::PropertyMap baseProperties = {
+        {"Name", name},
+        {"UUID", fpgaUuid},
+    };
+
+    // NSM_Chassis_Attributes type but NO LocationType and NO ChassisType
+    dbus::PropertyMap attributesProperties = {
+        {"Type", std::string("NSM_Chassis_Attributes")},
+        {"Name", std::string("IRoT_MinAttrs")},
+    };
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = baseProperties;
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMap = attributesProperties;
+
+    // Act
+    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
+                           objPath);
+
+    // Assert - Should create Asset(1 static + 3 inventory) + Health(1)
+    // but NOT Location nor Chassis since keys are missing
+    EXPECT_GE(fpga->staticSensors.size(), 2u);
+}
+
+// ---------------------------------------------------------------------------
+// createNsmIRoTResponder: NSM_Chassis_Attributes with LocationType only
+// Exercises createIRoTResponderLocation but skips createIRoTResponderChassis
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_AttributesWithLocationOnly_CreatesLocationSensor)
+{
+    // Arrange
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_b12d_loc";
+
+    dbus::PropertyMap baseProperties = {
+        {"Name", name},
+        {"UUID", fpgaUuid},
+    };
+
+    dbus::PropertyMap attributesProperties = {
+        {"Type", std::string("NSM_Chassis_Attributes")},
+        {"Name", std::string("IRoT_LocOnly")},
+        {"LocationType",
+         std::string("xyz.openbmc_project.Inventory.Decorator.Location."
+                     "LocationTypes.Embedded")},
+    };
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = baseProperties;
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMap = attributesProperties;
+
+    // Act
+    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
+                           objPath);
+
+    // Assert - Asset + Health + Location (no Chassis)
+    EXPECT_GE(fpga->staticSensors.size(), 3u);
+}
+
+// ---------------------------------------------------------------------------
+// createNsmIRoTResponder: NSM_Chassis_Attributes with ChassisType only
+// Exercises createIRoTResponderChassis but skips createIRoTResponderLocation
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_AttributesWithChassisOnly_CreatesChassisSensor)
+{
+    // Arrange
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_b12d_ch";
+
+    dbus::PropertyMap baseProperties = {
+        {"Name", name},
+        {"UUID", fpgaUuid},
+    };
+
+    dbus::PropertyMap attributesProperties = {
+        {"Type", std::string("NSM_Chassis_Attributes")},
+        {"Name", std::string("IRoT_ChassisOnly")},
+        {"ChassisType",
+         std::string("xyz.openbmc_project.Inventory.Item.Chassis."
+                     "ChassisType.Module")},
+    };
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = baseProperties;
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMap = attributesProperties;
+
+    // Act
+    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
+                           objPath);
+
+    // Assert - Asset + Health + Chassis (no Location)
+    EXPECT_GE(fpga->staticSensors.size(), 3u);
+}
+
+// ---------------------------------------------------------------------------
+// createNsmIRoTResponder: attributes without Name property
+// Tests the branch where name is not in allCurrentIfaceProperties
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_AttributesNoName_CreatesWithEmptyName)
+{
+    // Arrange
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_b12d_noname";
+
+    dbus::PropertyMap baseProperties = {
+        {"Name", name},
+        {"UUID", fpgaUuid},
+    };
+
+    // No "Name" key in the attribute properties (tests the missing
+    // Name branch in createIRoTResponderAsset)
+    dbus::PropertyMap attributesProperties = {
+        {"Type", std::string("NSM_Chassis_Attributes")},
+    };
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = baseProperties;
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMap = attributesProperties;
+
+    // Act
+    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
+                           objPath);
+
+    // Assert - Asset + Health (without Location/Chassis since not provided)
+    EXPECT_GE(fpga->staticSensors.size(), 2u);
+}
+
+// ---------------------------------------------------------------------------
+// createNsmIRoTResponder: base type with missing Name and missing Type
+// This tests the createNsmIRoTResponder function when the "Name" and "Type"
+// keys are missing from the property maps
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_ChassisTypeMissing_HandlesGracefully)
+{
+    // Arrange
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_b12d_notype";
+
+    dbus::PropertyMap baseProperties = {
+        {"UUID", fpgaUuid},
+        // Missing "Name" key to hit the branch where name stays empty
+    };
+
+    // Missing "Type" key to hit the branch where type stays empty
+    dbus::PropertyMap responderProperties = {
+        {"UUID", fpgaUuid},
+    };
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = baseProperties;
+
+    auto& propertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
+    propertyMap = responderProperties;
+
+    // Act - when type is empty, neither the baseType nor
+    // NSM_Chassis_Attributes branches are taken
+    createNsmIRoTResponder(mockManager, basicIntfName + ".Chassis", objPath);
+
+    // Assert - no sensors added since type does not match
+    // Just ensure no crash
+    SUCCEED();
+}
+
+// ---------------------------------------------------------------------------
+// NsmIRoTResponder: HealthIntf template instantiation
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest, ConstructorWithHealthIntf_CreatesObject)
+{
+    // Arrange & Act
+    auto healthResponder = std::make_shared<NsmIRoTResponder<HealthIntf>>(
+        "HealthTestB12D", "NSM_ChassisIRoTResponder");
+
+    // Assert
+    EXPECT_NE(healthResponder, nullptr);
+    EXPECT_EQ(healthResponder->getName(), "HealthTestB12D");
+    EXPECT_EQ(healthResponder->getType(), "NSM_ChassisIRoTResponder");
+}
+
+// ---------------------------------------------------------------------------
+// NsmIRoTResponder: LocationIntf template instantiation
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest, ConstructorWithLocationIntf_CreatesObject)
+{
+    // Arrange & Act
+    auto locationResponder = std::make_shared<NsmIRoTResponder<LocationIntf>>(
+        "LocationTestB12D", "NSM_ChassisIRoTResponder");
+
+    // Assert
+    EXPECT_NE(locationResponder, nullptr);
+    EXPECT_EQ(locationResponder->getName(), "LocationTestB12D");
+    EXPECT_EQ(locationResponder->getType(), "NSM_ChassisIRoTResponder");
+}
+
+// ---------------------------------------------------------------------------
+// NsmIRoTResponder: UuidIntf template instantiation
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest, ConstructorWithUuidIntf_CreatesObject)
+{
+    // Arrange & Act
+    auto uuidResponder = std::make_shared<NsmIRoTResponder<UuidIntf>>(
+        "UuidTestB12D", "NSM_ChassisIRoTResponder");
+
+    // Assert
+    EXPECT_NE(uuidResponder, nullptr);
+    EXPECT_EQ(uuidResponder->getName(), "UuidTestB12D");
+    EXPECT_EQ(uuidResponder->getType(), "NSM_ChassisIRoTResponder");
+}
+
+// ---------------------------------------------------------------------------
+// NsmIRoTResponder: AssociationDefinitionsIntf template instantiation
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest, ConstructorWithAssociationIntf_CreatesObject)
+{
+    // Arrange & Act
+    auto assocResponder =
+        std::make_shared<NsmIRoTResponder<AssociationDefinitionsIntf>>(
+            "AssocTestB12D", "NSM_ChassisIRoTResponder");
+
+    // Assert
+    EXPECT_NE(assocResponder, nullptr);
+    EXPECT_EQ(assocResponder->getName(), "AssocTestB12D");
+    EXPECT_EQ(assocResponder->getType(), "NSM_ChassisIRoTResponder");
+}
+
+// ---------------------------------------------------------------------------
+// NsmIRoTResponder: SPDMResponderIntf template instantiation
+// ---------------------------------------------------------------------------
+TEST_F(Batch12DIRoTResponderTest,
+       ConstructorWithSPDMResponderIntf_CreatesObject)
+{
+    // Arrange & Act
+    auto spdmResponder = std::make_shared<NsmIRoTResponder<SPDMResponderIntf>>(
+        "SPDMTestB12D", "NSM_ChassisIRoTResponder");
+
+    // Assert
+    EXPECT_NE(spdmResponder, nullptr);
+    EXPECT_EQ(spdmResponder->getName(), "SPDMTestB12D");
+    EXPECT_EQ(spdmResponder->getType(), "NSM_ChassisIRoTResponder");
+}
+
+// ============================================================================
+// addSensor<T> instantiation coverage
+// ============================================================================
+
+TEST_F(Batch12DIRoTResponderTest, AddSensorNsmIRoTResponderSPDM)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<SPDMResponderIntf>>(
+        "SPDMResponder_AS", "NSM_ChassisIRoTResponder");
+    size_t before = fpga->deviceSensors.size();
+    fpga->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(fpga->deviceSensors.size(), before);
+}
+
+// ============================================================================
+// NsmIRoTResponder<T>::update() coverage
+// For non-NsmAssetIntf and non-UuidIntf types, update() just co_returns
+// NSM_SUCCESS.
+// ============================================================================
+
+TEST_F(Batch12DIRoTResponderTest, UpdateHealthIntf)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<HealthIntf>>(
+        "HealthUpd", "NSM_ChassisIRoTResponder");
+    sensor->update(fpga);
+}
+
+TEST_F(Batch12DIRoTResponderTest, UpdateLocationIntf)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<LocationIntf>>(
+        "LocationUpd", "NSM_ChassisIRoTResponder");
+    sensor->update(fpga);
+}
+
+TEST_F(Batch12DIRoTResponderTest, UpdateAssociationDefinitionsIntf)
+{
+    auto sensor =
+        std::make_shared<NsmIRoTResponder<AssociationDefinitionsIntf>>(
+            "AssocUpd", "NSM_ChassisIRoTResponder");
+    sensor->update(fpga);
+}
+
+TEST_F(Batch12DIRoTResponderTest, UpdateSPDMResponderIntf)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<SPDMResponderIntf>>(
+        "SPDMUpd", "NSM_ChassisIRoTResponder");
+    sensor->update(fpga);
+}
+
+TEST_F(Batch12DIRoTResponderTest, UpdateChassisIntf)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<ChassisIntf>>(
+        "ChassisUpd", "NSM_ChassisIRoTResponder");
+    sensor->update(fpga);
+}

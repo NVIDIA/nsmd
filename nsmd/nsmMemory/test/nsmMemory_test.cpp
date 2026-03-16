@@ -656,3 +656,64 @@ TEST_F(NsmMemorySensorTestFixture,
     // configuration)
     EXPECT_GE(gpu->deviceSensors.size(), 1);
 }
+
+// ============================================================================
+// addSensor<T> instantiation coverage
+// ============================================================================
+
+TEST_F(NsmMemorySensorTestFixture, AddSensorNsmMemCurrClockFreq)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(
+        utils::DBusHandler::getBus(),
+        "/xyz/openbmc_project/inventory/test/mem_freq");
+    std::string testName = "MemCurrClockFreq_AS";
+    std::string testType = "NSM_Memory";
+    auto sensor = std::make_shared<NsmMemCurrClockFreq>(
+        testName, testType, dimmIntf,
+        "/xyz/openbmc_project/inventory/test/mem_freq");
+    size_t before = gpu->deviceSensors.size();
+    gpu->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+TEST_F(NsmMemorySensorTestFixture, AddSensorNsmMemCapacity)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(
+        utils::DBusHandler::getBus(),
+        "/xyz/openbmc_project/inventory/test/mem_cap");
+    std::string testName = "MemCapacity_AS";
+    std::string testType = "NSM_Memory";
+    auto sensor = std::make_shared<NsmMemCapacity>(testName, testType,
+                                                   dimmIntf);
+    size_t before = gpu->deviceSensors.size();
+    gpu->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+TEST_F(NsmMemorySensorTestFixture, AddSensorNsmMinMemoryClockLimit)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(
+        utils::DBusHandler::getBus(),
+        "/xyz/openbmc_project/inventory/test/mem_min_clk");
+    std::string testName = "MinMemClock_AS";
+    std::string testType = "NSM_Memory";
+    auto sensor = std::make_shared<NsmMinMemoryClockLimit>(testName, testType,
+                                                           dimmIntf);
+    size_t before = gpu->deviceSensors.size();
+    gpu->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+TEST_F(NsmMemorySensorTestFixture, AddSensorNsmMaxMemoryClockLimit)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(
+        utils::DBusHandler::getBus(),
+        "/xyz/openbmc_project/inventory/test/mem_max_clk");
+    std::string testName = "MaxMemClock_AS";
+    std::string testType = "NSM_Memory";
+    auto sensor = std::make_shared<NsmMaxMemoryClockLimit>(testName, testType,
+                                                           dimmIntf);
+    size_t before = gpu->deviceSensors.size();
+    gpu->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}

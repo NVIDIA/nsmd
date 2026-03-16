@@ -55,6 +55,10 @@ ninja -C builddir
 meson test -C builddir
 # Run specific unit test
 meson test -C builddir nsmChassis_test
+# Run all unit tests with Valgrind (memory leak detection)
+meson test -t 10 -C builddir --print-errorlogs --wrapper "valgrind --leak-check=full --track-origins=yes --show-reachable=yes"
+# Run specific unit test with Valgrind
+meson test -t 10 -C builddir nsmChassis_test --print-errorlogs --wrapper "valgrind --leak-check=full --track-origins=yes --show-reachable=yes"
 ```
 
 ### Generate coverage report

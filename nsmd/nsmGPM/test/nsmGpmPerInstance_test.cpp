@@ -273,3 +273,20 @@ TEST_F(NsmGPMPerInstanceTest, testHandleResponsePartialInstances)
     auto rc = perInstance.handleResponseMsg(responseMsg, responseBuffer.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
+
+// ============================================================================
+// addSensor<T> instantiation coverage
+// ============================================================================
+
+TEST_F(NsmGPMPerInstanceTest, AddSensorNsmGPMPerInstance)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+    const std::vector<bitfield8_t> instanceBitfield{
+        {.byte = 0xFF}, {.byte = 0x00}, {.byte = 0x00}, {.byte = 0x00}};
+    auto sensor = std::make_shared<NsmGPMPerInstance>(
+        "GPMPerInst_AS", "GPMPerInstance", 2, 0, 0, 10, instanceBitfield,
+        GPMMetricsUnit::PERCENTAGE, updator);
+    size_t before = gpu->deviceSensors.size();
+    gpu->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
