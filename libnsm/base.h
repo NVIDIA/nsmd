@@ -380,15 +380,22 @@ typedef enum {
 
 // Enum for Data Format (data type for bucket info)
 typedef enum {
-	NvU8 = 0,
-	NvS8 = 1,
-	NvU16 = 2,
-	NvS16 = 3,
-	NvU32 = 4,
-	NvS32 = 5,
-	NvU64 = 6,
-	NvS64 = 7,
-	NvS24_8 = 8,
+	Bool8 = 0,
+	Enum8 = 1, // encoded as 1 byte
+	NvU8 = 2,
+	NvS8 = 3,
+	NvU16 = 4,
+	NvS16 = 5,
+	NvU32 = 6,
+	NvS32 = 7,
+	NvU64 = 8,
+	NvS64 = 9,
+	Bitfield8 = 10,
+	Bitfield32 = 11,
+	NvS24_8 = 12,
+	String = 13,
+	CharacterArray = 14,
+	DateTime = 15,
 } BucketFormat;
 
 // Enum for Network HistogramID (Ids for Histogram type)
