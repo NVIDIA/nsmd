@@ -4864,6 +4864,83 @@ TEST(FirmwareRotProperty, EncodeSetResponseErrorCompletionCode)
 	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD6);
 }
 
+TEST(FirmwareRotProperty, EncodeSetReqByParamsFailoverPolicy)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(nsm_firmware_set_rot_property_req_command),
+	    0);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	uint16_t classification = 10;
+	uint16_t identifier = 2;
+	uint8_t index = 0;
+	uint8_t argumentData[] = {NSM_ROT_GLOBAL_FAILOVER_POLICY_NO_FAILOVER};
+
+	int rc = encode_nsm_firmware_set_rot_property_req_by_params(
+	    0, classification, identifier, index,
+	    NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY, argumentData,
+	    sizeof(argumentData), msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(msg->hdr.request, 1);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_FIRMWARE);
+
+	auto *request =
+	    reinterpret_cast<nsm_firmware_set_rot_property_req_command *>(
+		msg->payload);
+	EXPECT_EQ(request->hdr.command, NSM_FW_SET_ROT_PROPERTY);
+	EXPECT_EQ(le16toh(request->rot_property_req.component_classification),
+		  classification);
+	EXPECT_EQ(le16toh(request->rot_property_req.component_identifier),
+		  identifier);
+	EXPECT_EQ(request->rot_property_req.component_classification_index,
+		  index);
+	EXPECT_EQ(request->rot_property_req.property,
+		  NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY);
+	EXPECT_EQ(request->rot_property_req.argument_length, 1);
+	EXPECT_EQ(request->rot_property_req.argument_data[0],
+		  NSM_ROT_GLOBAL_FAILOVER_POLICY_NO_FAILOVER);
+}
+
+TEST(FirmwareRotProperty, EncodeSetReqByParamsNullMsg)
+{
+	uint8_t argumentData[] = {0};
+	EXPECT_EQ(encode_nsm_firmware_set_rot_property_req_by_params(
+		      0, 1, 2, 0, NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY,
+		      argumentData, sizeof(argumentData), nullptr),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(FirmwareRotProperty, EncodeSetReqByParamsNullData)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(nsm_firmware_set_rot_property_req_command),
+	    0);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	EXPECT_EQ(encode_nsm_firmware_set_rot_property_req_by_params(
+		      0, 1, 2, 0, NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY,
+		      nullptr, 1, msg),
+		  NSM_SW_ERROR_DATA);
+}
+
+TEST(FirmwareRotProperty, EncodeSetReqByParamsZeroLength)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(nsm_firmware_set_rot_property_req_command),
+	    0);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+	uint8_t argumentData[] = {0};
+
+	EXPECT_EQ(encode_nsm_firmware_set_rot_property_req_by_params(
+		      0, 1, 2, 0, NSM_ROT_PROPERTY_GLOBAL_FAILOVER_POLICY,
+		      argumentData, 0, msg),
+		  NSM_SW_ERROR_DATA);
+}
+
 TEST(FirmwareDotDisable, EncodeResponseErrorCompletionCode)
 {
 	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +

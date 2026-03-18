@@ -901,8 +901,352 @@ TEST_F(NsmRoTPropertyDeepTest,
 }
 
 // ============================================================================
+// NsmFailoverPolicyObject
+// ============================================================================
+
+TEST_F(NsmRoTPropertyDeepTest, FailoverPolicyObject_Constructor_SetsFields)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp1";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp1", testUuid, classification, identifier, index);
+
+    EXPECT_NE(obj, nullptr);
+    EXPECT_EQ(obj->classification, classification);
+    EXPECT_EQ(obj->identifier, identifier);
+    EXPECT_EQ(obj->index, index);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicyObject_GenRequestMsg_ValidParams_ReturnsRequest)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp2";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp2", testUuid, classification, identifier, index);
+
+    auto request = obj->genRequestMsg(0, 0);
+
+    EXPECT_TRUE(request.has_value());
+    EXPECT_EQ(request->size(),
+              sizeof(nsm_msg_hdr) +
+                  sizeof(nsm_firmware_get_erot_state_info_req));
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicyObject_GenRequestMsg_BadInstanceId_ReturnsNullopt)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp3";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp3", testUuid, classification, identifier, index);
+
+    auto request = obj->genRequestMsg(0, NSM_INSTANCE_MAX + 1);
+
+    EXPECT_FALSE(request.has_value());
+}
+
+// --- NsmFailoverPolicyObject handleResponseMsg ---
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicyObject_HandleResponse_Success_UpdatesProperties)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp4";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp4", testUuid, classification, identifier, index);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_erot_state_info_hdr_resp) +
+            sizeof(nsm_firmware_slot_info) * 2,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.fq_resp_hdr.global_failover_policy =
+        NSM_ROT_GLOBAL_FAILOVER_POLICY_AUTOMATIC_FAILOVER;
+    erotInfo.slot_info = nullptr;
+
+    auto rc = encode_nsm_query_get_erot_state_parameters_resp(
+        0, NSM_SUCCESS, ERR_NULL, &erotInfo, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = obj->handleResponseMsg(responseMsg, response.size());
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicyObject_HandleResponse_ErrorCC_ReturnsError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp5";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp5", testUuid, classification, identifier, index);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_erot_state_info_hdr_resp) +
+            sizeof(nsm_firmware_slot_info) * 2,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.slot_info = nullptr;
+
+    auto rc = encode_nsm_query_get_erot_state_parameters_resp(
+        0, NSM_SUCCESS, ERR_NULL, &erotInfo, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto* payload = reinterpret_cast<nsm_firmware_get_erot_state_info_resp*>(
+        responseMsg->payload);
+    payload->hdr.completion_code = NSM_ERROR;
+    response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = obj->handleResponseMsg(responseMsg, response.size());
+
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       DISABLED_FailoverPolicyObject_HandleResponse_DecodeFailure_ReturnsError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp-df";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp_df", testUuid, classification, identifier,
+        index);
+
+    // Buffer too small to even read the completion code field.
+    std::vector<uint8_t> response(4, 0);
+    auto responseMsg = reinterpret_cast<const nsm_msg*>(response.data());
+
+    auto rc = obj->handleResponseMsg(responseMsg, response.size());
+
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+// --- NsmFailoverPolicy::updateProperties ---
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicy_UpdateProperties_AutomaticFailover_SetsAutomatic)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp6";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp6", testUuid, classification, identifier, index);
+
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.fq_resp_hdr.global_failover_policy =
+        NSM_ROT_GLOBAL_FAILOVER_POLICY_AUTOMATIC_FAILOVER;
+
+    obj->nsmFailoverPolicy->updateProperties(erotInfo);
+
+    EXPECT_NE(obj->nsmFailoverPolicy, nullptr);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicy_UpdateProperties_NoFailover_SetsNoFailover)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp7";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp7", testUuid, classification, identifier, index);
+
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.fq_resp_hdr.global_failover_policy =
+        NSM_ROT_GLOBAL_FAILOVER_POLICY_NO_FAILOVER;
+
+    obj->nsmFailoverPolicy->updateProperties(erotInfo);
+
+    EXPECT_NE(obj->nsmFailoverPolicy, nullptr);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicy_UpdateProperties_NotApplicable_SetsUnknown)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp8";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp8", testUuid, classification, identifier, index);
+
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.fq_resp_hdr.global_failover_policy =
+        NSM_ROT_GLOBAL_FAILOVER_POLICY_NOT_APPLICABLE;
+
+    obj->nsmFailoverPolicy->updateProperties(erotInfo);
+
+    EXPECT_NE(obj->nsmFailoverPolicy, nullptr);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicy_UpdateProperties_InvalidValue_LogsError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp9";
+    auto obj = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_fp9", testUuid, classification, identifier, index);
+
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.fq_resp_hdr.global_failover_policy = 0xFE;
+
+    obj->nsmFailoverPolicy->updateProperties(erotInfo);
+
+    EXPECT_NE(obj->nsmFailoverPolicy, nullptr);
+}
+
+// --- FailoverPolicyHandler::updateFailoverPolicy coroutine ---
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicyHandler_InvalidValueType_ReturnsError)
+{
+    FailoverPolicyHandler handler;
+    AsyncOperationStatusType status = {};
+    AsyncSetOperationValueType value = uint32_t(42);
+
+    handler.updateFailoverPolicy(value, &status, fpga, classification,
+                                 identifier, index);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicyHandler_InvalidPolicyString_ReturnsError)
+{
+    FailoverPolicyHandler handler;
+    AsyncOperationStatusType status = {};
+    AsyncSetOperationValueType value = std::string("InvalidFailoverState");
+
+    handler.updateFailoverPolicy(value, &status, fpga, classification,
+                                 identifier, index);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicyHandler_AutomaticFailover_EncodesAndSends)
+{
+    FailoverPolicyHandler handler;
+    AsyncOperationStatusType status = {};
+    AsyncSetOperationValueType value = std::string(
+        "com.nvidia.FailoverPolicy.FailoverPolicyState.AutomaticFailover");
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_set_rot_property_resp_command),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_nsm_firmware_set_rot_property_resp(0, NSM_SUCCESS,
+                                                        ERR_NULL, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    testing::Mock::AllowLeak(fpga.get());
+    EXPECT_CALL(*fpga, postPatchIO).WillOnce(mockPostPatchIO(response));
+
+    handler.updateFailoverPolicy(value, &status, fpga, classification,
+                                 identifier, index);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+}
+
+TEST_F(NsmRoTPropertyDeepTest, FailoverPolicyHandler_NoFailover_EncodesAndSends)
+{
+    FailoverPolicyHandler handler;
+    AsyncOperationStatusType status = {};
+    AsyncSetOperationValueType value =
+        std::string("com.nvidia.FailoverPolicy.FailoverPolicyState.NoFailover");
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_set_rot_property_resp_command),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_nsm_firmware_set_rot_property_resp(0, NSM_SUCCESS,
+                                                        ERR_NULL, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    testing::Mock::AllowLeak(fpga.get());
+    EXPECT_CALL(*fpga, postPatchIO).WillOnce(mockPostPatchIO(response));
+
+    handler.updateFailoverPolicy(value, &status, fpga, classification,
+                                 identifier, index);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicyHandler_PostPatchIOFail_ReturnsWriteFailure)
+{
+    FailoverPolicyHandler handler;
+    AsyncOperationStatusType status = {};
+    AsyncSetOperationValueType value = std::string(
+        "com.nvidia.FailoverPolicy.FailoverPolicyState.AutomaticFailover");
+
+    testing::Mock::AllowLeak(fpga.get());
+    EXPECT_CALL(*fpga, postPatchIO)
+        .WillOnce(mockPostPatchIO(
+            static_cast<nsm_completion_codes>(NSM_SW_ERROR_COMMAND_FAIL)));
+
+    handler.updateFailoverPolicy(value, &status, fpga, classification,
+                                 identifier, index);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+TEST_F(NsmRoTPropertyDeepTest,
+       FailoverPolicyHandler_DecodeRespFail_ReturnsWriteFailure)
+{
+    FailoverPolicyHandler handler;
+    AsyncOperationStatusType status = {};
+    AsyncSetOperationValueType value =
+        std::string("com.nvidia.FailoverPolicy.FailoverPolicyState.NoFailover");
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_set_rot_property_resp_command),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_nsm_firmware_set_rot_property_resp(0, NSM_ERROR, ERR_NULL,
+                                                        responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    testing::Mock::AllowLeak(fpga.get());
+    EXPECT_CALL(*fpga, postPatchIO).WillOnce(mockPostPatchIO(response));
+
+    handler.updateFailoverPolicy(value, &status, fpga, classification,
+                                 identifier, index);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// --- updateFailoverPolicyHandler standalone wrapper ---
+
+TEST_F(NsmRoTPropertyDeepTest,
+       UpdateFailoverPolicyHandler_Wrapper_InvalidType_ReturnsError)
+{
+    AsyncOperationStatusType status = {};
+    AsyncSetOperationValueType value = uint32_t(42);
+
+    updateFailoverPolicyHandler(value, &status, fpga, classification,
+                                identifier, index);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+// ============================================================================
 // addSensor<T> instantiation coverage
 // ============================================================================
+
+TEST_F(NsmRoTPropertyDeepTest, AddSensorNsmFailoverPolicyObject)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    uuid_t testUuid = "test-uuid-fp-as";
+    auto sensor = std::make_shared<NsmFailoverPolicyObject>(
+        bus, chassisName + "_FP_AS", testUuid, classification, identifier,
+        index);
+    size_t before = fpga->deviceSensors.size();
+    fpga->addSensor(sensor, PollingType::RoundRobin);
+    EXPECT_GT(fpga->deviceSensors.size(), before);
+}
 
 TEST_F(NsmRoTPropertyDeepTest, AddSensorNsmInbandUpdatePolicyObject)
 {
