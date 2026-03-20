@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION &
+ * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION &
  * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -561,4 +561,53 @@ TEST(DebugTokenUtilsTest, StringViewHandlingAcrossFunctions)
     EXPECT_GE(result1, 0);
     EXPECT_GE(result2, 0);
     EXPECT_GE(result3, 0);
+}
+
+// ============================================================================
+// PDF-aligned GPU / SMA mappings
+// ============================================================================
+
+TEST(DebugTokenUtilsTest, gpuHardwareUnlockTargetMaskMatchesPdfBit)
+{
+    EXPECT_EQ(tokenSubtypeToEnum(4, 0x00200000, "GPU"),
+              TokenSubtypeEnum::TargetMaskUnlock);
+}
+
+TEST(DebugTokenUtilsTest, gpuHardwareUnlockPxucGlobalHulkMatchesPdfBit)
+{
+    EXPECT_EQ(tokenSubtypeToEnum(4, 0x00100000, "GPU"),
+              TokenSubtypeEnum::PxucGlobalHulk);
+}
+
+TEST(DebugTokenUtilsTest, smaDebugCapabilitySubtypesMatchPdf)
+{
+    EXPECT_EQ(tokenTypeToEnum(2, "SMA"), TokenTypeEnum::SMADebugCapability);
+    EXPECT_EQ(tokenSubtypeToEnum(2, 0x00000001, "SMA"),
+              TokenSubtypeEnum::RasTest);
+    EXPECT_EQ(tokenSubtypeToEnum(2, 0x00000002, "SMA"),
+              TokenSubtypeEnum::PowerFailI2cDebug);
+}
+
+TEST(DebugTokenUtilsTest, smaCpldDebugCapabilitySubtypeMatchesPdf)
+{
+    EXPECT_EQ(tokenTypeToEnum(4, "SMA"), TokenTypeEnum::CpldDebugCapability);
+    EXPECT_EQ(tokenSubtypeToEnum(4, 0x00000001, "SMA"),
+              TokenSubtypeEnum::CpldDebugEnable);
+}
+
+TEST(DebugTokenUtilsTest, unmappedTokenInputsReturnNone)
+{
+    // SMA token type values are 0, 1, 2, and 4 — numeric 3 is not mapped.
+    EXPECT_EQ(tokenTypeToEnum(3, "SMA"), TokenTypeEnum::None);
+
+    // SMADebugCapability only defines 0x1 and 0x2 (plus None); other bits are
+    // unmapped.
+    EXPECT_EQ(tokenSubtypeToEnum(2, 0x00000004, "SMA"), TokenSubtypeEnum::None);
+
+    // CpldDebugCapability only defines 0x1 (plus None); 0x2 is unmapped.
+    EXPECT_EQ(tokenSubtypeToEnum(4, 0x00000002, "SMA"), TokenSubtypeEnum::None);
+
+    // No subtype table for unknown device types.
+    EXPECT_EQ(tokenSubtypeToEnum(1, 0x00000001, "UnknownDevice"),
+              TokenSubtypeEnum::None);
 }

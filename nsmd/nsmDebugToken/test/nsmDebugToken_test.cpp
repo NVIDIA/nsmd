@@ -289,10 +289,16 @@ TEST_F(NsmDebugTokenTest, TokenUtils_SMATokenTypes)
     using TokenType = nsm::token_utils::TokenTypeEnum;
     std::string deviceType = "SMA";
 
-    EXPECT_EQ(nsm::token_utils::tokenTypeToUint32(TokenType::OTPDumpEnable,
+    EXPECT_EQ(nsm::token_utils::tokenTypeToUint32(TokenType::None, deviceType),
+              0);
+    EXPECT_EQ(nsm::token_utils::tokenTypeToUint32(
+                  TokenType::DebugFirmwareUnlock, deviceType),
+              1);
+    EXPECT_EQ(nsm::token_utils::tokenTypeToUint32(TokenType::SMADebugCapability,
                                                   deviceType),
               2);
-    EXPECT_EQ(nsm::token_utils::tokenTypeToUint32(TokenType::RAS, deviceType),
+    EXPECT_EQ(nsm::token_utils::tokenTypeToUint32(
+                  TokenType::CpldDebugCapability, deviceType),
               4);
 }
 
