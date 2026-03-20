@@ -182,7 +182,8 @@ const std::unordered_map<uint32_t,
           {0x00020000, TokenSubtypeEnum::VideDebug},
           {0x00040000, TokenSubtypeEnum::GlobalFunctionalDebugMinimal},
           {0x00080000, TokenSubtypeEnum::IstDebug},
-          {0x00100000, TokenSubtypeEnum::PxucGlobalHulk}}},
+          {0x00100000, TokenSubtypeEnum::PxucGlobalHulk},
+          {0x00200000, TokenSubtypeEnum::TargetMaskUnlock}}},
         {8, // RuntimeDebugUnlock subtypes
          {{0x00000000, TokenSubtypeEnum::None},
           {0x00000001, TokenSubtypeEnum::NvlinkErrorInjectionEnable},
@@ -200,8 +201,8 @@ const std::unordered_map<uint32_t,
 constexpr std::array<std::pair<uint32_t, TokenTypeEnum>, 4> smaTokenTypes{
     {{0, TokenTypeEnum::None},
      {1, TokenTypeEnum::DebugFirmwareUnlock},
-     {2, TokenTypeEnum::OTPDumpEnable},
-     {4, TokenTypeEnum::RAS}}};
+     {2, TokenTypeEnum::SMADebugCapability},
+     {4, TokenTypeEnum::CpldDebugCapability}}};
 
 // SMA device token subtypes - map indexed by token type value (numeric to enum)
 const std::unordered_map<uint32_t,
@@ -212,8 +213,13 @@ const std::unordered_map<uint32_t,
          {{0x00000000, TokenSubtypeEnum::None},
           {0x00000001, TokenSubtypeEnum::MCU},
           {0x00000002, TokenSubtypeEnum::CPLD}}},
-        {2, {{0, TokenSubtypeEnum::None}}}, // OTPDumpEnable
-        {4, {{0, TokenSubtypeEnum::None}}}  // RAS
+        {2, // SMADebugCapability
+         {{0x00000000, TokenSubtypeEnum::None},
+          {0x00000001, TokenSubtypeEnum::RasTest},
+          {0x00000002, TokenSubtypeEnum::PowerFailI2cDebug}}},
+        {4, // CpldDebugCapability
+         {{0x00000000, TokenSubtypeEnum::None},
+          {0x00000001, TokenSubtypeEnum::CpldDebugEnable}}},
 };
 
 // NIC device token types (numeric to enum)
