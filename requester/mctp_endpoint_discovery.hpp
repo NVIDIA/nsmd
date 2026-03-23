@@ -45,9 +45,9 @@ using MctpMedium = std::string;
 using MctpBinding = std::string;
 using ConfiguredPath = std::string;
 using DiscoveredEIDs =
-    std::map<eid_t, std::tuple<uuid_t, DeviceType, InstanceNumber, Active,
-                               MctpMedium, MctpBinding, ConfiguredPath,
-                               std::optional<eid_t>>>;
+    std::map<eid_t,
+             std::tuple<uuid_t, DeviceType, InstanceNumber, Active, MctpMedium,
+                        MctpBinding, ConfiguredPath, std::optional<eid_t>>>;
 using EidTable =
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>;
 using RequesterHandler = requester::Handler<requester::Request>;
@@ -246,12 +246,10 @@ class MctpDiscovery
         const T& value,
         const std::variant<std::vector<uint8_t>, std::vector<uuid_t>>&
             remapPropValues) const;
-    std::shared_ptr<nsm::NsmDevice>
-        mapNsmDeviceUsingEid(eid_t eid, uuid_t mctpUuid, uint8_t deviceType,
-                             uint8_t instanceNumber, std::string associatedPath,
-                             bool active, MctpMedium mctpMedium,
-                             MctpBinding mctpBinding,
-                             std::optional<eid_t> localEid);
+    std::shared_ptr<nsm::NsmDevice> mapNsmDeviceUsingEid(
+        eid_t eid, uuid_t mctpUuid, uint8_t deviceType, uint8_t instanceNumber,
+        std::string associatedPath, bool active, MctpMedium mctpMedium,
+        MctpBinding mctpBinding, std::optional<eid_t> localEid);
     int mapMctpEIDForNsmDevice(std::shared_ptr<nsm::NsmDevice> nsmDevice);
     void handleMctpStateTransition(const std::string objPath);
     requester::Coroutine findConfiguredAssociations(

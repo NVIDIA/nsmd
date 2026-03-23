@@ -27,6 +27,21 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+namespace
+{
+std::optional<std::vector<uint8_t>>
+    copySubscriptionResponse(const std::shared_ptr<const nsm_msg>& responseMsg,
+                             size_t responseLen)
+{
+    if (!responseMsg || responseLen == 0)
+    {
+        return std::nullopt;
+    }
+    const auto* bytes = reinterpret_cast<const uint8_t*>(responseMsg.get());
+    return std::vector<uint8_t>(bytes, bytes + responseLen);
+}
+} // namespace
+
 namespace nsm
 {
 NsmEventSetting::NsmEventSetting(const std::string& name,
@@ -42,14 +57,7 @@ requester::Coroutine
 {
     uint8_t rc = NSM_SW_SUCCESS;
     rc = co_await setEventSubscription(nsmDevice);
-    if (rc != NSM_SW_SUCCESS)
-    {
-        if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
-        {
-            lg2::error("setEventSubscription failed, eid={EID} rc={RC}", "EID",
-                       nsmDevice->getEid(), "RC", rc);
-        }
-    }
+    // recordEventSubscriptionStatus logs failure when rc != NSM_SW_SUCCESS
     nsmDevice->setEventMode(eventGenerationSetting);
     // coverity[missing_return]
     co_return rc;
@@ -61,9 +69,8 @@ requester::Coroutine
     auto localEidOpt = nsmDevice->getLocalEid();
     if (!localEidOpt)
     {
-        lg2::error(
-            "setEventSubscription skipped: localEid not set for eid={EID} (LocalEID not from MCTP)",
-            "EID", nsmDevice->getEid());
+        nsmDevice->recordEventSubscriptionStatus(
+            "skipped: localEid not set (LocalEID not from MCTP)");
         co_return NSM_ERR_INVALID_DATA;
     }
     Request request(sizeof(nsm_msg_hdr) +
@@ -74,10 +81,8 @@ requester::Coroutine
 
     if (rc)
     {
-        lg2::error(
-            "encode_nsm_set_event_subscription_req failed. eid={EID} rc={RC}",
-            "EID", nsmDevice->getEid(), "RC", rc);
-        // coverity[missing_return]
+        nsmDevice->recordEventSubscriptionStatus(
+            "failed: encode rc=" + std::to_string(rc), Request(request));
         co_return rc;
     }
 
@@ -87,6 +92,9 @@ requester::Coroutine
                                       responseLen, false);
     if (rc)
     {
+        nsmDevice->recordEventSubscriptionStatus(
+            "failed: sensorIO rc=" + std::to_string(rc), Request(request),
+            std::nullopt);
         // coverity[missing_return]
         co_return rc;
     }
@@ -96,12 +104,33 @@ requester::Coroutine
                                                 &cc);
     if (rc)
     {
-        lg2::error(
-            "decode_nsm_set_event_subscription_resp failed. eid={EID} rc={RC}",
-            "EID", nsmDevice->getEid(), "RC", rc);
+        nsmDevice->recordEventSubscriptionStatus(
+            "failed: decode rc=" + std::to_string(rc), Request(request),
+            copySubscriptionResponse(responseMsg, responseLen));
+        co_return rc;
     }
+    if (cc != NSM_SUCCESS)
+    {
+        if (cc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            nsmDevice->recordEventSubscriptionStatus(
+                "failed: unsupported command", Request(request),
+                copySubscriptionResponse(responseMsg, responseLen));
+        }
+        else
+        {
+            nsmDevice->recordEventSubscriptionStatus(
+                "failed: device cc=" + std::to_string(cc), Request(request),
+                copySubscriptionResponse(responseMsg, responseLen));
+        }
+        // coverity[missing_return]
+        co_return cc;
+    }
+    nsmDevice->recordEventSubscriptionStatus(
+        "OK (localEid=" + std::to_string(*localEidOpt) + ")", Request(request),
+        copySubscriptionResponse(responseMsg, responseLen));
     // coverity[missing_return]
-    co_return cc ? cc : rc;
+    co_return NSM_SW_SUCCESS;
 }
 
 NsmGetEventSetting::NsmGetEventSetting(
@@ -118,10 +147,8 @@ requester::Coroutine
     auto rc = encode_nsm_get_event_subscription_req(0, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::debug("encode_nsm_get_event_subscription_req failed. "
-                   "eid={EID} rc={RC}",
-                   "EID", nsmDevice->getEid(), "RC", rc);
-        // coverity[missing_return]
+        nsmDevice->recordEventSubscriptionStatus(
+            "failed: get encode rc=" + std::to_string(rc), Request(request));
         co_return rc;
     }
     std::shared_ptr<const nsm_msg> responseMsg;
@@ -130,18 +157,17 @@ requester::Coroutine
                                       responseLen, false);
     if (rc)
     {
-        lg2::debug(
-            "NsmGetEventConfig SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", nsmDevice->getEid());
-        // coverity[missing_return]
+        nsmDevice->recordEventSubscriptionStatus(
+            "failed: get sensorIO rc=" + std::to_string(rc), Request(request),
+            std::nullopt);
         co_return rc;
     }
     auto localEidOpt = nsmDevice->getLocalEid();
     if (!localEidOpt)
     {
-        lg2::error(
-            "NsmGetEventSetting update skipped: localEid not set for eid={EID} (LocalEID not from MCTP)",
-            "EID", nsmDevice->getEid());
+        nsmDevice->recordEventSubscriptionStatus(
+            "skipped: localEid not set (get path)", Request(request),
+            copySubscriptionResponse(responseMsg, responseLen));
         co_return NSM_ERR_INVALID_DATA;
     }
     auto localEid = *localEidOpt;
@@ -150,6 +176,14 @@ requester::Coroutine
     uint8_t receiver_eid = 0;
     rc = decode_nsm_get_event_subscription_resp(
         responseMsg.get(), responseLen, &cc, &reason_code, &receiver_eid);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        nsmDevice->recordEventSubscriptionStatus(
+            "failed: get decode rc=" + std::to_string(rc), Request(request),
+            copySubscriptionResponse(responseMsg, responseLen));
+        co_return rc;
+    }
 
     // if the response is not successful or receiver_eid is not equal to
     // localEid, we need to call setEventSubscription
@@ -160,11 +194,14 @@ requester::Coroutine
             "CC", cc, "RC", rc, "RECEIVER_EID", receiver_eid, "LOCAL_EID",
             localEid);
         rc = co_await eventSetting->setEventSubscription(nsmDevice);
-        if (rc != NSM_SW_SUCCESS)
-        {
-            lg2::error("setEventSubscription failed, eid={EID} rc={RC}", "EID",
-                       nsmDevice->getEid(), "RC", rc);
-        }
+        // recordEventSubscriptionStatus logs failure if setEventSubscription
+        // fails
+    }
+    else
+    {
+        nsmDevice->recordEventSubscriptionStatus(
+            "OK (localEid=" + std::to_string(localEid) + ")", Request(request),
+            copySubscriptionResponse(responseMsg, responseLen));
     }
 
     // coverity[missing_return]
@@ -220,6 +257,7 @@ requester::Coroutine createNsmEventSetting(SensorManager& manager,
         name, type, eventGenerationSetting, nsmDevice);
     auto getEventSensor = std::make_shared<NsmGetEventSetting>(name, type,
                                                                sensor);
+    nsmDevice->setHasNsmEventSettingConfig(true);
     nsmDevice->addCapabilityRefreshSensor(sensor);
 
     // update sensor

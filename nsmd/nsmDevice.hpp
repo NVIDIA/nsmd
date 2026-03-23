@@ -44,6 +44,9 @@
 #include <optional>
 #include <ranges> // For ranges::find_if
 #include <set>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #define MAX_SENSOR_UPDATE_BATCH_SIZE 10
 
@@ -402,6 +405,34 @@ class NsmDevice :
         return localEid;
     }
 
+    /** @brief Record event subscription status for logDump (success or
+     * failure). Called by NsmEventSetting on every attempt.
+     * @param request Last NSM request bytes sent (nullopt if none, e.g. skipped
+     * before encode).
+     * @param response Last NSM response bytes received (nullopt if none). */
+    void recordEventSubscriptionStatus(
+        std::string_view status,
+        std::optional<std::vector<uint8_t>> request = std::nullopt,
+        std::optional<std::vector<uint8_t>> response = std::nullopt);
+
+    /** @brief Get last event subscription status for logDump. Returns cached
+     * string or nullopt if never attempted. */
+    std::optional<std::string> getLastEventSubscriptionStatus() const;
+
+    /** @brief Last Set/Get event subscription request bytes, if recorded. */
+    std::optional<std::vector<uint8_t>> getLastEventSubscriptionRequest() const;
+
+    /** @brief Last Set/Get event subscription response bytes, if recorded. */
+    std::optional<std::vector<uint8_t>>
+        getLastEventSubscriptionResponse() const;
+
+    /** @brief Mark that this device has NSM_EventSetting config (used for
+     * logDump to distinguish pending vs N/A). */
+    void setHasNsmEventSettingConfig(bool hasConfig);
+
+    /** @brief Whether this device has NSM_EventSetting config. */
+    bool hasNsmEventSettingConfig() const;
+
     /** @brief getter of deviceType */
     uint8_t getDeviceType()
     {
@@ -553,6 +584,10 @@ class NsmDevice :
     uint8_t eventMode;
     eid_t eid = 0;
     std::optional<eid_t> localEid;
+    std::optional<std::string> lastEventSubscriptionStatus;
+    std::optional<std::vector<uint8_t>> lastEventSubscriptionRequest;
+    std::optional<std::vector<uint8_t>> lastEventSubscriptionResponse;
+    bool hasNsmEventSettingConfigFlag = false;
     uuid_t uuid;
     bool isDeviceActive = false;
     bool isDeviceReady = false;

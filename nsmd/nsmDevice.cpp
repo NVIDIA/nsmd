@@ -69,6 +69,49 @@ uint8_t NsmDevice::getEventMode()
     return eventMode;
 }
 
+void NsmDevice::recordEventSubscriptionStatus(
+    std::string_view status, std::optional<std::vector<uint8_t>> request,
+    std::optional<std::vector<uint8_t>> response)
+{
+    lastEventSubscriptionStatus = std::string(status);
+    lastEventSubscriptionRequest = std::move(request);
+    lastEventSubscriptionResponse = std::move(response);
+    // Log failures/skips but not success (OK) or unsupported command
+    if (!status.empty() && !status.starts_with("OK") &&
+        status.find("unsupported command") == std::string_view::npos)
+    {
+        lg2::error("Event subscription eid={EID}: {STATUS}", "EID", eid,
+                   "STATUS", status);
+    }
+}
+
+std::optional<std::string> NsmDevice::getLastEventSubscriptionStatus() const
+{
+    return lastEventSubscriptionStatus;
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmDevice::getLastEventSubscriptionRequest() const
+{
+    return lastEventSubscriptionRequest;
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmDevice::getLastEventSubscriptionResponse() const
+{
+    return lastEventSubscriptionResponse;
+}
+
+void NsmDevice::setHasNsmEventSettingConfig(bool hasConfig)
+{
+    hasNsmEventSettingConfigFlag = hasConfig;
+}
+
+bool NsmDevice::hasNsmEventSettingConfig() const
+{
+    return hasNsmEventSettingConfigFlag;
+}
+
 bool NsmDevice::allCommandCodesAreRetrieved()
 {
     return areMessageTypesRetrieved &&
@@ -459,7 +502,8 @@ bool NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
             fruDeviceManager.reset();
         }
         this->eid = eid;
-        this->localEid = localEid; // may be nullopt if MCTP did not provide LocalEID
+        this->localEid =
+            localEid; // may be nullopt if MCTP did not provide LocalEID
         this->uuid = uuid;
         this->mctpMedium = mctpMedium;
         this->mctpBinding = mctpBinding;
@@ -1032,6 +1076,39 @@ requester::Coroutine NsmDevice::dumpNsmDeviceInfoTask()
         "Device Active: {DEVICE_ACTIVE}, Device Ready: {DEVICE_READY}, Discovery Pending: {DISCOVERY_PENDING}",
         "DEVICE_ACTIVE", isDeviceActive, "DEVICE_READY", isDeviceReady,
         "DISCOVERY_PENDING", discoveryPending);
+
+    std::string eventSubStatus;
+    if (auto status = getLastEventSubscriptionStatus())
+    {
+        eventSubStatus = *status;
+    }
+    else if (hasNsmEventSettingConfig())
+    {
+        eventSubStatus = "pending";
+    }
+    else
+    {
+        eventSubStatus = "N/A (no NSM_EventSetting config)";
+    }
+    lg2::error("EID: {EID} Event subscription: {STATUS}", "EID", eid, "STATUS",
+               eventSubStatus);
+    if (lastEventSubscriptionRequest && !lastEventSubscriptionRequest->empty())
+    {
+        lg2::error(
+            "EID: {EID} Event subscription request (hex): {REQ}", "EID", eid,
+            "REQ",
+            utils::convertHexToString(*lastEventSubscriptionRequest,
+                                      lastEventSubscriptionRequest->size()));
+    }
+    if (lastEventSubscriptionResponse &&
+        !lastEventSubscriptionResponse->empty())
+    {
+        lg2::error(
+            "EID: {EID} Event subscription response (hex): {RESP}", "EID", eid,
+            "RESP",
+            utils::convertHexToString(*lastEventSubscriptionResponse,
+                                      lastEventSubscriptionResponse->size()));
+    }
 
     co_await mctp::MctpDiscovery::getInstance().dumpPingInfoTask(eid);
     co_await refreshCommandMatrix();

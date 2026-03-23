@@ -239,7 +239,9 @@ TEST_F(NsmEventSettingTestFixture, testNsmEventSettingUpdateError)
                                    NSM_SET_EVENT_SUBSCRIPTION,
                                    NSM_ERROR,
                                    0x11,
-                                   0x22};
+                                   0x22,
+                                   0,
+                                   0};
 
     EXPECT_CALL(*gpu, sensorIO)
         .WillOnce(mockSensorIO(setEventErrResp, Response{}));
@@ -259,7 +261,11 @@ TEST_F(NsmEventSettingTestFixture, testNsmEventSettingUnsupportedCommand)
                                    0x89,
                                    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
                                    NSM_SET_EVENT_SUBSCRIPTION,
-                                   NSM_ERR_UNSUPPORTED_COMMAND_CODE};
+                                   NSM_ERR_UNSUPPORTED_COMMAND_CODE,
+                                   0,
+                                   0,
+                                   0,
+                                   0};
 
     EXPECT_CALL(*gpu, sensorIO)
         .WillOnce(mockSensorIO(unsupportedResp, Response{}));
@@ -385,10 +391,259 @@ TEST_F(NsmEventSettingTestFixture, testEventSettingSetsDeviceEventMode)
                                 0x89,
                                 NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
                                 NSM_SET_EVENT_SUBSCRIPTION,
-                                NSM_SUCCESS};
+                                NSM_SUCCESS,
+                                0,
+                                0,
+                                0,
+                                0};
 
     EXPECT_CALL(*gpu, sensorIO)
         .WillOnce(mockSensorIO(setEventResp, Response{}));
 
     eventSetting.update(gpu);
+}
+
+// ---- Event subscription status cache for logDump ----
+
+TEST_F(NsmEventSettingTestFixture, testEventSubscriptionStatusLogOkWithLocalEid)
+{
+    gpu->localEid = 30; // Use specific localEid for OK message
+    uint8_t eventGenSetting = GLOBAL_EVENT_GENERATION_ENABLE_POLLING;
+    NsmEventSetting eventSetting("EventSetting", "NSM_EventSetting",
+                                 eventGenSetting, gpu);
+
+    const Response setEventResp{0x10,
+                                0xDE,
+                                0x00,
+                                0x89,
+                                NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                NSM_SET_EVENT_SUBSCRIPTION,
+                                NSM_SUCCESS,
+                                0,
+                                0,
+                                0,
+                                0};
+
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(setEventResp, Response{}));
+
+    eventSetting.update(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "OK (localEid=30)");
+}
+
+TEST_F(NsmEventSettingTestFixture,
+       testEventSubscriptionStatusLogSkippedLocalEidNotSet)
+{
+    gpu->localEid = std::nullopt; // Simulate LocalEID not from MCTP
+    uint8_t eventGenSetting = GLOBAL_EVENT_GENERATION_ENABLE_POLLING;
+    NsmEventSetting eventSetting("EventSetting", "NSM_EventSetting",
+                                 eventGenSetting, gpu);
+
+    eventSetting.setEventSubscription(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "skipped: localEid not set (LocalEID not from MCTP)");
+}
+
+TEST_F(NsmEventSettingTestFixture,
+       testEventSubscriptionStatusLogSkippedLocalEidNotSetGetPath)
+{
+    gpu->localEid = std::nullopt;
+    auto eventSetting = std::make_shared<NsmEventSetting>(
+        "EventSetting", "NSM_EventSetting", GLOBAL_EVENT_GENERATION_ENABLE_PUSH,
+        gpu);
+    NsmGetEventSetting getEventSetting("GetEventSetting", "NSM_GetEventSetting",
+                                       eventSetting);
+
+    // sensorIO must succeed to reach localEid check (which then fails)
+    const Response getEventResp{0x10,
+                                0xDE,
+                                0x00,
+                                0x89,
+                                NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                NSM_GET_EVENT_SUBSCRIPTION,
+                                NSM_SUCCESS,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0};
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(getEventResp, Response{}));
+
+    getEventSetting.update(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "skipped: localEid not set (get path)");
+}
+
+TEST_F(NsmEventSettingTestFixture, testEventSubscriptionStatusLogFailedSensorIO)
+{
+    uint8_t eventGenSetting = GLOBAL_EVENT_GENERATION_ENABLE_POLLING;
+    NsmEventSetting eventSetting("EventSetting", "NSM_EventSetting",
+                                 eventGenSetting, gpu);
+
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(Response{}, static_cast<nsm_completion_codes>(
+                                               NSM_SW_ERROR_TIMEOUT)));
+
+    eventSetting.setEventSubscription(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status,
+              "failed: sensorIO rc=" + std::to_string(NSM_SW_ERROR_TIMEOUT));
+}
+
+TEST_F(NsmEventSettingTestFixture, testEventSubscriptionStatusLogFailedDecode)
+{
+    uint8_t eventGenSetting = GLOBAL_EVENT_GENERATION_DISABLE;
+    NsmEventSetting eventSetting("EventSetting", "NSM_EventSetting",
+                                 eventGenSetting, gpu);
+
+    const Response badResp{0x10}; // Too short for valid decode
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(badResp, Response{}));
+
+    eventSetting.setEventSubscription(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_TRUE(status->find("failed: decode rc=") == 0);
+}
+
+TEST_F(NsmEventSettingTestFixture, testEventSubscriptionStatusLogFailedDeviceCc)
+{
+    uint8_t eventGenSetting = GLOBAL_EVENT_GENERATION_ENABLE_POLLING;
+    NsmEventSetting eventSetting("EventSetting", "NSM_EventSetting",
+                                 eventGenSetting, gpu);
+
+    const Response setEventErrResp{0x10,
+                                   0xDE,
+                                   0x00,
+                                   0x89,
+                                   NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                   NSM_SET_EVENT_SUBSCRIPTION,
+                                   NSM_ERROR,
+                                   0x11,
+                                   0x22,
+                                   0,
+                                   0};
+
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(setEventErrResp, Response{}));
+
+    eventSetting.setEventSubscription(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "failed: device cc=" + std::to_string(NSM_ERROR));
+}
+
+TEST_F(NsmEventSettingTestFixture,
+       testEventSubscriptionStatusLogFailedUnsupportedCommand)
+{
+    uint8_t eventGenSetting = GLOBAL_EVENT_GENERATION_ENABLE_PUSH;
+    NsmEventSetting eventSetting("EventSetting", "NSM_EventSetting",
+                                 eventGenSetting, gpu);
+
+    const Response unsupportedResp{0x10,
+                                   0xDE,
+                                   0x00,
+                                   0x89,
+                                   NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                   NSM_SET_EVENT_SUBSCRIPTION,
+                                   NSM_ERR_UNSUPPORTED_COMMAND_CODE,
+                                   0,
+                                   0,
+                                   0,
+                                   0};
+
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(unsupportedResp, Response{}));
+
+    eventSetting.setEventSubscription(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "failed: unsupported command");
+}
+
+TEST_F(NsmEventSettingTestFixture,
+       testEventSubscriptionStatusLogGetSuccessWithLocalEid)
+{
+    gpu->localEid = 25;
+    auto eventSetting = std::make_shared<NsmEventSetting>(
+        "EventSetting", "NSM_EventSetting", GLOBAL_EVENT_GENERATION_ENABLE_PUSH,
+        gpu);
+    NsmGetEventSetting getEventSetting("GetEventSetting", "NSM_GetEventSetting",
+                                       eventSetting);
+
+    const Response getEventResp{0x10,
+                                0xDE,
+                                0x00,
+                                0x89,
+                                NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                NSM_GET_EVENT_SUBSCRIPTION,
+                                NSM_SUCCESS,
+                                0,
+                                0,
+                                1,
+                                0,
+                                0x19}; // receiver_eid = 25 (matches localEid)
+
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(getEventResp, Response{}));
+
+    getEventSetting.update(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "OK (localEid=25)");
+}
+
+TEST_F(NsmEventSettingTestFixture,
+       testEventSubscriptionStatusLogFailedGetDecode)
+{
+    gpu->localEid = 0;
+    auto eventSetting = std::make_shared<NsmEventSetting>(
+        "EventSetting", "NSM_EventSetting", GLOBAL_EVENT_GENERATION_ENABLE_PUSH,
+        gpu);
+    NsmGetEventSetting getEventSetting("GetEventSetting", "NSM_GetEventSetting",
+                                       eventSetting);
+
+    const Response badResp(sizeof(nsm_msg_hdr), 0x10); // Incomplete payload
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(badResp, Response{}));
+
+    getEventSetting.update(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_TRUE(status->find("failed: get decode rc=") == 0);
+}
+
+TEST_F(NsmEventSettingTestFixture,
+       testEventSubscriptionStatusLogFailedGetSensorIO)
+{
+    gpu->localEid = 0;
+    auto eventSetting = std::make_shared<NsmEventSetting>(
+        "EventSetting", "NSM_EventSetting", GLOBAL_EVENT_GENERATION_ENABLE_PUSH,
+        gpu);
+    NsmGetEventSetting getEventSetting("GetEventSetting", "NSM_GetEventSetting",
+                                       eventSetting);
+
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(Response{}, static_cast<nsm_completion_codes>(
+                                               NSM_SW_ERROR_TIMEOUT)));
+
+    getEventSetting.update(gpu);
+
+    auto status = gpu->getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "failed: get sensorIO rc=" +
+                           std::to_string(NSM_SW_ERROR_TIMEOUT));
 }

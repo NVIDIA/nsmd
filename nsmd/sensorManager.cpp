@@ -58,11 +58,11 @@ SensorManagerImpl::SensorManagerImpl(
     requester::Handler<requester::Request>& handler, InstanceIdDb& instanceIdDb,
     sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
-    NsmDeviceTable& nsmDevices,
-    mctp_socket::Manager& sockManager, bool verbose) :
-    SensorManager(nsmDevices), bus(bus), event(event),
-    handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
-    eidTable(eidTable), sockManager(sockManager), verbose(verbose)
+    NsmDeviceTable& nsmDevices, mctp_socket::Manager& sockManager,
+    bool verbose) :
+    SensorManager(nsmDevices), bus(bus), event(event), handler(handler),
+    instanceIdDb(instanceIdDb), objServer(objServer), eidTable(eidTable),
+    sockManager(sockManager), verbose(verbose)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
         event,

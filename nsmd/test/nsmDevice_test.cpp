@@ -734,6 +734,80 @@ TEST(nsmDevice, TestAddDeviceEventMultiple)
     EXPECT_EQ(nsmDevice.deviceEvents.size(), initialEventCount + 2);
 }
 
+// ---- Event subscription status cache for logDump ----
+
+TEST(nsmDevice, TestEventSubscriptionStatusCacheRecordAndGet)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    EXPECT_FALSE(nsmDevice.getLastEventSubscriptionStatus().has_value());
+
+    nsmDevice.recordEventSubscriptionStatus("OK (localEid=30)");
+    auto status = nsmDevice.getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "OK (localEid=30)");
+
+    nsmDevice.recordEventSubscriptionStatus(
+        "skipped: localEid not set (LocalEID not from MCTP)");
+    status = nsmDevice.getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "skipped: localEid not set (LocalEID not from MCTP)");
+
+    nsmDevice.recordEventSubscriptionStatus("failed: sensorIO rc=5");
+    status = nsmDevice.getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "failed: sensorIO rc=5");
+
+    nsmDevice.recordEventSubscriptionStatus("pending");
+    status = nsmDevice.getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "pending");
+
+    nsmDevice.recordEventSubscriptionStatus("N/A (no NSM_EventSetting config)");
+    status = nsmDevice.getLastEventSubscriptionStatus();
+    ASSERT_TRUE(status.has_value());
+    EXPECT_EQ(*status, "N/A (no NSM_EventSetting config)");
+}
+
+TEST(nsmDevice, TestEventSubscriptionStatusCacheRecordsRequestResponse)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    EXPECT_FALSE(nsmDevice.getLastEventSubscriptionRequest().has_value());
+    EXPECT_FALSE(nsmDevice.getLastEventSubscriptionResponse().has_value());
+
+    std::vector<uint8_t> req{0x10, 0xde, 0x01};
+    std::vector<uint8_t> resp{0x10, 0xde, 0x02};
+    nsmDevice.recordEventSubscriptionStatus("OK (localEid=1)", req, resp);
+
+    auto gotReq = nsmDevice.getLastEventSubscriptionRequest();
+    auto gotResp = nsmDevice.getLastEventSubscriptionResponse();
+    ASSERT_TRUE(gotReq.has_value());
+    ASSERT_TRUE(gotResp.has_value());
+    EXPECT_EQ(*gotReq, req);
+    EXPECT_EQ(*gotResp, resp);
+
+    nsmDevice.recordEventSubscriptionStatus("skipped: localEid not set");
+    EXPECT_FALSE(nsmDevice.getLastEventSubscriptionRequest().has_value());
+    EXPECT_FALSE(nsmDevice.getLastEventSubscriptionResponse().has_value());
+}
+
+TEST(nsmDevice, TestEventSubscriptionStatusHasNsmEventSettingConfig)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    EXPECT_FALSE(nsmDevice.hasNsmEventSettingConfig());
+
+    nsmDevice.setHasNsmEventSettingConfig(true);
+    EXPECT_TRUE(nsmDevice.hasNsmEventSettingConfig());
+
+    nsmDevice.setHasNsmEventSettingConfig(false);
+    EXPECT_FALSE(nsmDevice.hasNsmEventSettingConfig());
+}
+
 // ---- addCapabilityRefreshSensor ----
 
 TEST(nsmDevice, TestAddCapabilityRefreshSensor)

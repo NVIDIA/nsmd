@@ -51,8 +51,7 @@ class LimitedSensorQueue;
 class SensorManager
 {
   public:
-    SensorManager(NsmDeviceTable& nsmDevices) : nsmDevices(nsmDevices)
-    {}
+    SensorManager(NsmDeviceTable& nsmDevices) : nsmDevices(nsmDevices) {}
     virtual ~SensorManager() = default;
 
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
@@ -117,8 +116,8 @@ class SensorManagerImpl : public SensorManager
         sdbusplus::asio::object_server& objServer,
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
-        NsmDeviceTable& nsmDevices,
-        mctp_socket::Manager& sockManager, bool verbose = false)
+        NsmDeviceTable& nsmDevices, mctp_socket::Manager& sockManager,
+        bool verbose = false)
     {
         if (instance)
         {
@@ -143,8 +142,8 @@ class SensorManagerImpl : public SensorManager
         sdbusplus::asio::object_server& objServer,
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
-        NsmDeviceTable& nsmDevices,
-        mctp_socket::Manager& sockManager, bool verbose);
+        NsmDeviceTable& nsmDevices, mctp_socket::Manager& sockManager,
+        bool verbose);
     ~SensorManagerImpl();
     static void dumpReadinessLogs();
     static void dumpNsmDevicesInfo();
