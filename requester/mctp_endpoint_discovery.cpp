@@ -204,13 +204,18 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
                 }
 
                 auto networkId = std::get<uint32_t>(properties.at("NetworkId"));
+                std::optional<eid_t> localEid;
+                if (properties.contains("LocalEID"))
+                {
+                    localEid = std::get<uint8_t>(properties.at("LocalEID"));
+                }
                 if (std::find(mctpTypes.begin(), mctpTypes.end(),
                               mctpTypeVDM) != mctpTypes.end())
                 {
                     handler.registerMctpEndpoint(eid, type, protocol, address);
                     cachedMctpInfoByPath[objPath] =
                         std::make_tuple(eid, uuid, mediumType, networkId,
-                                        bindingType, active, objPath);
+                                        bindingType, active, objPath, localEid);
                     mctpInfos.emplace_back(cachedMctpInfoByPath[objPath]);
                 }
             }
@@ -403,9 +408,16 @@ requester::Coroutine
         co_return NSM_ERR_INVALID_DATA;
     }
 
+    std::optional<eid_t> localEid;
+    if (allProperties.contains("LocalEID"))
+    {
+        localEid = std::get<uint8_t>(allProperties.at("LocalEID"));
+    }
+
     MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType, networkId,
                                         bindingType,
-                                        (connectivity == "Available"), objPath);
+                                        (connectivity == "Available"), objPath,
+                                        localEid);
     cachedMctpInfoByPath[objPath] = mctpInfo;
     if (connectivity == "Available")
     {
@@ -632,9 +644,16 @@ requester::Coroutine
         co_return NSM_ERR_INVALID_DATA;
     }
 
+    std::optional<eid_t> localEid;
+    if (allProperties.contains("LocalEID"))
+    {
+        localEid = std::get<uint8_t>(allProperties.at("LocalEID"));
+    }
+
     MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType, networkId,
                                         bindingType,
-                                        (connectivity == "Available"), objPath);
+                                        (connectivity == "Available"), objPath,
+                                        localEid);
 
     cachedMctpInfoByPath[objPath] = mctpInfo;
 
@@ -937,7 +956,7 @@ requester::Coroutine
     {
         // try ping
         auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding, active,
-               mctpObjPath] = mctpInfo;
+               mctpObjPath, localEid] = mctpInfo;
         auto rc = co_await ping(eid);
         discoveryEvents(eid).setValue(nsm::DiscoveryEventType::Ping, rc);
         if (rc != NSM_SW_SUCCESS)
@@ -970,12 +989,14 @@ requester::Coroutine
         std::string configuredPath = "";
         rc = co_await findConfiguredAssociations(mctpObjPath, configuredPath);
 
-        // save the nsm device identification info
+        // save the nsm device identification info (localEid from MCTP, nullopt if not provided)
         discoveredEIDs[eid] = {mctpUuid,   deviceType,  instanceNumber, true,
-                               mctpMedium, mctpBinding, configuredPath};
+                               mctpMedium, mctpBinding, configuredPath,
+                               localEid}; // std::optional - no assumption when absent
         auto nsmDevice = mapNsmDeviceUsingEid(eid, mctpUuid, deviceType,
                                               instanceNumber, configuredPath,
-                                              true, mctpMedium, mctpBinding);
+                                              true, mctpMedium, mctpBinding,
+                                              localEid);
         discoveryEvents(eid).setValue(
             nsm::DiscoveryEventType::OnlineMapNsmDeviceUsingEid,
             nsmDevice ? 1 : 0);
@@ -1032,10 +1053,10 @@ requester::Coroutine
             auto& value = discoveredEIDs[eid];
             std::get<3>(value) = false; // set EID is inactive
             auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber, active,
-                   mctpMedium, mctpBinding, associatedPath] = value;
+                   mctpMedium, mctpBinding, associatedPath, localEid] = value;
             nsmDevice = mapNsmDeviceUsingEid(
                 eid, uuid, mctpDeviceType, mctpDeviceInstanceNumber,
-                associatedPath, false, mctpMedium, mctpBinding);
+                associatedPath, false, mctpMedium, mctpBinding, localEid);
             discoveryEvents(eid).setValue(
                 nsm::DiscoveryEventType::OfflineMapNsmDeviceUsingEid,
                 nsmDevice ? 1 : 0);
@@ -1228,7 +1249,7 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
     for (auto& [eid, value] : discoveredEIDs)
     {
         auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber, active,
-               mctpMedium, mctpBinding, associatedPath] = value;
+               mctpMedium, mctpBinding, associatedPath, localEid] = value;
         if (mctpDeviceType == nsmDevice->getDeviceType() &&
             nsmDevice->getDeviceRemapProp() ==
                 nsm::DeviceRemapProperty::NSM_DEVICE_INSTANCE_NUMBER)
@@ -1238,7 +1259,7 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
             {
                 nsmDevice->updateDiscoveryIdentifiers(
                     eid, uuid, mctpDeviceInstanceNumber, associatedPath,
-                    mctpMedium, mctpBinding);
+                    mctpMedium, mctpBinding, localEid);
                 ret = NSM_SW_SUCCESS;
             }
         }
@@ -1250,7 +1271,7 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
             {
                 nsmDevice->updateDiscoveryIdentifiers(
                     eid, uuid, mctpDeviceInstanceNumber, associatedPath,
-                    mctpMedium, mctpBinding);
+                    mctpMedium, mctpBinding, localEid);
                 ret = NSM_SW_SUCCESS;
             }
         }
@@ -1262,7 +1283,7 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
             {
                 nsmDevice->updateDiscoveryIdentifiers(
                     eid, uuid, mctpDeviceInstanceNumber, associatedPath,
-                    mctpMedium, mctpBinding);
+                    mctpMedium, mctpBinding, localEid);
                 ret = NSM_SW_SUCCESS;
             }
         }
@@ -1275,7 +1296,7 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
             {
                 nsmDevice->updateDiscoveryIdentifiers(
                     eid, uuid, mctpDeviceInstanceNumber, associatedPath,
-                    mctpMedium, mctpBinding);
+                    mctpMedium, mctpBinding, localEid);
                 ret = NSM_SW_SUCCESS;
             }
         }
@@ -1286,7 +1307,8 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
 std::shared_ptr<nsm::NsmDevice> MctpDiscovery::mapNsmDeviceUsingEid(
     eid_t eid, uuid_t mctpUuid, uint8_t deviceType, uint8_t instanceNumber,
     std::string associatedPath, [[__maybe_unused__]] bool active,
-    MctpMedium mctpMedium, MctpBinding mctpBinding)
+    MctpMedium mctpMedium, MctpBinding mctpBinding,
+    std::optional<eid_t> localEid)
 {
     std::shared_ptr<nsm::NsmDevice> ret{};
 
@@ -1307,7 +1329,7 @@ std::shared_ptr<nsm::NsmDevice> MctpDiscovery::mapNsmDeviceUsingEid(
             {
                 if (nsmDevice->updateDiscoveryIdentifiers(
                         eid, mctpUuid, instanceNumber, associatedPath,
-                        mctpMedium, mctpBinding))
+                        mctpMedium, mctpBinding, localEid))
                 {
                     ret = nsmDevice;
                 }
@@ -1320,7 +1342,7 @@ std::shared_ptr<nsm::NsmDevice> MctpDiscovery::mapNsmDeviceUsingEid(
             {
                 if (nsmDevice->updateDiscoveryIdentifiers(
                         eid, mctpUuid, instanceNumber, associatedPath,
-                        mctpMedium, mctpBinding))
+                        mctpMedium, mctpBinding, localEid))
                 {
                     ret = nsmDevice;
                 }
@@ -1333,7 +1355,7 @@ std::shared_ptr<nsm::NsmDevice> MctpDiscovery::mapNsmDeviceUsingEid(
             {
                 if (nsmDevice->updateDiscoveryIdentifiers(
                         eid, mctpUuid, instanceNumber, associatedPath,
-                        mctpMedium, mctpBinding))
+                        mctpMedium, mctpBinding, localEid))
                 {
                     ret = nsmDevice;
                 }
@@ -1347,7 +1369,7 @@ std::shared_ptr<nsm::NsmDevice> MctpDiscovery::mapNsmDeviceUsingEid(
             {
                 if (nsmDevice->updateDiscoveryIdentifiers(
                         eid, mctpUuid, instanceNumber, associatedPath,
-                        mctpMedium, mctpBinding))
+                        mctpMedium, mctpBinding, localEid))
                 {
                     ret = nsmDevice;
                 }

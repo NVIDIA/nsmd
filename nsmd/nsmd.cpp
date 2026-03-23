@@ -54,21 +54,18 @@ void optionUsage(void)
     std::cerr << "Usage: nsmd [options]\n";
     std::cerr << "Options:\n";
     std::cerr << " [--verbose] - would enable verbosity\n";
-    std::cerr << " [--eid <EID>] - local EID\n";
 }
 
 int main(int argc, char** argv)
 {
     bool verbose = false;
     int argflag;
-    int localEid = LOCAL_EID;
     static struct option long_options[] = {{"verbose", no_argument, 0, 'v'},
-                                           {"help", no_argument, 0, 'h'},
-                                           {"eid", required_argument, 0, 'e'},
+                                          {"help", no_argument, 0, 'h'},
                                            {0, 0, 0, 0}};
 
-    while ((argflag = getopt_long(argc, argv, "hvre:", long_options,
-                                  nullptr)) >= 0)
+    while ((argflag = getopt_long(argc, argv, "hvr", long_options, nullptr)) >=
+           0)
     {
         switch (argflag)
         {
@@ -78,14 +75,6 @@ int main(int argc, char** argv)
                 break;
             case 'v':
                 verbose = true;
-                break;
-            case 'e':
-                localEid = std::stoi(optarg);
-                if (localEid < 0 || localEid > 255)
-                {
-                    optionUsage();
-                    exit(EXIT_FAILURE);
-                }
                 break;
             default:
                 exit(EXIT_FAILURE);
@@ -154,7 +143,7 @@ int main(int argc, char** argv)
         // Initialize the SensorManager before getting its instance
         nsm::SensorManagerImpl::initialize(bus, event, reqHandler, instanceIdDb,
                                            objServer, eidTable, nsmDevices,
-                                           localEid, sockManager, verbose);
+                                           sockManager, verbose);
 
         nsm::NsmRawCommandHandler::initialize(bus,
                                               "/xyz/openbmc_project/NSM/Raw");

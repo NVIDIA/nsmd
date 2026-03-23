@@ -51,17 +51,12 @@ class LimitedSensorQueue;
 class SensorManager
 {
   public:
-    SensorManager(NsmDeviceTable& nsmDevices, eid_t localEid) :
-        nsmDevices(nsmDevices), localEid(localEid)
+    SensorManager(NsmDeviceTable& nsmDevices) : nsmDevices(nsmDevices)
     {}
     virtual ~SensorManager() = default;
 
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
     virtual sdbusplus::asio::object_server& getObjServer() = 0;
-    eid_t getLocalEid()
-    {
-        return localEid;
-    }
     virtual std::shared_ptr<NsmDevice> getNsmDevice(uint8_t deviceType,
                                                     uint8_t instanceNumber,
                                                     uint8_t deviceRole) = 0;
@@ -96,7 +91,6 @@ class SensorManager
   protected:
     static std::unique_ptr<SensorManager> instance;
     NsmDeviceTable& nsmDevices;
-    const eid_t localEid;
 };
 
 /**
@@ -123,7 +117,7 @@ class SensorManagerImpl : public SensorManager
         sdbusplus::asio::object_server& objServer,
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
-        NsmDeviceTable& nsmDevices, eid_t localEid,
+        NsmDeviceTable& nsmDevices,
         mctp_socket::Manager& sockManager, bool verbose = false)
     {
         if (instance)
@@ -134,7 +128,7 @@ class SensorManagerImpl : public SensorManager
         }
         instance = std::make_unique<SensorManagerImpl>(
             bus, event, handler, instanceIdDb, objServer, eidTable, nsmDevices,
-            localEid, sockManager, verbose);
+            sockManager, verbose);
     }
 
     sdbusplus::asio::object_server& getObjServer()
@@ -149,7 +143,7 @@ class SensorManagerImpl : public SensorManager
         sdbusplus::asio::object_server& objServer,
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
-        NsmDeviceTable& nsmDevices, eid_t localEid,
+        NsmDeviceTable& nsmDevices,
         mctp_socket::Manager& sockManager, bool verbose);
     ~SensorManagerImpl();
     static void dumpReadinessLogs();

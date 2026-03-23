@@ -59,9 +59,9 @@ SensorManagerImpl::SensorManagerImpl(
     requester::Handler<requester::Request>& handler, InstanceIdDb& instanceIdDb,
     sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
-    NsmDeviceTable& nsmDevices, eid_t localEid,
+    NsmDeviceTable& nsmDevices,
     mctp_socket::Manager& sockManager, bool verbose) :
-    SensorManager(nsmDevices, localEid), bus(bus), event(event),
+    SensorManager(nsmDevices), bus(bus), event(event),
     handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
     eidTable(eidTable), sockManager(sockManager), verbose(verbose)
 {
