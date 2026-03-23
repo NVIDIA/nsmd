@@ -1349,7 +1349,7 @@ TEST(NsmDeviceExtended, UpdateDiscoveryIdentifiers_FirstTime_SetsAllFields)
 
     // Act
     bool result = nsmDevice.updateDiscoveryIdentifiers(
-        newEid, newUuid, instNum, assocPath, medium, binding);
+        newEid, newUuid, instNum, assocPath, medium, binding, 30);
 
     // Assert
     EXPECT_TRUE(result);
@@ -1359,6 +1359,7 @@ TEST(NsmDeviceExtended, UpdateDiscoveryIdentifiers_FirstTime_SetsAllFields)
     EXPECT_EQ(nsmDevice.mctpMedium, medium);
     EXPECT_EQ(nsmDevice.mctpBinding, binding);
     EXPECT_EQ(nsmDevice.associatedPath, assocPath);
+    EXPECT_EQ(nsmDevice.getLocalEid(), std::optional<eid_t>(30));
 }
 
 // --- updateDiscoveryIdentifiers - preferred path updates ---
@@ -1381,7 +1382,7 @@ TEST(NsmDeviceExtended,
 
     // Act
     bool result = nsmDevice.updateDiscoveryIdentifiers(
-        newEid, newUuid, instNum, assocPath, medium, binding);
+        newEid, newUuid, instNum, assocPath, medium, binding, 30);
 
     // Assert
     EXPECT_TRUE(result);

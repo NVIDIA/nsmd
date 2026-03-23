@@ -109,6 +109,8 @@ struct NsmEventSettingTestFixture :
         gpu = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
         EXPECT_NE(gpu, nullptr);
+        // Simulate MCTP discovery having provided LocalEID (0) for event tests
+        gpu->localEid = 0;
     }
 
     ~NsmEventSettingTestFixture()

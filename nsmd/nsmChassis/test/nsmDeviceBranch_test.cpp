@@ -276,7 +276,7 @@ TEST(NsmDeviceBatch9, UpdateDiscoveryIdentifiers_FirstCall)
 
     // Act
     bool isPreferred = device.updateDiscoveryIdentifiers(
-        eid, newUuid, devInstNum, associatedPath, mctpMedium, mctpBinding);
+        eid, newUuid, devInstNum, associatedPath, mctpMedium, mctpBinding, 30);
 
     // Assert
     EXPECT_TRUE(isPreferred);

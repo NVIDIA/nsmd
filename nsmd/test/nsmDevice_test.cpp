@@ -1878,7 +1878,7 @@ TEST(nsmDevice, UpdateDiscoveryIdentifiers_FirstTimeEmptyUuid_UpdatesAllFields)
 
     // Act
     bool result = nsmDevice.updateDiscoveryIdentifiers(
-        newEid, newUuid, devInstNum, assocPath, medium, binding);
+        newEid, newUuid, devInstNum, assocPath, medium, binding, 30);
 
     // Assert
     EXPECT_TRUE(result);
@@ -1900,12 +1900,12 @@ TEST(nsmDevice, UpdateDiscoveryIdentifiers_SameEidSameMedium_UpdatesFields)
     std::string binding = "xyz.openbmc_project.MCTP.Binding.PCIe";
 
     nsmDevice.updateDiscoveryIdentifiers(eid1, uuid1, 1, assocPath, medium,
-                                         binding);
+                                         binding, 30);
 
     // Act: update with same eid
     uuid_t uuid2 = "ffffffff-1111-2222-3333-444444444444";
     bool result = nsmDevice.updateDiscoveryIdentifiers(
-        eid1, uuid2, 2, assocPath, medium, binding);
+        eid1, uuid2, 2, assocPath, medium, binding, 30);
 
     // Assert
     EXPECT_TRUE(result);
@@ -1926,13 +1926,13 @@ TEST(nsmDevice, UpdateDiscoveryIdentifiers_DifferentEid_UpdatesEidAndUuid)
     std::string binding = "xyz.openbmc_project.MCTP.Binding.PCIe";
 
     nsmDevice.updateDiscoveryIdentifiers(eid1, uuid1, 1, assocPath, medium,
-                                         binding);
+                                         binding, 30);
 
     // Act
     eid_t eid2 = 20;
     uuid_t uuid2 = "ffffffff-1111-2222-3333-444444444444";
     bool result = nsmDevice.updateDiscoveryIdentifiers(
-        eid2, uuid2, 2, assocPath, medium, binding);
+        eid2, uuid2, 2, assocPath, medium, binding, 30);
 
     // Assert
     EXPECT_TRUE(result);

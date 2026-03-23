@@ -58,12 +58,19 @@ requester::Coroutine
 requester::Coroutine
     NsmEventSetting::setEventSubscription(std::shared_ptr<NsmDevice> nsmDevice)
 {
+    auto localEidOpt = nsmDevice->getLocalEid();
+    if (!localEidOpt)
+    {
+        lg2::error(
+            "setEventSubscription skipped: localEid not set for eid={EID} (LocalEID not from MCTP)",
+            "EID", nsmDevice->getEid());
+        co_return NSM_ERR_INVALID_DATA;
+    }
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_set_event_subscription_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    auto localEid = SensorManager::getInstance().getLocalEid();
     auto rc = encode_nsm_set_event_subscription_req(0, eventGenerationSetting,
-                                                    localEid, requestMsg);
+                                                    *localEidOpt, requestMsg);
 
     if (rc)
     {
@@ -129,7 +136,15 @@ requester::Coroutine
         // coverity[missing_return]
         co_return rc;
     }
-    auto localEid = SensorManager::getInstance().getLocalEid();
+    auto localEidOpt = nsmDevice->getLocalEid();
+    if (!localEidOpt)
+    {
+        lg2::error(
+            "NsmGetEventSetting update skipped: localEid not set for eid={EID} (LocalEID not from MCTP)",
+            "EID", nsmDevice->getEid());
+        co_return NSM_ERR_INVALID_DATA;
+    }
+    auto localEid = *localEidOpt;
     uint8_t cc = NSM_ERROR;
     uint16_t reason_code = ERR_NULL;
     uint8_t receiver_eid = 0;

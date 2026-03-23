@@ -41,6 +41,7 @@
 #include <coroutine>
 #include <deque>
 #include <map>
+#include <optional>
 #include <ranges> // For ranges::find_if
 #include <set>
 
@@ -379,7 +380,8 @@ class NsmDevice :
                                     uint8_t deviceInstanceNumber,
                                     std::string& associatedPath,
                                     std::string& mctpMedium,
-                                    std::string& mctpBinding);
+                                    std::string& mctpBinding,
+                                    std::optional<eid_t> localEid);
     virtual requester::Coroutine refreshCapabilitySensor();
     requester::Coroutine refreshCommandMatrix();
 
@@ -391,6 +393,13 @@ class NsmDevice :
     uuid_t getUuid()
     {
         return uuid;
+    }
+
+    /** @brief getter of local EID (BMC endpoint on the route to this device);
+     *  nullopt if not yet set from MCTP discovery */
+    std::optional<eid_t> getLocalEid() const
+    {
+        return localEid;
     }
 
     /** @brief getter of deviceType */
@@ -543,6 +552,7 @@ class NsmDevice :
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
     uint8_t eventMode;
     eid_t eid = 0;
+    std::optional<eid_t> localEid;
     uuid_t uuid;
     bool isDeviceActive = false;
     bool isDeviceReady = false;

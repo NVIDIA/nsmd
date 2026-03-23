@@ -400,13 +400,13 @@ TEST_F(SensorManagerGetEidTest, GetEid_CalledWithDevice_ReturnsEid)
     EXPECT_EQ(result, 42);
 }
 
-TEST_F(SensorManagerGetEidTest, GetLocalEid_ReturnsZero)
+TEST_F(SensorManagerGetEidTest, GetLocalEid_ReturnsNulloptBeforeDiscovery)
 {
-    // Act
-    eid_t result = mockManager.getLocalEid();
+    // Act - localEid is not set until MCTP discovery provides LocalEID
+    auto localEidOpt = gpu->getLocalEid();
 
-    // Assert
-    EXPECT_EQ(result, 0);
+    // Assert - no default assumption; nullopt until set from MCTP
+    EXPECT_FALSE(localEidOpt.has_value());
 }
 
 TEST_F(SensorManagerGetEidTest,
@@ -1326,8 +1326,8 @@ TEST(NsmDeviceDiscoveryId, FirstTime_EmptyUuid_SetsAllFields_ReturnsPreferred)
     std::string binding = "I2C";
 
     // Act
-    bool result = device.updateDiscoveryIdentifiers(newEid, newUuid, instNum,
-                                                    assocPath, medium, binding);
+    bool result = device.updateDiscoveryIdentifiers(
+        newEid, newUuid, instNum, assocPath, medium, binding, 30);
 
     // Assert
     EXPECT_TRUE(result);
@@ -1357,8 +1357,8 @@ TEST(NsmDeviceDiscoveryId, SameEid_SameMediumBinding_UpdatesAllFields)
     std::string binding = "I2C";
 
     // Act
-    bool result = device.updateDiscoveryIdentifiers(newEid, newUuid, instNum,
-                                                    assocPath, medium, binding);
+    bool result = device.updateDiscoveryIdentifiers(
+        newEid, newUuid, instNum, assocPath, medium, binding, 30);
 
     // Assert - same medium/binding is preferred
     EXPECT_TRUE(result);
@@ -1384,8 +1384,8 @@ TEST(NsmDeviceDiscoveryId, DifferentEid_PreferredPath_ResetsAndUpdates)
     std::string binding = "I2C";
 
     // Act
-    bool result = device.updateDiscoveryIdentifiers(newEid, newUuid, instNum,
-                                                    assocPath, medium, binding);
+    bool result = device.updateDiscoveryIdentifiers(
+        newEid, newUuid, instNum, assocPath, medium, binding, 30);
 
     // Assert
     EXPECT_TRUE(result);

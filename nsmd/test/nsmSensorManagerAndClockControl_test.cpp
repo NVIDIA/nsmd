@@ -943,13 +943,13 @@ TEST_F(SensorManagerStaticTest, GetNsmDevice_NonExistentDevice_ReturnsNull)
     EXPECT_EQ(device, nullptr);
 }
 
-TEST_F(SensorManagerStaticTest, GetLocalEid_ReturnsZeroForMock)
+TEST_F(SensorManagerStaticTest, GetLocalEid_ReturnsNulloptBeforeDiscovery)
 {
-    // Act
-    auto eid = mockManager.getLocalEid();
+    // Act - localEid is not set until MCTP discovery provides LocalEID
+    auto localEidOpt = gpu->getLocalEid();
 
-    // Assert
-    EXPECT_EQ(eid, 0);
+    // Assert - no default assumption; nullopt until set from MCTP
+    EXPECT_FALSE(localEidOpt.has_value());
 }
 
 TEST_F(SensorManagerStaticTest, GetInstance_ReturnsValidReference)

@@ -125,7 +125,7 @@ struct MockSensorManager : public SensorManager
     MockMctpDiscovery mockMctpDiscovery;
     MockSensorManager() = delete;
     MockSensorManager(NsmDeviceTable& nsmDevices) :
-        SensorManager(nsmDevices, 0), mockMctpDiscovery(nsmDevices)
+        SensorManager(nsmDevices), mockMctpDiscovery(nsmDevices)
     {}
     MOCK_METHOD(eid_t, getEid, (std::shared_ptr<NsmDevice> nsmDevice),
                 (override));

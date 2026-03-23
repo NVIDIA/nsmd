@@ -1356,7 +1356,7 @@ TEST(
 
     // First update
     bool result1 = nsmDevice.updateDiscoveryIdentifiers(
-        eid1, uuid1, 1, assocPath, medium, binding);
+        eid1, uuid1, 1, assocPath, medium, binding, 30);
     EXPECT_TRUE(result1);
     EXPECT_EQ(nsmDevice.getEid(), eid1);
     EXPECT_EQ(nsmDevice.getUuid(), uuid1);
@@ -1367,7 +1367,7 @@ TEST(
     std::string assocPath2 = "/mctp/test/path2";
 
     bool result2 = nsmDevice.updateDiscoveryIdentifiers(
-        eid2, uuid2, 2, assocPath2, medium, binding);
+        eid2, uuid2, 2, assocPath2, medium, binding, 30);
 
     // Assert: should update since same priority medium
     EXPECT_TRUE(result2);
