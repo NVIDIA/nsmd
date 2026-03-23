@@ -61,7 +61,7 @@ int main(int argc, char** argv)
     bool verbose = false;
     int argflag;
     static struct option long_options[] = {{"verbose", no_argument, 0, 'v'},
-                                          {"help", no_argument, 0, 'h'},
+                                           {"help", no_argument, 0, 'h'},
                                            {0, 0, 0, 0}};
 
     while ((argflag = getopt_long(argc, argv, "hvr", long_options, nullptr)) >=

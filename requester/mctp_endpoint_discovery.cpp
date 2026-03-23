@@ -414,10 +414,9 @@ requester::Coroutine
         localEid = std::get<uint8_t>(allProperties.at("LocalEID"));
     }
 
-    MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType, networkId,
-                                        bindingType,
-                                        (connectivity == "Available"), objPath,
-                                        localEid);
+    MctpInfo mctpInfo =
+        std::make_tuple(eid, uuid, mediumType, networkId, bindingType,
+                        (connectivity == "Available"), objPath, localEid);
     cachedMctpInfoByPath[objPath] = mctpInfo;
     if (connectivity == "Available")
     {
@@ -650,10 +649,9 @@ requester::Coroutine
         localEid = std::get<uint8_t>(allProperties.at("LocalEID"));
     }
 
-    MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType, networkId,
-                                        bindingType,
-                                        (connectivity == "Available"), objPath,
-                                        localEid);
+    MctpInfo mctpInfo =
+        std::make_tuple(eid, uuid, mediumType, networkId, bindingType,
+                        (connectivity == "Available"), objPath, localEid);
 
     cachedMctpInfoByPath[objPath] = mctpInfo;
 
@@ -989,14 +987,15 @@ requester::Coroutine
         std::string configuredPath = "";
         rc = co_await findConfiguredAssociations(mctpObjPath, configuredPath);
 
-        // save the nsm device identification info (localEid from MCTP, nullopt if not provided)
-        discoveredEIDs[eid] = {mctpUuid,   deviceType,  instanceNumber, true,
-                               mctpMedium, mctpBinding, configuredPath,
-                               localEid}; // std::optional - no assumption when absent
-        auto nsmDevice = mapNsmDeviceUsingEid(eid, mctpUuid, deviceType,
-                                              instanceNumber, configuredPath,
-                                              true, mctpMedium, mctpBinding,
-                                              localEid);
+        // save the nsm device identification info (localEid from MCTP, nullopt
+        // if not provided)
+        discoveredEIDs[eid] = {
+            mctpUuid,    deviceType,     instanceNumber, true, mctpMedium,
+            mctpBinding, configuredPath, localEid}; // std::optional - no
+                                                    // assumption when absent
+        auto nsmDevice = mapNsmDeviceUsingEid(
+            eid, mctpUuid, deviceType, instanceNumber, configuredPath, true,
+            mctpMedium, mctpBinding, localEid);
         discoveryEvents(eid).setValue(
             nsm::DiscoveryEventType::OnlineMapNsmDeviceUsingEid,
             nsmDevice ? 1 : 0);
