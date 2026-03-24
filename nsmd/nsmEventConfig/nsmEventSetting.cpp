@@ -70,7 +70,8 @@ requester::Coroutine
     if (!localEidOpt)
     {
         nsmDevice->recordEventSubscriptionStatus(
-            "skipped: localEid not set (LocalEID not from MCTP)");
+            "skipped: localEid not set (LocalEID not from MCTP)", std::nullopt,
+            std::nullopt);
         co_return NSM_ERR_INVALID_DATA;
     }
     Request request(sizeof(nsm_msg_hdr) +
@@ -82,9 +83,13 @@ requester::Coroutine
     if (rc)
     {
         nsmDevice->recordEventSubscriptionStatus(
-            "failed: encode rc=" + std::to_string(rc), Request(request));
+            "failed: encode rc=" + std::to_string(rc), Request(request),
+            std::nullopt);
         co_return rc;
     }
+
+    // sensorIO moves request bytes into the requester; keep a copy for logDump.
+    const Request requestSnapshot(request);
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
@@ -92,9 +97,9 @@ requester::Coroutine
                                       responseLen, false);
     if (rc)
     {
-        nsmDevice->recordEventSubscriptionStatus(
-            "failed: sensorIO rc=" + std::to_string(rc), Request(request),
-            std::nullopt);
+        nsmDevice->recordEventSubscriptionStatus("failed: sensorIO rc=" +
+                                                     std::to_string(rc),
+                                                 requestSnapshot, std::nullopt);
         // coverity[missing_return]
         co_return rc;
     }
@@ -105,7 +110,7 @@ requester::Coroutine
     if (rc)
     {
         nsmDevice->recordEventSubscriptionStatus(
-            "failed: decode rc=" + std::to_string(rc), Request(request),
+            "failed: decode rc=" + std::to_string(rc), requestSnapshot,
             copySubscriptionResponse(responseMsg, responseLen));
         co_return rc;
     }
@@ -114,20 +119,20 @@ requester::Coroutine
         if (cc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             nsmDevice->recordEventSubscriptionStatus(
-                "failed: unsupported command", Request(request),
+                "failed: unsupported command", requestSnapshot,
                 copySubscriptionResponse(responseMsg, responseLen));
         }
         else
         {
             nsmDevice->recordEventSubscriptionStatus(
-                "failed: device cc=" + std::to_string(cc), Request(request),
+                "failed: device cc=" + std::to_string(cc), requestSnapshot,
                 copySubscriptionResponse(responseMsg, responseLen));
         }
         // coverity[missing_return]
         co_return cc;
     }
     nsmDevice->recordEventSubscriptionStatus(
-        "OK (localEid=" + std::to_string(*localEidOpt) + ")", Request(request),
+        "OK (localEid=" + std::to_string(*localEidOpt) + ")", requestSnapshot,
         copySubscriptionResponse(responseMsg, responseLen));
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
@@ -147,27 +152,26 @@ requester::Coroutine
     auto rc = encode_nsm_get_event_subscription_req(0, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        nsmDevice->recordEventSubscriptionStatus(
-            "failed: get encode rc=" + std::to_string(rc), Request(request));
+        nsmDevice->recordEventSubscriptionStatus("failed: get encode rc=" +
+                                                 std::to_string(rc));
         co_return rc;
     }
+
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
                                       responseLen, false);
     if (rc)
     {
-        nsmDevice->recordEventSubscriptionStatus(
-            "failed: get sensorIO rc=" + std::to_string(rc), Request(request),
-            std::nullopt);
+        nsmDevice->recordEventSubscriptionStatus("failed: get sensorIO rc=" +
+                                                 std::to_string(rc));
         co_return rc;
     }
     auto localEidOpt = nsmDevice->getLocalEid();
     if (!localEidOpt)
     {
         nsmDevice->recordEventSubscriptionStatus(
-            "skipped: localEid not set (get path)", Request(request),
-            copySubscriptionResponse(responseMsg, responseLen));
+            "skipped: localEid not set (get path)");
         co_return NSM_ERR_INVALID_DATA;
     }
     auto localEid = *localEidOpt;
@@ -179,9 +183,8 @@ requester::Coroutine
 
     if (rc != NSM_SW_SUCCESS)
     {
-        nsmDevice->recordEventSubscriptionStatus(
-            "failed: get decode rc=" + std::to_string(rc), Request(request),
-            copySubscriptionResponse(responseMsg, responseLen));
+        nsmDevice->recordEventSubscriptionStatus("failed: get decode rc=" +
+                                                 std::to_string(rc));
         co_return rc;
     }
 
@@ -200,8 +203,7 @@ requester::Coroutine
     else
     {
         nsmDevice->recordEventSubscriptionStatus(
-            "OK (localEid=" + std::to_string(localEid) + ")", Request(request),
-            copySubscriptionResponse(responseMsg, responseLen));
+            "OK (localEid=" + std::to_string(localEid) + ")");
     }
 
     // coverity[missing_return]
