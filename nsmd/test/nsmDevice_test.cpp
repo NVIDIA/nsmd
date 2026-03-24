@@ -789,7 +789,8 @@ TEST(nsmDevice, TestEventSubscriptionStatusCacheRecordsRequestResponse)
     EXPECT_EQ(*gotReq, req);
     EXPECT_EQ(*gotResp, resp);
 
-    nsmDevice.recordEventSubscriptionStatus("skipped: localEid not set");
+    nsmDevice.recordEventSubscriptionStatus("skipped: localEid not set",
+                                            std::nullopt, std::nullopt);
     EXPECT_FALSE(nsmDevice.getLastEventSubscriptionRequest().has_value());
     EXPECT_FALSE(nsmDevice.getLastEventSubscriptionResponse().has_value());
 }

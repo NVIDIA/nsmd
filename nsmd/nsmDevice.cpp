@@ -69,6 +69,18 @@ uint8_t NsmDevice::getEventMode()
     return eventMode;
 }
 
+void NsmDevice::recordEventSubscriptionStatus(std::string_view status)
+{
+    lastEventSubscriptionStatus = std::string(status);
+    // Log failures/skips but not success (OK) or unsupported command
+    if (!status.empty() && !status.starts_with("OK") &&
+        status.find("unsupported command") == std::string_view::npos)
+    {
+        lg2::error("Event subscription eid={EID}: {STATUS}", "EID", eid,
+                   "STATUS", status);
+    }
+}
+
 void NsmDevice::recordEventSubscriptionStatus(
     std::string_view status, std::optional<std::vector<uint8_t>> request,
     std::optional<std::vector<uint8_t>> response)
@@ -1095,8 +1107,8 @@ requester::Coroutine NsmDevice::dumpNsmDeviceInfoTask()
     if (lastEventSubscriptionRequest && !lastEventSubscriptionRequest->empty())
     {
         lg2::error(
-            "EID: {EID} Event subscription request (hex): {REQ}", "EID", eid,
-            "REQ",
+            "EID: {EID} Set event subscription request (hex): {REQ}", "EID",
+            eid, "REQ",
             utils::convertHexToString(*lastEventSubscriptionRequest,
                                       lastEventSubscriptionRequest->size()));
     }
@@ -1104,8 +1116,8 @@ requester::Coroutine NsmDevice::dumpNsmDeviceInfoTask()
         !lastEventSubscriptionResponse->empty())
     {
         lg2::error(
-            "EID: {EID} Event subscription response (hex): {RESP}", "EID", eid,
-            "RESP",
+            "EID: {EID} Set event subscription response (hex): {RESP}", "EID",
+            eid, "RESP",
             utils::convertHexToString(*lastEventSubscriptionResponse,
                                       lastEventSubscriptionResponse->size()));
     }

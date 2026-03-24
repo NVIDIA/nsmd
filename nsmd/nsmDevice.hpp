@@ -405,24 +405,26 @@ class NsmDevice :
         return localEid;
     }
 
-    /** @brief Record event subscription status for logDump (success or
-     * failure). Called by NsmEventSetting on every attempt.
-     * @param request Last NSM request bytes sent (nullopt if none, e.g. skipped
-     * before encode).
-     * @param response Last NSM response bytes received (nullopt if none). */
+    /** @brief Record event subscription status for logDump. Does not clear
+     * cached Set request/response bytes; use the 3-arg overload with
+     * std::nullopt for both to clear. */
+    void recordEventSubscriptionStatus(std::string_view status);
+
+    /** @brief Record status and last NSM Set Event Subscription request /
+     * response bytes (decode_nsm_set_event_subscription_resp payload) for
+     * logDump. */
     void recordEventSubscriptionStatus(
-        std::string_view status,
-        std::optional<std::vector<uint8_t>> request = std::nullopt,
-        std::optional<std::vector<uint8_t>> response = std::nullopt);
+        std::string_view status, std::optional<std::vector<uint8_t>> request,
+        std::optional<std::vector<uint8_t>> response);
 
     /** @brief Get last event subscription status for logDump. Returns cached
      * string or nullopt if never attempted. */
     std::optional<std::string> getLastEventSubscriptionStatus() const;
 
-    /** @brief Last Set/Get event subscription request bytes, if recorded. */
+    /** @brief Last Set Event Subscription request bytes, if recorded. */
     std::optional<std::vector<uint8_t>> getLastEventSubscriptionRequest() const;
 
-    /** @brief Last Set/Get event subscription response bytes, if recorded. */
+    /** @brief Last Set Event Subscription response bytes, if recorded. */
     std::optional<std::vector<uint8_t>>
         getLastEventSubscriptionResponse() const;
 
@@ -585,6 +587,7 @@ class NsmDevice :
     eid_t eid = 0;
     std::optional<eid_t> localEid;
     std::optional<std::string> lastEventSubscriptionStatus;
+    /** Set Event Subscription (nsm_set_event_subscription_req / resp) only. */
     std::optional<std::vector<uint8_t>> lastEventSubscriptionRequest;
     std::optional<std::vector<uint8_t>> lastEventSubscriptionResponse;
     bool hasNsmEventSettingConfigFlag = false;
