@@ -41,6 +41,10 @@ const std::unordered_map<uint32_t, std::string_view> deviceModeIndexToName = {
      "CPU_Limit_GPU_Copy_Power_Limit_One_Shot"},
     {DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY,
      "CPU_Limit_GPU_Copy_Power_Limit_Persistent"},
+    {DEVICE_MODE_ONE_SHOT_GPU_COPY_SWITCH_POWER_LIMIT,
+     "GPU_Copy_Switch_Power_Limit_One_Shot"},
+    {DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT,
+     "GPU_Copy_Switch_Power_Limit_Persistent"},
 };
 
 NsmClearPowerLimitIntf ::NsmClearPowerLimitIntf(
@@ -80,6 +84,10 @@ uint32_t powerLimitIdToDeviceModeIndex(uint8_t powerLimitId, bool persistent)
         case CPU_LIMIT_GPU_COPY:
             return persistent ? DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY
                               : DEVICE_MODE_ONE_SHOT_CPU_POWER_LIMIT_GPU_COPY;
+        case GPU_COPY_SWITCH:
+            return persistent
+                       ? DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT
+                       : DEVICE_MODE_ONE_SHOT_GPU_COPY_SWITCH_POWER_LIMIT;
         default:
             lg2::error(
                 "powerLimitIdToDeviceModeIndex: unknown powerLimitId={ID}, using 0",
@@ -546,6 +554,10 @@ uint8_t
                     persistencyIntf->persistency(false);
                 }
             }
+            else
+            {
+                powerLimitsIntf->powerCap(reading);
+            }
         }
         else
         {
@@ -675,6 +687,28 @@ void createGPUPowerLimit(std::shared_ptr<NsmDevice> nsmDevice,
                                    AsyncSetOperationInfo{setPowerLimitHandler,
                                                          nsmPowerLimitSensor,
                                                          nsmDevice});
+    }
+    else if (type == "NSM_GPU_COPY_SWITCH_POWER_LIMIT")
+    {
+        std::string deviceName =
+            inventoryObjPath.substr(inventoryObjPath.find_last_of('/') + 1);
+        std::string objPath = "/xyz/openbmc_project/control/" + deviceName +
+                              "/GPU_Copy_Switch_Power_Limit";
+        auto powerLimitsIntf =
+            std::make_shared<PowerLimitsIntf>(bus, objPath.c_str());
+        auto associationDefinitionsIntf =
+            std::make_shared<AssociationDefinitionsIntf>(bus, objPath.c_str());
+
+        std::vector<std::tuple<std::string, std::string, std::string>>
+            associations = {{"switch_power_copied_by_gpu",
+                             "gpu_copy_switch_power", inventoryObjPath}};
+        associationDefinitionsIntf->associations(associations);
+
+        auto nsmPowerLimitSensor = std::make_shared<NsmPersistentPowerLimit>(
+            name, type, powerLimitsIntf, nullptr, associationDefinitionsIntf,
+            nsmDevice, GPU_COPY_SWITCH);
+        nsmDevice->addSensor(nsmPowerLimitSensor, false);
+        nsmDevice->addCapabilityRefreshSensor(nsmPowerLimitSensor);
     }
 }
 

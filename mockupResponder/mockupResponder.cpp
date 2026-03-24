@@ -8022,6 +8022,20 @@ std::vector<uint8_t>
             memcpy(data.data(), &powerLimit, sizeof(uint32_t));
             break;
         }
+        case DEVICE_MODE_ONE_SHOT_GPU_COPY_SWITCH_POWER_LIMIT:
+        {
+            uint32_t powerLimit = htole32(350000);
+            data.resize(sizeof(uint32_t));
+            memcpy(data.data(), &powerLimit, sizeof(uint32_t));
+            break;
+        }
+        case DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT:
+        {
+            uint32_t powerLimit = htole32(300000);
+            data.resize(sizeof(uint32_t));
+            memcpy(data.data(), &powerLimit, sizeof(uint32_t));
+            break;
+        }
         default:
         {
             uint32_t defaultValue = htole32(0);

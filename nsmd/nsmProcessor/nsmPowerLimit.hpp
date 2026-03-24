@@ -53,6 +53,7 @@ enum GpuPowerLimitId
 {
     GPU_BASE = 0,
     CPU_LIMIT_GPU_COPY = 1,
+    GPU_COPY_SWITCH = 2,
 };
 
 class NsmClearPowerLimitIntf : public ClearPowerLimitIntf

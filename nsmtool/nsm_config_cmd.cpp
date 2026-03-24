@@ -1451,7 +1451,9 @@ class GetDeviceModeSettingsV2 : public CommandInterface
             " 11 - One Shot GPU Base Power Limit\n"
             " 12 - Persistent GPU Base Power Limit\n"
             " 13 - One Shot CPU Power Limit GPU Copy\n"
-            " 14 - Persistent CPU Power Limit GPU Copy");
+            " 14 - Persistent CPU Power Limit GPU Copy\n"
+            " 15 - One Shot GPU Copy Switch Power Limit\n"
+            " 16 - Persistent GPU Copy Switch Power Limit");
         getDeviceModeSettingsV2Group->require_option(1);
     }
 

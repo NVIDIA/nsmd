@@ -3715,6 +3715,15 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                                 "NSM_GPU_COPY_CPU_POWER_LIMIT",
                                 inventoryObjPath);
         }
+        if (allCurrentIfaceProperties.count(
+                "GPUCopySwitchPowerLimitSupported") &&
+            std::get<bool>(allCurrentIfaceProperties.at(
+                "GPUCopySwitchPowerLimitSupported")))
+        {
+            createGPUPowerLimit(nsmDevice, bus, name,
+                                "NSM_GPU_COPY_SWITCH_POWER_LIMIT",
+                                inventoryObjPath);
+        }
     }
     else if (type == "NSM_PCIe")
     {
