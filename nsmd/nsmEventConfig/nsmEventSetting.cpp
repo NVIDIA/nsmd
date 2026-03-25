@@ -66,7 +66,7 @@ requester::Coroutine
 requester::Coroutine
     NsmEventSetting::setEventSubscription(std::shared_ptr<NsmDevice> nsmDevice)
 {
-    auto localEidOpt = nsmDevice->getLocalEid();
+    auto localEidOpt = nsmDevice->getMctpLocalEid();
     if (!localEidOpt)
     {
         nsmDevice->recordEventSubscriptionStatus(
@@ -167,7 +167,7 @@ requester::Coroutine
                                                  std::to_string(rc));
         co_return rc;
     }
-    auto localEidOpt = nsmDevice->getLocalEid();
+    auto localEidOpt = nsmDevice->getMctpLocalEid();
     if (!localEidOpt)
     {
         nsmDevice->recordEventSubscriptionStatus(

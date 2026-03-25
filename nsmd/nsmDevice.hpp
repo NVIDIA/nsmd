@@ -385,7 +385,7 @@ class NsmDevice :
                                     std::string& associatedPath,
                                     std::string& mctpMedium,
                                     std::string& mctpBinding,
-                                    std::optional<eid_t> localEid);
+                                    std::optional<eid_t> mctpLocalEid);
     requester::Coroutine refreshCapabilitySensor();
     requester::Coroutine refreshCommandMatrix();
 
@@ -399,11 +399,11 @@ class NsmDevice :
         return uuid;
     }
 
-    /** @brief getter of local EID (BMC endpoint on the route to this device);
+    /** @brief MCTP LocalEID (BMC endpoint on the route to this device);
      *  nullopt if not yet set from MCTP discovery */
-    std::optional<eid_t> getLocalEid() const
+    std::optional<eid_t> getMctpLocalEid() const
     {
-        return localEid;
+        return mctpLocalEid;
     }
 
     /** @brief Record event subscription status for logDump. Does not clear
@@ -586,7 +586,7 @@ class NsmDevice :
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
     uint8_t eventMode;
     eid_t eid = 0;
-    std::optional<eid_t> localEid;
+    std::optional<eid_t> mctpLocalEid;
     std::optional<std::string> lastEventSubscriptionStatus;
     /** Set Event Subscription (nsm_set_event_subscription_req / resp) only. */
     std::optional<std::vector<uint8_t>> lastEventSubscriptionRequest;

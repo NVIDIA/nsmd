@@ -545,7 +545,7 @@ bool NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
                                            std::string& associatedPath,
                                            std::string& mctpMedium,
                                            std::string& mctpBinding,
-                                           std::optional<eid_t> localEid)
+                                           std::optional<eid_t> mctpLocalEid)
 {
     bool isPreferred = true;
     try
@@ -573,8 +573,8 @@ bool NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
             fruDeviceManager.reset();
         }
         this->eid = eid;
-        this->localEid =
-            localEid; // may be nullopt if MCTP did not provide LocalEID
+        this->mctpLocalEid =
+            mctpLocalEid; // may be nullopt if MCTP did not provide LocalEID
         this->uuid = uuid;
         this->mctpMedium = mctpMedium;
         this->mctpBinding = mctpBinding;
