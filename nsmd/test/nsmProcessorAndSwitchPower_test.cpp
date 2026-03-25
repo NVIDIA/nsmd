@@ -1359,7 +1359,7 @@ TEST(NsmDeviceExtended, UpdateDiscoveryIdentifiers_FirstTime_SetsAllFields)
     EXPECT_EQ(nsmDevice.mctpMedium, medium);
     EXPECT_EQ(nsmDevice.mctpBinding, binding);
     EXPECT_EQ(nsmDevice.associatedPath, assocPath);
-    EXPECT_EQ(nsmDevice.getLocalEid(), std::optional<eid_t>(30));
+    EXPECT_EQ(nsmDevice.getMctpLocalEid(), std::optional<eid_t>(30));
 }
 
 // --- updateDiscoveryIdentifiers - preferred path updates ---

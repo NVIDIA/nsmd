@@ -44,7 +44,7 @@ using NetworkId = uint8_t;
 using Active = bool;
 using MctpInfo = std::tuple<
     eid_t, uuid_t, MctpMedium, NetworkId, MctpBinding, Active, MctpObjectPath,
-    std::optional<eid_t>>; // last = localEid (nullopt if not from MCTP)
+    std::optional<eid_t>>; // last = MCTP LocalEID (nullopt if not from MCTP)
 using MctpInfos = std::vector<MctpInfo>;
 using VendorIANA = uint32_t;
 

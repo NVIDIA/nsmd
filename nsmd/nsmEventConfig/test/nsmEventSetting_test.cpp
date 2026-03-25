@@ -110,7 +110,7 @@ struct NsmEventSettingTestFixture :
             mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
         EXPECT_NE(gpu, nullptr);
         // Simulate MCTP discovery having provided LocalEID (0) for event tests
-        gpu->localEid = 0;
+        gpu->mctpLocalEid = 0;
     }
 
     ~NsmEventSettingTestFixture()
@@ -407,7 +407,7 @@ TEST_F(NsmEventSettingTestFixture, testEventSettingSetsDeviceEventMode)
 
 TEST_F(NsmEventSettingTestFixture, testEventSubscriptionStatusLogOkWithLocalEid)
 {
-    gpu->localEid = 30; // Use specific localEid for OK message
+    gpu->mctpLocalEid = 30; // Use specific localEid for OK message
     uint8_t eventGenSetting = GLOBAL_EVENT_GENERATION_ENABLE_POLLING;
     NsmEventSetting eventSetting("EventSetting", "NSM_EventSetting",
                                  eventGenSetting, gpu);
@@ -437,7 +437,7 @@ TEST_F(NsmEventSettingTestFixture, testEventSubscriptionStatusLogOkWithLocalEid)
 TEST_F(NsmEventSettingTestFixture,
        testEventSubscriptionStatusLogSkippedLocalEidNotSet)
 {
-    gpu->localEid = std::nullopt; // Simulate LocalEID not from MCTP
+    gpu->mctpLocalEid = std::nullopt; // Simulate LocalEID not from MCTP
     uint8_t eventGenSetting = GLOBAL_EVENT_GENERATION_ENABLE_POLLING;
     NsmEventSetting eventSetting("EventSetting", "NSM_EventSetting",
                                  eventGenSetting, gpu);
@@ -452,7 +452,7 @@ TEST_F(NsmEventSettingTestFixture,
 TEST_F(NsmEventSettingTestFixture,
        testEventSubscriptionStatusLogSkippedLocalEidNotSetGetPath)
 {
-    gpu->localEid = std::nullopt;
+    gpu->mctpLocalEid = std::nullopt;
     auto eventSetting = std::make_shared<NsmEventSetting>(
         "EventSetting", "NSM_EventSetting", GLOBAL_EVENT_GENERATION_ENABLE_PUSH,
         gpu);
@@ -576,7 +576,7 @@ TEST_F(NsmEventSettingTestFixture,
 TEST_F(NsmEventSettingTestFixture,
        testEventSubscriptionStatusLogGetSuccessWithLocalEid)
 {
-    gpu->localEid = 25;
+    gpu->mctpLocalEid = 25;
     auto eventSetting = std::make_shared<NsmEventSetting>(
         "EventSetting", "NSM_EventSetting", GLOBAL_EVENT_GENERATION_ENABLE_PUSH,
         gpu);
@@ -609,7 +609,7 @@ TEST_F(NsmEventSettingTestFixture,
 TEST_F(NsmEventSettingTestFixture,
        testEventSubscriptionStatusLogFailedGetDecode)
 {
-    gpu->localEid = 0;
+    gpu->mctpLocalEid = 0;
     auto eventSetting = std::make_shared<NsmEventSetting>(
         "EventSetting", "NSM_EventSetting", GLOBAL_EVENT_GENERATION_ENABLE_PUSH,
         gpu);
@@ -629,7 +629,7 @@ TEST_F(NsmEventSettingTestFixture,
 TEST_F(NsmEventSettingTestFixture,
        testEventSubscriptionStatusLogFailedGetSensorIO)
 {
-    gpu->localEid = 0;
+    gpu->mctpLocalEid = 0;
     auto eventSetting = std::make_shared<NsmEventSetting>(
         "EventSetting", "NSM_EventSetting", GLOBAL_EVENT_GENERATION_ENABLE_PUSH,
         gpu);
