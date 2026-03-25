@@ -134,10 +134,7 @@ MockMctpDiscovery* MockMctpDiscovery::instance = nullptr;
 struct MockSensorManager : public SensorManager
 {
     MockSensorManager() = delete;
-    MockSensorManager(NsmDeviceTable& nsmDevices) : SensorManager(nsmDevices, 0)
-    {
-        // Ignore nsmDevices parameter for mock
-    }
+    MockSensorManager(NsmDeviceTable& nsmDevices) : SensorManager(nsmDevices) {}
     /*  MOCK_METHOD(requester::Coroutine, SendRecvNsmMsg,
                   (eid_t eid, Request& request,
                    std::shared_ptr<const nsm_msg>& responseMsg,
