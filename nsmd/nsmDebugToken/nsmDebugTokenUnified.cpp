@@ -121,10 +121,12 @@ requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
     }
     else
     {
-        auto error = std::make_tuple(
-            reasonCode, debug_token::Error(reasonCode).to_string());
-        lg2::error("DebugToken: eraseToken: eid={EID} rc={RC}", "EID", eid,
-                   "RC", reasonCode);
+        uint16_t errorCode =
+            (reasonCode != ERR_NULL) ? reasonCode : static_cast<uint16_t>(cc);
+        auto error = std::make_tuple(errorCode,
+                                     debug_token::Error(errorCode).to_string());
+        lg2::error("DebugToken: eraseToken: eid={EID} cc={CC} rc={RC}", "EID",
+                   eid, "CC", cc, "RC", reasonCode);
         valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::InternalFailure);
     }
@@ -236,8 +238,10 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
     }
     else
     {
-        auto error = std::make_tuple(
-            reasonCode, debug_token::Error(reasonCode).to_string());
+        uint16_t errorCode =
+            (reasonCode != ERR_NULL) ? reasonCode : static_cast<uint16_t>(cc);
+        auto error = std::make_tuple(errorCode,
+                                     debug_token::Error(errorCode).to_string());
         lg2::error("DebugToken: installToken: eid={EID} cc={CC} rc={RC}", "EID",
                    eid, "CC", cc, "RC", reasonCode);
         valueIntf->value(error);
