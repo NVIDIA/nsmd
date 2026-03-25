@@ -262,7 +262,8 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
             createPrettyName(device, name, baseType, allCurrentIfaceProperties);
         }
         if (device->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
-            device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8)
+            (device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8 ||
+             device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9))
         {
             createAssetTag(device, name, baseType);
             createChassisVersion(device, name, baseType);
