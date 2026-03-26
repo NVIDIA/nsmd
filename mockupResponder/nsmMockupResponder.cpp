@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "common/event.hpp"
 #include "mockupResponder.hpp"
 
 #include <err.h>
@@ -27,7 +28,6 @@
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server.hpp>
-#include <sdeventplus/event.hpp>
 
 #include <iostream>
 
@@ -143,11 +143,13 @@ int main(int argc, char** argv)
         sdbusplus::asio::object_server objServer(systemBus);
 
         auto bus = sdbusplus::bus::new_default();
-        auto event = sdeventplus::Event::get_default();
-        bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
+        common::Event event;
+        bus.attach_event(static_cast<sdeventplus::Event&>(event).get(),
+                         SD_EVENT_PRIORITY_NORMAL);
         sdbusplus::server::manager::manager objManager(bus, "/");
 
-        bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
+        bus.attach_event(static_cast<sdeventplus::Event&>(event).get(),
+                         SD_EVENT_PRIORITY_NORMAL);
         std::string serviceName = "xyz.openbmc_project.NSM.eid_" +
                                   std::to_string(eid);
         bus.request_name(serviceName.c_str());

@@ -103,7 +103,11 @@ struct coGetDbusProperty : coGetDbusPropertyBase, type
                       const std::string& property, const std::string& interface,
                       const std::string& service = entityManagerService) :
         coGetDbusPropertyBase(objectPath, property, interface, service), type()
-    {}
+    {
+#ifdef COVERAGE_DISABLE_COROUTINES
+        setRetValueByProperty();
+#endif // COVERAGE_DISABLE_COROUTINES
+    }
 };
 
 template <typename type>
@@ -137,7 +141,18 @@ struct coGetDbusProperty<type, std::enable_if_t<std::is_arithmetic_v<type> ||
                       const std::string& property, const std::string& interface,
                       const std::string& service = entityManagerService) :
         coGetDbusPropertyBase(objectPath, property, interface, service), ret()
-    {}
+    {
+#ifdef COVERAGE_DISABLE_COROUTINES
+        setRetValueByProperty();
+#endif // COVERAGE_DISABLE_COROUTINES
+    }
+
+#ifdef COVERAGE_DISABLE_COROUTINES
+    operator type() const noexcept
+    {
+        return static_cast<type>(ret);
+    }
+#endif // COVERAGE_DISABLE_COROUTINES
 };
 
 /** @struct coGetServiceMap
@@ -247,6 +262,18 @@ struct coLogEvent
                const std::map<std::string, std::string>& logData) :
         service(svc), messageId(msgId), level(lvl), data(logData)
     {}
+
+#ifdef COVERAGE_DISABLE_COROUTINES
+
+    coLogEvent(bool value) :
+        service(""), messageId(""), level(Level::Informational), data{},
+        success(value)
+    {}
+    operator bool() const noexcept
+    {
+        return success;
+    }
+#endif // COVERAGE_DISABLE_COROUTINES
 };
 
 } // namespace utils

@@ -84,9 +84,9 @@ class GetDeviceDiagnostics : public CommandInterface
     {
         uint8_t cc = NSM_ERROR;
         std::vector<uint8_t> seg_data(65535, 0);
-        uint16_t seg_data_size;
-        uint8_t next_segment_id;
-        uint16_t reason_code;
+        uint16_t seg_data_size = 0;
+        uint8_t next_segment_id = 0;
+        uint16_t reason_code = 0;
 
         auto rc = decode_get_device_diagnostics_resp(
             responsePtr, payloadLength, &cc, &reason_code, seg_data.data(),

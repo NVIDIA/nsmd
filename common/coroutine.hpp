@@ -136,6 +136,10 @@ struct Coroutine
         }
     };
 
+#ifdef COVERAGE_DISABLE_COROUTINES
+    promise_type promise;
+#endif // COVERAGE_DISABLE_COROUTINES
+
     /** @brief Check if the coroutine is done.
      *
      * @return True if the coroutine is done, false otherwise.
@@ -168,7 +172,11 @@ struct Coroutine
      */
     uint8_t data() const noexcept
     {
+#ifdef COVERAGE_DISABLE_COROUTINES
+        return promise.data; // In coverage mode, use promise directly
+#else
         return handle ? std::move(handle.promise().data) : 0;
+#endif
     }
 
     /** @brief Called by co_await operator to get return value when coroutine
@@ -196,18 +204,31 @@ struct Coroutine
     Coroutine(std::coroutine_handle<promise_type> h) : handle(h) {}
     Coroutine(const Coroutine&) = delete;
     Coroutine& operator=(const Coroutine&) = delete;
-    Coroutine(Coroutine&& other) noexcept :
-        handle(std::exchange(other.handle, {}))
+    Coroutine(Coroutine&& other) noexcept
+#ifdef COVERAGE_DISABLE_COROUTINES
+        :
+        promise({.parent_handle = {},
+                 .data = std::exchange(other.promise.data, 0),
+                 .exception = {},
+                 .detached = false})
+#else
+        : handle(std::exchange(other.handle, {}))
+#endif
     {}
     Coroutine& operator=(Coroutine&& other) noexcept
     {
         if (this != &other)
         {
+#ifndef COVERAGE_DISABLE_COROUTINES
             if (handle)
             {
                 handle.destroy();
             }
             handle = std::exchange(other.handle, {});
+#else
+            promise.data = other.promise.data;
+            other.promise.data = 0;
+#endif
         }
         return *this;
     }
@@ -286,5 +307,56 @@ struct Coroutine
                              // destroying the suspended frame
         return true;
     }
+
+#ifdef COVERAGE_DISABLE_COROUTINES
+
+    template <typename T>
+    Coroutine(T&& value)
+    {
+        promise.data = static_cast<uint8_t>(value);
+        // Don't create handle in coverage mode - it would be invalid
+        // handle = nullptr is already set by default initialization
+    }
+    // Constrain conversion operator to arithmetic types only
+    // to prevent unwanted conversions (e.g., to std::source_location)
+    template <typename T>
+        requires(std::is_arithmetic_v<T> || std::is_enum_v<T>)
+    operator T() const
+    {
+        return static_cast<T>(data());
+    }
+
+    explicit operator bool() const
+    {
+        return data() != 0;
+    }
+
+    template <typename T>
+    bool operator==(T other) const
+    {
+        return data() == static_cast<uint8_t>(other);
+    }
+
+    template <typename T>
+    bool operator!=(T other) const
+    {
+        return !(*this == other);
+    }
+#endif // COVERAGE_DISABLE_COROUTINES
 };
 } // namespace requester
+#ifdef COVERAGE_DISABLE_COROUTINES
+namespace lg2::details
+{
+// Custom log_convert for Coroutine - treat it as unsigned 8-bit value
+template <log_flags... Fs>
+inline auto log_convert(const char* h, log_flag<Fs...> f,
+                        const requester::Coroutine& rc)
+{
+    // Convert Coroutine to uint64_t (like other unsigned integrals in lg2)
+    // and add appropriate flags
+    return std::make_tuple(h, (f | unsigned_val | field8).value,
+                           static_cast<uint64_t>(rc.data()));
+}
+} // namespace lg2::details
+#endif // COVERAGE_DISABLE_COROUTINES

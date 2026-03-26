@@ -56,6 +56,7 @@ std::unordered_map<uint8_t, uint8_t> pciePortConfigMockTable = {
 
 EventSource::EventSource(const std::vector<uint64_t>& events)
 {
+    this->events.fill({0});
     for (auto& event : events)
     {
         if (event >= EVENT_SOURCES_LENGTH * 8)

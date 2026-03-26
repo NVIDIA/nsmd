@@ -119,7 +119,7 @@ uint8_t NsmSWInventoryDriverVersionAndStatus::handleResponseMsg(
     return cc ? cc : rc;
 }
 
-static requester::Coroutine
+requester::Coroutine
     createNsmNVLinkManagerDriverSensor(SensorManager& manager,
                                        const std::string& interface,
                                        const std::string& objPath)

@@ -40,7 +40,7 @@ namespace nsm
  * @param reasonCode The reason code from the NSM response
  * @return sdbusplus::common::com::nvidia::ImageCopy::ErrorCode
  */
-static sdbusplus::common::com::nvidia::ImageCopy::ErrorCode
+sdbusplus::common::com::nvidia::ImageCopy::ErrorCode
     mapReasonCodeToErrorCode(uint16_t reasonCode)
 {
     using ErrorCode = sdbusplus::common::com::nvidia::ImageCopy::ErrorCode;

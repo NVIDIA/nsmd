@@ -375,7 +375,7 @@ requester::Coroutine
     co_return cc ? cc : rc;
 }
 
-static requester::Coroutine
+requester::Coroutine
     CreateProcessorModulePowerControl(SensorManager& manager,
                                       const std::string& interface,
                                       const std::string& objPath)

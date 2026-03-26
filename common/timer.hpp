@@ -19,7 +19,7 @@
 
 #include "libnsm/base.h"
 
-#include <sdeventplus/event.hpp>
+#include "common/event.hpp"
 
 #include <coroutine>
 
@@ -59,9 +59,9 @@ class TimerAwaiter
      *
      * @param time Duration of the timer in milliseconds.
      */
-    TimerAwaiter(uint64_t time) :
-        durationInUsec(time * 1000), // Convert mSec to uSec
-        rc(NSM_SW_SUCCESS)           // Initialize the result code to success
+    TimerAwaiter(uint64_t time, const common::Event& event = common::Event()) :
+        event(event), durationInUsec(time * 1000), // Convert mSec to uSec
+        rc(NSM_SW_SUCCESS) // Initialize the result code to success
     {}
     ~TimerAwaiter()
     {
@@ -104,7 +104,8 @@ class TimerAwaiter
     {
         if (isRunning)
         {
-            sd_event_source_unref(eventSource); // Cancel the timer event source
+            sd_event_source_unref(event,
+                                  eventSource); // Cancel the timer event source
             if (sd_event_add_time(event.get(), &eventSource, CLOCK_MONOTONIC,
                                   0,            // Call the callback immediately
                                   0,
@@ -132,6 +133,13 @@ class TimerAwaiter
         return isRunning;
     }
 
+#ifdef COVERAGE_DISABLE_COROUTINES
+    operator nsm_sw_codes() const
+    {
+        return rc;
+    }
+#endif // COVERAGE_DISABLE_COROUTINES
+
   private:
     /** @brief Handle to resume the suspended coroutine. */
     std::coroutine_handle<> handle;
@@ -145,7 +153,7 @@ class TimerAwaiter
     sd_event_source* eventSource = nullptr;
 
     /** @brief Reference to the event loop where the timer is registered. */
-    const sdeventplus::Event event = sdeventplus::Event::get_default();
+    const common::Event event;
 
     /** @brief Start time of the timer. */
     uint64_t startTime = 0;
@@ -168,7 +176,7 @@ class TimerAwaiter
             isRunning = false;
             isExpired = now >= (startTime + durationInUsec);
             rc = isExpired ? NSM_SW_ERROR_TIMEOUT : NSM_SW_SUCCESS;
-            sd_event_source_unref(eventSource);
+            sd_event_source_unref(event, eventSource);
             handle.resume(); // Resume the coroutine
         }
     }

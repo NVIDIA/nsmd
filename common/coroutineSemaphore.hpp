@@ -17,8 +17,9 @@
 
 #pragma once
 
+#include "common/event.hpp"
+
 #include <phosphor-logging/lg2.hpp>
-#include <sdeventplus/event.hpp>
 
 #include <atomic>
 #include <coroutine>
@@ -44,9 +45,8 @@ class CoroutineSemaphore
     /**
      * @brief Constructs a binary semaphore.
      */
-    CoroutineSemaphore() :
-        binarySem(1), event(sdeventplus::Event::get_default()),
-        awaiterIdGenerator(0)
+    explicit CoroutineSemaphore(const common::Event& event = common::Event()) :
+        binarySem(1), event(event), awaiterIdGenerator(0)
     {}
 
     /**
@@ -150,6 +150,7 @@ class CoroutineSemaphore
         {
             // Schedule the resumption of the next coroutine in the event loop.
 
+            auto* awaiterPtr = new std::shared_ptr<Awaiter>(nextAwaiter);
             if (sd_event_add_defer(event.get(), nullptr,
                                    [](sd_event_source*, void* userdata) -> int {
                 auto nextAwaiter =
@@ -161,8 +162,9 @@ class CoroutineSemaphore
                 (*nextAwaiter)->handle.resume();
                 delete nextAwaiter; // Free memory after use
                 return 0;
-            }, new std::shared_ptr<Awaiter>(nextAwaiter)) < 0)
+            }, awaiterPtr) < 0)
             {
+                delete awaiterPtr; // Prevent memory leak on defer failure
                 lg2::error(
                     "Failed to schedule deferred coroutine resumption for eid: {EID}, Awaiter ID: {AWAITER_ID}",
                     "EID", nextAwaiter->eid, "AWAITER_ID",
@@ -178,7 +180,7 @@ class CoroutineSemaphore
 
   private:
     std::binary_semaphore binarySem; // Binary semaphore
-    sdeventplus::Event event;        // Event loop for resumption
+    const common::Event event;       // Event loop for resumption
     std::deque<std::shared_ptr<Awaiter>>
         suspendedQueue;              // Explicit queue for suspended coroutines
     std::mutex mutex;                // Protects access to suspendedQueue

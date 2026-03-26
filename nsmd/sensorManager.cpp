@@ -44,8 +44,34 @@
 namespace nsm
 {
 
-// Static instance definition
-std::unique_ptr<SensorManager> SensorManager::instance;
+// Singleton instance — external linkage for test DI
+std::unique_ptr<SensorManager> sensorManagerInstance;
+
+SensorManager& SensorManager::getInstance()
+{
+    if (!sensorManagerInstance)
+    {
+        throw std::runtime_error("SensorManager instance not initialized yet");
+    }
+    return *sensorManagerInstance;
+}
+
+void SensorManagerImpl::initialize(
+    sdbusplus::bus::bus& bus, common::Event& event,
+    requester::Handler<requester::Request>& handler,
+    nsm::InstanceIdDb& instanceIdDb, sdbusplus::asio::object_server& objServer,
+    std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
+    NsmDeviceTable& nsmDevices, mctp_socket::Manager& sockManager, bool verbose)
+{
+    if (sensorManagerInstance)
+    {
+        throw std::logic_error(
+            "Initialize called on an already initialized SensorManager");
+    }
+    sensorManagerInstance = std::make_unique<SensorManagerImpl>(
+        bus, event, handler, instanceIdDb, objServer, eidTable, nsmDevices,
+        sockManager, verbose);
+}
 bool SensorManagerImpl::isReadyForReadinessCheck = false;
 bool SensorManagerImpl::isMCTPReadyCheck = false;
 bool SensorManagerImpl::isEMReadyCheck = false;
@@ -54,7 +80,7 @@ std::map<std::string, std::string> SensorManagerImpl::readynessFailureMap = {};
 // Ensuring the constructor remains private and defined here if not
 // explicitly declared in the header
 SensorManagerImpl::SensorManagerImpl(
-    sdbusplus::bus::bus& bus, sdeventplus::Event& event,
+    sdbusplus::bus::bus& bus, common::Event& event,
     requester::Handler<requester::Request>& handler, InstanceIdDb& instanceIdDb,
     sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,

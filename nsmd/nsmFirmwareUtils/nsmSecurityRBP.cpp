@@ -421,7 +421,10 @@ uint8_t NsmMinSecVersionObject::handleResponseMsg(const nsm_msg* responseMsg,
     LG2_ERROR_FLT(
         "decode_nsm_query_firmware_security_version_number_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-    minSecVersion->updateProperties(sec_info);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        minSecVersion->updateProperties(sec_info);
+    }
     return cc ? cc : rc;
 }
 } // namespace nsm

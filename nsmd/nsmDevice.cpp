@@ -216,7 +216,7 @@ requester::Coroutine NsmDevice::markSensorsUnrefreshed()
         count++;
         if (count == MAX_SENSOR_UPDATE_BATCH_SIZE)
         {
-            co_await common::Sleep(event.get(), 10000, common::NonPriority);
+            co_await common::Sleep(event, 10000, common::NonPriority);
             count = 0;
         }
     }
@@ -268,7 +268,7 @@ requester::Coroutine NsmDevice::updateSensorsForOffline()
             ++sensorIndex;
             ++count;
         }
-        co_await common::Sleep(event.get(), 10000, common::NonPriority);
+        co_await common::Sleep(event, 10000, common::NonPriority);
     }
     co_return NSM_SW_SUCCESS;
 }
@@ -303,8 +303,7 @@ requester::Coroutine NsmDevice::waitForNsmDeviceUpdate()
     while (discoveryPending && iter < DEVICE_UPDATE_POST_PATCH_SLEEP_MAX_ITER)
     {
         iter++;
-        co_await common::Sleep(event.get(),
-                               DEVICE_UPDATE_POST_PATCH_SLEEP_MS * 1000,
+        co_await common::Sleep(event, DEVICE_UPDATE_POST_PATCH_SLEEP_MS * 1000,
                                common::NonPriority);
     }
     if (discoveryPending)
@@ -1166,7 +1165,17 @@ ProgressCounters& NsmDevice::progressCounters()
 
 DiscoveryEvents& NsmDevice::discoveryEvents()
 {
-    return mctp::MctpDiscovery::getInstance().discoveryEvents(eid);
+    try
+    {
+        return mctp::MctpDiscovery::getInstance().discoveryEvents(eid);
+    }
+    catch (const std::runtime_error&)
+    {
+        // Fallback for test environments where MctpDiscovery is not
+        // initialized. Return a thread-local static instance.
+        static thread_local DiscoveryEvents fallback(eid);
+        return fallback;
+    }
 }
 
 // FruInterfaceManager method implementations

@@ -26,6 +26,7 @@
  *   6. nsmRetimerPort.cpp               (93.6% -> cover 3 remaining)
  */
 
+#include "common/event.hpp"
 #include "test/mockDBusHandler.hpp"
 #include "test/mockSensorManager.hpp"
 
@@ -580,7 +581,7 @@ TEST_F(Batch12GCoroutineTest,
 TEST(NsmMessageHandler, GetSharedInstance_NotInitialized_Throws)
 {
     // Arrange: ensure instance is null
-    NsmMessageHandler::instance = nullptr;
+    nsmMessageHandlerInstance = nullptr;
 
     // Act & Assert
     EXPECT_THROW(NsmMessageHandler::getSharedInstance(), std::runtime_error);
@@ -594,11 +595,11 @@ TEST(NsmMessageHandler, GetSharedInstance_NotInitialized_Throws)
 TEST(NsmMessageHandler, Initialize_Success)
 {
     // Arrange
-    NsmMessageHandler::instance = nullptr;
+    nsmMessageHandlerInstance = nullptr;
 
     // Create a mock handler -- we need a RequesterHandler
     // Use a minimal approach: create the infrastructure
-    auto event = sdeventplus::Event::get_default();
+    common::Event event;
     nsm::InstanceIdDb instanceIdDb;
     mctp_socket::Manager socketManager;
     nsm::RequesterHandler reqHandler(event, instanceIdDb, socketManager, false);
@@ -611,7 +612,7 @@ TEST(NsmMessageHandler, Initialize_Success)
     EXPECT_NE(instance, nullptr);
 
     // Cleanup: reset for other tests
-    NsmMessageHandler::instance = nullptr;
+    nsmMessageHandlerInstance = nullptr;
 }
 
 /**
@@ -621,9 +622,9 @@ TEST(NsmMessageHandler, Initialize_Success)
 TEST(NsmMessageHandler, InitializeTwice_ThrowsLogicError)
 {
     // Arrange
-    NsmMessageHandler::instance = nullptr;
+    nsmMessageHandlerInstance = nullptr;
 
-    auto event = sdeventplus::Event::get_default();
+    common::Event event;
     nsm::InstanceIdDb instanceIdDb;
     mctp_socket::Manager socketManager;
     nsm::RequesterHandler reqHandler(event, instanceIdDb, socketManager, false);
@@ -634,7 +635,7 @@ TEST(NsmMessageHandler, InitializeTwice_ThrowsLogicError)
     EXPECT_THROW(NsmMessageHandler::initialize(reqHandler), std::logic_error);
 
     // Cleanup
-    NsmMessageHandler::instance = nullptr;
+    nsmMessageHandlerInstance = nullptr;
 }
 
 // ============================================================================
@@ -992,6 +993,36 @@ TEST(NsmDeviceProtectionOptions, HandleResponseMsg_UnknownProtectionMode)
     auto rc = opt.handleResponseMsg(response, responseData.size());
     EXPECT_EQ(rc, NSM_SUCCESS);
     EXPECT_EQ(opt.protectionIntf->protectionLevel(), ProtectionOption::Unknown);
+}
+
+TEST(NsmDeviceProtectionOptions, HandleResponseMsg_ErrorCC_ReturnsError)
+{
+    const char* path = "/xyz/openbmc_project/test/protection_9";
+    NsmDeviceProtectionOptions opt(bus, path, "prot9", "NSM_Protection");
+
+    // Fully-allocated buffer with error completion code
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+    auto* resp = reinterpret_cast<nsm_common_resp*>(response->payload);
+    resp->completion_code = NSM_ERROR;
+
+    auto rc = opt.handleResponseMsg(response, responseData.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmDeviceProtectionOptions, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    const char* path = "/xyz/openbmc_project/test/protection_10";
+    NsmDeviceProtectionOptions opt(bus, path, "prot10", "NSM_Protection");
+
+    // 7-byte buffer: safely reads cc=0 but too short for nsm_common_resp,
+    // triggering NSM_SW_ERROR_LENGTH from decode_common_resp
+    std::vector<uint8_t> responseData(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    auto rc = opt.handleResponseMsg(response, responseData.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
 }
 
 // ============================================================================

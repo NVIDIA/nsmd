@@ -242,10 +242,9 @@ bool NsmPCIeRetimerSwitchGetClockState::getRetimerClockState(
 }
 #endif
 
-static requester::Coroutine
-    CreatePCIeRetimerSwitch(SensorManager& manager,
-                            const std::string& interface,
-                            const std::string& objPath)
+requester::Coroutine CreatePCIeRetimerSwitch(SensorManager& manager,
+                                             const std::string& interface,
+                                             const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(

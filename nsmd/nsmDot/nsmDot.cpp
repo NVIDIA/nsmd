@@ -65,8 +65,8 @@ constexpr uint8_t DOT_STATUS_VOLATILE = 1;
 constexpr uint8_t DOT_STATUS_LOCKED = 2;
 constexpr uint8_t DOT_STATUS_DISABLED = 3;
 
-static void updateDotBlobIfChanged(const std::string& pathName,
-                                   const std::vector<uint8_t>& newBlob)
+void updateDotBlobIfChanged(const std::string& pathName,
+                            const std::vector<uint8_t>& newBlob)
 {
     if (newBlob.size() != dot_blob_utils::DOT_BLOB_SIZE_BYTES)
     {
@@ -496,7 +496,10 @@ requester::Coroutine NsmDotObject::dotCAKInstallAsyncHandler(
     lg2::info("Dot: CAK Install completed successfully: eid={EID}", "EID", eid);
     valueIntf->value(std::make_tuple(static_cast<uint16_t>(cc), "Success"));
     statusIntf->status(AsyncOperationStatusType::Success);
-    dotStatusSensor_->update(device).detach();
+    if (dotStatusSensor_)
+    {
+        dotStatusSensor_->update(device).detach();
+    }
     co_return NSM_SW_SUCCESS;
 }
 
@@ -787,7 +790,10 @@ requester::Coroutine
 
     valueIntf->value(dotBlob);
     statusIntf->status(AsyncOperationStatusType::Success);
-    dotStatusSensor_->update(device).detach();
+    if (dotStatusSensor_)
+    {
+        dotStatusSensor_->update(device).detach();
+    }
     co_return NSM_SW_SUCCESS;
 }
 
@@ -1082,7 +1088,10 @@ requester::Coroutine NsmDotObject::unlockAsyncHandler(
     lg2::info("Dot: Unlock completed successfully: eid={EID}", "EID", eid);
     valueIntf->value(std::vector<uint8_t>{});
     statusIntf->status(AsyncOperationStatusType::Success);
-    dotStatusSensor_->update(device).detach();
+    if (dotStatusSensor_)
+    {
+        dotStatusSensor_->update(device).detach();
+    }
     co_return NSM_SW_SUCCESS;
 }
 
@@ -1929,9 +1938,9 @@ requester::Coroutine NsmDotObject::recoverDOTAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-static requester::Coroutine createNsmDot(SensorManager& manager,
-                                         const std::string& interface,
-                                         const std::string& objPath)
+requester::Coroutine createNsmDot(SensorManager& manager,
+                                  const std::string& interface,
+                                  const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     dbus::PropertyMap allBaseIfaceProperties;

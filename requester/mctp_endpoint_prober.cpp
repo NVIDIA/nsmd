@@ -2,12 +2,12 @@
 
 #include "requester/mctp_endpoint_prober.hpp"
 
+#include "common/event.hpp"
 #include "common/sleep.hpp"
 #include "common/utils.hpp"
 #include "requester/retry_backoff_utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
-#include <sdeventplus/event.hpp>
 
 namespace requester
 {
@@ -131,7 +131,7 @@ requester::Coroutine MctpEndpointProber::ping(eid_t eid)
     LinearBackoffStats stats{};
     stats.config = cfg;
 
-    auto event = sdeventplus::Event::get_default();
+    common::Event event;
     const uint32_t delayMs = cfg.delayMs;
 
     for (uint8_t attempt = 1; attempt <= cfg.maxRetries; ++attempt)
@@ -226,7 +226,7 @@ requester::Coroutine MctpEndpointProber::getQueryDeviceIdentification(
     LinearBackoffStats stats{};
     stats.config = cfg;
 
-    auto event = sdeventplus::Event::get_default();
+    common::Event event;
     const uint32_t delayMs = cfg.delayMs;
 
     for (uint8_t attempt = 1; attempt <= cfg.maxRetries; ++attempt)

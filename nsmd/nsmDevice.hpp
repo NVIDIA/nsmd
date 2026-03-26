@@ -31,6 +31,7 @@
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
 #include "requester/handler.hpp"
+#include "sleep.hpp"
 #include "stateChangeLogger.hpp"
 #include "types.hpp"
 #include "utils.hpp"
@@ -609,7 +610,7 @@ class NsmDevice :
     std::shared_ptr<sdbusplus::asio::object_server> objServer;
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
     std::shared_ptr<ProgressCounters> sensorProgressCounters = nullptr;
-    const sdeventplus::Event event = sdeventplus::Event::get_default();
+    const common::Event event;
 
     void registerLongRunningEventHandler();
     common::CoroutineSemaphore
@@ -699,7 +700,7 @@ class NsmDevice :
     SensorQueue& staticSensors = sensors[PollingType::Static];
     SensorQueue& roundRobinSensors = sensors[PollingType::RoundRobin];
     ProgressCounters& progressCounters();
-    DiscoveryEvents& discoveryEvents();
+    virtual DiscoveryEvents& discoveryEvents();
 };
 
 } // namespace nsm

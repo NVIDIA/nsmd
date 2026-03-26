@@ -51,71 +51,56 @@ using DiscoveredEIDs =
 using EidTable =
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>;
 using RequesterHandler = requester::Handler<requester::Request>;
+class MctpDiscoveryTestAccess; // forward declaration for test access
+
 class MctpDiscovery
 {
+    friend class MctpDiscoveryTestAccess;
+
   public:
     MctpDiscovery() = delete;
     MctpDiscovery(const MctpDiscovery&) = delete;
     MctpDiscovery(MctpDiscovery&&) = delete;
     MctpDiscovery& operator=(const MctpDiscovery&) = delete;
     MctpDiscovery& operator=(MctpDiscovery&&) = delete;
-    ~MctpDiscovery() = default;
+    virtual ~MctpDiscovery() = default;
 
-    static MctpDiscovery& getInstance()
-    {
-        if (!instance)
-        {
-            throw std::runtime_error(
-                "MctpDiscovery instance is not initialized yet");
-        }
-        return *instance;
-    }
+    static MctpDiscovery& getInstance();
 
     static void
         initialize(sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
                    std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler,
                    EidTable& eidTable, nsm::NsmDeviceTable& nsmDevices,
-                   sdbusplus::asio::object_server& objServer)
-    {
-        if (instance)
-        {
-            throw std::logic_error(
-                "Initialize called on an already initialized MctpDiscovery");
-        }
-        static MctpDiscovery inst(bus, handler, nsmMsgHandler, eidTable,
-                                  nsmDevices, objServer);
-        instance = &inst;
-    }
+                   sdbusplus::asio::object_server& objServer);
 
-    std::shared_ptr<nsm::NsmDevice> getNsmDeviceFromStaticUUID(uuid_t uuid);
-    std::shared_ptr<nsm::NsmDevice> getNsmDeviceFromEid(eid_t eid);
-    std::shared_ptr<nsm::NsmDevice>
+    virtual std::shared_ptr<nsm::NsmDevice>
+        getNsmDeviceFromStaticUUID(uuid_t uuid);
+    virtual std::shared_ptr<nsm::NsmDevice> getNsmDeviceFromEid(eid_t eid);
+    virtual std::shared_ptr<nsm::NsmDevice>
         getNsmDeviceByIdentification(uint8_t deviceType, uint8_t instanceNumber,
                                      uint8_t deviceRole);
-    nsm::DiscoveryEvents& discoveryEvents(eid_t eid);
-    requester::Coroutine dumpPingInfoTask(eid_t eid);
+    virtual nsm::DiscoveryEvents& discoveryEvents(eid_t eid);
+    virtual requester::Coroutine dumpPingInfoTask(eid_t eid);
 
-    static void logProberSummaries()
-    {
-        if (instance)
-        {
-            instance->prober.logAllSummaries();
-        }
-    }
+    static void logProberSummaries();
 
-  private:
-    static MctpDiscovery* instance;
-    /** @brief Constructs the MCTP Discovery object to handle discovery of
-     *         MCTP enabled devices
-     *
-     *  @param[in] bus - reference to systemd bus
-     *  @param[in] list - initializer list to the MctpDiscoveryHandlerIntf
+  protected:
+    /** @brief Constructs the MCTP Discovery object.
+     *  Does NOT perform D-Bus discovery — call init() after construction.
      */
     explicit MctpDiscovery(
         sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
         std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler,
         EidTable& eidTable, nsm::NsmDeviceTable& nsmDevices,
         sdbusplus::asio::object_server& objServer);
+
+    /** @brief Performs D-Bus signal registration and initial endpoint
+     *         discovery. Called by initialize() after construction.
+     *         Virtual so tests can override to skip D-Bus operations.
+     */
+    virtual void init();
+
+  private:
     /** @brief reference to the systemd bus */
     sdbusplus::bus::bus& bus;
     mctp_socket::Handler& handler;
@@ -126,10 +111,10 @@ class MctpDiscovery
     // Dedicated prober to handle ping/query with backoff
     requester::MctpEndpointProber prober;
     /** @brief Used to watch for new MCTP endpoints */
-    sdbusplus::bus::match_t mctpEndpointAddedSignal;
+    std::optional<sdbusplus::bus::match_t> mctpEndpointAddedSignal;
 
     /** @brief Used to watch for the removed MCTP endpoints */
-    sdbusplus::bus::match_t mctpEndpointRemovedSignal;
+    std::optional<sdbusplus::bus::match_t> mctpEndpointRemovedSignal;
 
     /** @brief map of Queue to store the pending property change signal from
      * mctp service */

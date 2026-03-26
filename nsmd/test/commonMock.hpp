@@ -32,11 +32,17 @@ using ::testing::ElementsAre;
 #include "nsmMsghandler.hpp"
 #include "nsmSensor.hpp"
 
+namespace nsm
+{
+extern std::shared_ptr<NsmMessageHandler> nsmMessageHandlerInstance;
+} // namespace nsm
+
 #ifdef COVERAGE_DISABLE_COROUTINES
 #define EXPECT_THROW_COROUTINE(expression, exceptionType)                      \
     EXPECT_THROW(expression, exceptionType)
-// In coverage mode coroutines throw directly; catch and ignore to preserve
-// test intent of "exception handled internally by coroutine machinery".
+// In coverage mode coroutines throw directly; catch and ignore to preserve //
+// test intent of "exception handled internally by coroutine
+// machinery".
 #define EXPECT_NO_THROW_COROUTINE(expression)                                  \
     do                                                                         \
     {                                                                          \

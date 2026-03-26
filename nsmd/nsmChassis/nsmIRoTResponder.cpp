@@ -193,7 +193,7 @@ void createIRoTResponderChassis(std::shared_ptr<NsmDevice> device,
     device->addStaticSensor(chassisObject);
 }
 
-static void createIRoTResponderLocationCode(
+void createIRoTResponderLocationCode(
     std::shared_ptr<NsmDevice> device, std::string& name,
     const std::string& baseType, dbus::PropertyMap& allCurrentIfaceProperties)
 {
@@ -210,7 +210,7 @@ static void createIRoTResponderLocationCode(
     device->addStaticSensor(locationCodeObject);
 }
 
-static void createIRoTResponderLocationContext(
+void createIRoTResponderLocationContext(
     std::shared_ptr<NsmDevice> device, std::string& name,
     const std::string& baseType, dbus::PropertyMap& allCurrentIfaceProperties)
 {
@@ -227,7 +227,7 @@ static void createIRoTResponderLocationContext(
     device->addStaticSensor(locationContextObject);
 }
 
-static void createIRoTResponderFieldReplaceable(
+void createIRoTResponderFieldReplaceable(
     std::shared_ptr<NsmDevice> device, std::string& name,
     const std::string& baseType, dbus::PropertyMap& allCurrentIfaceProperties)
 {

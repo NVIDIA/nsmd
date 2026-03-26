@@ -886,12 +886,14 @@ double int64ToDoubleSafeConvert(int64_t value)
 {
     if (value < 0)
     {
-        if (static_cast<uint64_t>(-value) > MAX_SAFE_INTEGER_IN_DOUBLE)
+        // Avoid UB from negating INT64_MIN: compare directly instead
+        if (value < -static_cast<int64_t>(MAX_SAFE_INTEGER_IN_DOUBLE))
         {
             lg2::error(
                 "Warning: Int64 Value ({VAL}) exceeds safe range for double precision. Capping to maximum safe value.",
                 "VAL", value);
-            return static_cast<double>(-MAX_SAFE_INTEGER_IN_DOUBLE);
+            return static_cast<double>(
+                -static_cast<int64_t>(MAX_SAFE_INTEGER_IN_DOUBLE));
         }
     }
     else

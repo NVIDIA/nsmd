@@ -625,10 +625,10 @@ TEST_F(NsmSwitchDIFactoryTest, goodTestCreateNSMSwitch)
         {"Type", std::string("NSM_Switch")},
         {"SwitchType",
          std::string(
-             "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVSwitch")},
+             "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink")},
         {"SwitchSupportedProtocols",
          std::vector<std::string>{
-             "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVSwitch"}},
+             "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink"}},
     };
     auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                                  switchIntf);
@@ -800,7 +800,9 @@ TEST_F(NsmSwitchDIFactoryTest, goodTestCreateNSMSwitchMinimalProperties)
     const std::string switchIntf = basicIntfName + ".Switch";
     dbus::PropertyMap switchProperties = {
         {"Type", std::string("NSM_Switch")},
-        // SwitchType and SwitchSupportedProtocols omitted
+        {"SwitchType",
+         std::string(
+             "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink")},
     };
     auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                                  switchIntf);
@@ -814,24 +816,33 @@ TEST_F(NsmSwitchDIFactoryTest, goodTestCreateNSMSwitchMinimalProperties)
 }
 
 // Test: createNsmSwitchDI with NSM_FabricManager - minimal properties
+// Uses a unique objPath to avoid D-Bus vtable collision with the full FM test.
 TEST_F(NsmSwitchDIFactoryTest, goodTestCreateNSMFabricManagerMinimal)
 {
-    // Arrange
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+    // Arrange - use a unique config path to avoid D-Bus "FileExists" clash
+    const std::string minObjPath =
+        "/xyz/openbmc_project/inventory/system/nvswitch_fm_min";
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(minObjPath,
                                                               basicIntfName);
     basePropertyMap = basicProperties;
+    basePropertyMap["Name"] = std::string("FM_Min_0");
+    basePropertyMap["InventoryObjPath"] =
+        std::string("/xyz/openbmc_project/inventory/system/nvswitch_fm_min/");
 
     const std::string fabricMgrIntf = basicIntfName + ".FabricManager";
     dbus::PropertyMap fabricMgrProperties = {
         {"Type", std::string("NSM_FabricManager")},
-        // Name, InventoryObjPath, Description are optional
+        {"Name", std::string("FM_Minimal")},
+        {"InventoryObjPath",
+         std::string(
+             "/xyz/openbmc_project/inventory/system/nvswitch/fabricmgr_min/")},
     };
-    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(minObjPath,
                                                                  fabricMgrIntf);
     currentPropertyMap = fabricMgrProperties;
 
     // Act
-    createNsmSwitchDI(mockManager, fabricMgrIntf, objPath);
+    createNsmSwitchDI(mockManager, fabricMgrIntf, minObjPath);
 
     // Assert - sensor created even without optional FM properties
     EXPECT_GE(nvswitch->roundRobinSensors.size(), 1);

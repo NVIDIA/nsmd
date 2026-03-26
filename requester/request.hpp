@@ -36,6 +36,7 @@
 #include <sdeventplus/event.hpp>
 
 #include <chrono>
+#include <coroutine>
 #include <functional>
 #include <iostream>
 

@@ -17,6 +17,7 @@
 
 #include "config.h"
 
+#include "common/event.hpp"
 #include "eventManager.hpp"
 #include "eventTypeHandlers.hpp"
 #include "instance_id.hpp"
@@ -39,7 +40,6 @@
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server.hpp>
-#include <sdeventplus/event.hpp>
 #include <sharedMemCommon.hpp>
 #ifdef NVIDIA_SHMEM
 #include <tal.hpp>
@@ -93,9 +93,10 @@ int main(int argc, char** argv)
         sdbusplus::asio::object_server objServer(systemBus);
 
         auto bus = sdbusplus::bus::new_default();
-        auto event = sdeventplus::Event::get_default();
+        common::Event event;
         event.set_watchdog(true);
-        bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
+        bus.attach_event(static_cast<sdeventplus::Event&>(event).get(),
+                         SD_EVENT_PRIORITY_NORMAL);
         sdbusplus::server::manager::manager rootObjManager(bus, "/");
         sdbusplus::server::manager::manager inventoryObjManager(
             bus, "/xyz/openbmc_project/inventory");

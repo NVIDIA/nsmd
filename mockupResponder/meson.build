@@ -3,6 +3,7 @@ sources = [
     'debugToken.cpp',
     'mockupResponder.cpp',
     'firmwareUtils.cpp',
+    '../common/event.cpp',
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',
 ]

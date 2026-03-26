@@ -98,7 +98,7 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
     return cc;
 }
 
-static int extractNumber(const std::string& str)
+int extractNumber(const std::string& str)
 {
     auto it = str.rbegin();
     while (it != str.rend() && std::isdigit(*it))

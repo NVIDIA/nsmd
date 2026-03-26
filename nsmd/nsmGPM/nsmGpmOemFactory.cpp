@@ -46,7 +46,7 @@ std::vector<uint8_t> convertToBytes(const std::vector<uint64_t>& data)
     return result;
 }
 
-static requester::Coroutine
+requester::Coroutine
     getPerInstanceInterfacesAsync(const std::string& interface,
                                   const std::string& objPath,
                                   std::vector<std::string>& interfaces)
@@ -301,10 +301,9 @@ requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
     co_return NSM_SUCCESS;
 }
 
-static requester::Coroutine
-    createNsmPerPortGPMMetrics(SensorManager& manager,
-                               const std::string& interface,
-                               const std::string& objPath)
+requester::Coroutine createNsmPerPortGPMMetrics(SensorManager& manager,
+                                                const std::string& interface,
+                                                const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
 

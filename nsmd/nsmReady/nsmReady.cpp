@@ -28,10 +28,9 @@
 
 namespace nsm
 {
-static requester::Coroutine
-    createNsmReadySensor(SensorManager& /*manager*/,
-                         const std::string& /*interface*/,
-                         const std::string& /*objPath*/)
+requester::Coroutine createNsmReadySensor(SensorManager& /*manager*/,
+                                          const std::string& /*interface*/,
+                                          const std::string& /*objPath*/)
 {
     // dbus timeout seen
     nsm::SensorManagerImpl::isEMReady();

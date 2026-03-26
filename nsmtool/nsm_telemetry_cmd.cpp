@@ -1545,7 +1545,7 @@ class GetTemperatureReading : public CommandInterface
     }
 
   private:
-    uint8_t sensorId;
+    uint8_t sensorId{};
     static constexpr uint8_t AggregateSensorId{255};
 };
 
@@ -1569,8 +1569,8 @@ class ReadThermalParameter : public CommandInterface
     void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
     {
         const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
-        uint8_t cc;
-        uint16_t reason_code;
+        uint8_t cc = 0;
+        uint16_t reason_code = 0;
         int32_t threshold;
 
         auto rc = decode_read_thermal_parameter_resp(responsePtr, msg_len, &cc,
@@ -1640,7 +1640,7 @@ class ReadThermalParameter : public CommandInterface
     }
 
   private:
-    uint8_t sensorId;
+    uint8_t sensorId{};
     static constexpr uint8_t AggregateSensorId{255};
 };
 
@@ -1867,8 +1867,8 @@ class GetCurrentEnergyCount : public CommandInterface
     void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
     {
         const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
-        uint8_t cc;
-        uint16_t reason_code;
+        uint8_t cc = 0;
+        uint16_t reason_code = 0;
         uint64_t reading;
 
         auto rc = decode_get_current_energy_count_resp(
@@ -1939,7 +1939,7 @@ class GetCurrentEnergyCount : public CommandInterface
     }
 
   private:
-    uint8_t sensorId;
+    uint8_t sensorId{};
     static constexpr uint8_t AggregateSensorId{255};
 };
 
@@ -1962,8 +1962,8 @@ class GetVoltage : public CommandInterface
     void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
     {
         const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
-        uint8_t cc;
-        uint16_t reason_code;
+        uint8_t cc = 0;
+        uint16_t reason_code = 0;
         uint32_t reading;
 
         auto rc = decode_get_voltage_resp(responsePtr, msg_len, &cc,
@@ -2031,7 +2031,7 @@ class GetVoltage : public CommandInterface
     }
 
   private:
-    uint8_t sensorId;
+    uint8_t sensorId{};
     static constexpr uint8_t AggregateSensorId{255};
 };
 
@@ -2062,8 +2062,8 @@ class GetAltitudePressure : public CommandInterface
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
         const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
-        uint8_t cc;
-        uint16_t reason_code;
+        uint8_t cc = 0;
+        uint16_t reason_code = 0;
         uint32_t reading;
 
         auto rc = decode_get_altitude_pressure_resp(responsePtr, msg_len, &cc,
@@ -3073,8 +3073,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
     }
 
   protected:
-    uint8_t deviceIndex;
-    uint8_t groupId;
+    uint8_t deviceIndex{};
+    uint8_t groupId{};
 };
 
 class QueryMultiportScalarGroupTelemetry : public QueryScalarGroupTelemetry
@@ -3595,8 +3595,8 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
     }
 
   private:
-    uint8_t deviceIndex;
-    uint8_t groupId;
+    uint8_t deviceIndex{};
+    uint8_t groupId{};
 };
 
 class PcieFundamentalReset : public CommandInterface
@@ -3723,9 +3723,9 @@ class ClearScalarDataSource : public CommandInterface
         nsmtool::helper::DisplayInJson(result);
     }
 
-    uint8_t device_index;
-    uint8_t groupId;
-    uint8_t dsId;
+    uint8_t device_index{};
+    uint8_t groupId{};
+    uint8_t dsId{};
 };
 
 class GetClockLimit : public CommandInterface

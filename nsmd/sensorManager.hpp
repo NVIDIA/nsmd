@@ -63,15 +63,7 @@ class SensorManager
         getNsmDeviceFromStaticUUID(uuid_t uuid) = 0;
 
     // Static method to access the instance of the class
-    static SensorManager& getInstance()
-    {
-        if (!instance)
-        {
-            throw std::runtime_error(
-                "SensorManager instance not initialized yet");
-        }
-        return *instance;
-    }
+    static SensorManager& getInstance();
     std::unordered_map<std::string, std::shared_ptr<NsmObject>>
         objectPathToSensorMap;
     std::vector<std::shared_ptr<NsmPowerCap>> powerCapList;
@@ -88,7 +80,6 @@ class SensorManager
         deviceToPortMap;
 
   protected:
-    static std::unique_ptr<SensorManager> instance;
     NsmDeviceTable& nsmDevices;
 };
 
@@ -110,25 +101,14 @@ class SensorManagerImpl : public SensorManager
 
     // Static method to initialize the instance
     static void initialize(
-        sdbusplus::bus::bus& bus, sdeventplus::Event& event,
+        sdbusplus::bus::bus& bus, common::Event& event,
         requester::Handler<requester::Request>& handler,
         nsm::InstanceIdDb& instanceIdDb,
         sdbusplus::asio::object_server& objServer,
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
         NsmDeviceTable& nsmDevices, mctp_socket::Manager& sockManager,
-        bool verbose = false)
-    {
-        if (instance)
-        {
-            throw std::logic_error(
-                "Initialize called on an already initialized "
-                "SensorManager");
-        }
-        instance = std::make_unique<SensorManagerImpl>(
-            bus, event, handler, instanceIdDb, objServer, eidTable, nsmDevices,
-            sockManager, verbose);
-    }
+        bool verbose = false);
 
     sdbusplus::asio::object_server& getObjServer()
     {
@@ -136,7 +116,7 @@ class SensorManagerImpl : public SensorManager
     }
 
     SensorManagerImpl(
-        sdbusplus::bus::bus& bus, sdeventplus::Event& event,
+        sdbusplus::bus::bus& bus, common::Event& event,
         requester::Handler<requester::Request>& handler,
         nsm::InstanceIdDb& instanceIdDb,
         sdbusplus::asio::object_server& objServer,
@@ -160,12 +140,12 @@ class SensorManagerImpl : public SensorManager
 #ifdef NVIDIA_STANDBYTODC
     void gpioStatusPropertyChangedHandler(sdbusplus::message::message& msg);
 #endif
-    requester::Coroutine
+    virtual requester::Coroutine
         refreshCommandMatrix(std::shared_ptr<NsmDevice> nsmDevice);
-    requester::Coroutine
+    virtual requester::Coroutine
         pollPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice,
                             const uint64_t& t0);
-    requester::Coroutine
+    virtual requester::Coroutine
         pollNonPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice,
                                const uint64_t& t0);
 
@@ -174,7 +154,6 @@ class SensorManagerImpl : public SensorManager
         updateLongRunningSensor(std::shared_ptr<NsmDevice> nsmDevice,
                                 std::shared_ptr<NsmObject> sensor,
                                 std::shared_ptr<LimitedSensorQueue> sensors);
-
     std::shared_ptr<NsmDevice> getNsmDeviceFromStaticUUID(uuid_t uuid) override;
     std::shared_ptr<NsmDevice> getNsmDevice(uint8_t deviceType,
                                             uint8_t instanceNumber,
@@ -195,7 +174,7 @@ class SensorManagerImpl : public SensorManager
     void checkAllDevicesReady();
 
     sdbusplus::bus::bus& bus;
-    sdeventplus::Event& event;
+    common::Event& event;
     requester::Handler<requester::Request>& handler;
     nsm::InstanceIdDb& instanceIdDb;
     sdbusplus::asio::object_server& objServer;

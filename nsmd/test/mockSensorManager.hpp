@@ -23,10 +23,10 @@
 #include <gtest/gtest.h>
 
 #define private public
-#define protected public
 #include "eventManager.hpp"
 #include "instance_id.hpp"
 #include "nsmDevice.hpp"
+#include "nsmSetAsync/asyncOperationManager.hpp"
 #include "requester/handler.hpp"
 #include "sensorManager.hpp"
 #include "socket_handler.hpp"
@@ -36,7 +36,16 @@
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdeventplus/event.hpp>
 #undef private
-#undef protected
+
+namespace nsm
+{
+extern std::unique_ptr<SensorManager> sensorManagerInstance;
+} // namespace nsm
+
+namespace mctp
+{
+extern std::unique_ptr<MctpDiscovery> mctpDiscoveryInstance;
+} // namespace mctp
 
 #include "commonMock.hpp"
 using namespace nsm;
@@ -144,6 +153,19 @@ struct MockSensorManager : public SensorManager
     }
 };
 
+// Mock SensorManager that always returns nullptr from
+// getNsmDeviceFromStaticUUID. Use this to exercise factory-function !nsmDevice
+// error branches.
+struct NullReturnMockSensorManager : public MockSensorManager
+{
+    NullReturnMockSensorManager(NsmDeviceTable& d) : MockSensorManager(d) {}
+    std::shared_ptr<NsmDevice>
+        getNsmDeviceFromStaticUUID(uuid_t /*uuid*/) override
+    {
+        return nullptr;
+    }
+};
+
 class SensorManagerTest
 {
     static void allocMessage(const Response& response,
@@ -244,6 +266,10 @@ class SensorManagerTest
                 device->gpuDriverSensor.reset();
                 device->msgTypesSensor.reset();
                 device->eventDispatcher.eventsMap.clear();
+                // Detach coroutine tasks to break circular references:
+                // deviceTask captures shared_ptr<NsmDevice> in its frame.
+                device->task.detach();
+                device->longRunningTask.detach();
                 // Clear shared_ptr to avoid circular references
                 device->nsmMsgHandler.reset();
                 device->objServer.reset();
@@ -251,15 +277,20 @@ class SensorManagerTest
         }
         // Clear devices to ensure fresh state for each test
         devices.clear();
+        // Clear AsyncOperationManager dispatchers to release sensor references.
+        // Dispatchers hold shared_ptr<NsmObject> via AsyncSetOperationInfo,
+        // which prevents sensor/D-Bus interface destruction between tests.
+        // Access via #define private public in this header.
+        AsyncOperationManager::getInstance()->dispatchers.clear();
     }
 
     SensorManagerTest() = delete;
     SensorManagerTest(NsmDeviceTable& devices) : mockManager(devices)
     {
-        SensorManager::instance.reset(&mockManager);
+        sensorManagerInstance.reset(&mockManager);
     }
     virtual ~SensorManagerTest()
     {
-        SensorManager::instance.release();
+        sensorManagerInstance.release();
     }
 };

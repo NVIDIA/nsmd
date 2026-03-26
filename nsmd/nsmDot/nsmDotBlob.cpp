@@ -127,7 +127,7 @@ requester::Coroutine NsmDotBlobObject::updateBlobAsyncHandler(
 
     try
     {
-        dot_blob_utils::ensureBlobDirectory(dot_blob_utils::DOT_BLOB_DIR);
+        dot_blob_utils::ensureBlobDirectory(dot_blob_utils::blobDir);
 
         // FD is already duplicated in updateBlob(), just use it directly
         int sourceFd = blobFd;
@@ -257,9 +257,9 @@ sdbusplus::message::object_path
     return objPath;
 }
 
-static requester::Coroutine createNsmDotBlob(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath)
+requester::Coroutine createNsmDotBlob(SensorManager& manager,
+                                      const std::string& interface,
+                                      const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     dbus::PropertyMap allBaseIfaceProperties;

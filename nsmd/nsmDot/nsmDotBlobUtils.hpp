@@ -29,6 +29,10 @@ constexpr const char* DOT_BLOB_DIR = "/var/emmc/misc/dot-blob";
 
 constexpr size_t DOT_BLOB_SIZE_BYTES = 1024;
 
+// Runtime-overridable paths (override in unit tests to redirect blob storage)
+extern const char* blobDir;
+extern const char* emmcBasePath;
+
 /**
  * @brief Calculate SHA256 hash of data
  * @param data Input data to hash

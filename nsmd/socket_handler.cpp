@@ -25,7 +25,6 @@
 
 #include <linux/if_arp.h>
 #include <linux/mctp.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
 
@@ -34,6 +33,11 @@
 #ifdef LTTNG_TRACING
 #include "tracepoints/nsmd-tp.h"
 #endif
+
+// Activates syscall redirect macros — must be the last include so all system
+// headers are already parsed before the macros take effect.
+#define NSMD_SOCKET_REDIRECT
+#include "socketIo.hpp"
 
 namespace mctp_socket
 {

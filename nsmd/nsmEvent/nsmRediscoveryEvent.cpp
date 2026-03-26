@@ -133,7 +133,7 @@ requester::Coroutine
     co_return NSM_SW_SUCCESS;
 }
 
-static requester::Coroutine
+requester::Coroutine
     createNsmRediscoveryEvent([[maybe_unused]] SensorManager& manager,
                               const std::string& interface,
                               const std::string& objPath)

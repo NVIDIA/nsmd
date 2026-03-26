@@ -70,8 +70,7 @@ NsmPersistentPowerLimit::NsmPersistentPowerLimit(
     powerLimitsIntf->powerCapEnable(true);
 }
 
-static uint32_t powerLimitIdToDeviceModeIndex(uint8_t powerLimitId,
-                                              bool persistent)
+uint32_t powerLimitIdToDeviceModeIndex(uint8_t powerLimitId, bool persistent)
 {
     switch (powerLimitId)
     {

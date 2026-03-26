@@ -505,6 +505,32 @@ struct SendRecvNsmMsg
         }
         resumeHandle();
     }
+#ifdef COVERAGE_DISABLE_COROUTINES
+    // Constrain conversion operator to arithmetic types only
+    // to prevent unwanted conversions (e.g., to std::source_location)
+    template <typename T>
+        requires(std::is_arithmetic_v<T> || std::is_enum_v<T>)
+    operator T() const
+    {
+        return static_cast<T>(rc);
+    }
+#endif // COVERAGE_DISABLE_COROUTINES
 };
 
 } // namespace requester
+
+#ifdef COVERAGE_DISABLE_COROUTINES
+namespace lg2::details
+{
+// Template specialization for SendRecvNsmMsg
+template <class RequesterHandler, log_flags... Fs>
+inline auto log_convert(const char* h, log_flag<Fs...> f,
+                        const requester::SendRecvNsmMsg<RequesterHandler>& msg)
+{
+    // Convert SendRecvNsmMsg.rc to uint64_t (like other unsigned integrals in
+    // lg2) and add appropriate flags
+    return std::make_tuple(h, (f | unsigned_val | field8).value,
+                           static_cast<uint64_t>(msg.rc));
+}
+} // namespace lg2::details
+#endif // COVERAGE_DISABLE_COROUTINES

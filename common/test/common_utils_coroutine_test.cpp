@@ -92,6 +92,12 @@ TEST(CoroutineDestructorTest, DestroyCompletedHandle_NoMemoryLeak)
  */
 TEST(CoroutineDestructorTest, MoveAssignment_DestroysOldSuspendedHandle)
 {
+#ifdef COVERAGE_DISABLE_COROUTINES
+    // In coverage mode co_await is a no-op, so suspendedCoroutine() completes
+    // immediately and done() returns true. The test is only meaningful with
+    // real coroutines.
+    GTEST_SKIP() << "Skipped: coroutine suspension not available in coverage";
+#endif
     auto coro = suspendedCoroutine();
     EXPECT_FALSE(coro.done());
 

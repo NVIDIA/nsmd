@@ -1,4 +1,5 @@
 sources = [
+    '../common/event.cpp',
     '../common/utils.cpp',
     '../debug-token/tlv_decoder.cpp',
     '../debug-token/tlv_encoder.cpp',
@@ -11,6 +12,7 @@ sources = [
     'sensorManager.cpp',
     'socket_handler.cpp',
     'nsmDevice.cpp',
+    'nsmMsghandler.cpp',
     'nsmObjectFactory.cpp',
     'nsmSensorAggregator.cpp',
     'nsmSensor.cpp',
@@ -153,25 +155,29 @@ nsmd_base = static_library(
     implicit_include_directories: false,
     include_directories: include_directories(nsmd_headers),
     dependencies: deps,
+    cpp_args: tests_cpp_args,
 )
 
-nsmd_prod = static_library(
-    'nsmd_prod',
-    'nsmd.cpp',
-    '../common/dBusHandler.cpp',
-    implicit_include_directories: false,
-    include_directories: include_directories(nsmd_headers),
-    dependencies: deps,
-)
+if not get_option('b_coverage')
+    nsmd_prod = static_library(
+        'nsmd_prod',
+        'nsmd.cpp',
+        'socketIo.cpp',
+        '../common/dBusHandler.cpp',
+        implicit_include_directories: false,
+        include_directories: include_directories(nsmd_headers),
+        dependencies: deps,
+    )
 
-# Build nsmd binary
-executable(
-    'nsmd',
-    link_whole: nsmd_base,
-    link_with: nsmd_prod,
-    install: true,
-    install_dir: get_option('bindir'),
-)
+    # Build nsmd binary
+    executable(
+        'nsmd',
+        link_whole: nsmd_base,
+        link_with: nsmd_prod,
+        install: true,
+        install_dir: get_option('bindir'),
+    )
+endif
 
 if get_option('progressCounter').enabled()
     executable(
@@ -207,12 +213,14 @@ if get_option('tests').enabled()
         implicit_include_directories: false,
         include_directories: include_directories(tests_include_dirs),
         dependencies: [deps, gmock],
+        cpp_args: tests_cpp_args,
     )
 
     tests_deps = declare_dependency(
         link_with: [nsmd_base, nsmd_test],
         include_directories: include_directories(tests_include_dirs),
         dependencies: [deps, gtest, gmock],
+        compile_args: tests_cpp_args,
     )
 
     subdir('test')

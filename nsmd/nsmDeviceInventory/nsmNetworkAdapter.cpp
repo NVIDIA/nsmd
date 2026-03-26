@@ -290,10 +290,9 @@ inline void createDeviceProtectionOptions(std::shared_ptr<NsmDevice> device,
                                   nsmDeviceProtectionOptions, device});
 }
 
-static requester::Coroutine
-    createNSMNetworkAdapter(SensorManager& manager,
-                            const std::string& interface,
-                            const std::string& objPath)
+requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
+                                             const std::string& interface,
+                                             const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(

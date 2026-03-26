@@ -92,10 +92,9 @@ int NsmResetRequiredEvent::handle(eid_t eid, NsmType /*type*/,
     return NSM_SW_SUCCESS;
 }
 
-static requester::Coroutine
-    createNsmResetRequiredEvent(SensorManager& manager,
-                                const std::string& interface,
-                                const std::string& objPath)
+requester::Coroutine createNsmResetRequiredEvent(SensorManager& manager,
+                                                 const std::string& interface,
+                                                 const std::string& objPath)
 {
     NsmEventInfo info{};
 

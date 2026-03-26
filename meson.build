@@ -15,6 +15,7 @@ sdeventplus = dependency('sdeventplus')
 phosphor_dbus_interfaces = dependency('phosphor-dbus-interfaces')
 phosphor_logging = dependency('phosphor-logging')
 
+tests_cpp_args = []
 if get_option('tests').enabled()
     gtest = dependency(
         'gtest',
@@ -36,6 +37,14 @@ if get_option('tests').enabled()
     endif
     gtest = gtest.as_system('system')
     gmock = gmock.as_system('system')
+
+    if get_option('b_coverage')
+        tests_cpp_args = [
+            '-DCOVERAGE_DISABLE_COROUTINES',
+            '-Dco_return=return',
+            '-Dco_await=',
+        ]
+    endif
 endif
 
 if get_option('system-guid').enabled()

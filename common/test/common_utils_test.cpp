@@ -1527,7 +1527,7 @@ TEST(TypeConversion, int64ToDoubleSafeConvert_NegativeExceedsSafe_ReturnsCapped)
     double result = utils::int64ToDoubleSafeConvert(value);
 
     // Assert
-    EXPECT_DOUBLE_EQ(result, static_cast<double>(-((1ULL << 53) - 1)));
+    EXPECT_DOUBLE_EQ(result, -static_cast<double>((1ULL << 53) - 1));
 }
 
 TEST(TypeConversion, DISABLED_int64ToDoubleSafeConvert_MinInt64_ReturnsCapped)

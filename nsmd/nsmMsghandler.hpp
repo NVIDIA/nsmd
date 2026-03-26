@@ -67,35 +67,10 @@ class NsmMessageHandler : public std::enable_shared_from_this<NsmMessageHandler>
      * @brief Get the singleton instance as a shared pointer
      * @return Shared pointer to the singleton instance
      */
-    static std::shared_ptr<NsmMessageHandler> getSharedInstance()
-    {
-        if (!instance)
-        {
-            throw std::runtime_error(
-                "NsmMessageHandler instance is not initialized yet");
-        }
-        return instance;
-    }
-
-    static void initialize(RequesterHandler& handler)
-    {
-        if (instance)
-        {
-            throw std::logic_error(
-                "Initialize called on an already initialized NsmMessageHandler");
-        }
-        // Use a helper struct to access private constructor
-        struct MakeSharedEnabler : public NsmMessageHandler
-        {
-            MakeSharedEnabler(RequesterHandler& h) : NsmMessageHandler(h) {}
-        };
-        instance = std::make_shared<MakeSharedEnabler>(handler);
-    }
+    static std::shared_ptr<NsmMessageHandler> getSharedInstance();
+    static void initialize(RequesterHandler& handler);
 
   private:
-    // Static shared pointer for singleton
-    static std::shared_ptr<NsmMessageHandler> instance;
-
     RequesterHandler& reqHandler;
 
   protected:
@@ -142,9 +117,5 @@ class NsmMessageHandler : public std::enable_shared_from_this<NsmMessageHandler>
     friend class NsmDevice;
     friend class mctp::MctpDiscovery;
 };
-
-// Initialize the static member - this must be in the header for header-only
-// implementation
-inline std::shared_ptr<NsmMessageHandler> NsmMessageHandler::instance = nullptr;
 
 } // namespace nsm

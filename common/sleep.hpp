@@ -19,12 +19,12 @@
 
 #include "libnsm/base.h"
 
+#include "common/event.hpp"
 #include "common/globals.hpp"
 
 #include <systemd/sd-event.h>
 
 #include <sdbusplus/timer.hpp>
-#include <sdeventplus/event.hpp>
 #include <sdeventplus/source/event.hpp>
 
 #include <coroutine>
@@ -49,7 +49,7 @@ struct Sleep
     sd_event_source* eventSource = nullptr;
 
     /** @brief Reference to the event loop where the timer is registered. */
-    const sdeventplus::Event& event;
+    const common::Event& event;
 
     /** @brief Duration for which the coroutine should sleep, in microseconds.
      */
@@ -73,7 +73,7 @@ struct Sleep
     {
         /* TODO: See if the event source can be reused.*/
         auto* sleep = static_cast<Sleep*>(userdata);
-        sd_event_source_unref(sleep->eventSource);
+        sd_event_source_unref(sleep->event, sleep->eventSource);
         sleep->resumeHandle.resume(); // Resume the coroutine
         return 0;                     // Success
     }
@@ -137,11 +137,17 @@ struct Sleep
      * added.
      * @param durationInMsec Duration of the sleep in microseconds.
      */
-    Sleep(const sdeventplus::Event& event, uint64_t durationInUsec,
+    Sleep(const common::Event& event, uint64_t durationInUsec,
           TimerEventPriority priority) :
         event(event), durationInUsec(durationInUsec),
         timerEventPriority(priority),
         rc(NSM_SW_SUCCESS) // Initialize the result code to success
     {}
+#ifdef COVERAGE_DISABLE_COROUTINES
+    operator nsm_sw_codes() const
+    {
+        return rc;
+    }
+#endif // COVERAGE_DISABLE_COROUTINES
 };
 } // namespace common

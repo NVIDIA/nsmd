@@ -41,7 +41,41 @@
 
 namespace mctp
 {
-MctpDiscovery* MctpDiscovery::instance = nullptr;
+std::unique_ptr<MctpDiscovery> mctpDiscoveryInstance;
+
+MctpDiscovery& MctpDiscovery::getInstance()
+{
+    if (!mctpDiscoveryInstance)
+    {
+        throw std::runtime_error(
+            "MctpDiscovery instance is not initialized yet");
+    }
+    return *mctpDiscoveryInstance;
+}
+
+void MctpDiscovery::initialize(
+    sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
+    std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler, EidTable& eidTable,
+    nsm::NsmDeviceTable& nsmDevices, sdbusplus::asio::object_server& objServer)
+{
+    if (mctpDiscoveryInstance)
+    {
+        throw std::logic_error(
+            "Initialize called on an already initialized MctpDiscovery");
+    }
+    mctpDiscoveryInstance = std::unique_ptr<MctpDiscovery>(new MctpDiscovery(
+        bus, handler, nsmMsgHandler, eidTable, nsmDevices, objServer));
+    mctpDiscoveryInstance->init();
+}
+
+void MctpDiscovery::logProberSummaries()
+{
+    if (mctpDiscoveryInstance)
+    {
+        mctpDiscoveryInstance->prober.logAllSummaries();
+    }
+}
+
 const std::string emptyUUID = "00000000-0000-0000-0000-000000000000";
 
 MctpDiscovery::MctpDiscovery(
@@ -52,17 +86,10 @@ MctpDiscovery::MctpDiscovery(
     bus(bus), handler(handler), nsmMsgHandler(nsmMsgHandler),
     eidTable(eidTable), nsmDevices(nsmDevices), objServer(objServer),
     prober(nsmMsgHandler, requester::retry::LinearBackoffConfig{},
-           std::bind_front(&MctpDiscovery::SendRecvNsmMsg, this)),
-    mctpEndpointAddedSignal(
-        bus,
-        sdbusplus::bus::match::rules::interfacesAdded(
-            "/au/com/codeconstruct/mctp1"),
-        std::bind_front(&MctpDiscovery::discoverEndpoints, this)),
-    mctpEndpointRemovedSignal(
-        bus,
-        sdbusplus::bus::match::rules::interfacesRemoved(
-            "/au/com/codeconstruct/mctp1"),
-        std::bind_front(&MctpDiscovery::cleanEndpoints, this))
+           std::bind_front(&MctpDiscovery::SendRecvNsmMsg, this))
+{}
+
+void MctpDiscovery::init()
 {
     dbus::ObjectValueTree objects;
     std::set<dbus::Service> mctpCtrlServices;
@@ -70,6 +97,16 @@ MctpDiscovery::MctpDiscovery(
 
     try
     {
+        mctpEndpointAddedSignal.emplace(
+            bus,
+            sdbusplus::bus::match::rules::interfacesAdded(
+                "/au/com/codeconstruct/mctp1"),
+            std::bind_front(&MctpDiscovery::discoverEndpoints, this));
+        mctpEndpointRemovedSignal.emplace(
+            bus,
+            sdbusplus::bus::match::rules::interfacesRemoved(
+                "/au/com/codeconstruct/mctp1"),
+            std::bind_front(&MctpDiscovery::cleanEndpoints, this));
         const dbus::Interfaces ifaceList{"xyz.openbmc_project.MCTP.Endpoint"};
         auto getSubTreeResponse = utils::DBusHandler().getSubtree(
             "/au/com/codeconstruct/mctp1", 0, ifaceList);

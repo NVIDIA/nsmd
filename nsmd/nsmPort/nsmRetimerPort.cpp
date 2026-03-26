@@ -1372,10 +1372,9 @@ requester::Coroutine
     co_return NSM_SUCCESS;
 }
 
-static requester::Coroutine
-    createNsmPCIeRetimerPorts(SensorManager& manager,
-                              const std::string& interface,
-                              const std::string& objPath)
+requester::Coroutine createNsmPCIeRetimerPorts(SensorManager& manager,
+                                               const std::string& interface,
+                                               const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
 
@@ -1532,7 +1531,7 @@ inline void createNsmPCIePortConfigurationInfo(
                                   pciePortConfigurationInfo, nsmDevice});
 }
 
-static requester::Coroutine
+requester::Coroutine
     createNsmMultiPCIeRetimerPorts(SensorManager& manager,
                                    const std::string& interface,
                                    const std::string& objPath)

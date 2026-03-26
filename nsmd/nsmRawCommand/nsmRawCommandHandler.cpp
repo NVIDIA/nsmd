@@ -50,8 +50,8 @@ NsmRawCommandHandler& NsmRawCommandHandler::getInstance()
     return *NsmRawCommandHandler::instance;
 }
 
-static Response copySuccessResponse(uint8_t cc, const nsm_msg* responseMsg,
-                                    size_t responseLen)
+Response copySuccessResponse(uint8_t cc, const nsm_msg* responseMsg,
+                             size_t responseLen)
 {
     auto dataSize = responseLen - sizeof(nsm_msg_hdr) - 2;
     // completion code + data
@@ -61,7 +61,7 @@ static Response copySuccessResponse(uint8_t cc, const nsm_msg* responseMsg,
     return data;
 }
 
-static Response copyReasonCodeResponse(uint8_t cc, uint16_t reasonCode)
+Response copyReasonCodeResponse(uint8_t cc, uint16_t reasonCode)
 {
     // completion code + reason code
     Response data(3, 0);

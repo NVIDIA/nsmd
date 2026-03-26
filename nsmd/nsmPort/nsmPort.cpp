@@ -11,8 +11,8 @@
 
 namespace nsm
 {
-static std::string getTopologyObjPath(const std::string& deviceName,
-                                      const uint8_t deviceType)
+std::string getTopologyObjPath(const std::string& deviceName,
+                               const uint8_t deviceType)
 {
     std::string topologyObjPath =
         "/xyz/openbmc_project/inventory/system/linktopology/";
@@ -48,9 +48,9 @@ using TopologyData =
     std::map<ObjectPath,
              std::pair<LogicalPortNumber, std::vector<utils::Association>>>;
 
-static requester::Coroutine coGetTopologyData(const std::string& topoObjPath,
-                                              const std::string& topoIntfSubStr,
-                                              TopologyData& topologyData)
+requester::Coroutine coGetTopologyData(const std::string& topoObjPath,
+                                       const std::string& topoIntfSubStr,
+                                       TopologyData& topologyData)
 {
     auto mapperResponse = co_await utils::coGetServiceMap(topoObjPath,
                                                           dbus::Interfaces{});
@@ -91,6 +91,7 @@ static requester::Coroutine coGetTopologyData(const std::string& topoObjPath,
                     lg2::error(
                         "Association in topology must follow (fwd, bck, absolutePath) for {OBJ}",
                         "OBJ", topoObjPath);
+                    continue;
                 }
 
                 associationTmp.clear();
@@ -1923,7 +1924,7 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
     co_return NSM_SUCCESS;
 }
 
-static requester::Coroutine
+requester::Coroutine
     createNsmPortSensorWithNetworkPortAddresses(SensorManager& manager,
                                                 const std::string& interface,
                                                 const std::string& objPath)
@@ -1932,10 +1933,9 @@ static requester::Coroutine
     co_return rc;
 }
 
-static requester::Coroutine
-    createNsmPortSensorGeneric(SensorManager& manager,
-                               const std::string& interface,
-                               const std::string& objPath)
+requester::Coroutine createNsmPortSensorGeneric(SensorManager& manager,
+                                                const std::string& interface,
+                                                const std::string& objPath)
 {
     auto rc = co_await createNsmPortSensor(manager, interface, objPath, false);
     co_return rc;

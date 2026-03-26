@@ -34,9 +34,9 @@
 namespace nsm
 {
 
-static std::string getDumpPath(const std::string& name,
-                               const std::string& inventoryPath,
-                               DebugDumpType dumpType)
+std::string getDumpPath(const std::string& name,
+                        const std::string& inventoryPath,
+                        DebugDumpType dumpType)
 {
     using std::filesystem::path;
     if (dumpType == DebugDumpType::Diagnostics)

@@ -31,6 +31,10 @@
 namespace nsm::dot_blob_utils
 {
 
+// Default to production paths; override in unit tests to redirect storage
+const char* blobDir = DOT_BLOB_DIR;
+const char* emmcBasePath = EMMC_BASE_PATH;
+
 using sdbusplus::xyz::openbmc_project::Common::Error::ResourceNotFound;
 using sdbusplus::xyz::openbmc_project::Common::File::Error::Open;
 using sdbusplus::xyz::openbmc_project::Common::File::Error::Read;
@@ -55,11 +59,11 @@ void ensureBlobDirectory(const std::string& dirPath)
     namespace fs = std::filesystem;
     std::error_code ec;
 
-    if (!fs::exists(dot_blob_utils::EMMC_BASE_PATH, ec))
+    if (!fs::exists(dot_blob_utils::emmcBasePath, ec))
     {
         lg2::error(
             "DotBlobUtils: EMMC base path does not exist: path={PATH}, error={ERROR}",
-            "PATH", dot_blob_utils::EMMC_BASE_PATH, "ERROR", ec.message());
+            "PATH", dot_blob_utils::emmcBasePath, "ERROR", ec.message());
         throw Open();
     }
 
@@ -173,7 +177,7 @@ std::vector<uint8_t> readBlobFile(const std::string& filePath)
 
 std::string getBlobFilePath(const std::string& pathName)
 {
-    return std::string(DOT_BLOB_DIR) + "/" + pathName + ".bin";
+    return std::string(blobDir) + "/" + pathName + ".bin";
 }
 
 } // namespace nsm::dot_blob_utils

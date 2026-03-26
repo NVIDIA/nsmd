@@ -36,10 +36,9 @@ NsmPCIeRetimerFabricDI::NsmPCIeRetimerFabricDI(
         FabricIntf::convertFabricTypeFromString(fabricsType));
 }
 
-static requester::Coroutine
-    createNSMPCIeRetimerFabrics(SensorManager& manager,
-                                const std::string& interface,
-                                const std::string& objPath)
+requester::Coroutine createNSMPCIeRetimerFabrics(SensorManager& manager,
+                                                 const std::string& interface,
+                                                 const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(

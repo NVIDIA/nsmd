@@ -264,10 +264,10 @@ TEST_F(NsmIRoTResponderTest, testUpdateUuidIntfSuccess)
     auto irotResponder = std::make_shared<NsmIRoTResponder<UuidIntf>>(name,
                                                                       type);
 
-    mctp::MctpDiscovery::instance =
-        reinterpret_cast<mctp::MctpDiscovery*>(&mockManager.mockMctpDiscovery);
+    mctp::mctpDiscoveryInstance.reset(
+        reinterpret_cast<mctp::MctpDiscovery*>(&mockManager.mockMctpDiscovery));
     irotResponder->update(fpga);
-    mctp::MctpDiscovery::instance = nullptr;
+    mctp::mctpDiscoveryInstance.release();
 }
 
 TEST_F(NsmIRoTResponderTest, testCreateIRoTResponderWithAssociations)

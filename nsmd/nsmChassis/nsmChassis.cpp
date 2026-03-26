@@ -39,7 +39,7 @@
 namespace nsm
 {
 
-static void markAssetPropertiesNotSupported(
+void markAssetPropertiesNotSupported(
     NsmChassis<NsmAssetIntf>& asset,
     const std::unordered_set<nsm_inventory_property_identifiers>& props)
 {
@@ -63,11 +63,10 @@ static void markAssetPropertiesNotSupported(
     }
 }
 
-static void
-    createAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
-                const dbus::PropertyMap& allCurrentIfaceProperties,
-                const std::unordered_set<nsm_inventory_property_identifiers>&
-                    unsupported = {})
+void createAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
+                 const dbus::PropertyMap& allCurrentIfaceProperties,
+                 const std::unordered_set<nsm_inventory_property_identifiers>&
+                     unsupported = {})
 {
     auto chassisAsset = std::make_shared<NsmChassis<NsmAssetIntf>>(name);
     std::string manufacturer = MANUFACTURER_NVIDIA;
@@ -103,16 +102,14 @@ static void
     }
 }
 
-static void createSKU(std::shared_ptr<NsmDevice> device,
-                      const std::string& name)
+void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name)
 {
     auto chassisSKU = std::make_shared<NsmChassis<NsmApSkuIdIntf>>(name);
     device->addStaticSensor(chassisSKU);
 }
 
-static void createFPGAAsset(std::shared_ptr<NsmDevice> device,
-                            const std::string& name,
-                            const dbus::PropertyMap& allCurrentIfaceProperties)
+void createFPGAAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
+                     const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     auto chassisAsset = std::make_shared<NsmChassis<NsmAssetIntf>>(name);
     std::string manufacturer = MANUFACTURER_NVIDIA;
@@ -126,8 +123,7 @@ static void createFPGAAsset(std::shared_ptr<NsmDevice> device,
     device->addDeviceSensors(chassisAsset);
 }
 
-static void createDimension(std::shared_ptr<NsmDevice> device,
-                            const std::string& name)
+void createDimension(std::shared_ptr<NsmDevice> device, const std::string& name)
 {
     auto chassisDimension = std::make_shared<NsmChassis<DimensionIntf>>(name);
     auto depth = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
@@ -141,10 +137,9 @@ static void createDimension(std::shared_ptr<NsmDevice> device,
     device->addStaticSensor(height);
 }
 
-static void
-    createChassisType(std::shared_ptr<NsmDevice> device,
-                      const std::string& name,
-                      const dbus::PropertyMap& allCurrentIfaceProperties)
+void createChassisType(std::shared_ptr<NsmDevice> device,
+                       const std::string& name,
+                       const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     std::string chassisType;
     if (allCurrentIfaceProperties.count("ChassisType"))
@@ -159,8 +154,7 @@ static void
     device->addStaticSensor(chassis);
 }
 
-static void createHealth(std::shared_ptr<NsmDevice> device,
-                         const std::string& name)
+void createHealth(std::shared_ptr<NsmDevice> device, const std::string& name)
 {
     std::string health = HEALTH_TYPE_OK;
     auto chassisHealth = std::make_shared<NsmChassis<HealthIntf>>(name);
@@ -169,9 +163,8 @@ static void createHealth(std::shared_ptr<NsmDevice> device,
     device->addStaticSensor(chassisHealth);
 }
 
-static void createLocation(std::shared_ptr<NsmDevice> device,
-                           const std::string& name,
-                           const dbus::PropertyMap& allCurrentIfaceProperties)
+void createLocation(std::shared_ptr<NsmDevice> device, const std::string& name,
+                    const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     std::string locationType;
     if (allCurrentIfaceProperties.count("LocationType"))
@@ -187,10 +180,9 @@ static void createLocation(std::shared_ptr<NsmDevice> device,
     device->addStaticSensor(chassisLocation);
 }
 
-static void
-    createLocationCode(std::shared_ptr<NsmDevice> device,
-                       const std::string& name,
-                       const dbus::PropertyMap& allCurrentIfaceProperties)
+void createLocationCode(std::shared_ptr<NsmDevice> device,
+                        const std::string& name,
+                        const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     std::string locationCode;
     if (allCurrentIfaceProperties.count("LocationCode"))
@@ -205,10 +197,9 @@ static void
     device->addStaticSensor(chassisLocationCode);
 }
 
-static void
-    createLocationContext(std::shared_ptr<NsmDevice> device,
-                          const std::string& name,
-                          const dbus::PropertyMap& allCurrentIfaceProperties)
+void createLocationContext(std::shared_ptr<NsmDevice> device,
+                           const std::string& name,
+                           const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     std::string locationContext;
     if (allCurrentIfaceProperties.count("LocationContext"))
@@ -223,10 +214,9 @@ static void
     device->addStaticSensor(chassisLocationContext);
 }
 
-static void
-    createFieldReplaceable(std::shared_ptr<NsmDevice> device,
-                           const std::string& name,
-                           const dbus::PropertyMap& allCurrentIfaceProperties)
+void createFieldReplaceable(std::shared_ptr<NsmDevice> device,
+                            const std::string& name,
+                            const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     bool fieldReplaceable;
     if (allCurrentIfaceProperties.count("FieldReplaceable"))
@@ -241,9 +231,9 @@ static void
     device->addStaticSensor(chassisReplaceable);
 }
 
-static void createPowerLimit(std::shared_ptr<NsmDevice> device,
-                             const std::string& name,
-                             const dbus::PropertyMap& allCurrentIfaceProperties)
+void createPowerLimit(std::shared_ptr<NsmDevice> device,
+                      const std::string& name,
+                      const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     auto chassisPowerLimit = std::make_shared<NsmChassis<PowerLimitIntf>>(name);
     bool priority = false; // Default priority is false for sub types
@@ -260,9 +250,9 @@ static void createPowerLimit(std::shared_ptr<NsmDevice> device,
                       priority);
 }
 
-static void createPrettyName(std::shared_ptr<NsmDevice> device,
-                             const std::string& name,
-                             const dbus::PropertyMap& allCurrentIfaceProperties)
+void createPrettyName(std::shared_ptr<NsmDevice> device,
+                      const std::string& name,
+                      const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     std::string prettyName;
     if (allCurrentIfaceProperties.count("PrettyNameForChassis"))
@@ -276,9 +266,9 @@ static void createPrettyName(std::shared_ptr<NsmDevice> device,
     device->addStaticSensor(chassisPrettyName);
 }
 
-static void createWriteProtect(std::shared_ptr<NsmDevice> device,
-                               const std::string& name,
-                               const dbus::PropertyMap& allBaseIfaceProperties)
+void createWriteProtect(std::shared_ptr<NsmDevice> device,
+                        const std::string& name,
+                        const dbus::PropertyMap& allBaseIfaceProperties)
 {
     NsmDeviceIdentification deviceType = NSM_DEV_ID_UNKNOWN;
     if (allBaseIfaceProperties.count("DeviceType"))
@@ -298,9 +288,8 @@ static void createWriteProtect(std::shared_ptr<NsmDevice> device,
     device->addSensor(writeProtectJumper, false);
 }
 
-static void createResetMetrics(std::shared_ptr<NsmDevice> device,
-                               const std::string& name,
-                               sdbusplus::bus::bus& bus)
+void createResetMetrics(std::shared_ptr<NsmDevice> device,
+                        const std::string& name, sdbusplus::bus::bus& bus)
 {
     auto objectPath = chassisInventoryBasePath.string() + "/" + name +
                       "/ResetStatistics";
@@ -341,7 +330,7 @@ static void createResetMetrics(std::shared_ptr<NsmDevice> device,
     device->addSensor(resetStatisticsSensor, false);
 }
 
-static void createErrorInjectionPayload(
+void createErrorInjectionPayload(
     SensorManager& manager, std::shared_ptr<NsmDevice> device,
     const std::string& name, const dbus::PropertyMap& allBaseIfaceProperties)
 {
@@ -359,21 +348,20 @@ static void createErrorInjectionPayload(
     }
 }
 
-static void createDeviceDiagnostics(std::shared_ptr<NsmDevice> device,
-                                    const std::string& name, const uuid_t& uuid,
-                                    sdbusplus::bus::bus& bus)
+void createDeviceDiagnostics(std::shared_ptr<NsmDevice> device,
+                             const std::string& name, const uuid_t& uuid,
+                             sdbusplus::bus::bus& bus)
 {
     device->addStaticSensor(std::make_shared<NsmDebugInfoObject>(
         bus, name, chassisInventoryBasePath.string() + "/",
         "NSM_DeviceDiagnostics", uuid, DebugDumpType::Diagnostics));
 }
 
-static void
-    createChassisAttributes(std::shared_ptr<NsmDevice> device,
-                            SensorManager& manager, sdbusplus::bus::bus& bus,
-                            const std::string& name, const uuid_t& uuid,
-                            const dbus::PropertyMap& allCurrentIfaceProperties,
-                            const dbus::PropertyMap& allBaseIfaceProperties)
+void createChassisAttributes(std::shared_ptr<NsmDevice> device,
+                             SensorManager& manager, sdbusplus::bus::bus& bus,
+                             const std::string& name, const uuid_t& uuid,
+                             const dbus::PropertyMap& allCurrentIfaceProperties,
+                             const dbus::PropertyMap& allBaseIfaceProperties)
 {
     // Handle Asset (always NVIDIA manufacturer if AssetInformationAvailable)
     if (allCurrentIfaceProperties.count("AssetInformationAvailable") &&
@@ -455,10 +443,9 @@ static void
     }
 }
 
-static void
-    createFPGAAttributes(std::shared_ptr<NsmDevice> device,
-                         const std::string& name,
-                         const dbus::PropertyMap& allCurrentIfaceProperties)
+void createFPGAAttributes(std::shared_ptr<NsmDevice> device,
+                          const std::string& name,
+                          const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     createFPGAAsset(device, name, allCurrentIfaceProperties);
     createSKU(device, name);
@@ -476,11 +463,10 @@ static void
     createHealth(device, name);
 }
 
-static void
-    createOperationalStatus(std::shared_ptr<NsmDevice> device,
-                            const std::string& name,
-                            const dbus::PropertyMap& allCurrentIfaceProperties,
-                            const dbus::PropertyMap& allBaseIfaceProperties)
+void createOperationalStatus(std::shared_ptr<NsmDevice> device,
+                             const std::string& name,
+                             const dbus::PropertyMap& allCurrentIfaceProperties,
+                             const dbus::PropertyMap& allBaseIfaceProperties)
 {
     uint64_t deviceType = 0;
     if (allBaseIfaceProperties.count("DeviceType"))
@@ -521,10 +507,10 @@ static void
                       priority);
 }
 
-static void createPowerState(std::shared_ptr<NsmDevice> device,
-                             const std::string& name,
-                             const dbus::PropertyMap& allCurrentIfaceProperties,
-                             const dbus::PropertyMap& allBaseIfaceProperties)
+void createPowerState(std::shared_ptr<NsmDevice> device,
+                      const std::string& name,
+                      const dbus::PropertyMap& allCurrentIfaceProperties,
+                      const dbus::PropertyMap& allBaseIfaceProperties)
 {
     uint64_t deviceType = 0;
     if (allBaseIfaceProperties.count("DeviceType"))
