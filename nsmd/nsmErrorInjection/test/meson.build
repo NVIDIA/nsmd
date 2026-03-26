@@ -1,4 +1,8 @@
-tests = ['nsmErrorInjection_test']
+tests = [
+    'nsmErrorInjection_test',
+    'nsmErrorInjectionCommonBranch_test',
+    'nsmErrorInjectionCommonBranch2_test',
+]
 
 foreach t : tests
     test(

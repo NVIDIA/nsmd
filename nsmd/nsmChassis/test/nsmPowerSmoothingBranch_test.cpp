@@ -645,3 +645,173 @@ TEST(NsmCurrentPowerProfileBatch11F,
     EXPECT_NE(result, path);
     EXPECT_NE(result, "");
 }
+
+// Covers nsmPowerSmoothing.cpp L590: FALSE branch of
+// `if (!hasProfileId(profileId))` — when handleResponseMsg is called twice
+// with the same profileId, the second call finds the profile already exists
+// and skips creating a new one.
+TEST(NsmPowerProfileCollectionBatch11F,
+     HandleResponseMsg_DuplicateProfileId_SkipsCreation)
+{
+    // Arrange
+    std::string name = "profileCollDup";
+    std::string type = "profileCollType";
+    std::string path =
+        "/xyz/openbmc_project/inventory/batch11f/profilecoll_dup";
+    NsmPowerProfileCollection sensor(name, type, path, nullptr);
+
+    // Build a valid response with 1 profile (profileId=0)
+    struct nsm_get_all_preset_profile_meta_data profile_meta_data{};
+    int number_of_profiles = 1;
+    profile_meta_data.max_profiles_supported = number_of_profiles;
+    struct nsm_preset_profile_data profiles[1]{};
+    uint16_t data_size = sizeof(struct nsm_get_all_preset_profile_meta_data) +
+                         number_of_profiles *
+                             sizeof(struct nsm_preset_profile_data);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp) + data_size, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    uint8_t rc = encode_get_preset_profile_resp(
+        0, NSM_SUCCESS, ERR_NULL, &profile_meta_data, profiles,
+        number_of_profiles, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+
+    // First call: hasProfileId(0) == false → TRUE branch: creates profile
+    rc = sensor.handleResponseMsg(responseMsg, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_TRUE(sensor.hasProfileId(0));
+
+    // Second call: hasProfileId(0) == true → FALSE branch: skips creation
+    rc = sensor.handleResponseMsg(responseMsg, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    // Profile still exists (not duplicated)
+    EXPECT_TRUE(sensor.hasProfileId(0));
+}
+
+// ============================================================================
+// cc!=NSM_SUCCESS FALSE branch tests for handleResponseMsg in 5 sensor classes
+// (nsmPowerSmoothing.cpp L103, L209, L323, L430, L582)
+//
+// Pattern: 9-byte buffer with cc=NSM_ERROR →
+//   decode_reason_code_and_cc returns NSM_SW_SUCCESS with cc=NSM_ERROR
+//   → if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS) FALSE branch
+//   → updateReading() NOT called
+// ============================================================================
+
+// L103: NsmPowerSmoothing::handleResponseMsg
+TEST(NsmPowerSmoothingBatch11F,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_L103FalseBranch)
+{
+    auto bus = sdbusplus::bus::new_default();
+    std::string path = "/xyz/openbmc_project/inventory/batch11f/pwrsmooth_ccbr";
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(bus, path,
+                                                                nullptr);
+    std::string name = "pwrSmoothCCBr";
+    std::string type = "pwrSmoothType";
+    NsmPowerSmoothing sensor(name, type, path, featIntf, nullptr);
+
+    // 9-byte buffer: decode_reason_code_and_cc → NSM_SW_SUCCESS, cc=NSM_ERROR
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// L209: NsmHwCircuitryTelemetry::handleResponseMsg
+TEST(NsmHwCircuitryBatch11F,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_L209FalseBranch)
+{
+    auto bus = sdbusplus::bus::new_default();
+    std::string path = "/xyz/openbmc_project/inventory/batch11f/hwcircuit_ccbr";
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(bus, path,
+                                                                nullptr);
+    std::string name = "hwCircuitCCBr";
+    std::string type = "hwCircuitType";
+    NsmHwCircuitryTelemetry sensor(name, type, path, featIntf);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// L323: NsmCurrentPowerSmoothingProfile::handleResponseMsg
+TEST(NsmCurrentPowerProfileBatch11F,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_L323FalseBranch)
+{
+    auto bus = sdbusplus::bus::new_default();
+    std::string path =
+        "/xyz/openbmc_project/inventory/batch11f/curprofile_ccbr";
+    auto adminProfileIntf = std::make_shared<OemAdminProfileIntf>(bus, path,
+                                                                  nullptr);
+    std::string adminName = "adminCCBr";
+    std::string adminType = "adminType";
+    auto adminSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
+        adminName, adminType, adminProfileIntf, path, nullptr);
+    auto curProfileIntf = std::make_shared<OemCurrentPowerProfileIntf>(
+        bus, path, adminProfileIntf->getInventoryObjPath(), nullptr);
+    std::string collName = "profileCollCCBr";
+    std::string collType = "profileCollType";
+    auto profileColl = std::make_shared<NsmPowerProfileCollection>(
+        collName, collType, path, nullptr);
+    std::string name = "curProfileCCBr";
+    std::string type = "curProfileType";
+    NsmCurrentPowerSmoothingProfile sensor(name, type, path, curProfileIntf,
+                                           profileColl, adminSensor, nullptr);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// L430: NsmPowerSmoothingAdminOverride::handleResponseMsg
+TEST(NsmAdminOverrideBatch11F,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_L430FalseBranch)
+{
+    auto bus = sdbusplus::bus::new_default();
+    std::string path = "/xyz/openbmc_project/inventory/batch11f/admin_ccbr";
+    auto adminIntf = std::make_shared<OemAdminProfileIntf>(bus, path, nullptr);
+    std::string name = "adminCCBr";
+    std::string type = "adminType";
+    NsmPowerSmoothingAdminOverride sensor(name, type, adminIntf, path, nullptr);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// L582: NsmPowerProfileCollection::handleResponseMsg
+TEST(NsmPowerProfileCollectionBatch11F,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_L582FalseBranch)
+{
+    std::string name = "profileCollCCBr";
+    std::string type = "profileCollType";
+    std::string path =
+        "/xyz/openbmc_project/inventory/batch11f/profilecoll_ccbr";
+    NsmPowerProfileCollection sensor(name, type, path, nullptr);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}

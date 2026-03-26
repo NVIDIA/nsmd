@@ -221,3 +221,178 @@ TEST(NsmLongRunningEventHandler, Handle_NoDeviceForEid_ReturnsErrorData)
                                 NSM_LONG_RUNNING_EVENT, msg, eventData.size()),
                  std::runtime_error);
 }
+
+// =============================================================================
+// EventDispatcher branch-coverage tests
+// =============================================================================
+
+// Minimal NsmEvent concrete class for testing EventDispatcher.
+struct MockNsmEvent : public NsmEvent
+{
+    MockNsmEvent() : NsmEvent("mock", "mock_type") {}
+    int handle(eid_t, NsmType, NsmEventId, const nsm_msg*, size_t) override
+    {
+        return NSM_SW_SUCCESS;
+    }
+};
+
+// addEvent(): adding the same (type, eventId) pair a second time must return
+// NSM_SW_ERROR_DATA (duplicate guard, line 101-103 in nsmEvent.cpp).
+TEST(EventDispatcher, AddEvent_DuplicateEventId_ReturnsErrorData)
+{
+    EventDispatcher dispatcher;
+    NsmType type = NSM_TYPE_NETWORK_PORT;
+    NsmEventId eventId = NSM_THRESHOLD_EVENT;
+
+    EXPECT_EQ(
+        dispatcher.addEvent(type, eventId, std::make_shared<MockNsmEvent>()),
+        NSM_SW_SUCCESS);
+    EXPECT_EQ(
+        dispatcher.addEvent(type, eventId, std::make_shared<MockNsmEvent>()),
+        NSM_SW_ERROR_DATA);
+}
+
+// handle(): when the NsmType is not present in eventsMap the function
+// must return NSM_SW_ERROR_DATA (lines 115-121 in nsmEvent.cpp).
+TEST(EventDispatcher, Handle_TypeNotFound_ReturnsErrorData)
+{
+    EventDispatcher dispatcher; // empty – no events registered
+    std::vector<uint8_t> eventData(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto* msg = reinterpret_cast<const nsm_msg*>(eventData.data());
+
+    auto rc = dispatcher.handle(0, NSM_TYPE_NETWORK_PORT, NSM_THRESHOLD_EVENT,
+                                msg, eventData.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// handle(): when the NsmType IS registered but the eventId is absent the
+// function must return NSM_SW_ERROR_DATA (lines 124-130 in nsmEvent.cpp).
+TEST(EventDispatcher, Handle_EventIdNotFound_ReturnsErrorData)
+{
+    EventDispatcher dispatcher;
+    NsmType type = NSM_TYPE_NETWORK_PORT;
+    NsmEventId registeredId = NSM_THRESHOLD_EVENT;
+    NsmEventId unknownId = registeredId + 1;
+
+    dispatcher.addEvent(type, registeredId, std::make_shared<MockNsmEvent>());
+
+    std::vector<uint8_t> eventData(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto* msg = reinterpret_cast<const nsm_msg*>(eventData.data());
+
+    auto rc = dispatcher.handle(0, type, unknownId, msg, eventData.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// =============================================================================
+// DelegatingEventHandler branch-coverage tests
+// =============================================================================
+
+// Concrete subclass to expose the protected enableDelegation() for testing.
+struct TestDelegatingHandler : public DelegatingEventHandler
+{
+    uint8_t nsmType() override
+    {
+        return NSM_TYPE_NETWORK_PORT;
+    }
+    int testEnableDelegation(NsmEventId eventId)
+    {
+        return enableDelegation(eventId);
+    }
+};
+
+// enableDelegation(): calling it twice with the same eventId must return
+// NSM_SW_ERROR_DATA on the second call (lines 137-143 in nsmEvent.cpp).
+TEST(DelegatingEventHandler, EnableDelegation_Duplicate_ReturnsErrorData)
+{
+    TestDelegatingHandler handler;
+    NsmEventId eventId = NSM_THRESHOLD_EVENT;
+
+    EXPECT_EQ(handler.testEnableDelegation(eventId), NSM_SW_SUCCESS);
+    EXPECT_EQ(handler.testEnableDelegation(eventId), NSM_SW_ERROR_DATA);
+}
+
+// delegate(): MctpDiscovery::getInstance() is not initialised in unit tests,
+// so it throws std::runtime_error before line 158 is reached.
+// Calling handle() after enableDelegation() exercises the delegate() function
+// entry (lines 151-156) and improves function coverage for nsmEvent.cpp.
+TEST(DelegatingEventHandler, Delegate_MctpDiscoveryNotInit_ThrowsRuntimeError)
+{
+    TestDelegatingHandler handler;
+    NsmEventId eventId = NSM_THRESHOLD_EVENT;
+    handler.testEnableDelegation(eventId);
+
+    std::vector<uint8_t> eventData(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto* msg = reinterpret_cast<const nsm_msg*>(eventData.data());
+
+    // EventHandler::handle() -> handlers.at(eventId)() -> delegate()
+    // -> MctpDiscovery::getInstance() throws std::runtime_error
+    EXPECT_THROW(handler.handle(0, NSM_TYPE_NETWORK_PORT, eventId, msg,
+                                eventData.size()),
+                 std::runtime_error);
+}
+
+// EventHandler::handle(): when eventId is not in handlers map the unsupported
+// event path is taken (eventHandler.hpp line 58-66).  No exception thrown.
+TEST(DelegatingEventHandler, Handle_UnregisteredEventId_CallsUnsupportedEvent)
+{
+    TestDelegatingHandler handler;
+    // do NOT call enableDelegation – handlers map is empty
+    NsmEventId eventId = NSM_THRESHOLD_EVENT;
+
+    std::vector<uint8_t> eventData(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto* msg = reinterpret_cast<const nsm_msg*>(eventData.data());
+
+    // Should not throw; unsupportedEvent() is called instead
+    EXPECT_NO_THROW(handler.handle(0, NSM_TYPE_NETWORK_PORT, eventId, msg,
+                                   eventData.size()));
+}
+
+// =============================================================================
+// logEventAsync branch-coverage tests
+//
+// logEventAsync has a static cachedLoggingService that persists across all
+// calls within the same binary.  Tests must run in order:
+//   1. EmptyServiceMap   – cache not set, serviceMap empty → early return
+//   2. NonEmptyServiceMap – cache not set, serviceMap populated → cache set
+//   3. CachedService     – cache set by test 2, serviceMap cleared by TearDown
+//
+// DBusTest::TearDown() clears MockDbusAsync::serviceMap() between tests, but
+// it does NOT reset cachedLoggingService (it's static inside logEventAsync).
+// =============================================================================
+
+struct LogEventAsyncTest : public testing::Test, public utils::DBusTest
+{};
+
+// Test 1: empty serviceMap → hits serviceMap.empty()=true branch → early
+// NSM_SW_ERROR return; cache remains unset.
+TEST_F(LogEventAsyncTest, EmptyServiceMap_EarlyReturn)
+{
+    // MockDbusAsync::serviceMap() is empty by default after DBusTest::SetUp()
+    logEventAsync("test.MessageId", Level::Critical, {});
+    // No assertion needed – we are exercising the branch, not the return value
+    // (logEventAsync returns a Coroutine whose result is not co_awaited here,
+    //
+    //  but because coGetServiceMap::await_ready() returns true synchronously
+    //  the whole function body executes before this line returns).
+}
+
+// Test 2: non-empty serviceMap → cache miss path: lookup succeeds, service
+// cached.  Covers serviceMap.empty()=false, !cachedLoggingService=true, and
+// the coLogEvent success path.
+TEST_F(LogEventAsyncTest, NonEmptyServiceMap_CachesAndSucceeds)
+{
+    auto& smap = utils::MockDbusAsync::serviceMap();
+    smap.push_back({"xyz.openbmc_project.Logging", {}});
+    logEventAsync("test.MessageId", Level::Critical, {});
+}
+
+// Test 3: cachedLoggingService is set by test 2; DBusTest::TearDown() cleared
+// serviceMap, so coGetServiceMap would return empty – but the cached path is
+// taken and skips the lookup entirely.  Covers cachedLoggingService=true
+// branch and the coLogEvent success path from the cached code-path.
+TEST_F(LogEventAsyncTest, CachedService_SkipsLookup)
+{
+    // serviceMap is empty (cleared by TearDown after test 2)
+    // cachedLoggingService was set by test 2 → service not empty → no lookup
+    logEventAsync("test.MessageId", Level::Critical, {});
+}

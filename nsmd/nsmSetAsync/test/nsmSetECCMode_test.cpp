@@ -8,7 +8,6 @@
 #define private public
 #define protected public
 
-#include "base.h"
 #include "platform-environmental.h"
 
 #include "asyncOperationManager.hpp"
@@ -122,9 +121,6 @@ TEST_F(NsmSetECCModeTest, testHandleResponseMsgValidLongRunning)
     NsmSetEccMode sensor(true, mockDevice);
 
     // Create a mock response message for event-based response
-    // encode_set_ECC_mode_event_resp uses encode_long_running_resp which
-    // writes sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
-    // sizeof(nsm_long_running_resp)
     std::vector<uint8_t> responseData(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
                                       sizeof(nsm_long_running_resp));
     auto responseMsg = reinterpret_cast<nsm_msg*>(responseData.data());

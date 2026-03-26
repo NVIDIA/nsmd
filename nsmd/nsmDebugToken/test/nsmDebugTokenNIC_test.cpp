@@ -781,3 +781,195 @@ TEST_F(NsmDebugTokenNICWithDeviceTest, updateDeviceIdHexFormatting)
     EXPECT_EQ(rc, NSM_SUCCESS);
     EXPECT_EQ(debugToken->tokenDeviceID(), "0x000FAA55");
 }
+
+// ============================================================================
+// Branch coverage: decode failure paths (cc != NSM_SUCCESS in response)
+// ============================================================================
+
+TEST_F(NsmDebugTokenNICWithDeviceTest,
+       disableTokensAsyncHandlerDecodeFailureNonSuccessCC)
+{
+    // Encode a non-success CC response: decodeRc=NSM_SW_SUCCESS, cc=NSM_ERROR
+    // triggers: if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS) →
+    // WriteFailure
+    Response errorResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto errMsg = reinterpret_cast<nsm_msg*>(errorResp.data());
+    encode_nsm_disable_tokens_resp(0, NSM_ERROR, 0x1234, errMsg);
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(errorResp));
+    auto request = makeDisableTokensRequest();
+    auto [rc, statusIntf, valueIntf] = callDisableTokensAsync(request);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::WriteFailure);
+}
+
+TEST_F(NsmDebugTokenNICWithDeviceTest,
+       getRequestAsyncHandlerDecodeFailureNonSuccessCC)
+{
+    // Encode a non-success CC response for query_token_parameters
+    // triggers: if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS) →
+    // InternalFailure
+    Response errorResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto errMsg = reinterpret_cast<nsm_msg*>(errorResp.data());
+    struct nsm_debug_token_request dummyReq = {};
+    encode_nsm_query_token_parameters_resp(0, NSM_ERROR, 0x5678, &dummyReq,
+                                           errMsg);
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(errorResp));
+    auto request = makeQueryTokenParametersRequest();
+    auto [rc, statusIntf, valueIntf] = callGetRequestAsync(request);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+TEST_F(NsmDebugTokenNICWithDeviceTest,
+       getStatusAsyncHandlerDecodeFailureNonSuccessCC)
+{
+    // Encode a non-success CC response for query_token_status
+    // triggers: if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS) →
+    // InternalFailure
+    Response errorResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto errMsg = reinterpret_cast<nsm_msg*>(errorResp.data());
+    encode_nsm_query_token_status_resp(
+        0, NSM_ERROR, 0x9876, NSM_DEBUG_TOKEN_STATUS_NO_TOKEN_APPLIED,
+        NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE, NSM_DEBUG_TOKEN_TYPE_CRCS,
+        0, errMsg);
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(errorResp));
+    auto request = makeQueryTokenStatusRequest();
+    auto [rc, statusIntf, valueIntf] = callGetStatusAsync(request);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// installTokenAsyncHandler decode failure via wrong-size error response:
+// decode_reason_code_and_cc checks exact non-success size; wrong size →
+// NSM_SW_ERROR_LENGTH → decodeRc != NSM_SW_SUCCESS → InternalFailure
+TEST_F(NsmDebugTokenNICWithDeviceTest, installTokenAsyncHandlerDecodeFailure)
+{
+    Response malformedResp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto errMsg = reinterpret_cast<nsm_msg*>(malformedResp.data());
+    encode_nsm_provide_token_resp(0, NSM_ERROR, 0x1234, errMsg);
+    std::vector<uint8_t> tokenData(50, 0xAA);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(malformedResp));
+    auto request = makeProvideTokenRequest(tokenData);
+    auto [rc, statusIntf, valueIntf] = callInstallTokenAsync(request);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// ============================================================================
+// Branch coverage: getStatusAsyncHandler switch statement default cases
+// ============================================================================
+
+// Invalid token type triggers switch default (lines 262-268)
+TEST_F(NsmDebugTokenNICWithDeviceTest, getStatusAsyncHandlerInvalidTokenType)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createQueryTokenStatusResponse(
+            NSM_DEBUG_TOKEN_STATUS_NO_TOKEN_APPLIED,
+            NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE,
+            static_cast<nsm_debug_token_type>(0xFF), 0)));
+    auto request = makeQueryTokenStatusRequest();
+    auto [rc, statusIntf, valueIntf] = callGetStatusAsync(request);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// Invalid token status triggers switch default (lines 285-301)
+TEST_F(NsmDebugTokenNICWithDeviceTest, getStatusAsyncHandlerInvalidTokenStatus)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createQueryTokenStatusResponse(
+            static_cast<nsm_debug_token_status>(0xFF),
+            NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE,
+            NSM_DEBUG_TOKEN_TYPE_CRCS, 0)));
+    auto request = makeQueryTokenStatusRequest();
+    auto [rc, statusIntf, valueIntf] = callGetStatusAsync(request);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// Invalid additional info triggers switch default (lines 325-332)
+TEST_F(NsmDebugTokenNICWithDeviceTest,
+       getStatusAsyncHandlerInvalidAdditionalInfo)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createQueryTokenStatusResponse(
+            NSM_DEBUG_TOKEN_STATUS_NO_TOKEN_APPLIED,
+            static_cast<nsm_debug_token_status_additional_info>(0xFF),
+            NSM_DEBUG_TOKEN_TYPE_CRCS, 0)));
+    auto request = makeQueryTokenStatusRequest();
+    auto [rc, statusIntf, valueIntf] = callGetStatusAsync(request);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// ============================================================================
+// Branch coverage: remaining valid enum values in getStatusAsyncHandler
+// switches
+// ============================================================================
+
+TEST_F(NsmDebugTokenNICWithDeviceTest, getStatusAsyncHandlerChallengeProvided)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createQueryTokenStatusResponse(
+            NSM_DEBUG_TOKEN_STATUS_CHALLENGE_PROVIDED,
+            NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE,
+            NSM_DEBUG_TOKEN_TYPE_CRCS, 0)));
+    auto request = makeQueryTokenStatusRequest();
+    auto [rc, statusIntf, valueIntf] = callGetStatusAsync(request);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}
+
+TEST_F(NsmDebugTokenNICWithDeviceTest, getStatusAsyncHandlerInstallationTimeout)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createQueryTokenStatusResponse(
+            NSM_DEBUG_TOKEN_STATUS_INSTALLATION_TIMEOUT,
+            NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE,
+            NSM_DEBUG_TOKEN_TYPE_CRCS, 0)));
+    auto request = makeQueryTokenStatusRequest();
+    auto [rc, statusIntf, valueIntf] = callGetStatusAsync(request);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}
+
+TEST_F(NsmDebugTokenNICWithDeviceTest, getStatusAsyncHandlerTokenTimeout)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createQueryTokenStatusResponse(
+            NSM_DEBUG_TOKEN_STATUS_TOKEN_TIMEOUT,
+            NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE,
+            NSM_DEBUG_TOKEN_TYPE_CRCS, 0)));
+    auto request = makeQueryTokenStatusRequest();
+    auto [rc, statusIntf, valueIntf] = callGetStatusAsync(request);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}
+
+TEST_F(NsmDebugTokenNICWithDeviceTest,
+       getStatusAsyncHandlerEndRequestNotAccepted)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createQueryTokenStatusResponse(
+            NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ACTIVE,
+            NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_END_REQUEST_NOT_ACCEPTED,
+            NSM_DEBUG_TOKEN_TYPE_CRCS, 100)));
+    auto request = makeQueryTokenStatusRequest();
+    auto [rc, statusIntf, valueIntf] = callGetStatusAsync(request);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}
+
+TEST_F(NsmDebugTokenNICWithDeviceTest, getStatusAsyncHandlerQueryDisallowed)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createQueryTokenStatusResponse(
+            NSM_DEBUG_TOKEN_STATUS_NO_TOKEN_APPLIED,
+            NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_QUERY_DISALLOWED,
+            NSM_DEBUG_TOKEN_TYPE_FRC, 0)));
+    auto request = makeQueryTokenStatusRequest(NSM_DEBUG_TOKEN_TYPE_FRC);
+    auto [rc, statusIntf, valueIntf] = callGetStatusAsync(request);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}

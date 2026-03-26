@@ -1,8 +1,4 @@
-# nsmManagers tests now use nsmd_test
-# nsmManagers is ALWAYS compiled into nsmd_test (core functionality)
-# All sources already compiled into nsmd_test, no need to recompile
-
-tests = ['nsmFabricManager_test']
+tests = ['nsmFabricManager_test', 'nsmFabricManagerBranch_test']
 
 foreach t : tests
     test(
@@ -13,6 +9,7 @@ foreach t : tests
             implicit_include_directories: false,
             include_directories: ['.', '..'],
             link_args: dynamic_linker,
+            build_rpath: '',
             dependencies: tests_deps,
         ),
         workdir: meson.current_source_dir(),

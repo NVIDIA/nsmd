@@ -20,11 +20,8 @@
 #define private public
 #define protected public
 
-// Override production paths for testing before including the header
-#undef NSM_DOT_BLOB_TEST_OVERRIDE
-#define NSM_DOT_BLOB_TEST_OVERRIDE 1
-
 #include "nsmDotBlob.hpp"
+#include "nsmDotBlobUtils.hpp"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -46,11 +43,15 @@ namespace fs = std::filesystem;
 constexpr size_t DOT_BLOB_SIZE = dot_blob_utils::DOT_BLOB_SIZE_BYTES;
 constexpr const char* TEST_BLOB_DIR = "/tmp/nsm_dotblob_test";
 
-class NsmDotBlobTest : public Test
+class NsmDotBlobTest : public Test, public utils::DBusTest
 {
   protected:
     void SetUp() override
     {
+        // Override production paths to use temp directory in tests
+        dot_blob_utils::blobDir = TEST_BLOB_DIR;
+        dot_blob_utils::emmcBasePath = "/tmp";
+
         testBlobDir = TEST_BLOB_DIR;
         std::error_code ec;
         fs::remove_all(testBlobDir, ec);
@@ -67,6 +68,9 @@ class NsmDotBlobTest : public Test
         dotBlobObject.reset();
         std::error_code ec;
         fs::remove_all(testBlobDir, ec);
+        // Restore production paths
+        dot_blob_utils::blobDir = dot_blob_utils::DOT_BLOB_DIR;
+        dot_blob_utils::emmcBasePath = dot_blob_utils::EMMC_BASE_PATH;
     }
 
     std::vector<uint8_t> createTestBlobData(size_t size = DOT_BLOB_SIZE,
@@ -182,6 +186,7 @@ TEST_F(NsmDotBlobTest, UpdateBlobHandlesEmptyData)
 
 TEST_F(NsmDotBlobTest, UpdateBlobHandlesInvalidFd)
 {
+    // dup(-1) fails → updateBlob throws InternalFailure (not File::Error::Open)
     sdbusplus::message::unix_fd invalidFd(-1);
 
     EXPECT_THROW(
@@ -190,13 +195,13 @@ TEST_F(NsmDotBlobTest, UpdateBlobHandlesInvalidFd)
             {
                 dotBlobObject->updateBlob(invalidFd);
             }
-            catch (const sdbusplus::xyz::openbmc_project::Common::File::Error::
-                       Open& e)
+            catch (const sdbusplus::xyz::openbmc_project::Common::Error::
+                       InternalFailure& e)
             {
                 throw;
             }
         },
-        sdbusplus::xyz::openbmc_project::Common::File::Error::Open);
+        sdbusplus::xyz::openbmc_project::Common::Error::InternalFailure);
 }
 
 TEST_F(NsmDotBlobTest, UpdateBlobHandlesOversizedData)
@@ -314,21 +319,25 @@ TEST_F(NsmDotBlobTest, GetBlobThrowsWhenDirectoryNotFound)
 
 TEST_F(NsmDotBlobTest, GetBlobHandlesEmptyFile)
 {
+    // getBlob() requires exactly DOT_BLOB_SIZE bytes; empty file (0 bytes)
+    // triggers the size check and throws File::Error::Read
     std::string blobPath = getBlobFilePath();
     std::ofstream outFile(blobPath, std::ios::binary);
     outFile.close();
 
-    sdbusplus::message::unix_fd resultFd;
-    EXPECT_NO_THROW(resultFd = dotBlobObject->getBlob());
-
-    int fd = resultFd;
-    ASSERT_NE(fd, -1);
-
-    std::vector<uint8_t> readData(DOT_BLOB_SIZE);
-    ssize_t bytesRead = read(fd, readData.data(), readData.size());
-    EXPECT_EQ(bytesRead, 0);
-
-    close(fd);
+    EXPECT_THROW(
+        {
+            try
+            {
+                dotBlobObject->getBlob();
+            }
+            catch (const sdbusplus::xyz::openbmc_project::Common::File::Error::
+                       Read& e)
+            {
+                throw;
+            }
+        },
+        sdbusplus::xyz::openbmc_project::Common::File::Error::Read);
 }
 
 TEST_F(NsmDotBlobTest, GetBlobFilePathIsCorrect)

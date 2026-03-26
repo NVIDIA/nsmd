@@ -261,3 +261,190 @@ TEST(NsmPCIeErrors, HandleResponseMsg_Group4_Success_UpdatesReplayCounts)
     EXPECT_EQ(intf->nakSentCount(), 33u);
     EXPECT_EQ(intf->nakReceivedCount(), 44u);
 }
+
+// =============================================================================
+// handleResponseMsg – GROUP_ID_3 error CC (else branch of the macro)
+// =============================================================================
+
+TEST(NsmPCIeErrors, HandleResponseMsg_Group3_ErrorCC_ClearsFields)
+{
+    std::shared_ptr<PCIeEccIntf> intf;
+    auto provider = makeProvider("/test/pcie_errors/resp_g3_err", intf);
+    NsmPCIeErrors sensor(provider, 0, GROUP_ID_3);
+
+    // First set a non-zero value
+    nsm_query_scalar_group_telemetry_group_3 data = {};
+    data.L0ToRecoveryCount = 55;
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_3_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseData.data());
+    encode_query_scalar_group_telemetry_v1_group3_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, responseMsg);
+    sensor.handleResponseMsg(responseMsg, responseData.size());
+    EXPECT_EQ(intf->l0ToRecoveryCount(), 55u);
+
+    // Now send error CC → else branch: zeroed data → l0ToRecoveryCount = 0
+    encode_query_scalar_group_telemetry_v1_group3_resp(0, NSM_ERROR, ERR_NULL,
+                                                       &data, responseMsg);
+    auto result = sensor.handleResponseMsg(responseMsg, responseData.size());
+
+    EXPECT_NE(result, NSM_SUCCESS);
+    EXPECT_EQ(intf->l0ToRecoveryCount(), 0u);
+}
+
+// =============================================================================
+// handleResponseMsg – GROUP_ID_4 error CC (else branch of the macro)
+// =============================================================================
+
+TEST(NsmPCIeErrors, HandleResponseMsg_Group4_ErrorCC_ClearsFields)
+{
+    std::shared_ptr<PCIeEccIntf> intf;
+    auto provider = makeProvider("/test/pcie_errors/resp_g4_err", intf);
+    NsmPCIeErrors sensor(provider, 0, GROUP_ID_4);
+
+    // First set non-zero values
+    nsm_query_scalar_group_telemetry_group_4 data = {};
+    data.replay_cnt = 5;
+    data.replay_rollover_cnt = 6;
+    data.NAK_sent_cnt = 7;
+    data.NAK_recv_cnt = 8;
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_4_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseData.data());
+    encode_query_scalar_group_telemetry_v1_group4_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, responseMsg);
+    sensor.handleResponseMsg(responseMsg, responseData.size());
+    EXPECT_EQ(intf->replayCount(), 5u);
+
+    // Now send error CC → else branch: zeroed data → all counts = 0
+    encode_query_scalar_group_telemetry_v1_group4_resp(0, NSM_ERROR, ERR_NULL,
+                                                       &data, responseMsg);
+    auto result = sensor.handleResponseMsg(responseMsg, responseData.size());
+
+    EXPECT_NE(result, NSM_SUCCESS);
+    EXPECT_EQ(intf->replayCount(), 0u);
+    EXPECT_EQ(intf->replayRolloverCount(), 0u);
+    EXPECT_EQ(intf->nakSentCount(), 0u);
+    EXPECT_EQ(intf->nakReceivedCount(), 0u);
+}
+
+// =============================================================================
+// handleResponseMsg – decode failure (rc != NSM_SW_SUCCESS branch)
+//
+// A 7-byte buffer allows decode_reason_code_and_cc to safely read cc at
+// payload[1] (zero = NSM_SUCCESS) but fails the subsequent minimum-size check
+// in the group-specific decode function, returning NSM_SW_ERROR_LENGTH.
+// This covers the rc != NSM_SW_SUCCESS short-circuit branch of the compound
+// condition `if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)`.
+// =============================================================================
+
+TEST(NsmPCIeErrors, HandleResponseMsg_Group2_DecodeFail)
+{
+    std::shared_ptr<PCIeEccIntf> intf;
+    auto provider = makeProvider("/test/pcie_errors/dec_g2", intf);
+    NsmPCIeErrors sensor(provider, 0, GROUP_ID_2);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<const nsm_msg*>(response.data());
+    auto rc = sensor.handleResponseMsg(responseMsg, response.size());
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmPCIeErrors, HandleResponseMsg_Group3_DecodeFail)
+{
+    std::shared_ptr<PCIeEccIntf> intf;
+    auto provider = makeProvider("/test/pcie_errors/dec_g3", intf);
+    NsmPCIeErrors sensor(provider, 0, GROUP_ID_3);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<const nsm_msg*>(response.data());
+    auto rc = sensor.handleResponseMsg(responseMsg, response.size());
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmPCIeErrors, HandleResponseMsg_Group4_DecodeFail)
+{
+    std::shared_ptr<PCIeEccIntf> intf;
+    auto provider = makeProvider("/test/pcie_errors/dec_g4", intf);
+    NsmPCIeErrors sensor(provider, 0, GROUP_ID_4);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<const nsm_msg*>(response.data());
+    auto rc = sensor.handleResponseMsg(responseMsg, response.size());
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// =============================================================================
+// genRequestMsg – encode failure path (lines 76-79)
+// encode_query_scalar_group_telemetry_v1_req fails when instanceId >
+// NSM_INSTANCE_MAX, triggering the debug log and returning std::nullopt.
+// =============================================================================
+
+TEST(NsmPCIeErrors, GenRequestMsg_InvalidInstanceId_ReturnsNullopt)
+{
+    std::shared_ptr<PCIeEccIntf> intf;
+    auto provider = makeProvider("/test/pcie_errors/genreq_invalid", intf);
+    NsmPCIeErrors sensor(provider, 0, GROUP_ID_2);
+
+    // instanceId > NSM_INSTANCE_MAX causes encode to return non-zero
+    auto request = sensor.genRequestMsg(5, NSM_INSTANCE_MAX + 1);
+
+    EXPECT_FALSE(request.has_value());
+}
+
+// =============================================================================
+// Branch 12 coverage: rc==NSM_SW_SUCCESS && cc==NSM_ERROR → else path
+// A 9-byte buffer (sizeof(nsm_msg_hdr)+sizeof(nsm_common_non_success_resp))
+// with cc=NSM_ERROR causes decode_reason_code_and_cc to return NSM_SW_SUCCESS
+// with cc=NSM_ERROR, making the `cc==NSM_SUCCESS` condition FALSE.
+// =============================================================================
+
+TEST(NsmPCIeErrors,
+     HandleResponseMsg_Group2_DecodeSuccessNonZeroCC_ClearsFields)
+{
+    std::shared_ptr<PCIeEccIntf> intf;
+    auto provider = makeProvider("/test/pcie_errors/cc_g2", intf);
+    NsmPCIeErrors sensor(provider, 0, GROUP_ID_2);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmPCIeErrors,
+     HandleResponseMsg_Group3_DecodeSuccessNonZeroCC_ClearsFields)
+{
+    std::shared_ptr<PCIeEccIntf> intf;
+    auto provider = makeProvider("/test/pcie_errors/cc_g3", intf);
+    NsmPCIeErrors sensor(provider, 0, GROUP_ID_3);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmPCIeErrors,
+     HandleResponseMsg_Group4_DecodeSuccessNonZeroCC_ClearsFields)
+{
+    std::shared_ptr<PCIeEccIntf> intf;
+    auto provider = makeProvider("/test/pcie_errors/cc_g4", intf);
+    NsmPCIeErrors sensor(provider, 0, GROUP_ID_4);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}

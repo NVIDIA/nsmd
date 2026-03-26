@@ -1,4 +1,9 @@
-tests = ['nsmEventSetting_test', 'nsmEventConfig_test']
+tests = [
+    'nsmEventSetting_test',
+    'nsmEventConfig_test',
+    'nsmEventConfigBranch_test',
+    'nsmEventConfigDeepBranch_test',
+]
 
 foreach t : tests
     test(

@@ -5,6 +5,10 @@
 
 #include "nsmDotBlobUtils.hpp"
 
+#include <sdbusplus/exception.hpp>
+#include <xyz/openbmc_project/Common/File/error.hpp>
+#include <xyz/openbmc_project/Common/error.hpp>
+
 #include <filesystem>
 #include <fstream>
 

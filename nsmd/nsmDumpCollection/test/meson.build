@@ -1,7 +1,3 @@
-# nsmDumpCollection tests now use nsmd_test
-# nsmDumpCollection is CONDITIONAL - only runs if enabled
-# All sources already compiled into nsmd_test, no need to recompile
-
 tests = ['nsmDumpCollection_test']
 
 foreach t : tests

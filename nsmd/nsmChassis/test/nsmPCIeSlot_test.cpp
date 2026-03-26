@@ -8,6 +8,8 @@
 #define private public
 #define protected public
 
+#include "libnsm/pci-links.h"
+
 #include "nsmChassis/nsmPCIeSlot.hpp"
 
 using namespace nsm;
@@ -314,4 +316,45 @@ TEST_F(NsmPCIeSlotTest, HandleResponseMsgWithDifferentSlots)
     EXPECT_GE(result1, 0);
     EXPECT_GE(result2, 0);
     EXPECT_GE(result3, 0);
+}
+
+// Error-CC path: decode succeeds but cc = NSM_ERROR (non-zero)
+// → return cc ? cc : rc; takes the true branch (return cc).
+TEST_F(NsmPCIeSlotTest, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    NsmInterfaceProvider<PCIeSlotIntf> provider;
+    NsmPCIeSlot slot(provider, testDeviceIndex);
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_1_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    struct nsm_query_scalar_group_telemetry_group_1 link_info = {};
+    uint8_t rc = encode_query_scalar_group_telemetry_v1_group1_resp(
+        testInstanceId, NSM_ERROR, ERR_NULL, &link_info, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    uint8_t result = slot.handleResponseMsg(response, responseData.size());
+    EXPECT_NE(result, NSM_SW_SUCCESS);
+}
+
+// NsmPCIeSlot::handleResponseMsg: rc==NSM_SW_SUCCESS, cc==NSM_ERROR →
+// L65 FALSE via cc!=NSM_SUCCESS → else block (invoke noop on empty provider)
+// (existing ErrorCC test uses full-size buffer → decode_reason_code_and_cc
+// returns NSM_SW_ERROR_LENGTH, covering rc!=NSM_SW_SUCCESS only)
+TEST_F(NsmPCIeSlotTest, HandleResponseMsg_DecodeSuccessNonZeroCC_ElseBranch)
+{
+    NsmInterfaceProvider<PCIeSlotIntf> provider;
+    NsmPCIeSlot slot(provider, testDeviceIndex);
+
+    // Exactly-sized non-success buffer: decode_reason_code_and_cc returns
+    // NSM_SW_SUCCESS with cc=NSM_ERROR → L65 FALSE via cc!=NSM_SUCCESS
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    uint8_t result = slot.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(result, NSM_SUCCESS);
 }

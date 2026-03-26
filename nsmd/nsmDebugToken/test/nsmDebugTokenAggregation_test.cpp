@@ -4,6 +4,7 @@
  */
 
 #include "test/mockDBusHandler.hpp"
+#include "test/mockSensorManager.hpp"
 
 #include <gtest/gtest.h>
 
@@ -11,7 +12,9 @@
 #define protected public
 
 #include "nsmDebugTokenAggregation.hpp"
+#include "nsmDebugTokenUnified.hpp"
 
+#include <debug-token.h>
 #include <debug-token/tlv.h>
 #include <debug-token/types.h>
 #include <sys/mman.h>
@@ -337,6 +340,44 @@ TEST_F(NsmDebugTokenAggregationTest, ParseTlvTokensInsufficientTlvHeader)
     EXPECT_EQ(rc, -1);
 }
 
+TEST_F(NsmDebugTokenAggregationTest, ParseTlvTokensTruncatedStructureBody)
+{
+    NsmDebugTokenAggregationObject obj(bus, testPath);
+
+    DebugTokenHeader header{};
+    memset(&header, 0, sizeof(header));
+    header.numberOfRecords = 1;
+    header.offsetToListOfStructs = sizeof(DebugTokenHeader);
+
+    auto headerBytes = makeValidHeaderBytes(1);
+    std::vector<uint8_t> fileData = headerBytes;
+
+    // Build a StructureHeader whose size field indicates 100 bytes of payload,
+    // but append NO payload bytes → offset+totalStructSize > tokenData.size()
+    // triggers the line 208 error path.
+    debug_token::StructureHeader tlvHdr{};
+    memset(&tlvHdr, 0, sizeof(tlvHdr));
+    // Valid TLV1 identifier
+    tlvHdr.identifier[0] = 0x54;
+    tlvHdr.identifier[1] = 0x4C;
+    tlvHdr.identifier[2] = 0x56;
+    tlvHdr.identifier[3] = 0x31;
+    tlvHdr.versionMajor = 1;
+    tlvHdr.versionMinor = 0;
+    tlvHdr.size = 100; // claims 100 bytes of payload
+    fileData.insert(fileData.end(), reinterpret_cast<uint8_t*>(&tlvHdr),
+                    reinterpret_cast<uint8_t*>(&tlvHdr) + sizeof(tlvHdr));
+    // No payload bytes appended → total struct size (32+100=132) > tokenData
+    // (32)
+
+    memcpy(&header, fileData.data(), sizeof(header));
+
+    NsmDebugTokenAggregationObject::TokenMap tokens;
+    int rc = obj.parseTlvTokens(fileData, header, tokens);
+
+    EXPECT_EQ(rc, -1);
+}
+
 TEST_F(NsmDebugTokenAggregationTest, ParseTlvTokensOneValidToken)
 {
     NsmDebugTokenAggregationObject obj(bus, testPath);
@@ -466,3 +507,267 @@ TEST_F(NsmDebugTokenAggregationTest, ParseTokenFileHeaderOnlyNoTokens)
     EXPECT_EQ(rc, -1);
     close(fd);
 }
+
+// ============================================================================
+// installTokensToDevices() branch coverage
+// Covers lines 265-267 (null guard), 271-276 (empty serial), 293-299
+// (unmatched serial) in nsmDebugTokenAggregation.cpp
+// ============================================================================
+
+struct NsmDebugTokenInstallTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    NsmDeviceTable devices;
+    sdbusplus::bus_t& bus = utils::DBusHandler::getBus();
+
+    NsmDebugTokenInstallTest() : SensorManagerTest(devices) {}
+
+    ~NsmDebugTokenInstallTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+// Branch A (L265-267): nullptr entry in debugTokenList → skipped by null guard
+TEST_F(NsmDebugTokenInstallTest, InstallTokensToDevices_NullTokenInList_Skipped)
+{
+    NsmDebugTokenAggregationObject obj(
+        bus, "/xyz/openbmc_project/debug_token_install_ta");
+    mockManager.debugTokenList.push_back(nullptr);
+
+    NsmDebugTokenAggregationObject::TokenMap tokens;
+    tokens["SERIAL_A"] = {0x01, 0x02, 0x03};
+
+    auto statusIntf =
+        std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/ta");
+    auto valueIntf =
+        std::make_shared<AsyncValueIntf>(bus, "/com/nvidia/nsmd/aop/ta");
+
+    auto coro = obj.installTokensToDevices(std::move(tokens), statusIntf,
+                                           valueIntf);
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+}
+
+// Branch B (L271-276): empty tokenDeviceID() → skipped
+// A freshly constructed NsmDebugTokenUnifiedObject has empty tokenDeviceID()
+TEST_F(NsmDebugTokenInstallTest,
+       InstallTokensToDevices_EmptySerialToken_Skipped)
+{
+    NsmDebugTokenAggregationObject obj(
+        bus, "/xyz/openbmc_project/debug_token_install_tb");
+
+    auto tokenObj = std::make_shared<NsmDebugTokenUnifiedObject>(
+        bus, "ut_dev_tb", "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0", "GPU");
+    // tokenDeviceID() is "" by default → branch B is taken
+    mockManager.debugTokenList.push_back(tokenObj);
+
+    NsmDebugTokenAggregationObject::TokenMap tokens;
+    tokens["SERIAL_B"] = {0x04, 0x05, 0x06};
+
+    auto statusIntf =
+        std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/tb");
+    auto valueIntf =
+        std::make_shared<AsyncValueIntf>(bus, "/com/nvidia/nsmd/aop/tb");
+
+    auto coro = obj.installTokensToDevices(std::move(tokens), statusIntf,
+                                           valueIntf);
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+}
+
+// Branch C (L293-299): token serial not in deviceMap → unmatched warning
+TEST_F(NsmDebugTokenInstallTest,
+       InstallTokensToDevices_UnmatchedSerial_TokenSkipped)
+{
+    NsmDebugTokenAggregationObject obj(
+        bus, "/xyz/openbmc_project/debug_token_install_tc");
+
+    auto tokenObj = std::make_shared<NsmDebugTokenUnifiedObject>(
+        bus, "ut_dev_tc", "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0", "GPU");
+    tokenObj->tokenDeviceID("DEVSERIAL_C");
+    mockManager.debugTokenList.push_back(tokenObj);
+
+    // Token uses a different serial → deviceMap.find() returns end()
+    NsmDebugTokenAggregationObject::TokenMap tokens;
+    tokens["OTHERSERIAL_C"] = {0x07, 0x08, 0x09};
+
+    auto statusIntf =
+        std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/tc");
+    auto valueIntf =
+        std::make_shared<AsyncValueIntf>(bus, "/com/nvidia/nsmd/aop/tc");
+
+    auto coro = obj.installTokensToDevices(std::move(tokens), statusIntf,
+                                           valueIntf);
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// Branch coverage: matched serial path in installTokensToDevices()
+// Covers lines 302-352 (matched device found, installTokenToDevice called,
+// errorCode==0 success branch and failureCount>0 InternalFailure branch)
+// ============================================================================
+
+struct NsmDebugTokenInstallWithDeviceTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> mockDevice;
+    sdbusplus::bus_t& bus = utils::DBusHandler::getBus();
+    const uuid_t tokenUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+
+    NsmDebugTokenInstallWithDeviceTest() : SensorManagerTest(devices)
+    {
+        mockDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(tokenUuid));
+    }
+
+    ~NsmDebugTokenInstallWithDeviceTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+
+    static Response createInstallTokenResponse(uint8_t cc = NSM_SUCCESS,
+                                               uint16_t reasonCode = 0)
+    {
+        Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_install_token_resp),
+                          0);
+        auto msg = reinterpret_cast<nsm_msg*>(response.data());
+        encode_nsm_install_token_resp(0, cc, reasonCode, msg);
+        return response;
+    }
+};
+
+// Matched serial, installTokenDirect succeeds → successCount++ → Success
+TEST_F(NsmDebugTokenInstallWithDeviceTest,
+       InstallTokensToDevices_MatchedSerial_Success)
+{
+    NsmDebugTokenAggregationObject obj(
+        bus, "/xyz/openbmc_project/debug_token_install_td");
+
+    auto tokenObj = std::make_shared<NsmDebugTokenUnifiedObject>(
+        bus, "ut_dev_td", tokenUuid, "GPU");
+    tokenObj->tokenDeviceID("DEVSERIAL_TD");
+    tokenObj->installationChunkSize = 4096;
+    mockManager.debugTokenList.push_back(tokenObj);
+
+    NsmDebugTokenAggregationObject::TokenMap tokens;
+    tokens["DEVSERIAL_TD"] = {0xAA, 0xBB, 0xCC};
+
+    auto statusIntf =
+        std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/td");
+    auto valueIntf =
+        std::make_shared<AsyncValueIntf>(bus, "/com/nvidia/nsmd/aop/td");
+
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createInstallTokenResponse(NSM_SUCCESS, 0)))
+        .WillRepeatedly(mockPostPatchIO(NSM_ERROR));
+
+    auto coro = obj.installTokensToDevices(std::move(tokens), statusIntf,
+                                           valueIntf);
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}
+
+// Matched serial, installTokenDirect fails → failureCount++ → InternalFailure
+TEST_F(NsmDebugTokenInstallWithDeviceTest,
+       InstallTokensToDevices_MatchedSerial_Failure)
+{
+    NsmDebugTokenAggregationObject obj(
+        bus, "/xyz/openbmc_project/debug_token_install_te");
+
+    auto tokenObj = std::make_shared<NsmDebugTokenUnifiedObject>(
+        bus, "ut_dev_te", tokenUuid, "GPU");
+    tokenObj->tokenDeviceID("DEVSERIAL_TE");
+    tokenObj->installationChunkSize = 4096;
+    mockManager.debugTokenList.push_back(tokenObj);
+
+    NsmDebugTokenAggregationObject::TokenMap tokens;
+    tokens["DEVSERIAL_TE"] = {0xDD, 0xEE};
+
+    auto statusIntf =
+        std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/te");
+    auto valueIntf =
+        std::make_shared<AsyncValueIntf>(bus, "/com/nvidia/nsmd/aop/te");
+
+    // postPatchIO returns error → installTokenDirect sets errorCode != 0
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(NSM_ERROR));
+
+    auto coro = obj.installTokensToDevices(std::move(tokens), statusIntf,
+                                           valueIntf);
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// installToken() success path (lines 87-90): parse OK + tokens non-empty →
+// installTokensToDevices().detach() called → returns valid object path.
+// Uses NsmDebugTokenInstallWithDeviceTest (has SensorManager initialized).
+TEST_F(NsmDebugTokenInstallWithDeviceTest, InstallToken_ValidFile_ReturnsPath)
+{
+    NsmDebugTokenAggregationObject obj(
+        bus, "/xyz/openbmc_project/debug_token_install_vf");
+
+    // Build a valid single-record token file
+    std::vector<uint8_t> serialBytes = {0x0A, 0x0B, 0x0C, 0x0D};
+    auto tlvData = makeTlvWithSerial(serialBytes);
+    uint32_t totalSize =
+        static_cast<uint32_t>(sizeof(DebugTokenHeader) + tlvData.size());
+    auto headerBytes = makeValidHeaderBytes(1, sizeof(DebugTokenHeader),
+                                            totalSize);
+    std::vector<uint8_t> fileData = headerBytes;
+    fileData.insert(fileData.end(), tlvData.begin(), tlvData.end());
+
+    int fd = createMemFd(fileData);
+    ASSERT_GE(fd, 0);
+
+    // No matching device serial → installTokensToDevices does nothing but
+    // must not crash.  SensorManager is initialized by SensorManagerTest.
+    sdbusplus::message::object_path result;
+    EXPECT_NO_THROW(
+        { result = obj.installToken(sdbusplus::message::unix_fd(fd)); });
+    EXPECT_FALSE(result.str.empty());
+    close(fd);
+}
+
+// ============================================================================
+// installToken() public method branch coverage
+// Lines 80-84: parse failure → throws InvalidArgument
+// Lines 87-90: success path → returns valid object path
+// ============================================================================
+
+TEST_F(NsmDebugTokenAggregationTest, InstallToken_ParseFail_ThrowsInvalidArg)
+{
+    NsmDebugTokenAggregationObject obj(bus, testPath + "_it1");
+
+    // File with wrong type field → parseHeader returns -1 → parseRc != 0
+    auto headerBytes = makeValidHeaderBytes();
+    headerBytes[1] = 0xFF; // corrupt type: FileTypeDebugToken != 0xFF
+    int fd = createMemFd(headerBytes);
+    ASSERT_GE(fd, 0);
+
+    EXPECT_THROW(
+        obj.installToken(sdbusplus::message::unix_fd(fd)),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+    close(fd);
+}
+
+TEST_F(NsmDebugTokenAggregationTest, InstallToken_EmptyTokens_ThrowsInvalidArg)
+{
+    NsmDebugTokenAggregationObject obj(bus, testPath + "_it2");
+
+    // Valid header with 0 records → tokens remain empty → parseRc=-1
+    auto headerBytes = makeValidHeaderBytes(0);
+    int fd = createMemFd(headerBytes);
+    ASSERT_GE(fd, 0);
+
+    EXPECT_THROW(
+        obj.installToken(sdbusplus::message::unix_fd(fd)),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+    close(fd);
+}
+
+// Success path (lines 87-90) requires SensorManager — use
+// NsmDebugTokenInstallWithDeviceTest which extends SensorManagerTest.
+// Test defined below in that fixture section.

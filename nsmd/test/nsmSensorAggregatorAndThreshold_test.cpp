@@ -27,11 +27,12 @@
  *        updated when handleSample returns error
  *   2. nsmd/nsmSensors/nsmInventoryProperty.cpp
  *      - Constructor (lines 25-28): NsmInventoryPropertyBase(pdi, property)
- *      - genRequestMsg encode failure path (line 40): lg2::debug when
- *        encode_get_inventory_information_req fails (instanceId > 31)
+ *      - genRequestMsg encode failure path (line 40): lg2::debug when //
+ * encode_get_inventory_information_req fails (instanceId >
+ * 31)
  *   3. nsmd/nsmNumericSensor/nsmThreshold.cpp
- *      - genRequestMsg encode failure path (lines 36,38-39): lg2::debug when
- *        encode_read_thermal_parameter_req fails (instanceId > 31)
+ *      - genRequestMsg encode failure path (lines 36,38-39): lg2::debug when //
+ * encode_read_thermal_parameter_req fails (instanceId > 31)
  */
 
 #include <gtest/gtest.h>

@@ -22,6 +22,7 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "nsmObjectFactory.hpp"
 #include "nsmPCIeRetimer.hpp"
 
 using namespace nsm;
@@ -264,4 +265,45 @@ TEST_F(NsmPCIeRetimerFactoryTest, CreatePCIeRetimerChassisInvalidUUID)
 
     // Should have only the automatic first sensor
     EXPECT_EQ(1, gpu->deviceSensors.size());
+}
+
+// Via factory dispatch: missing UUID → parseStaticUuid throws → caught by
+// createObjects → no additional sensor
+TEST_F(NsmPCIeRetimerFactoryTest, Factory_MissingUUID_NoSensor)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_PCIeRetimer";
+    const std::string testPath =
+        "/xyz/openbmc_project/inventory/system/chassis/retimer_nouuid";
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath, interface);
+    propertyMap["Name"] = std::string("PCIeRetimer_NoUUID");
+    // UUID deliberately absent → empty uuid → parseStaticUuid fails
+
+    const size_t before = gpu->deviceSensors.size();
+    NsmObjectFactory::instance().createObjects(mockManager, interface,
+                                               testPath);
+
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// Missing "Name" property → FALSE branch for count("Name") → empty name →
+// invalid D-Bus path (trailing slash) → exception caught by createObjects →
+// no sensor
+TEST_F(NsmPCIeRetimerFactoryTest, Factory_MissingName_NoSensor)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_PCIeRetimer";
+    const std::string testPath =
+        "/xyz/openbmc_project/inventory/system/chassis/retimer_noname";
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath, interface);
+    // No "Name" key → FALSE branch of count("Name")
+    propertyMap["UUID"] = retimerUuid;
+
+    const size_t before = gpu->deviceSensors.size();
+    NsmObjectFactory::instance().createObjects(mockManager, interface,
+                                               testPath);
+
+    EXPECT_EQ(before, gpu->deviceSensors.size());
 }

@@ -670,6 +670,25 @@ TEST_F(NsmSwitchIsolationBatch10Test,
     EXPECT_NE(rc, NSM_SUCCESS);
 }
 
+TEST_F(NsmSwitchIsolationBatch10Test, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    // Arrange
+    auto isolationIntf = std::make_shared<SwitchIsolationIntf>(bus,
+                                                               objPath.c_str());
+    NsmSwitchIsolationMode isolationMode(name, type, isolationIntf);
+
+    // 7-byte buffer: safely reads cc=0 at payload[1] but too short for
+    // nsm_get_switch_isolation_mode_resp; decode returns NSM_SW_ERROR_LENGTH
+    std::vector<uint8_t> responseData(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    // Act
+    auto rc = isolationMode.handleResponseMsg(response, responseData.size());
+
+    // Assert
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
 // =============================================================================
 // PART 2c: NsmSwitchL1PredictionMode -- genRequestMsg / handleResponseMsg
 // =============================================================================
@@ -773,6 +792,26 @@ TEST_F(NsmSwitchL1PredBatch10Test, HandleResponseMsg_CcError_ReturnsErrorCode)
 
     // Act
     rc = predMode.handleResponseMsg(response, responseData.size());
+
+    // Assert
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST_F(NsmSwitchL1PredBatch10Test, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    // Arrange
+    auto enableIntf = std::make_shared<EnableIntf>(bus, objPath.c_str());
+    auto assocDefIntf =
+        std::make_shared<AssociationDefinitionsInft>(bus, objPath.c_str());
+    NsmSwitchL1PredictionMode predMode(name, type, enableIntf, assocDefIntf);
+
+    // 7-byte buffer: safely reads cc=0 at payload[1] but too short for
+    // nsm_get_device_mode_setting_resp; decode returns NSM_SW_ERROR_LENGTH
+    std::vector<uint8_t> responseData(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    // Act
+    auto rc = predMode.handleResponseMsg(response, responseData.size());
 
     // Assert
     EXPECT_NE(rc, NSM_SUCCESS);
@@ -986,6 +1025,7 @@ TEST_F(NsmSwitchPowerModeBatch10Test,
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
 
     // Act -- coroutine catches exception internally (direct throw in coverage)
+    //
     EXPECT_NO_THROW_COROUTINE(
         powerMode->setL1PowerModePatch(value, &status, nvswitch));
 }
@@ -1011,6 +1051,7 @@ TEST_F(NsmSwitchPowerModeBatch10Test,
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
 
     // Act -- coroutine catches exception internally (direct throw in coverage)
+    //
     EXPECT_NO_THROW_COROUTINE(
         powerMode->setL1PowerModePatch(value, &status, nvswitch));
 }
@@ -1038,6 +1079,7 @@ TEST_F(NsmSwitchPowerModeBatch10Test,
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
 
     // Act -- coroutine catches exception internally (direct throw in coverage)
+    //
     EXPECT_NO_THROW_COROUTINE(
         powerMode->setL1PowerModePatch(value, &status, nvswitch));
 }
@@ -1066,6 +1108,7 @@ TEST_F(NsmSwitchPowerModeBatch10Test,
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
 
     // Act -- coroutine catches exception internally (direct throw in coverage)
+    //
     EXPECT_NO_THROW_COROUTINE(
         powerMode->setL1PowerModePatch(value, &status, nvswitch));
 }

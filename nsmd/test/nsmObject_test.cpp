@@ -153,3 +153,45 @@ TEST_F(NsmObjectTest, goodTestMultipleObjects)
     EXPECT_EQ(obj2.getType(), "Type2");
     EXPECT_EQ(obj3.getType(), "Type3");
 }
+
+// Call the base-class NsmObject::update() default implementation.
+// In COVERAGE_DISABLE_COROUTINES mode co_return becomes return, so the //
+// method body (lines 77-80 in nsmObject.hpp) executes
+// synchronously.
+TEST_F(NsmObjectTest, goodTestUpdateBaseImplementation)
+{
+    TestNsmObject obj(name, type);
+    // TestNsmObject does not override update() → base implementation runs.
+    // The return value (Coroutine) is discarded; we just verify no exception.
+    EXPECT_NO_THROW((void)obj.update(nullptr));
+}
+
+// Verify setLastUpdatedTimeStamp with edge values to increase branch coverage
+// on the assignment at line 66 of nsmObject.hpp.
+TEST_F(NsmObjectTest, goodTestSetTimestampEdgeCases)
+{
+    TestNsmObject obj(name, type);
+    obj.setLastUpdatedTimeStamp(0);
+    EXPECT_EQ(obj.lastUpdatedTimeStampInUsec, uint64_t(0));
+    obj.setLastUpdatedTimeStamp(std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(obj.lastUpdatedTimeStampInUsec,
+              std::numeric_limits<uint64_t>::max());
+}
+
+// Call the base-class NsmObject::handleOfflineState() default implementation.
+// The default body is a no-op (just `return;`), so we only verify it doesn't
+// throw and is reachable (line 83-86 of nsmObject.hpp).
+TEST_F(NsmObjectTest, HandleOfflineState_BaseImpl_NoOp)
+{
+    TestNsmObject obj(name, type);
+    EXPECT_NO_THROW(obj.handleOfflineState());
+}
+
+// Call the base-class NsmObject::updateMetricOnSharedMemory() default
+// implementation.  The default body is empty {}; verify it is reachable
+// (line 88 of nsmObject.hpp).
+TEST_F(NsmObjectTest, UpdateMetricOnSharedMemory_BaseImpl_NoOp)
+{
+    TestNsmObject obj(name, type);
+    EXPECT_NO_THROW(obj.updateMetricOnSharedMemory());
+}

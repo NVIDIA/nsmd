@@ -46,9 +46,81 @@
 //       #include "nsmNumericSensor/nsmThresholdAggregator.hpp"
 // ============================================================================
 
+#include "test/mockDBusHandler.hpp"
+#include "test/mockSensorManager.hpp"
+
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+using namespace ::testing;
+
+#define private public
+#define protected public
+
+#include "nsmAsyncLongRunningSensor.hpp"
+#include "nsmLongRunningSensor.hpp"
+#include "nsmNumericSensor/nsmNumericSensor.hpp"
+#include "nsmNumericSensor/nsmThreshold.hpp"
+#include "nsmNumericSensor/nsmThresholdAggregator.hpp"
+#include "nsmNumericSensor/nsmThresholdValue.hpp"
+
 // ============================================================================
 // PART A: NsmLongRunningSensor and NsmAsyncLongRunningSensor tests
 // ============================================================================
+
+// ---------------------------------------------------------------------------
+// Concrete test classes and fixture (mirrors nsmLongRunning_test.cpp)
+// ---------------------------------------------------------------------------
+
+class TestNsmLongRunningSensor : public nsm::NsmLongRunningSensor
+{
+  public:
+    TestNsmLongRunningSensor(const std::string& name, const std::string& type,
+                             bool isLongRunning,
+                             std::shared_ptr<nsm::NsmDevice> device,
+                             uint8_t messageType, uint8_t commandCode) :
+        NsmLongRunningSensor(name, type, isLongRunning, device, messageType,
+                             commandCode)
+    {}
+
+    std::optional<std::vector<uint8_t>> genRequestMsg(eid_t, uint8_t) override
+    {
+        return std::vector<uint8_t>{};
+    }
+
+    uint8_t handleResponseMsg(const nsm_msg*, size_t) override
+    {
+        return NSM_SW_SUCCESS;
+    }
+};
+
+class TestNsmAsyncLongRunningSensor : public nsm::NsmAsyncLongRunningSensor
+{
+  public:
+    TestNsmAsyncLongRunningSensor(const std::string& name,
+                                  const std::string& type, bool isLongRunning,
+                                  std::shared_ptr<nsm::NsmDevice> device,
+                                  uint8_t messageType, uint8_t commandCode) :
+        NsmAsyncLongRunningSensor(name, type, isLongRunning, device,
+                                  messageType, commandCode)
+    {}
+
+    std::optional<std::vector<uint8_t>> genRequestMsg(eid_t, uint8_t) override
+    {
+        return std::vector<uint8_t>{};
+    }
+
+    uint8_t handleResponseMsg(const nsm_msg*, size_t) override
+    {
+        return NSM_SW_SUCCESS;
+    }
+};
+
+class NsmLongRunningTest : public Test
+{
+  protected:
+    sdbusplus::bus_t& bus = utils::DBusHandler::getBus();
+};
 
 // ---------------------------------------------------------------------------
 // Mockable concrete classes for NsmLongRunningSensor
@@ -855,12 +927,12 @@ TEST_F(NsmThresholdTest, Equals_SameNameAndType_ReturnsTrue)
     EXPECT_TRUE(t1 == t2);
 }
 
-TEST_F(NsmThresholdTest, Equals_DifferentName_ReturnsFalse)
+TEST_F(NsmThresholdTest, Equals_DifferentSensorId_ReturnsFalse)
 {
     auto sv1 = std::make_shared<nsm::NsmNumericSensorValueAggregate>();
     auto sv2 = std::make_shared<nsm::NsmNumericSensorValueAggregate>();
-    nsm::NsmThreshold t1("ThreshA", "TypeA", 1, sv1);
-    nsm::NsmThreshold t2("ThreshB", "TypeA", 1, sv2);
+    nsm::NsmThreshold t1("ThreshA", "NSM_ThermalParameter", 1, sv1);
+    nsm::NsmThreshold t2("ThreshB", "NSM_ThermalParameter", 2, sv2);
     EXPECT_FALSE(t1 == t2);
 }
 

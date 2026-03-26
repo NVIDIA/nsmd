@@ -4,6 +4,17 @@ tests = [
     'nsmWorkloadPowerProfileInfoIface_test',
     'nsmResetEdppAsyncIface_test',
     'nsmPowerSmoothing_v2_test',
+    'nsmClearPowerCapIface_test',
+    'nsmClearPowerCapBranch_test',
+    'nsmActivateErrorInjectAsyncIntf_test',
+    'nsmPowerSmoothingFeatureIntf_test',
+    'nsmPowerSmoothingAdminProfileIntf_test',
+    'nsmLogDumpOnDemand_test',
+    'nsmPowerSmoothingV2Branch_test',
+    'nsmPowerSmoothingV2Branch2_test',
+    'nsmDbusIfaceOverrideBranch_test',
+    'nsmPowerSmoothingAdminProfileV2Branch_test',
+    'nsmPowerSmoothingFeatureV2Branch_test',
 ]
 
 foreach t : tests

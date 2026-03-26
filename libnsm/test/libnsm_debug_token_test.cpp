@@ -96,7 +96,8 @@ TEST(provideToken, testGoodDecodeResponse)
 // Test to cover line 208 in debug-token.c (message length validation)
 TEST(provideToken, DISABLED_testDecodeResponseShortMessage)
 {
-	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 1); // Too short
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 NSM_RESPONSE_ERROR_LEN); // Too short
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
 	uint8_t cc = 0;
@@ -198,7 +199,8 @@ TEST(disableTokens, testGoodDecodeResponse)
 // Test to cover line 296 in debug-token.c (message length validation)
 TEST(disableTokens, DISABLED_testDecodeResponseShortMessage)
 {
-	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 1); // Too short
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 NSM_RESPONSE_ERROR_LEN); // Too short
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
 	uint8_t cc = 0;
@@ -1941,4 +1943,448 @@ TEST(QueryToken, EncodeRequest)
 	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
 	auto rc = encode_nsm_query_token_req(0, msg);
 	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+}
+
+// Branch coverage: encode_nsm_query_token_parameters_req L49
+TEST(DebugTokenNullBranch, EncodeQueryTokenParamReq_NullMsg)
+{
+	auto rc = encode_nsm_query_token_parameters_req(
+	    0, NSM_DEBUG_TOKEN_OPCODE_RMCS, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage: encode_nsm_query_token_parameters_resp L112
+TEST(DebugTokenNullBranch, EncodeQueryTokenParamResp_NullMsg)
+{
+	auto rc = encode_nsm_query_token_parameters_resp(0, NSM_SUCCESS, 0,
+							 nullptr, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage: decode_nsm_query_token_parameters_resp L83
+// (msg == NULL || token_request == NULL)
+TEST(DebugTokenNullBranch, DecodeQueryTokenParamResp_NullMsg)
+{
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	struct nsm_debug_token_request token_request = {};
+	auto rc = decode_nsm_query_token_parameters_resp(
+	    nullptr, 0, &cc, &reason_code, &token_request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DebugTokenNullBranch, DecodeQueryTokenParamResp_NullTokenRequest)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	auto rc = decode_nsm_query_token_parameters_resp(msg, buf.size(), &cc,
+							 &reason_code, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage: encode_nsm_provide_token_req L168
+// (msg == NULL || token_data == NULL)
+TEST(DebugTokenNullBranch, EncodeProvideTokenReq_NullMsg)
+{
+	uint8_t token_data[4] = {};
+	auto rc = encode_nsm_provide_token_req(0, token_data, 4, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DebugTokenNullBranch, EncodeProvideTokenReq_NullTokenData)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_nsm_provide_token_req(0, nullptr, 4, msg);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage: encode_nsm_query_token_status_req L358
+TEST(DebugTokenNullBranch, EncodeQueryTokenStatusReq_NullMsg)
+{
+	auto rc = encode_nsm_query_token_status_req(0, NSM_DEBUG_TOKEN_TYPE_FRC,
+						    nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage: decode_nsm_query_token_status_resp L393
+// (msg == NULL || status == NULL || additional_info == NULL || ...)
+TEST(DebugTokenNullBranch, DecodeQueryTokenStatusResp_NullMsg)
+{
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	enum nsm_debug_token_status status = {};
+	enum nsm_debug_token_status_additional_info additional_info = {};
+	enum nsm_debug_token_type token_type = {};
+	uint32_t time_left = 0;
+	auto rc = decode_nsm_query_token_status_resp(
+	    nullptr, 0, &cc, &reason_code, &status, &additional_info,
+	    &token_type, &time_left);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DebugTokenNullBranch, DecodeQueryTokenStatusResp_NullStatus)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	enum nsm_debug_token_status_additional_info additional_info = {};
+	enum nsm_debug_token_type token_type = {};
+	uint32_t time_left = 0;
+	auto rc = decode_nsm_query_token_status_resp(
+	    msg, buf.size(), &cc, &reason_code, nullptr, &additional_info,
+	    &token_type, &time_left);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage: encode_nsm_query_device_ids_req L474
+TEST(DebugTokenNullBranch, EncodeQueryDeviceIdsReq_NullMsg)
+{
+	auto rc = encode_nsm_query_device_ids_req(0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// ---------------------------------------------------------------------------
+// Null checks for secondary conditions (cc/reason_code/time_left/etc == NULL)
+// ---------------------------------------------------------------------------
+
+// decode_nsm_provide_token_resp L197: cc == NULL
+TEST(DebugTokenNullBranch, DecodeProvideTokenResp_NullCc)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 8, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint16_t reason_code = 0;
+	auto rc = decode_nsm_provide_token_resp(msg, buf.size(), nullptr,
+						&reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_nsm_disable_tokens_resp L285: cc == NULL
+TEST(DebugTokenNullBranch, DecodeDisableTokensResp_NullCc)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 8, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint16_t reason_code = 0;
+	auto rc = decode_nsm_disable_tokens_resp(msg, buf.size(), nullptr,
+						 &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_nsm_query_token_status_resp L394: token_type == NULL
+TEST(DebugTokenNullBranch, DecodeQueryTokenStatusResp_NullTokenType)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 8, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	enum nsm_debug_token_status status = {};
+	enum nsm_debug_token_status_additional_info additional_info = {};
+	uint32_t time_left = 0;
+	auto rc = decode_nsm_query_token_status_resp(
+	    msg, buf.size(), &cc, &reason_code, &status, &additional_info,
+	    nullptr, &time_left);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// ---------------------------------------------------------------------------
+// Pack-fail branches (instance_id > NSM_INSTANCE_MAX = 31)
+// ---------------------------------------------------------------------------
+
+static std::vector<uint8_t> g_dbg_buf(1024, 0);
+static nsm_msg *g_dbg_msg()
+{
+	return reinterpret_cast<nsm_msg *>(g_dbg_buf.data());
+}
+
+// encode_nsm_query_token_parameters_req L66
+TEST(DebugTokenPackFailBranch, EncodeQueryTokenParamReq_PackFail)
+{
+	auto rc = encode_nsm_query_token_parameters_req(
+	    32, NSM_DEBUG_TOKEN_OPCODE_RMCS, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_query_token_parameters_resp L122
+TEST(DebugTokenPackFailBranch, EncodeQueryTokenParamResp_PackFail)
+{
+	auto rc = encode_nsm_query_token_parameters_resp(32, NSM_SUCCESS, 0,
+							 nullptr, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_provide_token_req L181
+TEST(DebugTokenPackFailBranch, EncodeProvideTokenReq_PackFail)
+{
+	uint8_t token_data[1] = {0};
+	auto rc = encode_nsm_provide_token_req(32, token_data, 1, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_provide_token_resp L227
+TEST(DebugTokenPackFailBranch, EncodeProvideTokenResp_PackFail)
+{
+	auto rc =
+	    encode_nsm_provide_token_resp(32, NSM_SUCCESS, 0, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_disable_tokens_req L270
+TEST(DebugTokenPackFailBranch, EncodeDisableTokensReq_PackFail)
+{
+	auto rc = encode_nsm_disable_tokens_req(32, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_disable_tokens_resp L315
+TEST(DebugTokenPackFailBranch, EncodeDisableTokensResp_PackFail)
+{
+	auto rc =
+	    encode_nsm_disable_tokens_resp(32, NSM_SUCCESS, 0, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_query_token_status_req L374
+TEST(DebugTokenPackFailBranch, EncodeQueryTokenStatusReq_PackFail)
+{
+	auto rc = encode_nsm_query_token_status_req(
+	    32, NSM_DEBUG_TOKEN_TYPE_FRC, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_query_token_status_resp L435
+TEST(DebugTokenPackFailBranch, EncodeQueryTokenStatusResp_PackFail)
+{
+	auto rc = encode_nsm_query_token_status_resp(
+	    32, NSM_SUCCESS, 0, static_cast<nsm_debug_token_status>(0),
+	    static_cast<nsm_debug_token_status_additional_info>(0),
+	    static_cast<nsm_debug_token_type>(0), 0, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_query_device_ids_req L484
+TEST(DebugTokenPackFailBranch, EncodeQueryDeviceIdsReq_PackFail)
+{
+	auto rc = encode_nsm_query_device_ids_req(32, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_query_device_ids_resp L543
+TEST(DebugTokenPackFailBranch, EncodeQueryDeviceIdsResp_PackFail)
+{
+	uint8_t dev_id[1] = {0};
+	auto rc = encode_nsm_query_device_ids_resp(32, NSM_SUCCESS, 0, dev_id,
+						   1, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_install_token_req L613
+TEST(DebugTokenPackFailBranch, EncodeInstallTokenReq_PackFail)
+{
+	uint8_t data[1] = {0};
+	auto rc = encode_nsm_install_token_req(32, 0, 0, 0, data, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_install_token_resp L659
+TEST(DebugTokenPackFailBranch, EncodeInstallTokenResp_PackFail)
+{
+	auto rc =
+	    encode_nsm_install_token_resp(32, NSM_SUCCESS, 0, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_erase_token_req L711
+TEST(DebugTokenPackFailBranch, EncodeEraseTokenReq_PackFail)
+{
+	auto rc = encode_nsm_erase_token_req(32, 0, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_erase_token_resp L752
+TEST(DebugTokenPackFailBranch, EncodeEraseTokenResp_PackFail)
+{
+	auto rc = encode_nsm_erase_token_resp(32, NSM_SUCCESS, 0, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_query_token_req L799
+TEST(DebugTokenPackFailBranch, EncodeQueryTokenReq_PackFail)
+{
+	auto rc = encode_nsm_query_token_req(32, g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_nsm_query_token_resp L857
+TEST(DebugTokenPackFailBranch, EncodeQueryTokenResp_PackFail)
+{
+	uint8_t payload[1] = {0};
+	auto rc = encode_nsm_query_token_resp(32, NSM_SUCCESS, 0, payload, 1,
+					      g_dbg_msg());
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ===========================================================================
+// rc != NSM_SW_SUCCESS branches (B0 of || condition)
+// Pass msg with error CC + wrong size → decode_reason_code_and_cc returns
+// NSM_SW_ERROR_LENGTH, so rc != NSM_SW_SUCCESS → TRUE branch taken
+// ===========================================================================
+// Error-CC buffer helper: large buffer with completion_code = NSM_ERROR
+// payload[1] (not payload[0]) is completion_code in nsm_common_resp
+static std::vector<uint8_t> makeErrCcBuf(size_t size = sizeof(nsm_msg_hdr) +
+						       100)
+{
+	std::vector<uint8_t> buf(size, 0);
+	buf[sizeof(nsm_msg_hdr) + 1] = 0xFF; // completion_code != NSM_SUCCESS
+	return buf;
+}
+
+// decode_nsm_query_token_parameters_resp L88 — rc != NSM_SW_SUCCESS
+TEST(DebugTokenBranches, DecodeQueryTokenParamResp_RcFail)
+{
+	auto buf = makeErrCcBuf();
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	struct nsm_debug_token_request token_req = {};
+	auto rc = decode_nsm_query_token_parameters_resp(msg, buf.size(), &cc,
+							 &reason, &token_req);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// decode_nsm_provide_token_resp L197 — rc != NSM_SW_SUCCESS
+TEST(DebugTokenBranches, DecodeProvideTokenResp_RcFail)
+{
+	auto buf = makeErrCcBuf();
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	auto rc = decode_nsm_provide_token_resp(msg, buf.size(), &cc, &reason);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// decode_nsm_disable_tokens_resp L285 — reason_code=NULL
+TEST(DebugTokenBranches, DecodeDisableTokensResp_NullReasonCode)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	auto rc = decode_nsm_disable_tokens_resp(msg, buf.size(), &cc, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_nsm_disable_tokens_resp L290 — rc != NSM_SW_SUCCESS
+TEST(DebugTokenBranches, DecodeDisableTokensResp_RcFail)
+{
+	auto buf = makeErrCcBuf();
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	auto rc = decode_nsm_disable_tokens_resp(msg, buf.size(), &cc, &reason);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// decode_nsm_query_token_status_resp L394 — time_left=NULL
+TEST(DebugTokenBranches, DecodeQueryTokenStatusResp_NullTimeLeft)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	enum nsm_debug_token_status status = {};
+	enum nsm_debug_token_status_additional_info additional_info = {};
+	enum nsm_debug_token_type token_type = {};
+	auto rc = decode_nsm_query_token_status_resp(
+	    msg, buf.size(), &cc, &reason, &status, &additional_info,
+	    &token_type, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_nsm_query_token_status_resp L399 — rc != NSM_SW_SUCCESS
+TEST(DebugTokenBranches, DecodeQueryTokenStatusResp_RcFail)
+{
+	auto buf = makeErrCcBuf();
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	enum nsm_debug_token_status status = {};
+	enum nsm_debug_token_status_additional_info additional_info = {};
+	enum nsm_debug_token_type token_type = {};
+	uint32_t time_left = 0;
+	auto rc = decode_nsm_query_token_status_resp(
+	    msg, buf.size(), &cc, &reason, &status, &additional_info,
+	    &token_type, &time_left);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// decode_nsm_query_token_resp L820 — rc != NSM_SW_SUCCESS
+TEST(DebugTokenBranches, DecodeQueryTokenResp_RcFail)
+{
+	auto buf = makeErrCcBuf();
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	size_t tlv_payload_len = 0;
+	auto rc = decode_nsm_query_token_resp(msg, buf.size(), &cc, &reason,
+					      nullptr, &tlv_payload_len);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ===========================================================================
+// decode_nsm_install_token_req branch coverage
+// L577: data_size too small, L588: size mismatch, L591: data=NULL
+// ===========================================================================
+
+// L577 TRUE: data_size < minimum (zero-fill → data_size=0)
+TEST(DebugTokenBranches, DecodeInstallTokenReq_DataSizeTooSmall)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_install_token_req), 0);
+	// data_size = 0 (zero-fill) < 13 → L577 TRUE
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint32_t chunk_offset = 0, chunk_length = 0, length_remaining = 0;
+	auto rc = decode_nsm_install_token_req(msg, buf.size(), &chunk_offset,
+					       &chunk_length, &length_remaining,
+					       nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+// L588 TRUE: data_size >= 13 but != expected (data_size=13, chunk_length=5)
+TEST(DebugTokenBranches, DecodeInstallTokenReq_DataSizeMismatch)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_install_token_req) + 10, 0);
+	// data_size at payload offset 2 = 13 (LE16): passes L577
+	buf[sizeof(nsm_msg_hdr) + 2] = 13;
+	buf[sizeof(nsm_msg_hdr) + 3] = 0;
+	// chunk_length at payload offset 10 = 5: expected_size = 12+5=17 ≠ 13
+	buf[sizeof(nsm_msg_hdr) + 10] = 5;
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint32_t chunk_offset = 0, chunk_length = 0, length_remaining = 0;
+	auto rc = decode_nsm_install_token_req(msg, buf.size(), &chunk_offset,
+					       &chunk_length, &length_remaining,
+					       nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+// L591 FALSE: data=NULL, valid data_size=13, chunk_length=1 → skip copy
+TEST(DebugTokenBranches, DecodeInstallTokenReq_NullData)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_install_token_req) + 10, 0);
+	// data_size=13: passes L577 (>= 13)
+	buf[sizeof(nsm_msg_hdr) + 2] = 13;
+	buf[sizeof(nsm_msg_hdr) + 3] = 0;
+	// chunk_length=1: expected_size = 4+4+4+1 = 13 = data_size → passes
+	// L588
+	buf[sizeof(nsm_msg_hdr) + 10] = 1;
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint32_t chunk_offset = 0, chunk_length = 0, length_remaining = 0;
+	// data=NULL → L591 FALSE → skip copy → NSM_SW_SUCCESS
+	auto rc = decode_nsm_install_token_req(msg, buf.size(), &chunk_offset,
+					       &chunk_length, &length_remaining,
+					       nullptr);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }

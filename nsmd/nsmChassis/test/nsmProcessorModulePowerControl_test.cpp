@@ -22,6 +22,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "libnsm/base.h"
+
 #include "nsmProcessorModulePowerControl.hpp"
 
 using namespace nsm;
@@ -42,6 +44,11 @@ struct NsmProcessorModulePowerControlTest :
     std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf;
 
     NsmProcessorModulePowerControlTest() : SensorManagerTest(devices) {}
+
+    ~NsmProcessorModulePowerControlTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
 
     void SetUp() override
     {
@@ -265,6 +272,11 @@ struct NsmModulePowerLimitTest :
     std::string path = "/xyz/openbmc_project/test/power_limit";
 
     NsmModulePowerLimitTest() : SensorManagerTest(devices) {}
+
+    ~NsmModulePowerLimitTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
 
     void SetUp() override
     {
@@ -569,6 +581,14 @@ TEST_F(NsmProcessorModulePowerControlTest, GenRequestMsg_MaxInstanceId_Succeeds)
 
     // Assert
     EXPECT_TRUE(result.has_value());
+}
+
+TEST_F(NsmProcessorModulePowerControlTest,
+       BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    eid_t eid = 10;
+    auto result = powerControl->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(result.has_value());
 }
 
 // ===========================================================================
@@ -998,6 +1018,11 @@ struct NsmModulePowerLimitUpdateTest :
 
     NsmModulePowerLimitUpdateTest() : SensorManagerTest(devices) {}
 
+    ~NsmModulePowerLimitUpdateTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+
     void SetUp() override
     {
         auto& bus = utils::DBusHandler::getBus();
@@ -1101,6 +1126,11 @@ struct NsmDefaultModulePowerLimitTest :
     std::shared_ptr<MockNsmDevice> nsmDevice;
 
     NsmDefaultModulePowerLimitTest() : SensorManagerTest(devices) {}
+
+    ~NsmDefaultModulePowerLimitTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
 
     void SetUp() override
     {
@@ -1240,4 +1270,393 @@ TEST_F(NsmProcessorModulePowerControlTest,
     size_t before = device->deviceSensors.size();
     device->addSensor(powerControl, PollingType::RoundRobin);
     EXPECT_GT(device->deviceSensors.size(), before);
+}
+
+// ===========================================================================
+// NsmModulePowerLimit::update() missing branch coverage
+// ===========================================================================
+
+// Error CC → shouldLog returns true, inner-if false, powerCap not updated
+TEST_F(NsmModulePowerLimitUpdateTest, Update_ErrorCC_DoesNotSetValue)
+{
+    auto powerLimit = std::make_shared<NsmModulePowerLimit>(
+        name, type, MAXIMUM_MODULE_POWER_LIMIT, powerCapIntf);
+
+    powerCapIntf->maxPowerCapValue(111);
+
+    uint32_t valueMw = 500000;
+    uint16_t dataSize = sizeof(valueMw);
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + dataSize, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+    encode_get_inventory_information_resp(
+        0, NSM_ERROR, ERR_NULL, dataSize,
+        reinterpret_cast<const uint8_t*>(&valueMw), response);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseData));
+
+    powerLimit->update(nsmDevice);
+
+    // cc != NSM_SUCCESS → powerCap not updated
+    EXPECT_EQ(powerCapIntf->maxPowerCapValue(), 111u);
+}
+
+// Unknown propertyId + successful decode → default switch case, no property set
+TEST_F(NsmModulePowerLimitUpdateTest, Update_UnknownPropertyId_DefaultCase)
+{
+    std::string unknownName = "UnknownPowerLimit";
+    std::string unknownType = "NSM_UnknownPowerLimit";
+    auto powerLimit = std::make_shared<NsmModulePowerLimit>(
+        unknownName, unknownType, 0xFF, powerCapIntf);
+
+    powerCapIntf->maxPowerCapValue(222);
+
+    uint32_t valueMw = 300000;
+    auto responseData = buildInventoryResponse(valueMw);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseData));
+
+    powerLimit->update(nsmDevice);
+
+    // default switch case → neither max nor min updated
+    EXPECT_EQ(powerCapIntf->maxPowerCapValue(), 222u);
+}
+
+// ===========================================================================
+// NsmDefaultModulePowerLimit::update() short buffer (decode failure)
+// ===========================================================================
+
+TEST_F(NsmDefaultModulePowerLimitTest, Update_DecodeFail_ShortBuffer)
+{
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
+        name, type, clearPowerCapIntf);
+
+    clearPowerCapIntf->defaultPowerCap(333);
+
+    // Too-short response → decode_get_inventory_information_resp fails
+    std::vector<uint8_t> responseData(sizeof(nsm_msg_hdr) + 2, 0);
+
+    EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseData));
+
+    sensor->update(nsmDevice);
+
+    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 333u);
+}
+
+// ===========================================================================
+// CreateProcessorModulePowerControl factory function tests (via
+// NsmObjectFactory)
+// ===========================================================================
+
+#include "nsmObjectFactory.hpp"
+
+struct CreatePMPCFactoryTest :
+    public testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string configIntf =
+        "xyz.openbmc_project.Configuration.NSM_ModulePowerControl";
+    const std::string assocIntf = "xyz.openbmc_project.Association.Definitions";
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+
+    CreatePMPCFactoryTest() : SensorManagerTest(devices)
+    {
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    ~CreatePMPCFactoryTest()
+    {
+        cleanupDeviceSensors(devices);
+        mockManager.processorModuleToDeviceMap.clear();
+    }
+
+    void setupConfig(const std::string& objPath, const std::string& sensorName,
+                     uint64_t index = 0, bool priority = false)
+    {
+        auto& pm = utils::MockDbusAsync::propertyMap(objPath, configIntf);
+        pm["Name"] = std::string(sensorName);
+        pm["UUID"] = gpuUuid;
+        pm["Type"] = std::string("NSM_ModulePowerControl");
+        pm["Index"] = index;
+        pm["Priority"] = priority;
+    }
+
+    void setupAssociations(const std::string& objPath,
+                           const std::string& chassisPath)
+    {
+        std::string parentPath = objPath.substr(0, objPath.rfind('/'));
+        auto& pm = utils::MockDbusAsync::propertyMap(parentPath, assocIntf);
+        using AssocVec =
+            std::vector<std::tuple<std::string, std::string, std::string>>;
+        pm["Associations"] =
+            AssocVec{{"parent_chassis", "power_controls", chassisPath}};
+    }
+
+    void callFactory(const std::string& objPath)
+    {
+        auto& factory = NsmObjectFactory::instance();
+        auto it = factory.creationFunctions.find(configIntf);
+        ASSERT_NE(it, factory.creationFunctions.end());
+        it->second(mockManager, configIntf, objPath);
+    }
+};
+
+// No "parent_chassis" in associations → chassisPath.size() == 0 → NSM_ERROR
+TEST_F(CreatePMPCFactoryTest, Factory_NoChassis_ErrorReturn)
+{
+    const std::string objPath = "/test/pmpc_nochassis/Module0";
+    setupConfig(objPath, "PMPC_NoChassis");
+    // No associations set → empty vector → chassisPath stays ""
+
+    size_t devBefore = gpu->deviceSensors.size();
+    size_t staticBefore = gpu->staticSensors.size();
+
+    callFactory(objPath);
+
+    EXPECT_EQ(gpu->deviceSensors.size(), devBefore);
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore);
+}
+
+// index != 0 → processorModuleToDeviceMap updated but no sensors created
+TEST_F(CreatePMPCFactoryTest, Factory_IndexNonZero_MapUpdatedNoSensors)
+{
+    const std::string objPath = "/test/pmpc_idx1/Module0";
+    setupConfig(objPath, "PMPC_Idx1", /*index=*/1);
+    setupAssociations(objPath,
+                      "/xyz/openbmc_project/inventory/system/chassis/HGX_B0");
+
+    size_t devBefore = gpu->deviceSensors.size();
+    size_t staticBefore = gpu->staticSensors.size();
+
+    callFactory(objPath);
+
+    // Map updated but no sensors added (index != 0 → early return)
+    EXPECT_FALSE(mockManager.processorModuleToDeviceMap.empty());
+    EXPECT_EQ(gpu->deviceSensors.size(), devBefore);
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore);
+}
+
+// index == 0 → full sensor creation: 1 device sensor + 3 static sensors
+TEST_F(CreatePMPCFactoryTest, Factory_IndexZero_SensorsCreated)
+{
+    const std::string objPath = "/test/pmpc_idx0/Module0";
+    setupConfig(objPath, "PMPC_Idx0", /*index=*/0, /*priority=*/true);
+    setupAssociations(objPath,
+                      "/xyz/openbmc_project/inventory/system/chassis/HGX_C0");
+
+    size_t devBefore = gpu->deviceSensors.size();
+    size_t staticBefore = gpu->staticSensors.size();
+
+    callFactory(objPath);
+
+    // NsmProcessorModulePowerControl added as device sensor
+    EXPECT_GT(gpu->deviceSensors.size(), devBefore);
+    // NsmModulePowerLimit x2 + NsmDefaultModulePowerLimit added as static
+    EXPECT_GT(gpu->staticSensors.size(), staticBefore);
+}
+
+// Two calls with same chassis path → second hits push_back branch
+TEST_F(CreatePMPCFactoryTest, Factory_SameChassis_MapPushBack)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis/HGX_D0";
+    const std::string inventoryPath =
+        "/xyz/openbmc_project/inventory/system/chassis/power/control/HGX_D0";
+
+    // First call: index=1, new map key inserted
+    const std::string objPath1 = "/test/pmpc_pushback_a/Module0";
+    setupConfig(objPath1, "PMPC_PB_A", /*index=*/1);
+    setupAssociations(objPath1, chassisPath);
+    callFactory(objPath1);
+
+    ASSERT_EQ(mockManager.processorModuleToDeviceMap.count(inventoryPath), 1u);
+    EXPECT_EQ(mockManager.processorModuleToDeviceMap[inventoryPath].size(), 1u);
+
+    // Second call: same chassis path → push_back branch
+    const std::string objPath2 = "/test/pmpc_pushback_b/Module0";
+    setupConfig(objPath2, "PMPC_PB_B", /*index=*/1);
+    setupAssociations(objPath2, chassisPath);
+    callFactory(objPath2);
+
+    EXPECT_EQ(mockManager.processorModuleToDeviceMap[inventoryPath].size(), 2u);
+}
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in CreateProcessorModulePowerControl
+// =============================================================================
+
+// "Priority" absent → count("Priority") FALSE → priority=false (default)
+// → sensors still created (index=0 path)
+TEST_F(CreatePMPCFactoryTest, Factory_MissingPriority_SensorsCreated)
+{
+    const std::string objPath = "/test/pmpc_nopriority/Module0";
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, configIntf);
+    pm["Name"] = std::string("PMPC_NoPriority");
+    pm["UUID"] = gpuUuid;
+    pm["Type"] = std::string("NSM_ModulePowerControl");
+    pm["Index"] = uint64_t(0);
+    // "Priority" intentionally omitted → priority=false (default)
+    setupAssociations(objPath,
+                      "/xyz/openbmc_project/inventory/system/chassis/HGX_FP0");
+
+    size_t devBefore = gpu->deviceSensors.size();
+    callFactory(objPath);
+    EXPECT_GT(gpu->deviceSensors.size(), devBefore);
+}
+
+// "Name" absent → count("Name") FALSE → name="" → sensors created
+// (NsmProcessorModulePowerControl uses inventoryObjPath, not name, for D-Bus)
+TEST_F(CreatePMPCFactoryTest, Factory_MissingName_SensorsCreated)
+{
+    const std::string objPath = "/test/pmpc_noname/Module0";
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, configIntf);
+    // "Name" intentionally omitted → name=""
+    pm["UUID"] = gpuUuid;
+    pm["Type"] = std::string("NSM_ModulePowerControl");
+    pm["Index"] = uint64_t(0);
+    pm["Priority"] = bool(false);
+    setupAssociations(objPath,
+                      "/xyz/openbmc_project/inventory/system/chassis/HGX_NN0");
+
+    size_t devBefore = gpu->deviceSensors.size();
+    callFactory(objPath);
+    // Sensor created with empty name — inventoryObjPath is valid
+    EXPECT_GT(gpu->deviceSensors.size(), devBefore);
+}
+
+// "Index" absent → count("Index") FALSE → index=0 (default)
+// → same code path as explicit index=0 → sensors created
+TEST_F(CreatePMPCFactoryTest, Factory_MissingIndex_DefaultsZero_SensorsCreated)
+{
+    const std::string objPath = "/test/pmpc_noindex/Module0";
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, configIntf);
+    pm["Name"] = std::string("PMPC_NoIndex");
+    pm["UUID"] = gpuUuid;
+    pm["Type"] = std::string("NSM_ModulePowerControl");
+    // "Index" intentionally omitted → index=0 (default) → sensors created
+    pm["Priority"] = bool(false);
+    setupAssociations(objPath,
+                      "/xyz/openbmc_project/inventory/system/chassis/HGX_NI0");
+
+    size_t devBefore = gpu->deviceSensors.size();
+    callFactory(objPath);
+    EXPECT_GT(gpu->deviceSensors.size(), devBefore);
+}
+
+// "UUID" absent → count("UUID") FALSE → uuid="" →
+// getNsmDeviceFromStaticUUID("") → parseStaticUuid throws std::runtime_error
+// Only runs in coverage build: in real-coroutine mode callFactory() discards
+// the returned Coroutine; the exception is stored in the coroutine's promise
+// and never propagated to the caller.
+#ifdef COVERAGE_DISABLE_COROUTINES
+TEST_F(CreatePMPCFactoryTest, Factory_MissingUUID_Throws)
+{
+    const std::string objPath = "/test/pmpc_nouuid/Module0";
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, configIntf);
+    pm["Name"] = std::string("PMPC_NoUUID");
+    pm["Type"] = std::string("NSM_ModulePowerControl");
+    pm["Index"] = uint64_t(0);
+    pm["Priority"] = bool(false);
+    // "UUID" intentionally omitted → uuid="" → parseStaticUuid throws
+    setupAssociations(objPath,
+                      "/xyz/openbmc_project/inventory/system/chassis/HGX_NU0");
+
+    EXPECT_THROW(callFactory(objPath), std::exception);
+}
+#endif // COVERAGE_DISABLE_COROUTINES
+
+// "Type" absent → count("Type") FALSE → type="" → sensor created with
+// empty type (NsmProcessorModulePowerControl uses name-based D-Bus path)
+TEST_F(CreatePMPCFactoryTest, Factory_MissingType_SensorsCreated)
+{
+    const std::string objPath = "/test/pmpc_notype/Module0";
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, configIntf);
+    pm["Name"] = std::string("PMPC_NoType");
+    pm["UUID"] = gpuUuid;
+    // "Type" intentionally omitted → type=""
+    pm["Index"] = uint64_t(0);
+    pm["Priority"] = bool(false);
+    setupAssociations(objPath,
+                      "/xyz/openbmc_project/inventory/system/chassis/HGX_NT0");
+
+    size_t devBefore = gpu->deviceSensors.size();
+    callFactory(objPath);
+    EXPECT_GT(gpu->deviceSensors.size(), devBefore);
+}
+
+// ===========================================================================
+// NsmProcessorModulePowerControl::clearPowerCap() branch coverage
+// (lines 207, 209-212, 219-222)
+// ===========================================================================
+
+// clearPowerCap() – happy path (lines 209-222):
+// AsyncOperationManager returns a valid objectPath (always non-empty).
+// doClearPowerCapOnModule is detached synchronously; with the path not
+// present in processorModuleToDeviceMap the inner loop has zero iterations.
+// Lines 207 (doClearPowerCapOnModule closing brace), 209, 211-212, 219,
+// 221-222 are covered.
+TEST_F(NsmProcessorModulePowerControlTest,
+       ClearPowerCap_HappyPath_ReturnsObjectPath)
+{
+    // Ensure patchPowerLimitInProgress is false before the call
+    powerControl->patchPowerLimitInProgress = false;
+
+    sdbusplus::message::object_path objPath;
+    EXPECT_NO_THROW(objPath = powerControl->clearPowerCap());
+    EXPECT_FALSE(std::string(objPath).empty());
+}
+
+// handleResponseMsg: rc==NSM_SW_SUCCESS, cc==NSM_ERROR →
+// `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` false branch →
+// powerCapIntf NOT updated.
+TEST_F(NsmProcessorModulePowerControlTest,
+       HandleResponseMsg_DecodeSuccessNonZeroCC_DoesNotUpdatePowerCap)
+{
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = powerControl->handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// Branch 12: L187 second operand in setPowerLimitOnModule —
+// rc==NSM_SW_SUCCESS but cc!=NSM_SUCCESS → 9-byte buffer causes
+// decode_reason_code_and_cc to return NSM_SW_SUCCESS with cc=NSM_ERROR.
+TEST_F(NsmProcessorModulePowerControlTest,
+       UpdatePowerLimitOnModule_DecodeSuccessNonZeroCC_SetsWriteFailure)
+{
+    const uuid_t deviceUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto nsmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+    ASSERT_NE(nsmDevice, nullptr);
+
+    SensorManager& manager = SensorManager::getInstance();
+    manager.processorModuleToDeviceMap[path] = {nsmDevice};
+
+    // 9-byte buffer: decode_reason_code_and_cc returns NSM_SW_SUCCESS with
+    // cc=NSM_ERROR → rc=0 (FALSE) but cc!=0 (TRUE) → second operand at L187
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    EXPECT_CALL(*nsmDevice,
+                postPatchIO(testing::_, testing::_, testing::_, testing::_))
+        .WillOnce(mockPostPatchIO(buf));
+
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+    powerControl->patchPowerLimitInProgress = false;
+    auto coroutine = powerControl->updatePowerLimitOnModule(&status, NEW_LIMIT,
+                                                            400);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+    EXPECT_FALSE(powerControl->patchPowerLimitInProgress);
 }

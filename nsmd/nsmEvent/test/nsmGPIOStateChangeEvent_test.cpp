@@ -3,12 +3,16 @@
  * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  */
 
+#include "device-capability-discovery.h"
+
 #include "nsmEvent/nsmGPIOStateChangeEvent.hpp"
+#include "test/mockDBusHandler.hpp"
 
 #include <memory>
 
 #include <gtest/gtest.h>
 
+using namespace ::testing;
 using namespace nsm;
 
 class NsmGPIOStateChangeEventTest : public ::testing::Test
@@ -268,4 +272,89 @@ TEST_F(NsmGPIOStateChangeEventTest, HandleWithDifferentEventInstances)
     EXPECT_GE(result1, 0);
     EXPECT_GE(result2, 0);
     EXPECT_GE(result3, 0);
+}
+
+// ============================================================================
+// Tests covering the gpioStateIntf != nullptr branch (lines 63-89)
+// ============================================================================
+
+struct NsmGPIOStateChangeEventDbusTest : public Test, public utils::DBusTest
+{
+    static constexpr eid_t testEid = 10;
+    sdbusplus::bus_t& bus = utils::DBusHandler::getBus();
+};
+
+// handle() – gpioStateIntf non-null, 1 GPIO event:
+// Covers lines 63-89 (entire gpioStateIntf block):
+//   - lastChangeTime update
+//   - for loop body (1 iteration)
+//   - if (!currentState.empty()) → true → lineStates() / gpioChanged() called
+TEST_F(NsmGPIOStateChangeEventDbusTest,
+       Handle_WithGPIOStateIntf_OneEvent_UpdatesState)
+{
+    auto gpioIntf = std::make_shared<GPIOStateIntf>(bus, "/test/gpio/ev/0");
+    NsmGPIOStateChangeEvent event("GPIOEvent", "GPIO", gpioIntf);
+
+    // Build a GPIO state change event with 1 GPIO entry (index=5, value=1)
+    nsm_gpio_state_change_event_payload payload = {};
+    payload.timestamp_low = 12345;
+    payload.timestamp_high = 0;
+    payload.num_gpio_events = 1;
+    payload.gpio_events[0].gpio_index = 5;
+    payload.gpio_events[0].gpio_value = 1;
+
+    constexpr size_t payloadSize = sizeof(nsm_gpio_state_change_event_payload);
+    constexpr size_t msgLen = sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                              payloadSize;
+    std::vector<uint8_t> msgBuf(msgLen, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(msgBuf.data());
+
+    auto rc = encode_nsm_gpio_state_change_event(0, false, &payload, msg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto result = event.handle(testEid, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                               NSM_GPIO_STATE_CHANGE_EVENT, msg, msgLen);
+    EXPECT_EQ(result, NSM_SW_SUCCESS);
+
+    // Verify lastChangeTime was updated
+    EXPECT_EQ(gpioIntf->lastChangeTime(), 12345ULL);
+
+    // Verify lineStates now contains gpio index 5 = true
+    auto states = gpioIntf->lineStates();
+    ASSERT_EQ(states.count(5), 1u);
+    EXPECT_TRUE(states.at(5));
+}
+
+// handle() – gpioStateIntf non-null, 0 GPIO events:
+// Covers the false branch of if (!currentState.empty()) (line 84):
+//   - currentState starts empty (default lineStates = {}),
+//     loop has 0 iterations, so currentState stays empty
+//   - if (!currentState.empty()) → false → lineStates/gpioChanged NOT called
+TEST_F(NsmGPIOStateChangeEventDbusTest,
+       Handle_WithGPIOStateIntf_ZeroEvents_NoLineStateUpdate)
+{
+    auto gpioIntf = std::make_shared<GPIOStateIntf>(bus, "/test/gpio/ev/1");
+    NsmGPIOStateChangeEvent event("GPIOEvent2", "GPIO", gpioIntf);
+
+    // 0 GPIO events: encode with num_gpio_events=0
+    nsm_gpio_state_change_event_payload zeroPayload = {};
+    zeroPayload.timestamp_low = 9999;
+    zeroPayload.num_gpio_events = 0;
+
+    constexpr size_t payloadSize = sizeof(nsm_gpio_state_change_event_payload) -
+                                   sizeof(nsm_gpio_event);
+    constexpr size_t msgLen = sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                              payloadSize;
+    std::vector<uint8_t> msgBuf(msgLen + 64, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(msgBuf.data());
+
+    auto rc = encode_nsm_gpio_state_change_event(0, false, &zeroPayload, msg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto result = event.handle(testEid, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                               NSM_GPIO_STATE_CHANGE_EVENT, msg, msgLen);
+    EXPECT_EQ(result, NSM_SW_SUCCESS);
+
+    // lineStates should still be empty (the if-block was NOT entered)
+    EXPECT_TRUE(gpioIntf->lineStates().empty());
 }

@@ -301,5 +301,6 @@ TEST(SafeConvertTest, Int64ToDoubleSafeConvertNegativeExceedsRange)
     auto result = utils::int64ToDoubleSafeConvert(value);
 
     // Should be capped to -MAX_SAFE_INTEGER_IN_DOUBLE
-    EXPECT_DOUBLE_EQ(result, static_cast<double>(-((1ULL << 53) - 1)));
+    // Use 1LL (signed) to get correct negative value; 1ULL would wrap around
+    EXPECT_DOUBLE_EQ(result, static_cast<double>(-((1LL << 53) - 1)));
 }

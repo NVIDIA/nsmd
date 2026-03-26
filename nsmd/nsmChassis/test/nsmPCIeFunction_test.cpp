@@ -8,6 +8,8 @@
 #define private public
 #define protected public
 
+#include "libnsm/pci-links.h"
+
 #include "nsmChassis/nsmPCIeFunction.hpp"
 
 using namespace nsm;
@@ -371,4 +373,45 @@ TEST_F(NsmPCIeFunctionTest, HandleResponseMsgWithLargeResponse)
     uint8_t result = function.handleResponseMsg(&response, 1000);
 
     EXPECT_GE(result, 0);
+}
+
+// Error-CC path: decode succeeds but cc = NSM_ERROR (non-zero)
+// → return cc ? cc : rc; takes the true branch (return cc).
+TEST_F(NsmPCIeFunctionTest, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    NsmInterfaceProvider<PCIeDeviceIntf> provider;
+    NsmPCIeFunction function(provider, testDeviceIndex, testFunctionId);
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_0_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    struct nsm_query_scalar_group_telemetry_group_0 data = {};
+    uint8_t rc = encode_query_scalar_group_telemetry_v1_group0_resp(
+        testInstanceId, NSM_ERROR, ERR_NULL, &data, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    uint8_t result = function.handleResponseMsg(response, responseData.size());
+    EXPECT_NE(result, NSM_SW_SUCCESS);
+}
+
+// nsmPCIeFunction.cpp L116 second operand of ||:
+// rc==NSM_SW_SUCCESS but cc==NSM_ERROR.
+// 9-byte buffer: decode_query_scalar_group_telemetry_v1_group0_resp calls
+// decode_reason_code_and_cc which returns NSM_SW_SUCCESS with cc=NSM_ERROR
+// → second operand of the || condition is TRUE (hexFormat returns "").
+TEST_F(NsmPCIeFunctionTest, HandleResponseMsg_DecodeSuccessNonZeroCC)
+{
+    NsmInterfaceProvider<PCIeDeviceIntf> provider;
+    NsmPCIeFunction function(provider, testDeviceIndex, testFunctionId);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code = NSM_ERROR
+
+    auto response = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t result = function.handleResponseMsg(response, buf.size());
+    EXPECT_NE(result, NSM_SW_SUCCESS);
 }

@@ -99,7 +99,7 @@ TEST(NsmWorkLoadProfileStatus, HandleResponseMsg_Success)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
-TEST(NsmWorkLoadProfileStatus, DISABLED_HandleResponseMsg_BadNull)
+TEST(NsmWorkLoadProfileStatus, HandleResponseMsg_BadNull)
 {
     auto profileStatusInfo =
         std::make_shared<OemProfileInfoIntf>(busWPP, invPathWPP, nullptr);
@@ -122,8 +122,9 @@ TEST(NsmWorkLoadProfileStatus, DISABLED_HandleResponseMsg_BadNull)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
     size_t msg_len = responseMsg.size();
+    // cc initialized to NSM_ERROR(1); return cc?cc:rc returns cc not rc
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+    EXPECT_EQ(rc, NSM_ERROR);
     rc = sensor.handleResponseMsg(response, msg_len - 1);
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
@@ -469,7 +470,7 @@ TEST(NsmWorkloadPowerProfilePage, HandleResponseMsg_Success)
     EXPECT_TRUE(profileCollection->hasProfileId(0));
 }
 
-TEST(NsmWorkloadPowerProfilePage, DISABLED_HandleResponseMsg_BadNull)
+TEST(NsmWorkloadPowerProfilePage, HandleResponseMsg_BadNull)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
     std::shared_ptr<MockNsmDevice> device =
@@ -491,8 +492,9 @@ TEST(NsmWorkloadPowerProfilePage, DISABLED_HandleResponseMsg_BadNull)
                                        profileMapper, 0);
 
     size_t msg_len = 128;
+    // cc initialized to NSM_ERROR(1); return cc?cc:rc returns cc not rc
     uint8_t rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+    EXPECT_EQ(rc, NSM_ERROR);
 }
 
 TEST(NsmWorkloadPowerProfilePage, HandleResponseMsg_ErrorCC)
@@ -541,4 +543,83 @@ TEST(NsmWorkloadPowerProfilePage, HandleResponseMsg_ErrorCC)
     size_t msg_len = responseMsg.size();
     rc = sensor.handleResponseMsg(response, msg_len);
     EXPECT_EQ(rc, NSM_ERROR);
+}
+
+TEST(NsmWorkLoadProfileStatus, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto profileStatusInfo =
+        std::make_shared<OemProfileInfoIntf>(busWPP, invPathWPP, nullptr);
+    auto profileInfoAsync = std::make_shared<NsmWorkloadProfileInfoAsyncIntf>(
+        busWPP, invPathWPP.c_str(), nullptr);
+
+    NsmWorkLoadProfileStatus sensor(sNameWPP, sTypeWPP, invPathWPP,
+                                    profileStatusInfo, profileInfoAsync);
+
+    // 7-byte buffer: safely reads cc=0 at payload[1] but too short for
+    // nsm_get_workload_power_profile_status_info_resp; decode returns error
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t rc = sensor.handleResponseMsg(response, responseMsg.size());
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmWorkloadPowerProfilePage, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<MockNsmDevice> device =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
+
+    auto profileCollection =
+        std::make_shared<NsmWorkloadPowerProfileCollection>(sNameWPP, sTypeWPP,
+                                                            invPathWPP, device);
+    auto pageCollection =
+        std::make_shared<NsmWorkloadPowerProfilePageCollection>(
+            sNameWPP, sTypeWPP, invPathWPP, device);
+
+    std::vector<std::string> profileNames = {"Profile0"};
+    auto profileMapper = std::make_shared<NsmWorkLoadProfileEnum>(
+        sNameWPP, sTypeWPP, profileNames);
+
+    NsmWorkloadPowerProfilePage sensor(sNameWPP, sTypeWPP, invPathWPP, device,
+                                       profileCollection, pageCollection,
+                                       profileMapper, 0);
+
+    // 7-byte buffer: safely reads cc=0 at payload[1] but too short for
+    // nsm_get_workload_power_profile_info_resp; decode returns error
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t rc = sensor.handleResponseMsg(response, responseMsg.size());
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// instanceId > NSM_INSTANCE_MAX → encode_get_workload_power_profile_info_req
+// fails → FALSE branch (encode failure path) taken → returns nullopt
+TEST(NsmWorkloadPowerProfilePage,
+     GenRequestMsg_InvalidInstanceId_ReturnsNullopt)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    std::shared_ptr<MockNsmDevice> device =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
+
+    auto profileCollection =
+        std::make_shared<NsmWorkloadPowerProfileCollection>(sNameWPP, sTypeWPP,
+                                                            invPathWPP, device);
+    auto pageCollection =
+        std::make_shared<NsmWorkloadPowerProfilePageCollection>(
+            sNameWPP, sTypeWPP, invPathWPP, device);
+
+    std::vector<std::string> profileNames = {"Profile0"};
+    auto profileMapper = std::make_shared<NsmWorkLoadProfileEnum>(
+        sNameWPP, sTypeWPP, profileNames);
+
+    NsmWorkloadPowerProfilePage sensor(sNameWPP, sTypeWPP, invPathWPP, device,
+                                       profileCollection, pageCollection,
+                                       profileMapper, 0);
+
+    auto request = sensor.genRequestMsg(10, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
 }

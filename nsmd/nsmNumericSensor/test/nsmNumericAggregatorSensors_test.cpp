@@ -96,6 +96,34 @@ TEST(nsmTempSensorAggregator, BadHandleSampleData)
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
+// tag > MAX → early return without calling decode (TRUE branch of L59)
+TEST(nsmTempSensorAggregator, HandleSample_TagAboveMax_ReturnsSuccess)
+{
+    NsmTempAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true};
+    const uint8_t aboveMaxTag =
+        static_cast<uint8_t>(NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE + 1);
+    auto rc = aggregator.handleSample({aboveMaxTag, 0, nullptr, true});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// valid=false → updateSensorNotWorking path (TRUE branch of L64)
+TEST(nsmTempSensorAggregator, HandleSample_ValidFalse_ReturnsSuccess)
+{
+    NsmTempAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true};
+    auto rc = aggregator.handleSample({1, 0, nullptr, false});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// Bad genRequestMsg: instanceId > NSM_INSTANCE_MAX → encode fails → nullopt
+TEST(nsmTempSensorAggregator, BadGenReq)
+{
+    NsmTempAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true};
+    const uint8_t eid{12};
+    const uint8_t bad_instance_id{32}; // NSM_INSTANCE_MAX = 31
+    auto request = aggregator.genRequestMsg(eid, bad_instance_id);
+    EXPECT_FALSE(request.has_value());
+}
+
 TEST(nsmPowerSensorAggregator, GoodGenReq)
 {
     NsmPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true,
@@ -168,6 +196,51 @@ TEST(nsmPowerSensorAggregator, BadHandleSampleData)
     rc = aggregator.handleSample({1, static_cast<uint8_t>(reading_datasize - 1),
                                   reading_sample.data(), true});
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+// valid=false → updateSensorNotWorking (TRUE branch of L60)
+TEST(nsmPowerSensorAggregator, HandleSample_ValidFalse_ReturnsSuccess)
+{
+    NsmPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true,
+                                  0};
+    auto rc = aggregator.handleSample({1, 0, nullptr, false});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// TIMESTAMP tag + nullptr data → decode_aggregate_timestamp_data fails
+// → rc != NSM_SW_SUCCESS TRUE branch (L71)
+TEST(nsmPowerSensorAggregator, HandleSample_TimestampDecodeFailure_ReturnsError)
+{
+    NsmPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true,
+                                  0};
+    auto rc = aggregator.handleSample({aggregator.TIMESTAMP, 0, nullptr, true});
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// tag above MAX and not TIMESTAMP → neither if-branch taken (FALSE branch of
+// else-if at L78)
+TEST(nsmPowerSensorAggregator,
+     HandleSample_TagAboveMaxNotTimestamp_ReturnsSuccess)
+{
+    NsmPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true,
+                                  0};
+    // 0xF0 > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE(0xEF) and !=
+    // TIMESTAMP(0xFF)
+    const uint8_t aboveMaxTag =
+        static_cast<uint8_t>(NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE + 1);
+    auto rc = aggregator.handleSample({aboveMaxTag, 0, nullptr, true});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// Bad genRequestMsg: instanceId > NSM_INSTANCE_MAX → encode fails → nullopt
+TEST(nsmPowerSensorAggregator, BadGenReq)
+{
+    NsmPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true,
+                                  0};
+    const uint8_t eid{12};
+    const uint8_t bad_instance_id{32}; // NSM_INSTANCE_MAX = 31
+    auto request = aggregator.genRequestMsg(eid, bad_instance_id);
+    EXPECT_FALSE(request.has_value());
 }
 
 TEST(nsmPeakPowerSensorAggregator, GoodGenReq)
@@ -244,6 +317,50 @@ TEST(nsmPeakPowerSensorAggregator, BadHandleSampleData)
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
+// valid=false → updateSensorNotWorking (TRUE branch of L61)
+TEST(nsmPeakPowerSensorAggregator, HandleSample_ValidFalse_ReturnsSuccess)
+{
+    NsmPeakPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                      true, 0};
+    auto rc = aggregator.handleSample({1, 0, nullptr, false});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// TIMESTAMP tag + nullptr data → decode fails → rc != NSM_SW_SUCCESS TRUE
+// branch (L72)
+TEST(nsmPeakPowerSensorAggregator,
+     HandleSample_TimestampDecodeFailure_ReturnsError)
+{
+    NsmPeakPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                      true, 0};
+    auto rc = aggregator.handleSample({aggregator.TIMESTAMP, 0, nullptr, true});
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// tag above MAX and not TIMESTAMP → neither if-branch taken (FALSE branch of
+// else-if at L79)
+TEST(nsmPeakPowerSensorAggregator,
+     HandleSample_TagAboveMaxNotTimestamp_ReturnsSuccess)
+{
+    NsmPeakPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                      true, 0};
+    const uint8_t aboveMaxTag =
+        static_cast<uint8_t>(NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE + 1);
+    auto rc = aggregator.handleSample({aboveMaxTag, 0, nullptr, true});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// Bad genRequestMsg: instanceId > NSM_INSTANCE_MAX → encode fails → nullopt
+TEST(nsmPeakPowerSensorAggregator, BadGenReq)
+{
+    NsmPeakPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                      true, 0};
+    const uint8_t eid{12};
+    const uint8_t bad_instance_id{32}; // NSM_INSTANCE_MAX = 31
+    auto request = aggregator.genRequestMsg(eid, bad_instance_id);
+    EXPECT_FALSE(request.has_value());
+}
+
 TEST(nsmEnergySensorAggregator, GoodGenReq)
 {
     NsmEnergyAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
@@ -308,6 +425,37 @@ TEST(nsmEnergySensorAggregator, BadHandleSampleData)
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
+// tag > MAX → early return (TRUE branch of L60)
+TEST(nsmEnergySensorAggregator, HandleSample_TagAboveMax_ReturnsSuccess)
+{
+    NsmEnergyAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                   false};
+    const uint8_t aboveMaxTag =
+        static_cast<uint8_t>(NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE + 1);
+    auto rc = aggregator.handleSample({aboveMaxTag, 0, nullptr, true});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// valid=false → updateSensorNotWorking path (TRUE branch of L65)
+TEST(nsmEnergySensorAggregator, HandleSample_ValidFalse_ReturnsSuccess)
+{
+    NsmEnergyAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                   false};
+    auto rc = aggregator.handleSample({1, 0, nullptr, false});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// Bad genRequestMsg: instanceId > NSM_INSTANCE_MAX → encode fails → nullopt
+TEST(nsmEnergySensorAggregator, BadGenReq)
+{
+    NsmEnergyAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                   false};
+    const uint8_t eid{12};
+    const uint8_t bad_instance_id{32}; // NSM_INSTANCE_MAX = 31
+    auto request = aggregator.genRequestMsg(eid, bad_instance_id);
+    EXPECT_FALSE(request.has_value());
+}
+
 TEST(nsmVoltageSensorAggregator, GoodGenReq)
 {
     NsmVoltageAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
@@ -366,6 +514,37 @@ TEST(nsmVoltageSensorAggregator, BadHandleSampleData)
     rc = aggregator.handleSample(
         {1, static_cast<uint8_t>(data_size - 1), sample.data(), true});
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+// tag > MAX → early return (TRUE branch of L59)
+TEST(nsmVoltageSensorAggregator, HandleSample_TagAboveMax_ReturnsSuccess)
+{
+    NsmVoltageAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                    false};
+    const uint8_t aboveMaxTag =
+        static_cast<uint8_t>(NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE + 1);
+    auto rc = aggregator.handleSample({aboveMaxTag, 0, nullptr, true});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// valid=false → updateSensorNotWorking path (TRUE branch of L64)
+TEST(nsmVoltageSensorAggregator, HandleSample_ValidFalse_ReturnsSuccess)
+{
+    NsmVoltageAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                    false};
+    auto rc = aggregator.handleSample({1, 0, nullptr, false});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// Bad genRequestMsg: instanceId > NSM_INSTANCE_MAX → encode fails → nullopt
+TEST(nsmVoltageSensorAggregator, BadGenReq)
+{
+    NsmVoltageAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                    false};
+    const uint8_t eid{12};
+    const uint8_t bad_instance_id{32}; // NSM_INSTANCE_MAX = 31
+    auto request = aggregator.genRequestMsg(eid, bad_instance_id);
+    EXPECT_FALSE(request.has_value());
 }
 
 TEST(nsmThresholdAggregator, GoodGenReq)

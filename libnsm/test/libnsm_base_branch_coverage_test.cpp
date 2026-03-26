@@ -957,3 +957,132 @@ TEST(EncodeSetGpioStateRespBranch, ErrorCompletionCode)
 	EXPECT_EQ(resp_payload->completion_code, cc);
 	EXPECT_EQ(le16toh(resp_payload->reason_code), reason_code);
 }
+
+// Branch coverage for encode_get_supported_nvidia_message_types_resp
+// Tests the "if (msg == NULL)" TRUE branch (line 435 in base.c)
+TEST(EncodeGetSupportedNvidiaMsgTypesRespBranch, NullMsg)
+{
+	auto rc = encode_get_supported_nvidia_message_types_resp(
+	    0, NSM_SUCCESS, 0, nullptr, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage for encode_nsm_query_device_identification_req
+// Tests the "if (msg == NULL)" TRUE branch (line 593 in base.c)
+TEST(EncodeNsmQueryDeviceIdentificationReqBranch, NullMsg)
+{
+	auto rc = encode_nsm_query_device_identification_req(0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage for encode_nsm_event_acknowledgement — L730
+TEST(EncodeNsmEventAcknowledgementBranch, NullMsg)
+{
+	auto rc = encode_nsm_event_acknowledgement(0, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// Branch coverage for decode_nsm_event_acknowledgement — L755
+// (event_id == NULL part — short-circuits after msg/instance_id/nsm_type)
+TEST(DecodeNsmEventAcknowledgementBranch, NullEventId)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_event_ack) + 1, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t instance_id = 0, nsm_type = 0;
+	auto rc = decode_nsm_event_acknowledgement(
+	    msg, buf.size(), &instance_id, &nsm_type, nullptr);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// Branch coverage for encode_common_req_v2 — L897
+TEST(EncodeCommonReqV2Branch, NullMsg)
+{
+	auto rc = encode_common_req_v2(0, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage for encode_get_histogram_format_req — L1210
+TEST(EncodeGetHistogramFormatReqBranch, NullMsg)
+{
+	auto rc = encode_get_histogram_format_req(0, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage for encode_get_histogram_format_resp — L1266
+TEST(EncodeGetHistogramFormatRespBranch, NullMsg)
+{
+	auto rc = encode_get_histogram_format_resp(0, NSM_SUCCESS, 0, nullptr,
+						   nullptr, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage for encode_get_histogram_data_req — L1371
+TEST(EncodeGetHistogramDataReqBranch, NullMsg)
+{
+	auto rc = encode_get_histogram_data_req(0, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage for encode_get_histogram_data_resp — L1427
+TEST(EncodeGetHistogramDataRespBranch, NullMsg)
+{
+	auto rc = encode_get_histogram_data_resp(0, NSM_SUCCESS, 0, 0, 0,
+						 nullptr, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage for encode_get_gpio_state_req — L1510
+TEST(EncodeGetGpioStateReqBranch, NullMsg)
+{
+	auto rc = encode_get_gpio_state_req(0, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage for encode_get_gpio_state_resp — L1568
+TEST(EncodeGetGpioStateRespBranch, NullMsg)
+{
+	auto rc = encode_get_gpio_state_resp(0, NSM_SUCCESS, 0, 0, 0, nullptr,
+					     0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage for encode_set_gpio_state_req — L1644 (msg == NULL)
+TEST(EncodeSetGpioStateReqBranch, NullMsg)
+{
+	uint8_t gpio_vals[1] = {0};
+	auto rc = encode_set_gpio_state_req(0, 0, 0, gpio_vals, 1, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// ---------------------------------------------------------------------------
+// Pack-fail branches (instance_id > NSM_INSTANCE_MAX = 31)
+// ---------------------------------------------------------------------------
+
+// Branch coverage for encode_ping_req — L362 (rc != NSM_SW_SUCCESS)
+TEST(EncodePingReqBranch, PackFail)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_ping_req(32, msg); // instance_id 32 > NSM_INSTANCE_MAX
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Branch coverage for encode_common_req_v2 — L904 (rc != NSM_SW_SUCCESS)
+TEST(EncodeCommonReqV2Branch, PackFail)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_common_req_v2(32, 0, 0, msg);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Branch coverage for encode_set_gpio_state_req — L1659 (rc != NSM_SW_SUCCESS)
+TEST(EncodeSetGpioStateReqBranch, PackFail)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	uint8_t gpio_vals[1] = {0};
+	auto rc = encode_set_gpio_state_req(32, 0, 0, gpio_vals, 1, msg);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}

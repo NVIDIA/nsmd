@@ -18,7 +18,7 @@
  *   - void nsm::NsmDevice::addSensor<nsm::EthPortTelemetryAggregator>
  *
  * Each test creates a concrete sensor of the target type and calls
- * device->addSensor(sensor, PollingType::RoundRobin) to instantiate the
+ * device->addSensor(sensor, PollingType::RoundRobin) to instantiate the //
  * corresponding addSensor<T> template in nsmDevice.hpp.
  */
 

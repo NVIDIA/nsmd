@@ -18,6 +18,7 @@
 #include "nsmDotUtils.hpp"
 
 #include <openssl/bio.h>
+#include <openssl/core_names.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
@@ -27,6 +28,47 @@
 #include <string>
 
 #include <gtest/gtest.h>
+
+// Helper: generate a PEM public key for the named algorithm/group.
+// Returns empty string on failure.
+static std::string generatePEMPublicKey(const char* algorithm,
+                                        const char* groupName = nullptr)
+{
+    std::unique_ptr<EVP_PKEY_CTX, decltype(&EVP_PKEY_CTX_free)> kctx{
+        EVP_PKEY_CTX_new_from_name(nullptr, algorithm, nullptr),
+        &EVP_PKEY_CTX_free};
+    if (!kctx || EVP_PKEY_keygen_init(kctx.get()) <= 0)
+    {
+        return {};
+    }
+    if (groupName)
+    {
+        OSSL_PARAM params[] = {
+            OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME,
+                                   const_cast<char*>(groupName), 0),
+            OSSL_PARAM_END};
+        if (EVP_PKEY_CTX_set_params(kctx.get(), params) <= 0)
+        {
+            return {};
+        }
+    }
+    EVP_PKEY* rawKey = nullptr;
+    if (EVP_PKEY_keygen(kctx.get(), &rawKey) <= 0 || !rawKey)
+    {
+        return {};
+    }
+    std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> pkey{rawKey,
+                                                             &EVP_PKEY_free};
+    std::unique_ptr<BIO, decltype(&BIO_free)> bio{BIO_new(BIO_s_mem()),
+                                                  &BIO_free};
+    if (!bio || PEM_write_bio_PUBKEY(bio.get(), pkey.get()) <= 0)
+    {
+        return {};
+    }
+    char* data = nullptr;
+    long len = BIO_get_mem_data(bio.get(), &data);
+    return {data, static_cast<size_t>(len)};
+}
 
 using namespace nsm::dot;
 
@@ -78,6 +120,27 @@ TEST(DecodeHexTest, InvalidHexCharactersCorrectLength)
     std::string hexInput = "0123456789abcdgz"; // 'g' and 'z' are invalid hex
     uint8_t output[8] = {0};
     EXPECT_FALSE(decodeHex(hexInput, output, 8));
+}
+
+// decodeHex: empty input → TRUE branch of first condition in
+// `if (input.empty() || !output || expectedSize == 0)` (line 128)
+TEST(DecodeHexTest, EmptyInputReturnsFalse)
+{
+    uint8_t output[8] = {0};
+    EXPECT_FALSE(decodeHex("", output, 8));
+}
+
+// decodeHex: null output → second condition TRUE (line 128)
+TEST(DecodeHexTest, NullOutputReturnsFalse)
+{
+    EXPECT_FALSE(decodeHex("0102", nullptr, 1));
+}
+
+// decodeHex: zero expectedSize → third condition TRUE (line 128)
+TEST(DecodeHexTest, ZeroExpectedSizeReturnsFalse)
+{
+    uint8_t output[8] = {0};
+    EXPECT_FALSE(decodeHex("01", output, 0));
 }
 
 TEST(DecodeBase64Test, EmptyInputReturnsfalse)
@@ -240,6 +303,46 @@ TEST(BIOPtrTest, MoveAssignment)
     EXPECT_EQ(bioPtr2.get(), bio1);
 }
 
+// BIOPtr self-move-assignment: this == &other → FALSE branch of
+// `if (this != &other)` (line 55). bio_ must remain unchanged.
+TEST(BIOPtrTest, SelfMoveAssignment)
+{
+    BIO* bio = BIO_new(BIO_s_mem());
+    ASSERT_NE(bio, nullptr);
+    BIOPtr bioPtr(bio);
+
+    // Suppress -Wself-move: intentionally testing the self-assignment guard
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wself-move"
+    bioPtr = std::move(bioPtr);
+#pragma GCC diagnostic pop
+    EXPECT_EQ(bioPtr.get(), bio);
+}
+
+// BIOPtr move-assign from a moved-from (null) source: this != &other AND
+// this->bio_ == nullptr → FALSE branch of `if (bio_)` (line 57).
+TEST(BIOPtrTest, MoveAssignFromNullSource)
+{
+    BIO* bio1 = BIO_new(BIO_s_mem());
+    ASSERT_NE(bio1, nullptr);
+    BIOPtr src(bio1);
+
+    // Move src into temp to make src null
+    BIOPtr temp(std::move(src)); // src.bio_ = nullptr now
+
+    // Create dest also with null bio_
+    BIO* bio2 = BIO_new(BIO_s_mem());
+    ASSERT_NE(bio2, nullptr);
+    BIOPtr dest(bio2);
+    BIOPtr dest2(std::move(dest)); // dest.bio_ = nullptr
+
+    // dest.bio_ == nullptr → `if (bio_)` FALSE: skip BIO_free_all
+    // Then dest.bio_ = src.bio_ = nullptr
+    dest = std::move(src); // both bio_ are nullptr
+    EXPECT_FALSE(dest);
+    EXPECT_FALSE(src);
+}
+
 TEST(DecodePEMKeyTest, EmptyInputReturnsFalse)
 {
     uint8_t output[ECDSA_KEY_SIZE] = {0};
@@ -368,4 +471,62 @@ TEST(DecodeKeyDataTest, PEMFormatWithWrongSizeReturnsFalse)
         "-----END PUBLIC KEY-----\n";
     // Wrong size - should fail
     EXPECT_FALSE(decodeKeyData(pemKey, output, LMS_KEY_SIZE));
+}
+
+// decodeKeyData: decodePEMKey fails (no PEM header), decodeBase64 SUCCEEDS →
+// TRUE branch of `if (decodeBase64(...))` (line 166).
+// 96 zero bytes base64-encoded = 128 'A' characters (no padding needed
+// since 96 % 3 == 0); BIO_FLAGS_BASE64_NO_NL mode is used.
+TEST(DecodeKeyDataTest, Base64InputSucceeds_CoversLine166)
+{
+    // 96 zero bytes encoded as base64: each triplet 0x00,0x00,0x00 → "AAAA"
+    // 32 groups × "AAAA" = 128 'A' characters
+    std::string b64Input(128, 'A');
+    uint8_t output[ECDSA_KEY_SIZE] = {};
+    EXPECT_TRUE(decodeKeyData(b64Input, output, ECDSA_KEY_SIZE));
+    // All bytes should be zero
+    for (size_t i = 0; i < ECDSA_KEY_SIZE; i++)
+    {
+        EXPECT_EQ(output[i], 0x00) << "byte " << i;
+    }
+}
+
+// decodeKeyData: decodePEMKey fails (no PEM header), decodeBase64 fails
+// (wrong decoded size), decodeHex SUCCEEDS →
+// TRUE branch of `if (decodeHex(...))` (line 171).
+// 96 zero bytes hex-encoded = 192 '0' characters.
+// decodeBase64 of "000...000" (192 chars) → 144 bytes decoded ≠ 96 → fails.
+TEST(DecodeKeyDataTest, HexInputSucceeds_CoversLine171)
+{
+    // 96 zero bytes as hex: "000000...000000" (192 '0' chars)
+    std::string hexInput(ECDSA_KEY_SIZE * 2, '0');
+    uint8_t output[ECDSA_KEY_SIZE] = {};
+    EXPECT_TRUE(decodeKeyData(hexInput, output, ECDSA_KEY_SIZE));
+    for (size_t i = 0; i < ECDSA_KEY_SIZE; i++)
+    {
+        EXPECT_EQ(output[i], 0x00) << "byte " << i;
+    }
+}
+
+// decodePEMKey: RSA public key → EVP_PKEY_get_id() != EVP_PKEY_EC (TRUE
+// branch at the non-EC-type check). Covers the early-return path for
+// non-elliptic-curve key types.
+TEST(DecodePEMKeyTest, RSAKey_NotECType_ReturnsFalse)
+{
+    std::string rsaPem = generatePEMPublicKey("RSA");
+    ASSERT_FALSE(rsaPem.empty()) << "RSA key generation failed";
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    EXPECT_FALSE(decodePEMKey(rsaPem, output, ECDSA_KEY_SIZE));
+}
+
+// decodePEMKey: P-521 EC key → coordinates are 66 bytes each, but
+// coordinateSize = ECDSA_KEY_SIZE/2 = 48. BN_num_bytes(x) > coordinateSize
+// → TRUE branch of the coordinate-size guard (covers the L253 condition).
+TEST(DecodePEMKeyTest, P521Key_OversizedCoordinate_ReturnsFalse)
+{
+    std::string p521Pem = generatePEMPublicKey("EC", "P-521");
+    ASSERT_FALSE(p521Pem.empty()) << "P-521 key generation failed";
+    uint8_t output[ECDSA_KEY_SIZE] = {0};
+    // ECDSA_KEY_SIZE=96 → coordinateSize=48; P-521 has 66-byte coordinates
+    EXPECT_FALSE(decodePEMKey(p521Pem, output, ECDSA_KEY_SIZE));
 }

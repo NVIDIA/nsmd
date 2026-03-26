@@ -454,3 +454,144 @@ TEST_F(NsmSetWriteProtectedTest, goodTestCX8Write)
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().cx8);
 }
+
+// ---- getValue() direct tests for untested switch cases ----
+
+// default: branch – invalid dataIndex value → returns false
+TEST(NsmSetWriteProtectedGetValue, DefaultCase_ReturnsFalse)
+{
+    nsm_fpga_diagnostics_settings_wp data{};
+    // Set every bit so that any valid case would return true
+    std::memset(&data, 0xFF, sizeof(data));
+
+    // Cast an out-of-range integer so the switch hits the default branch
+    auto invalidIndex =
+        static_cast<diagnostics_enable_disable_wp_data_index>(0);
+    EXPECT_FALSE(NsmSetWriteProtected::getValue(data, invalidIndex));
+}
+
+// BASEBOARD_FRU_EEPROM / CX7_FRU_EEPROM / HMC_FRU_EEPROM → data.baseboard
+TEST(NsmSetWriteProtectedGetValue, BaseboardFruEeprom_ReturnsBaseboard)
+{
+    nsm_fpga_diagnostics_settings_wp data{};
+    data.baseboard = 1;
+    EXPECT_TRUE(NsmSetWriteProtected::getValue(data, BASEBOARD_FRU_EEPROM));
+    EXPECT_TRUE(NsmSetWriteProtected::getValue(data, CX7_FRU_EEPROM));
+    EXPECT_TRUE(NsmSetWriteProtected::getValue(data, HMC_FRU_EEPROM));
+}
+
+// RETIMER_EEPROM → data.retimer
+TEST(NsmSetWriteProtectedGetValue, RetimerEeprom_ReturnsRetimer)
+{
+    nsm_fpga_diagnostics_settings_wp data{};
+    data.retimer = 1;
+    EXPECT_TRUE(NsmSetWriteProtected::getValue(data, RETIMER_EEPROM));
+}
+
+// NVSW_EEPROM_BOTH → data.nvSwitch
+TEST(NsmSetWriteProtectedGetValue, NvswEepromBoth_ReturnsNvSwitch)
+{
+    nsm_fpga_diagnostics_settings_wp data{};
+    data.nvSwitch = 1;
+    EXPECT_TRUE(NsmSetWriteProtected::getValue(data, NVSW_EEPROM_BOTH));
+}
+
+// GPU_1_4_SPI_FLASH → data.gpu1_4; GPU_5_8_SPI_FLASH → data.gpu5_8
+TEST(NsmSetWriteProtectedGetValue, Gpu14And58SpiFlash)
+{
+    nsm_fpga_diagnostics_settings_wp data{};
+    data.gpu1_4 = 1;
+    data.gpu5_8 = 1;
+    EXPECT_TRUE(NsmSetWriteProtected::getValue(data, GPU_1_4_SPI_FLASH));
+    EXPECT_TRUE(NsmSetWriteProtected::getValue(data, GPU_5_8_SPI_FLASH));
+}
+
+// GPU_SPI_FLASH compound && FALSE branch: any bit zero → returns false
+// Line 62: return data.gpu1_4 && data.gpu5_8 && data.gpu9_12 && data.gpu13_16;
+// Branch 11→15 (FALSE path) taken when gpu1_4 == 0
+TEST(NsmSetWriteProtectedGetValue, GpuSpiFlash_PartialBits_ReturnsFalse)
+{
+    nsm_fpga_diagnostics_settings_wp data{};
+    // All bits zero → compound && evaluates to false at the first operand
+    EXPECT_FALSE(NsmSetWriteProtected::getValue(data, GPU_SPI_FLASH));
+    // One bit set but others zero → still false (short-circuits at gpu5_8=0)
+    data.gpu1_4 = 1;
+    EXPECT_FALSE(NsmSetWriteProtected::getValue(data, GPU_SPI_FLASH));
+}
+
+// Error-CC path: setWriteProtected coroutine – postPatchIO succeeds but
+// cc = NSM_ERROR → co_return cc ? cc : rc; takes the true branch. //
+
+TEST_F(NsmSetWriteProtectedTest, SetWriteProtected_ErrorCC_CoversTrueBranch)
+{
+    init(HMC_SPI_FLASH);
+
+    // Construct response with cc = NSM_ERROR (byte 6 holds completion code)
+    Response errorMsg = enableDisableMsg;
+    errorMsg[6] = NSM_ERROR;
+
+    EXPECT_CALL(*fpga, postPatchIO)
+        .Times(1)
+        .WillOnce(mockPostPatchIO(errorMsg));
+
+    // cc = NSM_ERROR → status = WriteFailure → throw
+    EXPECT_THROW(
+        writeProtected(true),
+        sdbusplus::xyz::openbmc_project::Common::Device::Error::WriteFailure);
+}
+
+// setWriteProtected(): postPatchIO returns a generic (non-UNSUPPORTED) error →
+// enters the inner if(rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE) true branch →
+// triggers lg2::error logging at lines 153-156 of nsmSetWriteProtected.cpp. //
+
+TEST_F(NsmSetWriteProtectedTest,
+       WriteProtected_PostPatchIOGenericError_LogsErrorAndThrows)
+{
+    init(HMC_SPI_FLASH);
+    // NSM_SW_ERROR is non-zero and ≠ NSM_ERR_UNSUPPORTED_COMMAND_CODE, so the
+    // inner logging branch (lines 153-156) is taken before the WriteFailure
+    // throw.
+    EXPECT_CALL(*fpga, postPatchIO)
+        .Times(1)
+        .WillOnce(mockPostPatchIO(enableDisableMsg, NSM_ERROR));
+    EXPECT_THROW(
+        writeProtected(true),
+        sdbusplus::xyz::openbmc_project::Common::Device::Error::WriteFailure);
+}
+
+// setWriteProtected(): decode returns NSM_SW_SUCCESS but cc != NSM_SUCCESS
+// (L168 FALSE: rc==NSM_SW_SUCCESS && cc!=NSM_SUCCESS branch not taken).
+// Use 9-byte buffer so decode_reason_code_and_cc returns NSM_SW_SUCCESS.
+TEST_F(NsmSetWriteProtectedTest,
+       SetWriteProtected_DecodeSuccessNonZeroCC_WriteFailure)
+{
+    init(HMC_SPI_FLASH);
+
+    // sizeof(nsm_msg_hdr)+sizeof(nsm_common_non_success_resp)=9 bytes:
+    // decode_reason_code_and_cc returns NSM_SW_SUCCESS with cc=NSM_ERROR
+    Response ccErrResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    ccErrResp[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // payload[1]=cc
+
+    EXPECT_CALL(*fpga, postPatchIO)
+        .Times(1)
+        .WillOnce(mockPostPatchIO(ccErrResp));
+
+    EXPECT_THROW(
+        writeProtected(true),
+        sdbusplus::xyz::openbmc_project::Common::Device::Error::WriteFailure);
+}
+
+// writeProtected() receives a non-bool variant value →
+// std::get_if<bool>(&value) returns nullptr →
+// throws sdbusplus InvalidArgument (line 120 in nsmSetWriteProtected.cpp).
+TEST_F(NsmSetWriteProtectedTest,
+       WriteProtected_NonBoolValue_ThrowsInvalidArgument)
+{
+    init(CPU_SPI_FLASH_1);
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType nonBool = uint32_t(42);
+    EXPECT_THROW_COROUTINE(
+        writeProtectedIntf->writeProtected(nonBool, &status, fpga),
+        sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
+}

@@ -1137,13 +1137,13 @@ TEST(PlatformEnvironmentalDecoders, DecodeGetRowRemapAvailabilityReq)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
-// TODO: Fix - failing with NSM_SW_ERROR_DATA
-TEST(PlatformEnvironmentalDecoders, DISABLED_DecodeGetMemoryCapacityUtilReq)
+// instance_id must be <= NSM_INSTANCE_MAX (31=0x1f); 0x20 causes encode fail
+TEST(PlatformEnvironmentalDecoders, DecodeGetMemoryCapacityUtilReq)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
 					sizeof(nsm_common_req));
 	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
-	uint8_t instance_id = 0x20;
+	uint8_t instance_id = 0x01;
 
 	// Encode request (no-payload request)
 	int rc = encode_get_memory_capacity_util_req(instance_id, msg);
@@ -1155,15 +1155,14 @@ TEST(PlatformEnvironmentalDecoders, DISABLED_DecodeGetMemoryCapacityUtilReq)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
-// TODO: Fix - failing with NSM_SW_ERROR_DATA
-TEST(PlatformEnvironmentalDecoders,
-     DISABLED_DecodeGetClockOutputEnabledStateReq)
+// instance_id must be <= NSM_INSTANCE_MAX (31=0x1f); 0x21 causes encode fail
+TEST(PlatformEnvironmentalDecoders, DecodeGetClockOutputEnabledStateReq)
 {
 	std::vector<uint8_t> requestMsg(
 	    sizeof(nsm_msg_hdr) +
 	    sizeof(nsm_get_clock_output_enabled_state_req));
 	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
-	uint8_t instance_id = 0x21;
+	uint8_t instance_id = 0x02;
 	uint8_t output_id_in = 0x03;
 
 	// Encode request
@@ -1180,13 +1179,13 @@ TEST(PlatformEnvironmentalDecoders,
 	EXPECT_EQ(output_id_out, output_id_in);
 }
 
-// TODO: Fix - failing with NSM_SW_ERROR_DATA
-TEST(PlatformEnvironmentalDecoders, DISABLED_DecodeSetClockLimitReq)
+// instance_id must be <= NSM_INSTANCE_MAX (31=0x1f); 0x22 causes encode fail
+TEST(PlatformEnvironmentalDecoders, DecodeSetClockLimitReq)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
 					sizeof(nsm_set_clock_limit_req));
 	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
-	uint8_t instance_id = 0x22;
+	uint8_t instance_id = 0x03;
 	uint8_t clock_id_in = 0x05;
 	uint8_t flags_in = 0x03;
 	uint32_t limit_min_in = 0x12345678;
@@ -1209,4 +1208,481 @@ TEST(PlatformEnvironmentalDecoders, DISABLED_DecodeSetClockLimitReq)
 	EXPECT_EQ(flags_out, flags_in);
 	EXPECT_EQ(limit_min_out, limit_min_in);
 	EXPECT_EQ(limit_max_out, limit_max_in);
+}
+
+// ============================================================================
+// NULL / error-path branch coverage for additional encode/decode functions
+// (These cover the 50%-branches not yet reached by existing tests.)
+// ============================================================================
+
+// --- decode_get_inventory_information_req ---
+
+TEST(PlatformEnvBranch2, DecodeGetInventoryInfoReq_NullMsg)
+{
+	uint8_t prop_id;
+	auto rc = decode_get_inventory_information_req(nullptr, 64, &prop_id);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetInventoryInfoReq_NullPropertyId)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_inventory_information_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto rc =
+	    decode_get_inventory_information_req(msg, buf.size(), nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetInventoryInfoReq_ShortLength)
+{
+	std::vector<uint8_t> buf(2);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	uint8_t prop_id;
+	auto rc =
+	    decode_get_inventory_information_req(msg, buf.size(), &prop_id);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetInventoryInfoReq_SmallDataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_inventory_information_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	// Set data_size to 0 (too small for property_identifier)
+	auto *req =
+	    reinterpret_cast<nsm_get_inventory_information_req *>(msg->payload);
+	req->hdr.data_size = 0;
+	uint8_t prop_id;
+	auto rc =
+	    decode_get_inventory_information_req(msg, buf.size(), &prop_id);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// --- encode_get_inventory_information_resp ---
+
+TEST(PlatformEnvBranch2, EncodeGetInventoryInfoResp_NullMsg)
+{
+	auto rc = encode_get_inventory_information_resp(0, NSM_SUCCESS, 0, 4,
+							nullptr, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, EncodeGetInventoryInfoResp_NullInventoryData)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_inventory_information_resp) +
+				 4);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	// cc=NSM_SUCCESS with null inventory_information triggers NULL error
+	auto rc = encode_get_inventory_information_resp(0, NSM_SUCCESS, 0, 4,
+							nullptr, msg);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- decode_get_inventory_information_resp ---
+
+TEST(PlatformEnvBranch2, DecodeGetInventoryInfoResp_NullDataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_inventory_information_resp) +
+				 4);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = 0;
+	uint8_t inv_data[4] = {};
+	// null data_size triggers NULL check
+	auto rc = decode_get_inventory_information_resp(
+	    msg, buf.size(), &cc, &reason_code, nullptr, inv_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- encode_get_platform_env_command_no_payload_req ---
+
+TEST(PlatformEnvBranch2, EncodePlatformEnvNoPayloadReq_NullMsg)
+{
+	auto rc = encode_get_platform_env_command_no_payload_req(
+	    0, nullptr, NSM_GET_INVENTORY_INFORMATION);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- decode_inventory_information_as_uint32 ---
+
+TEST(PlatformEnvBranch2, DecodeInventoryInfoAsUint32_ShortDataSize)
+{
+	uint8_t data[4] = {0x01, 0x02, 0x03, 0x04};
+	// data_size < sizeof(uint32_t) → returns UINT32_MAX
+	auto result = decode_inventory_information_as_uint32(data, 3);
+	EXPECT_EQ(result, UINT32_MAX);
+}
+
+// --- encode_read_thermal_parameter_req ---
+
+TEST(PlatformEnvBranch2, EncodeReadThermalParameterReq_NullMsg)
+{
+	auto rc = encode_read_thermal_parameter_req(0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- decode_read_thermal_parameter_req ---
+
+TEST(PlatformEnvBranch2, DecodeReadThermalParameterReq_NullMsg)
+{
+	uint8_t param_id;
+	auto rc = decode_read_thermal_parameter_req(nullptr, 64, &param_id);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, DecodeReadThermalParameterReq_NullParamId)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_read_thermal_parameter_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto rc = decode_read_thermal_parameter_req(msg, buf.size(), nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, DecodeReadThermalParameterReq_ShortLength)
+{
+	std::vector<uint8_t> buf(2);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	uint8_t param_id;
+	auto rc = decode_read_thermal_parameter_req(msg, buf.size(), &param_id);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(PlatformEnvBranch2, DecodeReadThermalParameterReq_SmallDataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_read_thermal_parameter_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto *req =
+	    reinterpret_cast<nsm_read_thermal_parameter_req *>(msg->payload);
+	req->hdr.data_size = 0; // too small (< sizeof(parameter_id) = 1)
+	uint8_t param_id;
+	auto rc = decode_read_thermal_parameter_req(msg, buf.size(), &param_id);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// --- encode_read_thermal_parameter_resp ---
+
+TEST(PlatformEnvBranch2, EncodeReadThermalParameterResp_NullMsg)
+{
+	auto rc =
+	    encode_read_thermal_parameter_resp(0, NSM_SUCCESS, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- encode_get_max_observed_power_req ---
+
+TEST(PlatformEnvBranch2, EncodeGetMaxObservedPowerReq_NullMsg)
+{
+	auto rc = encode_get_max_observed_power_req(0, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- decode_get_max_observed_power_req ---
+
+TEST(PlatformEnvBranch2, DecodeGetMaxObservedPowerReq_NullMsg)
+{
+	uint8_t sensor_id, avg_interval;
+	auto rc = decode_get_max_observed_power_req(nullptr, 64, &sensor_id,
+						    &avg_interval);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetMaxObservedPowerReq_ShortLength)
+{
+	std::vector<uint8_t> buf(2);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	uint8_t sensor_id, avg_interval;
+	auto rc = decode_get_max_observed_power_req(msg, buf.size(), &sensor_id,
+						    &avg_interval);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetMaxObservedPowerReq_SmallDataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_max_observed_power_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto *req =
+	    reinterpret_cast<nsm_get_max_observed_power_req *>(msg->payload);
+	req->hdr.data_size = 0; // too small (< sensor_id + avg_interval = 2)
+	uint8_t sensor_id, avg_interval;
+	auto rc = decode_get_max_observed_power_req(msg, buf.size(), &sensor_id,
+						    &avg_interval);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// --- encode_get_max_observed_power_resp ---
+
+TEST(PlatformEnvBranch2, EncodeGetMaxObservedPowerResp_NullMsg)
+{
+	auto rc =
+	    encode_get_max_observed_power_resp(0, NSM_SUCCESS, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- encode_get_driver_info_req ---
+
+TEST(PlatformEnvBranch2, EncodeGetDriverInfoReq_NullMsg)
+{
+	auto rc = encode_get_driver_info_req(0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- decode_get_driver_info_req ---
+
+TEST(PlatformEnvBranch2, DecodeGetDriverInfoReq_NullMsg)
+{
+	auto rc = decode_get_driver_info_req(nullptr, 64);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetDriverInfoReq_ShortLength)
+{
+	std::vector<uint8_t> buf(2);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto rc = decode_get_driver_info_req(msg, buf.size());
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetDriverInfoReq_NonZeroDataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto *req = reinterpret_cast<nsm_common_req *>(msg->payload);
+	req->data_size = 1; // must be 0 for a no-payload request
+	auto rc = decode_get_driver_info_req(msg, buf.size());
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// --- encode_get_driver_info_resp ---
+
+TEST(PlatformEnvBranch2, EncodeGetDriverInfoResp_NullMsg)
+{
+	auto rc =
+	    encode_get_driver_info_resp(0, NSM_SUCCESS, 0, 0, nullptr, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, EncodeGetDriverInfoResp_NullDriverData)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_driver_info_resp) + 4);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	// cc=NSM_SUCCESS, data_size > 0, but driver_info_data=NULL → NULL error
+	auto rc =
+	    encode_get_driver_info_resp(0, NSM_SUCCESS, 0, 4, nullptr, msg);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- encode_get_current_energy_count_resp ---
+
+TEST(PlatformEnvBranch2, EncodeGetCurrentEnergyCountResp_NullMsg)
+{
+	auto rc =
+	    encode_get_current_energy_count_resp(0, NSM_SUCCESS, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- encode_get_voltage_req ---
+
+TEST(PlatformEnvBranch2, EncodeGetVoltageReq_NullMsg)
+{
+	auto rc = encode_get_voltage_req(0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- decode_get_voltage_req ---
+
+TEST(PlatformEnvBranch2, DecodeGetVoltageReq_NullMsg)
+{
+	uint8_t sensor_id;
+	auto rc = decode_get_voltage_req(nullptr, 64, &sensor_id);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetVoltageReq_NullSensorId)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_voltage_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto rc = decode_get_voltage_req(msg, buf.size(), nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetVoltageReq_ShortLength)
+{
+	std::vector<uint8_t> buf(2);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	uint8_t sensor_id;
+	auto rc = decode_get_voltage_req(msg, buf.size(), &sensor_id);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(PlatformEnvBranch2, DecodeGetVoltageReq_SmallDataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_voltage_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto *req = reinterpret_cast<nsm_get_voltage_req *>(msg->payload);
+	req->hdr.data_size = 0; // too small (< sizeof(sensor_id) = 1)
+	uint8_t sensor_id;
+	auto rc = decode_get_voltage_req(msg, buf.size(), &sensor_id);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// --- encode_get_voltage_resp ---
+
+TEST(PlatformEnvBranch2, EncodeGetVoltageResp_NullMsg)
+{
+	auto rc = encode_get_voltage_resp(0, NSM_SUCCESS, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- encode_get_MIG_mode_req ---
+
+TEST(PlatformEnvBranch2, EncodeGetMIGModeReq_NullMsg)
+{
+	auto rc = encode_get_MIG_mode_req(0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- encode_get_MIG_mode_resp ---
+
+TEST(PlatformEnvBranch2, EncodeGetMIGModeResp_NullMsg)
+{
+	bitfield8_t flags = {};
+	auto rc = encode_get_MIG_mode_resp(0, NSM_SUCCESS, 0, &flags, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, EncodeGetMIGModeResp_NullFlags)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_MIG_mode_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto rc = encode_get_MIG_mode_resp(0, NSM_SUCCESS, 0, nullptr, msg);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- decode_get_MIG_mode_resp: wrong command field ---
+
+TEST(PlatformEnvBranch2, DecodeGetMIGModeResp_WrongCommand)
+{
+	// Build a valid-length response but with wrong command byte
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_MIG_mode_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	// Fill header fields to pass decode_reason_code_and_cc:
+	// completion_code = NSM_SUCCESS, msg_len matches exactly
+	auto *resp = reinterpret_cast<nsm_get_MIG_mode_resp *>(msg->payload);
+	resp->hdr.completion_code = NSM_SUCCESS;
+	resp->hdr.data_size = htole16(sizeof(bitfield8_t));
+	resp->hdr.command = 0xFF; // wrong command (not NSM_GET_MIG_MODE)
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t data_size = 0;
+	uint16_t reason_code = 0;
+	bitfield8_t flags = {};
+	auto rc = decode_get_MIG_mode_resp(msg, buf.size(), &cc, &data_size,
+					   &reason_code, &flags);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// --- encode_set_MIG_mode_req ---
+
+TEST(PlatformEnvBranch2, EncodeSetMIGModeReq_NullMsg)
+{
+	auto rc = encode_set_MIG_mode_req(0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, EncodeSetMIGModeReq_PackHeaderFail)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_set_MIG_mode_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	// instance_id > NSM_INSTANCE_MAX (31) → pack_nsm_header fails
+	auto rc = encode_set_MIG_mode_req(0x22, 0, msg);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// --- decode_set_MIG_mode_req: wrong data_size ---
+
+TEST(PlatformEnvBranch2, DecodeSetMIGModeReq_WrongDataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_set_MIG_mode_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	// First encode a valid request to get correct header
+	encode_set_MIG_mode_req(0, 1, msg);
+	// Then corrupt data_size to trigger error
+	auto *req = reinterpret_cast<nsm_set_MIG_mode_req *>(msg->payload);
+	req->hdr.data_size = 0; // should be sizeof(uint8_t) = 1
+	uint8_t mode;
+	auto rc = decode_set_MIG_mode_req(msg, buf.size(), &mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// --- encode_get_ECC_mode_req ---
+
+TEST(PlatformEnvBranch2, EncodeGetECCModeReq_NullMsg)
+{
+	auto rc = encode_get_ECC_mode_req(0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- encode_get_ECC_mode_resp ---
+
+TEST(PlatformEnvBranch2, EncodeGetECCModeResp_NullMsg)
+{
+	bitfield8_t flags = {};
+	auto rc = encode_get_ECC_mode_resp(0, NSM_SUCCESS, 0, &flags, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, EncodeGetECCModeResp_NullFlags)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_get_ECC_mode_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	auto rc = encode_get_ECC_mode_resp(0, NSM_SUCCESS, 0, nullptr, msg);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// --- encode_set_ECC_mode_req ---
+
+TEST(PlatformEnvBranch2, EncodeSetECCModeReq_NullMsg)
+{
+	auto rc = encode_set_ECC_mode_req(0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(PlatformEnvBranch2, EncodeSetECCModeReq_PackHeaderFail)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_set_ECC_mode_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	// instance_id > NSM_INSTANCE_MAX (31) → pack_nsm_header fails
+	auto rc = encode_set_ECC_mode_req(0x22, 0, msg);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// --- decode_set_ECC_mode_req: wrong data_size ---
+
+TEST(PlatformEnvBranch2, DecodeSetECCModeReq_WrongDataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				 sizeof(nsm_set_ECC_mode_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+	// First encode a valid request to get correct header
+	encode_set_ECC_mode_req(0, 1, msg);
+	// Then corrupt data_size to trigger error
+	auto *req = reinterpret_cast<nsm_set_ECC_mode_req *>(msg->payload);
+	req->hdr.data_size = 0; // should be sizeof(uint8_t) = 1
+	uint8_t mode;
+	auto rc = decode_set_ECC_mode_req(msg, buf.size(), &mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }

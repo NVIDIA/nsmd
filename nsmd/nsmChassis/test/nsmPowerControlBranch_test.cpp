@@ -595,3 +595,264 @@ TEST_F(NsmProcessorModulePowerControlExtTest,
     EXPECT_EQ(powerCapIntf->maxPowerCapValue(), 111u);
     EXPECT_EQ(powerCapIntf->minPowerCapValue(), 222u);
 }
+
+// =============================================================================
+// NsmPowerCapIntf – coroutine branch coverage
+// =============================================================================
+
+static std::vector<uint8_t>
+    makeGetPowerLimitSuccessResp(uint32_t enforcedLimitMw)
+{
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_resp), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_get_power_limit_resp(0, NSM_SUCCESS, ERR_NULL, 0, 0, enforcedLimitMw,
+                                msg);
+    return buf;
+}
+
+static std::vector<uint8_t> makeSetPowerLimitSuccessResp()
+{
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_set_power_limit_resp(0, NSM_SUCCESS, ERR_NULL, msg);
+    return buf;
+}
+
+struct NsmPowerCapIfaceTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+    std::string pcName = "TestPowerCap";
+    std::vector<std::string> parents;
+
+    NsmPowerCapIfaceTest() : SensorManagerTest(devices)
+    {
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    ~NsmPowerCapIfaceTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+
+    std::shared_ptr<NsmPowerCapIntf> makePowerCapIntf(const char* path)
+    {
+        return std::make_shared<NsmPowerCapIntf>(utils::DBusHandler::getBus(),
+                                                 path, pcName, parents, gpu);
+    }
+};
+
+// getPowerCapFromDevice: postPatchIO fails → returns error, doesn't set
+// powerCap
+TEST_F(NsmPowerCapIfaceTest, GetPowerCapFromDevice_PostPatchIOFails)
+{
+    auto iface =
+        makePowerCapIntf("/xyz/openbmc_project/control/power_cap/pc_piof");
+    iface->powerCap(0xDEAD);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(
+            mockPostPatchIO(makeGetPowerLimitSuccessResp(100), NSM_ERROR));
+
+    auto coro = iface->getPowerCapFromDevice();
+    // powerCap unchanged since postPatchIO failed before decode
+    EXPECT_EQ(iface->powerCap(), 0xDEAD);
+}
+
+// getPowerCapFromDevice: error CC → doesn't set powerCap
+TEST_F(NsmPowerCapIfaceTest, GetPowerCapFromDevice_ErrorCC_DoesNotSetPowerCap)
+{
+    auto iface =
+        makePowerCapIntf("/xyz/openbmc_project/control/power_cap/pc_errcc");
+    iface->powerCap(0xBEEF);
+
+    std::vector<uint8_t> errResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_resp), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(errResp.data());
+    encode_get_power_limit_resp(0, NSM_ERROR, ERR_INVALID_RQD, 0, 0, 0, msg);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(errResp));
+
+    auto coro = iface->getPowerCapFromDevice();
+    EXPECT_EQ(iface->powerCap(), 0xBEEF);
+}
+
+// getPowerCapFromDevice: success with valid limit → sets powerCap in watts
+TEST_F(NsmPowerCapIfaceTest, GetPowerCapFromDevice_Success_SetsPowerCap)
+{
+    auto iface =
+        makePowerCapIntf("/xyz/openbmc_project/control/power_cap/pc_ok");
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeGetPowerLimitSuccessResp(3000)));
+
+    auto coro = iface->getPowerCapFromDevice();
+    EXPECT_EQ(iface->powerCap(), 3u); // 3000 mW → 3 W
+}
+
+// getPowerCapFromDevice: INVALID_POWER_LIMIT → propagated as-is
+TEST_F(NsmPowerCapIfaceTest,
+       GetPowerCapFromDevice_InvalidLimit_SetsInvalidMarker)
+{
+    auto iface =
+        makePowerCapIntf("/xyz/openbmc_project/control/power_cap/pc_inv");
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(
+            mockPostPatchIO(makeGetPowerLimitSuccessResp(INVALID_POWER_LIMIT)));
+
+    auto coro = iface->getPowerCapFromDevice();
+    EXPECT_EQ(iface->powerCap(), INVALID_POWER_LIMIT);
+}
+
+// setPowerCap: non-tuple value → throws InvalidArgument
+TEST_F(NsmPowerCapIfaceTest, SetPowerCap_NonTupleValue_ThrowsInvalidArgument)
+{
+    auto iface =
+        makePowerCapIntf("/xyz/openbmc_project/control/power_cap/pc_nt");
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = std::string("invalid");
+
+    EXPECT_THROW_COROUTINE(
+        iface->setPowerCap(value, &status, gpu),
+        sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
+}
+
+// setPowerCap: powerLimit > max → InvalidArgument
+TEST_F(NsmPowerCapIfaceTest, SetPowerCap_AboveMax_ReturnsInvalidArgument)
+{
+    auto iface =
+        makePowerCapIntf("/xyz/openbmc_project/control/power_cap/pc_amax");
+    iface->maxPowerCapValue(100);
+    iface->minPowerCapValue(0);
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = std::make_tuple(true, 200u); // 200 > 100
+
+    auto coro = iface->setPowerCap(value, &status, gpu);
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+// setPowerCap: powerLimit < min → InvalidArgument
+TEST_F(NsmPowerCapIfaceTest, SetPowerCap_BelowMin_ReturnsInvalidArgument)
+{
+    auto iface =
+        makePowerCapIntf("/xyz/openbmc_project/control/power_cap/pc_bmin");
+    iface->maxPowerCapValue(100);
+    iface->minPowerCapValue(50);
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = std::make_tuple(true, 10u); // 10 < 50
+
+    auto coro = iface->setPowerCap(value, &status, gpu);
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+// setPowerCapOnDevice: postPatchIO fails → WriteFailure
+TEST_F(NsmPowerCapIfaceTest, SetPowerCapOnDevice_PostPatchIOFails_WriteFailure)
+{
+    auto iface =
+        makePowerCapIntf("/xyz/openbmc_project/control/power_cap/pc_spod_piof");
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeSetPowerLimitSuccessResp(), NSM_ERROR));
+
+    auto coro = iface->setPowerCapOnDevice(100, &status);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// setPowerCapOnDevice: error CC in response → WriteFailure
+TEST_F(NsmPowerCapIfaceTest, SetPowerCapOnDevice_ErrorCC_WriteFailure)
+{
+    auto iface = makePowerCapIntf(
+        "/xyz/openbmc_project/control/power_cap/pc_spod_errcc");
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+
+    std::vector<uint8_t> errResp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                 0);
+    auto msg = reinterpret_cast<nsm_msg*>(errResp.data());
+    encode_set_power_limit_resp(0, NSM_ERROR, ERR_INVALID_RQD, msg);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(errResp));
+
+    auto coro = iface->setPowerCapOnDevice(100, &status);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// setPowerCapOnDevice: success → calls getPowerCapFromDevice (two postPatchIO)
+TEST_F(NsmPowerCapIfaceTest, SetPowerCapOnDevice_Success_EmptyParents)
+{
+    auto iface =
+        makePowerCapIntf("/xyz/openbmc_project/control/power_cap/pc_spod_ok");
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+
+    // First: set power limit succeeds; second: verify getPowerCapFromDevice
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeSetPowerLimitSuccessResp()))
+        .WillOnce(mockPostPatchIO(makeGetPowerLimitSuccessResp(100000)));
+
+    auto coro = iface->setPowerCapOnDevice(100, &status, true);
+    EXPECT_NE(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// =============================================================================
+// doClearPowerCap and NsmChassisClearPowerCapAsyncIntf::clearPowerCap
+// =============================================================================
+
+// Forward-declare doClearPowerCap (free function in nsm namespace)
+namespace nsm
+{
+requester::Coroutine
+    doClearPowerCap(std::shared_ptr<AsyncStatusIntf> statusInterface);
+} // namespace nsm
+
+// doClearPowerCap: empty defaultPowerCapList → loop never entered →
+// statusInterface->status(Success) → co_return NSM_SW_SUCCESS //
+
+TEST_F(NsmPowerControlExtTest, DoClearPowerCap_EmptyList_StatusSuccess)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    // Ensure defaultPowerCapList is empty (it is by default in tests)
+    SensorManager& manager = SensorManager::getInstance();
+    manager.defaultPowerCapList.clear();
+
+    auto statusIntf = std::make_shared<AsyncStatusIntf>(
+        bus, "/xyz/openbmc_project/async/status/do_clear_1");
+
+    // Act: call doClearPowerCap directly
+    EXPECT_NO_THROW(nsm::doClearPowerCap(statusIntf));
+
+    // Assert: status should be Success (loop never ran, status stays Success)
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}
+
+// NsmChassisClearPowerCapAsyncIntf::clearPowerCap: AsyncOperationManager
+// allocates a status interface → objectPath is non-empty → doClearPowerCap
+// is called with empty defaultPowerCapList → returns a valid objectPath
+TEST_F(NsmPowerControlExtTest,
+       ChassisClearPowerCap_EmptyPowerCapList_ReturnsPath)
+{
+    // Ensure defaultPowerCapList is empty
+    SensorManager& manager = SensorManager::getInstance();
+    manager.defaultPowerCapList.clear();
+
+    // Act: call clearPowerCap on the NsmChassisClearPowerCapAsyncIntf
+    // AsyncOperationManager is a static singleton, it will allocate an object
+    sdbusplus::message::object_path path;
+    EXPECT_NO_THROW(
+        path = powerControl->clearPowerCapAsyncIntf->clearPowerCap());
+
+    // Assert: a valid (non-empty) path is returned
+    EXPECT_FALSE(std::string(path).empty());
+}

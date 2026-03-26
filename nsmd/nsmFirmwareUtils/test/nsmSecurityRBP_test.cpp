@@ -215,7 +215,7 @@ TEST_F(NsmSecurityCfgObjectTest,
 }
 
 TEST_F(NsmSecurityCfgObjectTest,
-       DISABLED_HandleResponseMsg_CompletionCodeError_ReturnsErrorCode)
+       HandleResponseMsg_CompletionCodeError_ReturnsErrorCode)
 {
     // Arrange
     std::vector<uint8_t> response(
@@ -239,7 +239,7 @@ TEST_F(NsmSecurityCfgObjectTest,
 }
 
 TEST_F(NsmSecurityCfgObjectTest,
-       DISABLED_HandleResponseMsg_TruncatedResponse_ReturnsNonSuccess)
+       HandleResponseMsg_TruncatedResponse_ReturnsNonSuccess)
 {
     // Arrange
     std::vector<uint8_t> response(
@@ -470,6 +470,12 @@ TEST_F(NsmMinSecVersionObjectTest,
     EXPECT_EQ(msgPtr->hdr.instance_id, altInstanceId);
 }
 
+TEST_F(NsmMinSecVersionObjectTest, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
 // -- NsmMinSecVersionObject::handleResponseMsg tests --
 
 TEST_F(NsmMinSecVersionObjectTest,
@@ -531,7 +537,7 @@ TEST_F(NsmMinSecVersionObjectTest,
 }
 
 TEST_F(NsmMinSecVersionObjectTest,
-       DISABLED_HandleResponseMsg_CompletionCodeError_ReturnsErrorCode)
+       HandleResponseMsg_CompletionCodeError_ReturnsErrorCode)
 {
     // Arrange
     std::vector<uint8_t> response(
@@ -556,7 +562,7 @@ TEST_F(NsmMinSecVersionObjectTest,
 }
 
 TEST_F(NsmMinSecVersionObjectTest,
-       DISABLED_HandleResponseMsg_TruncatedResponse_ReturnsNonSuccess)
+       HandleResponseMsg_TruncatedResponse_ReturnsNonSuccess)
 {
     // Arrange
     std::vector<uint8_t> response(
@@ -1373,7 +1379,8 @@ TEST_F(NsmFabricManagerStateTest,
     auto opIntf2 = std::make_shared<OperaStatusIntf>(
         bus, "/xyz/openbmc_project/inventory/system/fabric_manager_s3/FM1");
 
-    // Act - pass different path -> triggers lg2::error but still registers
+    // Act - pass different path -> triggers lg2::error but still registers //
+
     auto instance2 = NsmAggregateFabricManagerState::getInstance(
         inventoryObjPathFM2, fmIntf2, opIntf2, description);
 
@@ -1589,4 +1596,211 @@ TEST_F(NsmFabricManagerStateTest,
 
     // Assert
     EXPECT_NE(agg, nullptr);
+}
+
+// ============================================================================
+// SECTION 3: SecurityConfiguration async handler branch coverage
+// ============================================================================
+
+// Test: securityCfgAsyncHandler – postPatchIO fails (lines 102,104-105,107)
+// updateIrreversibleConfig(true) calls securityCfgAsyncHandler synchronously
+// in coverage mode.  When postPatchIO returns error the handler should call
+// finishOperation(Aborted) and co_return without throwing.
+TEST_F(NsmSecurityCfgObjectTest,
+       SecurityCfgAsync_PostPatchIOFail_FinishesAborted)
+{
+    EXPECT_CALL(*fpga, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(NSM_ERROR));
+
+    EXPECT_NO_THROW(sensor->securityCfgObject->updateIrreversibleConfig(true));
+}
+
+// Test: ENABLE path – postPatchIO succeeds but response too short so
+// decode_nsm_firmware_irreversible_config_request_2_resp fails (lines 120,122)
+TEST_F(NsmSecurityCfgObjectTest,
+       SecurityCfgAsync_EnablePath_DecodeFail_FinishesAborted)
+{
+    // Response has only header + 2 bytes, too short for the ENABLE response
+    std::vector<uint8_t> shortResponse(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
+    EXPECT_CALL(*fpga, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(shortResponse));
+
+    EXPECT_NO_THROW(sensor->securityCfgObject->updateIrreversibleConfig(true));
+}
+
+// Test: DISABLE path – postPatchIO succeeds but cc != NSM_SUCCESS so
+// decode_nsm_firmware_irreversible_config_request_1_resp returns cc !=
+// NSM_SUCCESS causing the production code to call finishOperation(Aborted)
+// (lines 134,136,138). Note: unlike the ENABLE path, the DISABLE decoder has no
+// data-length check after decode_reason_code_and_cc; a zero-filled response
+// yields cc=0=NSM_SUCCESS and the function proceeds to nsmSensor.update(),
+// which invokes an unmocked sensorIO and produces a null-handle Coroutine
+// triggering valgrind errors. Setting completion_code = NSM_ERROR ensures cc !=
+// NSM_SUCCESS so the decoder returns early and the production code aborts
+// without calling nsmSensor.update().
+TEST_F(NsmSecurityCfgObjectTest,
+       SecurityCfgAsync_DisablePath_DecodeFail_FinishesAborted)
+{
+    std::vector<uint8_t> shortResponse(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
+    // completion_code is at payload[1]; set to NSM_ERROR so decoder returns
+    // cc != NSM_SUCCESS and the handler calls finishOperation(Aborted).
+    shortResponse[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    EXPECT_CALL(*fpga, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(shortResponse));
+
+    EXPECT_NO_THROW(sensor->securityCfgObject->updateIrreversibleConfig(false));
+}
+
+// Test: SecurityConfiguration::startOperation – mutex already held (line 151)
+// First startOperation() acquires the mutex; the second call finds it locked
+// and throws Common::Error::Unavailable.
+TEST_F(NsmSecurityCfgObjectTest, StartOperation_AlreadyLocked_ThrowsUnavailable)
+{
+    // Acquire the mutex via the normal path
+    EXPECT_EQ(sensor->securityCfgObject->startOperation(), NSM_SW_SUCCESS);
+
+    // Second call: try_lock fails → throws
+    EXPECT_THROW(sensor->securityCfgObject->startOperation(),
+                 sdbusplus::error::xyz::openbmc_project::common::Unavailable);
+
+    // Cleanup: one unlock for the first successful lock
+    sensor->securityCfgObject->mutex.unlock();
+}
+
+// ============================================================================
+// SECTION 4: MinSecurityVersion::updateMinSecVersion and
+//            minSecVersionAsyncHandler branch coverage
+// ============================================================================
+
+// Test: MostRestrictiveValue path + postPatchIO fails
+// Covers updateMinSecVersion body (lines 251-282) and async handler failure
+// path (lines 295-316).
+TEST_F(NsmMinSecVersionObjectTest,
+       UpdateMinSecVersion_MostRestrictive_PostPatchIOFail)
+{
+    EXPECT_CALL(*fpga, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(NSM_ERROR));
+
+    EXPECT_NO_THROW(sensor->minSecVersion->updateMinSecVersion(
+        SecurityCommon::RequestTypes::MostRestrictiveValue, 0, 0));
+}
+
+// Test: SpecifiedValue path + response too short → decode fails
+// Covers lines 274-275 (SpecifiedValue branch) and async handler decode
+// failure path (lines 319-333).
+TEST_F(NsmMinSecVersionObjectTest,
+       UpdateMinSecVersion_SpecifiedValue_DecodeFail)
+{
+    std::vector<uint8_t> shortResponse(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN + 1, 0);
+    shortResponse[sizeof(nsm_msg_hdr) + 1] = NSM_ERR_INVALID_DATA;
+    EXPECT_CALL(*fpga, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(shortResponse));
+
+    EXPECT_NO_THROW(sensor->minSecVersion->updateMinSecVersion(
+        SecurityCommon::RequestTypes::SpecifiedValue, 12345, 5));
+}
+
+// Test: full success path – decode succeeds, updateMethod called, then
+// nsmSensor.update() is called (lines 335-340).
+TEST_F(NsmMinSecVersionObjectTest,
+       UpdateMinSecVersion_Success_CoversAsyncSuccessPath)
+{
+    // Build a valid postPatchIO response for
+    // decode_nsm_firmware_update_sec_ver_resp
+    std::vector<uint8_t> patchResponse(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_update_min_sec_ver_resp_command),
+        0);
+    auto patchRespMsg = reinterpret_cast<nsm_msg*>(patchResponse.data());
+    struct nsm_firmware_update_min_sec_ver_resp secResp{};
+    secResp.update_methods = 0x01;
+    auto rc = encode_nsm_firmware_update_sec_ver_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                      &secResp, patchRespMsg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Build a valid sensorIO response for nsmSensor.update(nsmDevice) that
+    // follows the successful async operation
+    // (NsmMinSecVersionObject::genRequestMsg encodes a security version
+    // request; provide a valid response for it).
+    std::vector<uint8_t> sensorResponse(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_security_version_number_resp_command),
+        0);
+    auto sensorRespMsg = reinterpret_cast<nsm_msg*>(sensorResponse.data());
+    struct nsm_firmware_security_version_number_resp secInfo{};
+    secInfo.minimum_security_version = htole16(5);
+    secInfo.pending_minimum_security_version = htole16(6);
+    rc = encode_nsm_query_firmware_security_version_number_resp(
+        0, NSM_SUCCESS, ERR_NULL, &secInfo, sensorRespMsg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*fpga, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(patchResponse));
+    EXPECT_CALL(*fpga, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(sensorResponse));
+
+    EXPECT_NO_THROW(sensor->minSecVersion->updateMinSecVersion(
+        SecurityCommon::RequestTypes::MostRestrictiveValue, 0, 0));
+}
+
+// Test: MinSecurityVersion::startOperation – mutex already held (similar
+// to SecurityConfiguration::startOperation test).
+TEST_F(NsmMinSecVersionObjectTest,
+       MinSecVersion_StartOperation_AlreadyLocked_ThrowsUnavailable)
+{
+    EXPECT_EQ(sensor->minSecVersion->startOperation(), NSM_SW_SUCCESS);
+
+    EXPECT_THROW(sensor->minSecVersion->startOperation(),
+                 sdbusplus::error::xyz::openbmc_project::common::Unavailable);
+
+    sensor->minSecVersion->mutex.unlock();
+}
+
+// NsmSecurityCfgObject::handleResponseMsg: rc==NSM_SW_SUCCESS, cc!=NSM_SUCCESS.
+// 9-byte buffer triggers decode_reason_code_and_cc to return NSM_SW_SUCCESS
+// with cc=NSM_ERROR → the "rc && cc == NSM_SUCCESS" condition is FALSE.
+TEST_F(NsmSecurityCfgObjectTest,
+       HandleResponseMsg_DecodeSuccessNonZeroCC_ReturnsCC)
+{
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto responseMsg = reinterpret_cast<nsm_msg*>(buf.data());
+
+    auto rc = sensor->handleResponseMsg(responseMsg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmMinSecVersionObject::handleResponseMsg: rc==NSM_SW_SUCCESS,
+// cc!=NSM_SUCCESS. 9-byte buffer triggers decode_reason_code_and_cc to return
+// NSM_SW_SUCCESS with cc=NSM_ERROR → the "rc && cc==NSM_SUCCESS" FALSE branch.
+TEST_F(NsmMinSecVersionObjectTest,
+       HandleResponseMsg_DecodeSuccessNonZeroCC_ReturnsCC)
+{
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto responseMsg = reinterpret_cast<nsm_msg*>(buf.data());
+
+    auto rc = sensor->handleResponseMsg(responseMsg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// nsmSecurityRBP.cpp L118 second operand of || (ENABLE path):
+// rc==NSM_SW_SUCCESS but cc==NSM_ERROR.
+// 9-byte buffer: decode_nsm_firmware_irreversible_config_request_2_resp calls
+// decode_reason_code_and_cc which returns NSM_SW_SUCCESS with cc=NSM_ERROR
+// → second operand of (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS) is TRUE.
+TEST_F(NsmSecurityCfgObjectTest,
+       SecurityCfgAsync_EnablePath_DecodeSuccessNonZeroCC_FinishesAborted)
+{
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code = NSM_ERROR
+
+    EXPECT_CALL(*fpga, postPatchIO(_, _, _, _)).WillOnce(mockPostPatchIO(buf));
+
+    EXPECT_NO_THROW(sensor->securityCfgObject->updateIrreversibleConfig(true));
 }

@@ -117,8 +117,7 @@ TEST(NsmPCIeAERErrorStatusTest, GenRequestMsg_InvalidInstanceId_ReturnsNullopt)
     EXPECT_FALSE(request.has_value());
 }
 
-TEST(NsmPCIeAERErrorStatusTest,
-     DISABLED_HandleResponseMsg_Success_UpdatesAERFields)
+TEST(NsmPCIeAERErrorStatusTest, HandleResponseMsg_Success_UpdatesAERFields)
 {
     // Arrange
     auto device = std::make_shared<MockNsmDevice>(
@@ -146,12 +145,11 @@ TEST(NsmPCIeAERErrorStatusTest,
 
     // Assert
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_EQ(aerIntf->aerUncorrectableErrorStatus(), "0xDEADBEEF");
-    EXPECT_EQ(aerIntf->aerCorrectableErrorStatus(), "0xCAFEBABE");
+    EXPECT_STREQ(aerIntf->aerUncorrectableErrorStatus().c_str(), "0xDEADBEEF");
+    EXPECT_STREQ(aerIntf->aerCorrectableErrorStatus().c_str(), "0xCAFEBABE");
 }
 
-TEST(NsmPCIeAERErrorStatusTest,
-     DISABLED_HandleResponseMsg_ZeroValues_FormatsCorrectly)
+TEST(NsmPCIeAERErrorStatusTest, HandleResponseMsg_ZeroValues_FormatsCorrectly)
 {
     // Arrange
     auto device = std::make_shared<MockNsmDevice>(
@@ -179,8 +177,8 @@ TEST(NsmPCIeAERErrorStatusTest,
 
     // Assert
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_EQ(aerIntf->aerUncorrectableErrorStatus(), "0x00000000");
-    EXPECT_EQ(aerIntf->aerCorrectableErrorStatus(), "0x00000000");
+    EXPECT_STREQ(aerIntf->aerUncorrectableErrorStatus().c_str(), "0x00000000");
+    EXPECT_STREQ(aerIntf->aerCorrectableErrorStatus().c_str(), "0x00000000");
 }
 
 TEST(NsmPCIeAERErrorStatusTest, HandleResponseMsg_ErrorCC_DoesNotUpdateFields)
@@ -216,7 +214,7 @@ TEST(NsmPCIeAERErrorStatusTest, HandleResponseMsg_ErrorCC_DoesNotUpdateFields)
     EXPECT_NE(rc, NSM_SW_SUCCESS);
 }
 
-TEST(NsmPCIeAERErrorStatusTest, DISABLED_HandleResponseMsg_NullMsg_ReturnsError)
+TEST(NsmPCIeAERErrorStatusTest, HandleResponseMsg_NullMsg_ReturnsError)
 {
     // Arrange
     auto device = std::make_shared<MockNsmDevice>(

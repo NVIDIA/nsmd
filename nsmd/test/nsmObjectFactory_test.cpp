@@ -162,3 +162,47 @@ TEST_F(NsmObjectFactoryTest, goodTestCreateObjectsUnknownInterface)
     // Should complete without error even for unknown interface
     // (no assertion needed, just ensuring it doesn't crash)
 }
+
+// isSupported() covers lines 70-71 in nsmObjectFactory.hpp
+TEST_F(NsmObjectFactoryTest, IsSupported_UnregisteredInterface_ReturnsFalse)
+{
+    auto& factory = NsmObjectFactory::instance();
+    EXPECT_FALSE(factory.isSupported("definitely.not.registered.XYZ"));
+}
+
+TEST_F(NsmObjectFactoryTest, IsSupported_RegisteredInterface_ReturnsTrue)
+{
+    auto& factory = NsmObjectFactory::instance();
+
+    auto testFunc = [](SensorManager&, const std::string&,
+                       const std::string&) -> requester::Coroutine {
+        co_return NSM_SUCCESS;
+    };
+
+    const std::string intf = "test.IsSupported.Interface";
+    factory.registerCreationFunction(testFunc, intf);
+
+    EXPECT_TRUE(factory.isSupported(intf));
+}
+
+// createObjects() exception catch path (nsmObjectFactory.cpp lines 42-47):
+// register a creation function that throws std::runtime_error and verify
+// that createObjects() absorbs the exception (does NOT rethrow it). //
+
+TEST_F(NsmObjectFactoryTest, CreateObjects_ThrowingFunction_ExceptionAbsorbed)
+{
+    auto& factory = NsmObjectFactory::instance();
+
+    auto throwingFunc = [](SensorManager&, const std::string&,
+                           const std::string&) -> requester::Coroutine {
+        throw std::runtime_error("factory test exception");
+        co_return NSM_SUCCESS;
+    };
+
+    const std::string intf = "test.ExceptionThrowingInterface";
+    factory.registerCreationFunction(throwingFunc, intf);
+
+    // createObjects wraps it->second() in try-catch; must not rethrow
+    EXPECT_NO_THROW_COROUTINE(
+        factory.createObjects(mockManager, intf, "/test/path"));
+}

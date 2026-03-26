@@ -71,6 +71,14 @@ TEST_F(CountersTest, DeviceCounterDumpObjectCreation)
     EXPECT_EQ(deviceData.maxRows, deviceData2.maxRows);
 }
 
+// getFd() covers counterProducer.cpp lines 42-44 (the unix_fd return method)
+TEST_F(CountersTest, DeviceCounterDumpObjectGetFd)
+{
+    DeviceCounterDumpObject deviceData("/tmp/test_getfd");
+    auto fd = deviceData.getFd();
+    EXPECT_GE(static_cast<int>(fd), 0);
+}
+
 TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCounters)
 {
     DeviceCounterDumpObject deviceData("/tmp/test_1");
@@ -262,6 +270,25 @@ TEST_F(CountersTest, DeviceCounterDumpObjectFileSizeAndDataIntegrity)
         EXPECT_LT(expectedRow, maxRows)
             << "Rotation logic failed for key " << testKeys[i];
     }
+}
+
+// updateCounters() write failure path: invalidate the fd after construction
+// so that lseek() inside CustomFD::write() fails → fd.write() returns false
+// → "if (!fd.write(...))" TRUE branch → throw → catch → return false. //
+
+TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCountersWriteFailure)
+{
+    DeviceCounterDumpObject deviceData("/tmp/test_write_fail");
+    CountersArray counters{};
+    counters[0] = 42; // non-zero, passes the all_of check
+
+    // Invalidate the underlying file descriptor so that the write() will fail
+    // (lseek on -1 returns EBADF → CustomFD::write() returns false).
+    close(deviceData.fd.fd);
+    deviceData.fd.fd = -1;
+
+    bool result = deviceData.updateCounters({0, 1000, counters});
+    EXPECT_FALSE(result);
 }
 
 TEST_F(CountersTest, DeviceCounterDumpObjectRotationWithLargeKeys)

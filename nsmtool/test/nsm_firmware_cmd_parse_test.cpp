@@ -99,6 +99,7 @@ static const std::string kSignatureFile = "/tmp/fw_test_sig_1840b.bin";
 static const std::string kDotBlobFile = "/tmp/fw_test_dotblob_1024b.bin";
 static const std::string kChallengeFile = "/tmp/fw_test_challenge_32b.bin";
 static const std::string kOutputFile = "/tmp/fw_test_output.bin";
+static const std::string kEmptyFile = "/tmp/fw_test_empty_0b.bin";
 
 // ---- Fixture that creates temp files ----------------------------------------
 
@@ -112,6 +113,7 @@ class NsmFirmwareCmdParseTest : public ::testing::Test
         createTempBinFile(kSignatureFile, 1840);
         createTempBinFile(kDotBlobFile, 1024);
         createTempBinFile(kChallengeFile, 32);
+        createTempBinFile(kEmptyFile, 0);
     }
 
     void TearDown() override
@@ -122,6 +124,7 @@ class NsmFirmwareCmdParseTest : public ::testing::Test
         std::remove(kDotBlobFile.c_str());
         std::remove(kChallengeFile.c_str());
         std::remove(kOutputFile.c_str());
+        std::remove(kEmptyFile.c_str());
     }
 };
 
@@ -1637,8 +1640,7 @@ TEST_F(NsmFirmwareCmdParseTest, DotCAKInstall_VerboseMode_CreateRequest)
 
 // ---- DotCAKInstall payload too small (lines 1222-1225) ----------------------
 
-TEST_F(NsmFirmwareCmdParseTest,
-       DISABLED_DotCAKInstall_ParseResponseTooShortPayload)
+TEST_F(NsmFirmwareCmdParseTest, DotCAKInstall_ParseResponseTooShortPayload)
 {
     CLI::App app;
     setupFirmwareCommands(app);
@@ -1648,7 +1650,8 @@ TEST_F(NsmFirmwareCmdParseTest,
                      "--lak_ecdsa_key", kEcdsaKeyFile});
 
     // Payload less than sizeof(nsm_common_resp) = 6 bytes → early return
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 1, 0);
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERR_INVALID_DATA;
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[7]->parseResponseMsg(msg, buf.size()));
 }
@@ -2075,6 +2078,590 @@ TEST_F(NsmFirmwareCmdParseTest, DotDisable_ParseResponseDecodeFailure)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 3, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[16]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- Error-path tests for commands missing truncated-buffer coverage --------
+
+static std::vector<uint8_t> makeTruncatedFwResp()
+{
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERR_INVALID_DATA;
+    return buf;
+}
+
+// [1] IrreversibleConfig – error paths for all three request types
+TEST_F(NsmFirmwareCmdParseTest, IrreversibleConfig_Query_ParseResponseError)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "IrreversibleConfig", {"-r", "0"});
+    auto buf = makeTruncatedFwResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[1]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST_F(NsmFirmwareCmdParseTest, IrreversibleConfig_Disable_ParseResponseError)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "IrreversibleConfig", {"-r", "1"});
+    auto buf = makeTruncatedFwResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[1]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST_F(NsmFirmwareCmdParseTest, IrreversibleConfig_Enable_ParseResponseError)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "IrreversibleConfig", {"-r", "2"});
+    auto buf = makeTruncatedFwResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[1]->parseResponseMsg(msg, buf.size()));
+}
+
+// [3] UpdateCodeAuthKeyPerm – error path
+TEST_F(NsmFirmwareCmdParseTest, UpdateCodeAuthKeyPerm_ParseResponseError)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "UpdateCodeAuthKeyPerm",
+                    {"-r", "0", "-c", "1", "-i", "0", "-d", "0", "-n", "0"});
+    auto buf = makeTruncatedFwResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[3]->parseResponseMsg(msg, buf.size()));
+}
+
+// [4] QueryFirmwareSecurityVersion – error path
+TEST_F(NsmFirmwareCmdParseTest, QueryFirmwareSecurityVersion_ParseResponseError)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "QueryFirmwareSecurityVersion",
+                    {"-c", "1", "-i", "0", "-d", "0"});
+    auto buf = makeTruncatedFwResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[4]->parseResponseMsg(msg, buf.size()));
+}
+
+// [5] UpdateMinSecurityVersion – error path
+TEST_F(NsmFirmwareCmdParseTest, UpdateMinSecurityVersion_ParseResponseError)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "UpdateMinSecurityVersion", {"-r", "0", "-n", "0"});
+    auto buf = makeTruncatedFwResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[5]->parseResponseMsg(msg, buf.size()));
+}
+
+// [6] SetRoTProperty – error path
+TEST_F(NsmFirmwareCmdParseTest, SetRoTProperty_ParseResponseError)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "SetRoTProperty", {"-p", "0"});
+    auto buf = makeTruncatedFwResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[6]->parseResponseMsg(msg, buf.size()));
+}
+
+// [5] UpdateMinSecurityVersion – bit16 (Warm Reset) branch coverage
+// (existing test uses update_methods=0x000600FF which has bit17,bit18 set but
+// bit16=0; this test sets bit16 to cover line 751)
+TEST_F(NsmFirmwareCmdParseTest,
+       UpdateMinSecurityVersion_ParseResponse_WarmReset)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "UpdateMinSecurityVersion", {"-r", "0", "-n", "0"});
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_update_min_sec_ver_resp_command),
+        0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    nsm_firmware_update_min_sec_ver_resp resp{};
+    // 0x000700FF: bits 0-7 + bit16 + bit17 + bit18 all set
+    resp.update_methods = 0x000700FF;
+    encode_nsm_firmware_update_sec_ver_resp(0, NSM_SUCCESS, ERR_NULL, &resp,
+                                            msg);
+    EXPECT_NO_THROW(commands[5]->parseResponseMsg(msg, buf.size()));
+}
+
+// [1] IrreversibleConfig – default case (requestType > 2) covers lines 868-869
+TEST_F(NsmFirmwareCmdParseTest, IrreversibleConfig_Default_ParseResponse)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    // requestType = 3 hits the default: branch in the switch statement
+    parseSubcmdArgs(app, "IrreversibleConfig", {"-r", "3"});
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[1]->parseResponseMsg(msg, buf.size()));
+}
+
+// [7] DotCAKInstall – payloadLength < sizeof(nsm_common_resp) = 6 (lines
+// 1230-1233) Use a 5-byte buffer (= sizeof(nsm_msg_hdr)) so payloadLength=5 < 6
+// triggers the early return before decoding.
+TEST_F(NsmFirmwareCmdParseTest, DotCAKInstall_PayloadTooSmall_ParseResponse)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    // Just need to register with any valid args so commands[7] is DotCAKInstall
+    parseSubcmdArgs(app, "DotCAKInstall",
+                    {"--cak_key_auth_scheme", "0", "--cak_ecdsa_key",
+                     kEcdsaKeyFile, "--lak_key_auth_scheme", "0",
+                     "--lak_ecdsa_key", kEcdsaKeyFile});
+    // 5 bytes = sizeof(nsm_msg_hdr); payload = 5 < sizeof(nsm_common_resp)=6
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr), 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[7]->parseResponseMsg(msg, buf.size()));
+}
+
+// [3] UpdateCodeAuthKeyPerm – indicesToBitmap throws when bitmapSize > 8
+// (lines 480-483). Pass --bitmap 9 so indicesToBitmap({}, 9) throws.
+TEST_F(NsmFirmwareCmdParseTest,
+       UpdateCodeAuthKeyPerm_BitmapTooLarge_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "UpdateCodeAuthKeyPerm",
+                    {"-r", "1", "-c", "0", "-i", "0", "-d", "0", "-n", "0",
+                     "--bitmap", "9"});
+    // indicesToBitmap({}, 9) throws std::invalid_argument (size >
+    // maxBitmapSize=8) catch block returns NSM_SW_ERROR_LENGTH → no exception
+    // from createRequestMsg
+    EXPECT_NO_THROW(commands[3]->createRequestMsg());
+}
+
+// [7] DotCAKInstall – LAK ECDSA key file reads as empty (lines 1133-1135)
+// CLI11 throws before storing the member when validateFileSize fails, so
+// lakKeyEcdsaKeyFile stays "" → readFileAsBytes("") returns {} → lines
+// 1133-1135
+TEST_F(NsmFirmwareCmdParseTest, DotCAKInstall_LakKeyReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    // kEmptyFile fails validateFileSize so lakKeyEcdsaKeyFile stays ""
+    // readFileAsBytes("") → empty (filename.empty() check) → lines 1133-1135
+    parseSubcmdArgs(app, "DotCAKInstall",
+                    {"--cak_key_auth_scheme", "0", "--cak_ecdsa_key",
+                     kEcdsaKeyFile, "--lak_key_auth_scheme", "0",
+                     "--lak_ecdsa_key", kEmptyFile});
+    EXPECT_NO_THROW(commands[7]->createRequestMsg());
+}
+
+// [7] DotCAKInstall – hybrid CAK LMS unreadable (lines 1120-1122)
+// Use valid-sized file so validator passes, then delete it before createRequest
+// so readFileAsBytes fails to open → cakLms.empty() → lines 1120-1122
+TEST_F(NsmFirmwareCmdParseTest,
+       DotCAKInstall_HybridCakLmsReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kCakLmsTmp = "/tmp/fw_test_cak_lms_48b_tmp.bin";
+    createTempBinFile(kCakLmsTmp, 48); // valid 48-byte → validator passes
+    parseSubcmdArgs(app, "DotCAKInstall",
+                    {"--cak_key_auth_scheme", "1", "--cak_ecdsa_key",
+                     kEcdsaKeyFile, "--cak_lms_key", kCakLmsTmp,
+                     "--lak_key_auth_scheme", "0", "--lak_ecdsa_key",
+                     kEcdsaKeyFile});
+    std::remove(kCakLmsTmp.c_str()); // delete so readFileAsBytes fails
+    EXPECT_NO_THROW(commands[7]->createRequestMsg());
+}
+
+// [7] DotCAKInstall – hybrid LAK LMS unreadable (lines 1150-1152)
+// Use valid-sized file so validator passes, then delete it before createRequest
+// so readFileAsBytes fails to open → lakLms.empty() → lines 1150-1152
+TEST_F(NsmFirmwareCmdParseTest,
+       DotCAKInstall_HybridLakLmsReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kLakLmsTmp = "/tmp/fw_test_lak_lms_48b_tmp.bin";
+    createTempBinFile(kLakLmsTmp, 48); // valid 48-byte → validator passes
+    parseSubcmdArgs(app, "DotCAKInstall",
+                    {"--cak_key_auth_scheme", "0", "--cak_ecdsa_key",
+                     kEcdsaKeyFile, "--lak_key_auth_scheme", "1",
+                     "--lak_ecdsa_key", kEcdsaKeyFile, "--lak_lms_key",
+                     kLakLmsTmp});
+    std::remove(kLakLmsTmp.c_str()); // delete so readFileAsBytes fails
+    EXPECT_NO_THROW(commands[7]->createRequestMsg());
+}
+
+// ============================================================
+// DotLock tests (commands[10])
+// ============================================================
+
+// [10] DotLock – hybrid CAK LMS file deleted before createRequest (lines
+// 1770-1775)
+TEST_F(NsmFirmwareCmdParseTest, DotLock_HybridCakLmsReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kCakLmsTmpDL = "/tmp/fw_test_dotlock_cak_lms.bin";
+    createTempBinFile(kCakLmsTmpDL, 48);
+    parseSubcmdArgs(
+        app, "DotLock",
+        {"--cak_key_auth_scheme", "1", "--cak_ecdsa_key", kEcdsaKeyFile,
+         "--cak_lms_key", kCakLmsTmpDL, "--lak_key_auth_scheme", "0",
+         "--lak_ecdsa_key", kEcdsaKeyFile, "--unlock_method", "0",
+         "--lock_signature_auth_scheme", "0", "--signature", kSignatureFile});
+    std::remove(kCakLmsTmpDL.c_str()); // delete → readFileAsBytes fails
+    EXPECT_NO_THROW(commands[10]->createRequestMsg());
+}
+
+// [10] DotLock – LAK ECDSA key file deleted before createRequest (lines
+// 1783-1787)
+TEST_F(NsmFirmwareCmdParseTest, DotLock_LakEcdsaReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kLakEcdsaTmpDL =
+        "/tmp/fw_test_dotlock_lak_ecdsa.bin";
+    createTempBinFile(kLakEcdsaTmpDL, 96);
+    parseSubcmdArgs(app, "DotLock",
+                    {"--cak_key_auth_scheme", "0", "--cak_ecdsa_key",
+                     kEcdsaKeyFile, "--lak_key_auth_scheme", "0",
+                     "--lak_ecdsa_key", kLakEcdsaTmpDL, "--unlock_method", "0",
+                     "--lock_signature_auth_scheme", "0", "--signature",
+                     kSignatureFile});
+    std::remove(kLakEcdsaTmpDL.c_str()); // delete → readFileAsBytes fails
+    EXPECT_NO_THROW(commands[10]->createRequestMsg());
+}
+
+// [10] DotLock – hybrid LAK LMS file deleted before createRequest (lines
+// 1800-1804)
+TEST_F(NsmFirmwareCmdParseTest, DotLock_HybridLakLmsReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kLakLmsTmpDL = "/tmp/fw_test_dotlock_lak_lms.bin";
+    createTempBinFile(kLakLmsTmpDL, 48);
+    parseSubcmdArgs(
+        app, "DotLock",
+        {"--cak_key_auth_scheme", "0", "--cak_ecdsa_key", kEcdsaKeyFile,
+         "--lak_key_auth_scheme", "1", "--lak_ecdsa_key", kEcdsaKeyFile,
+         "--lak_lms_key", kLakLmsTmpDL, "--unlock_method", "0",
+         "--lock_signature_auth_scheme", "0", "--signature", kSignatureFile});
+    std::remove(kLakLmsTmpDL.c_str()); // delete → readFileAsBytes fails
+    EXPECT_NO_THROW(commands[10]->createRequestMsg());
+}
+
+// [10] DotLock – static challenge file missing (unlock_method=2) (lines
+// 1831-1835)
+TEST_F(NsmFirmwareCmdParseTest, DotLock_StaticChallengeMissing_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    // unlock_method=2 but no --static_challenge → staticChallengeFile=""
+    parseSubcmdArgs(app, "DotLock",
+                    {"--cak_key_auth_scheme", "0", "--cak_ecdsa_key",
+                     kEcdsaKeyFile, "--lak_key_auth_scheme", "0",
+                     "--lak_ecdsa_key", kEcdsaKeyFile, "--unlock_method", "2",
+                     "--lock_signature_auth_scheme", "0", "--signature",
+                     kSignatureFile});
+    EXPECT_NO_THROW(commands[10]->createRequestMsg());
+}
+
+// [10] DotLock – static challenge file deleted before createRequest (lines
+// 1838-1843)
+TEST_F(NsmFirmwareCmdParseTest, DotLock_StaticChallengeReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kChallengeTmpDL =
+        "/tmp/fw_test_dotlock_challenge.bin";
+    createTempBinFile(kChallengeTmpDL, 32);
+    parseSubcmdArgs(
+        app, "DotLock",
+        {"--cak_key_auth_scheme", "0", "--cak_ecdsa_key", kEcdsaKeyFile,
+         "--lak_key_auth_scheme", "0", "--lak_ecdsa_key", kEcdsaKeyFile,
+         "--unlock_method", "2", "--static_challenge", kChallengeTmpDL,
+         "--lock_signature_auth_scheme", "0", "--signature", kSignatureFile});
+    std::remove(kChallengeTmpDL.c_str()); // delete → readFileAsBytes fails
+    EXPECT_NO_THROW(commands[10]->createRequestMsg());
+}
+
+// [10] DotLock – parseResponseMsg success path + output file write fails (line
+// 1927)
+TEST_F(NsmFirmwareCmdParseTest, DotLock_ParseResponseSuccessOutputWriteFail)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    // Set output to unwritable path so std::ofstream fails to open
+    parseSubcmdArgs(app, "DotLock",
+                    {"--cak_key_auth_scheme", "0", "--cak_ecdsa_key",
+                     kEcdsaKeyFile, "--lak_key_auth_scheme", "0",
+                     "--lak_ecdsa_key", kEcdsaKeyFile, "--unlock_method", "0",
+                     "--lock_signature_auth_scheme", "0", "--signature",
+                     kSignatureFile, "--output",
+                     "/tmp/nonexistent_dir_zzz/fw_dotlock_out.bin"});
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_dot_lock_resp),
+                             0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    std::vector<uint8_t> blob(DOT_BLOB_SIZE, 0);
+    encode_nsm_dot_lock_resp(0, NSM_SUCCESS, ERR_NULL, blob.data(), msg);
+    EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, buf.size()));
+}
+
+// ============================================================
+// DotCAKRotate tests (commands[11])
+// ============================================================
+
+// [11] DotCAKRotate – hybrid new CAK LMS file deleted before createRequest
+// (line 2034)
+TEST_F(NsmFirmwareCmdParseTest,
+       DotCAKRotate_HybridNewCakLmsReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kNewCakLmsTmp =
+        "/tmp/fw_test_dotcakrotate_lms.bin";
+    createTempBinFile(kNewCakLmsTmp, 48);
+    parseSubcmdArgs(app, "DotCAKRotate",
+                    {"--new_cak_key_auth_scheme", "1", "--new_cak_ecdsa_key",
+                     kEcdsaKeyFile, "--new_cak_lms_key", kNewCakLmsTmp,
+                     "--lak_signature_auth_scheme", "0", "--signature",
+                     kSignatureFile});
+    std::remove(kNewCakLmsTmp.c_str()); // delete → readFileAsBytes fails
+    EXPECT_NO_THROW(commands[11]->createRequestMsg());
+}
+
+// [11] DotCAKRotate – parseResponseMsg success + output file write fails (line
+// 2124)
+TEST_F(NsmFirmwareCmdParseTest,
+       DotCAKRotate_ParseResponseSuccessOutputWriteFail)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "DotCAKRotate",
+                    {"--new_cak_key_auth_scheme", "0", "--new_cak_ecdsa_key",
+                     kEcdsaKeyFile, "--lak_signature_auth_scheme", "0",
+                     "--signature", kSignatureFile, "--output",
+                     "/tmp/nonexistent_dir_zzz/fw_dotcakrotate_out.bin"});
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_rotate_resp), 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    std::vector<uint8_t> blob(DOT_BLOB_SIZE, 0);
+    encode_nsm_dot_cak_rotate_resp(0, NSM_SUCCESS, ERR_NULL, blob.data(), msg);
+    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+}
+
+// ============================================================
+// DotUnlockChallenge tests (commands[12])
+// ============================================================
+
+// [12] DotUnlockChallenge – parseResponseMsg success + output write fails (line
+// 2250)
+TEST_F(NsmFirmwareCmdParseTest,
+       DotUnlockChallenge_ParseResponseSuccessOutputWriteFail)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "DotUnlockChallenge",
+                    {"--unlock_type", "1", "--output",
+                     "/tmp/nonexistent_dir_zzz/fw_challenge_out.bin"});
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_unlock_challenge_resp), 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    std::vector<uint8_t> challenge(DOT_CHALLENGE_SIZE, 0);
+    encode_nsm_dot_unlock_challenge_resp(0, NSM_SUCCESS, ERR_NULL,
+                                         challenge.data(), msg);
+    EXPECT_NO_THROW(commands[12]->parseResponseMsg(msg, buf.size()));
+}
+
+// ============================================================
+// DotGetInfo tests (commands[14])
+// ============================================================
+
+// [14] DotGetInfo – parseResponseMsg success + output write fails (line 2457)
+TEST_F(NsmFirmwareCmdParseTest, DotGetInfo_ParseResponseSuccessOutputWriteFail)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    // output option has no validator so any path works
+    parseSubcmdArgs(
+        app, "DotGetInfo",
+        {"--output", "/tmp/nonexistent_dir_zzz/fw_dotgetinfo_out.bin"});
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_info_resp), 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    std::vector<uint8_t> infoBlob(DOT_BLOB_SIZE, 0);
+    encode_nsm_dot_get_info_resp(0, NSM_SUCCESS, ERR_NULL, 0, 0, 0,
+                                 infoBlob.data(), msg);
+    EXPECT_NO_THROW(commands[14]->parseResponseMsg(msg, buf.size()));
+}
+
+// ============================================================
+// DotDisable tests (commands[16])
+// ============================================================
+
+// [16] DotDisable – hybrid LAK LMS missing (similar to lines 2660-2664)
+TEST_F(NsmFirmwareCmdParseTest, DotDisable_HybridLakLmsMissing_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    // lak_key_auth_scheme=1 but no --lak_lms_key → lakLmsKeyFile=""
+    parseSubcmdArgs(app, "DotDisable",
+                    {"--lak_key_auth_scheme", "1", "--lak_ecdsa_key",
+                     kEcdsaKeyFile, "--unlock_method", "0",
+                     "--disable_signature_auth_scheme", "0", "--signature",
+                     kSignatureFile});
+    EXPECT_NO_THROW(commands[16]->createRequestMsg());
+}
+
+// [16] DotDisable – hybrid LAK LMS file deleted before createRequest (lines
+// 2666-2671)
+TEST_F(NsmFirmwareCmdParseTest, DotDisable_HybridLakLmsReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kLakLmsTmpDD =
+        "/tmp/fw_test_dotdisable_lak_lms.bin";
+    createTempBinFile(kLakLmsTmpDD, 48);
+    parseSubcmdArgs(app, "DotDisable",
+                    {"--lak_key_auth_scheme", "1", "--lak_ecdsa_key",
+                     kEcdsaKeyFile, "--lak_lms_key", kLakLmsTmpDD,
+                     "--unlock_method", "0", "--disable_signature_auth_scheme",
+                     "0", "--signature", kSignatureFile});
+    std::remove(kLakLmsTmpDD.c_str()); // delete → readFileAsBytes fails
+    EXPECT_NO_THROW(commands[16]->createRequestMsg());
+}
+
+// [16] DotDisable – static challenge missing when unlock_method=2 (lines
+// 2690-2694)
+TEST_F(NsmFirmwareCmdParseTest, DotDisable_StaticChallengeMissing_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    // unlock_method=2 but no --static_challenge → staticChallengeFile=""
+    parseSubcmdArgs(app, "DotDisable",
+                    {"--lak_key_auth_scheme", "0", "--lak_ecdsa_key",
+                     kEcdsaKeyFile, "--unlock_method", "2",
+                     "--disable_signature_auth_scheme", "0", "--signature",
+                     kSignatureFile});
+    EXPECT_NO_THROW(commands[16]->createRequestMsg());
+}
+
+// [16] DotDisable – static challenge file deleted before createRequest (lines
+// 2700-2702)
+TEST_F(NsmFirmwareCmdParseTest,
+       DotDisable_StaticChallengeReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kChallengeTmpDD =
+        "/tmp/fw_test_dotdisable_challenge.bin";
+    createTempBinFile(kChallengeTmpDD, 32);
+    parseSubcmdArgs(app, "DotDisable",
+                    {"--lak_key_auth_scheme", "0", "--lak_ecdsa_key",
+                     kEcdsaKeyFile, "--unlock_method", "2",
+                     "--static_challenge", kChallengeTmpDD,
+                     "--disable_signature_auth_scheme", "0", "--signature",
+                     kSignatureFile});
+    std::remove(kChallengeTmpDD.c_str()); // delete → readFileAsBytes fails
+    EXPECT_NO_THROW(commands[16]->createRequestMsg());
+}
+
+// [16] DotDisable – signature file deleted before createRequest (lines
+// 2709-2711)
+TEST_F(NsmFirmwareCmdParseTest, DotDisable_SignatureReadFail_CreateRequest)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    static const std::string kSigTmpDD = "/tmp/fw_test_dotdisable_sig.bin";
+    createTempBinFile(kSigTmpDD, 1840);
+    parseSubcmdArgs(app, "DotDisable",
+                    {"--lak_key_auth_scheme", "0", "--lak_ecdsa_key",
+                     kEcdsaKeyFile, "--unlock_method", "0",
+                     "--disable_signature_auth_scheme", "0", "--signature",
+                     kSigTmpDD});
+    std::remove(kSigTmpDD.c_str()); // delete → readFileAsBytes fails
+    EXPECT_NO_THROW(commands[16]->createRequestMsg());
+}
+
+// [16] DotDisable – parseResponseMsg success + output file write fails (line
+// 2788)
+TEST_F(NsmFirmwareCmdParseTest, DotDisable_ParseResponseSuccessOutputWriteFail)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "DotDisable",
+                    {"--lak_key_auth_scheme", "0", "--lak_ecdsa_key",
+                     kEcdsaKeyFile, "--unlock_method", "0",
+                     "--disable_signature_auth_scheme", "0", "--signature",
+                     kSignatureFile, "--output",
+                     "/tmp/nonexistent_dir_zzz/fw_dotdisable_out.bin"});
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_dot_disable_resp),
+                             0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    std::vector<uint8_t> blob(DOT_BLOB_SIZE, 0);
+    encode_nsm_dot_disable_resp(0, NSM_SUCCESS, ERR_NULL, blob.data(), msg);
+    EXPECT_NO_THROW(commands[16]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- UpdateCodeAuthKeyPerm: zero update methods (lines 516-548) -------------
+// The existing ParseResponse test uses allBits=0x000700FF so all bit-branches
+// take the TRUE path. This test uses updateMethod=0 to cover the FALSE branch
+// of each `if (updateMethodBits.bits.bitX)` check.
+
+TEST_F(NsmFirmwareCmdParseTest, UpdateCodeAuthKeyPerm_ParseResponse_NoBits)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "UpdateCodeAuthKeyPerm",
+                    {"-r", "0", "-c", "1", "-i", "0", "-d", "0", "-n", "0"});
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_update_resp), 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    uint32_t noBits = 0;
+    encode_nsm_code_auth_key_perm_update_resp(0, NSM_SUCCESS, ERR_NULL, noBits,
+                                              msg);
+    EXPECT_NO_THROW(commands[3]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- UpdateCodeAuthKeyPerm: invalid key index string (line 469) -------------
+// requestType=1 with a non-numeric key string triggers the stoul() exception,
+// covering the catch block at L469 of nsm_firmware_cmd.cpp.
+
+TEST_F(NsmFirmwareCmdParseTest,
+       UpdateCodeAuthKeyPerm_CreateRequest_InvalidKeyString)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(
+        app, "UpdateCodeAuthKeyPerm",
+        {"-r", "1", "-c", "1", "-i", "0", "-d", "0", "-n", "0", "-k", "abc"});
+    EXPECT_NO_THROW(commands[3]->createRequestMsg());
+}
+
+// ---- UpdateMinSecurityVersion: update_methods=0 (all FALSE branches) --------
+// Covers the FALSE branches (bit not set) of every if(updateMethodBits.bits.X)
+// check at L725-L757 in nsm_firmware_cmd.cpp.  The existing success test uses
+// 0x000700FF which sets all relevant bits, so only the TRUE paths were taken.
+// This test sets update_methods=0 so every bit check is FALSE, exercising the
+// skip-push_back path for all 9 branches.
+TEST_F(NsmFirmwareCmdParseTest,
+       UpdateMinSecurityVersion_ParseResponse_AllBitsZero)
+{
+    CLI::App app;
+    setupFirmwareCommands(app);
+    parseSubcmdArgs(app, "UpdateMinSecurityVersion", {"-r", "0", "-n", "0"});
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_update_min_sec_ver_resp_command),
+        0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    nsm_firmware_update_min_sec_ver_resp resp{};
+    resp.update_methods =
+        0; // all bits clear → every if-branch takes FALSE path
+    encode_nsm_firmware_update_sec_ver_resp(0, NSM_SUCCESS, ERR_NULL, &resp,
+                                            msg);
+    EXPECT_NO_THROW(commands[5]->parseResponseMsg(msg, buf.size()));
 }
 
 } // namespace nsmtool::firmware

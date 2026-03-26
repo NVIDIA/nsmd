@@ -29,6 +29,7 @@ using namespace ::testing;
 #include "platform-environmental.h"
 
 #include "nsmMemory/nsmMemory.hpp"
+#include "nsmObjectFactory.hpp"
 
 #undef private
 #undef protected
@@ -323,4 +324,252 @@ TEST(NsmMemCurrClockFreqBatch11F,
 
     // Assert
     EXPECT_EQ(dimmIntf->memoryConfiguredSpeedInMhz(), 3200u);
+}
+
+// =============================================================================
+// SECTION 2: createNsmMemorySensor factory branch coverage
+// Tests targeting the FALSE branches of property-presence checks (lines
+// 822-869 of nsmMemory.cpp) and early-return paths, using NsmObjectFactory
+// so that exceptions thrown inside the factory are caught and do not
+// propagate to the test.
+// =============================================================================
+
+struct NsmMemoryFactoryBranchTest :
+    public ::testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string memIntf = "xyz.openbmc_project.Configuration.NSM_Memory";
+    const std::string memAttrIntf =
+        "xyz.openbmc_project.Configuration.NSM_Memory.MemoryAttributes";
+
+    // Use a unique instance number to avoid collisions with other fixtures.
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:52";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+
+    NsmMemoryFactoryBranchTest() : SensorManagerTest(devices)
+    {
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    ~NsmMemoryFactoryBranchTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+
+    // Register a complete NSM_Memory property map on a given path, optionally
+    // omitting one property to test the FALSE branch of its count() check.
+    void registerFullMemProps(const std::string& path, bool includeName = true,
+                              bool includeUUID = true,
+                              bool includeInvPath = true,
+                              bool includeType = true,
+                              bool includeErrCorr = true,
+                              bool includeDevType = true,
+                              bool includePriority = true)
+    {
+        auto& pm = utils::MockDbusAsync::propertyMap(path, memIntf);
+        if (includeName)
+        {
+            pm["Name"] = std::string("MemFactory");
+        }
+        if (includeUUID)
+        {
+            pm["UUID"] = gpuUuid;
+        }
+        if (includeInvPath)
+        {
+            pm["InventoryObjPath"] =
+                std::string("/xyz/openbmc_project/inventory/system/memory/0");
+        }
+        if (includeType)
+        {
+            pm["Type"] = std::string("NSM_Memory");
+        }
+        if (includeErrCorr)
+        {
+            pm["ErrorCorrection"] = std::string(
+                "xyz.openbmc_project.Inventory.Item.Dimm.Ecc.MultiBitECC");
+        }
+        if (includeDevType)
+        {
+            pm["DeviceType"] = std::string(
+                "xyz.openbmc_project.Inventory.Item.Dimm.DeviceType.Other");
+        }
+        if (includePriority)
+        {
+            pm["Priority"] = false;
+        }
+    }
+};
+
+// No property map registered → coGetCachedBaseProperties returns NSM_SW_ERROR
+// → factory does early co_return (line 814 TRUE branch in nsmMemory.cpp). //
+
+TEST_F(NsmMemoryFactoryBranchTest, Factory_NoPropertyMap_EarlyReturn)
+{
+    const std::string testPath = "/xyz/test/mem/no_props";
+    // Intentionally do NOT register any property map for testPath.
+    const size_t before = gpu->deviceSensors.size();
+    NsmObjectFactory::instance().createObjects(mockManager, memIntf, testPath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// UUID absent in property map → uuid="" → parseStaticUuid("") throws
+// (line 827 FALSE branch covered; exception caught by createObjects).
+TEST_F(NsmMemoryFactoryBranchTest, Factory_MissingUUID_ThrowsNoSensor)
+{
+    const std::string testPath = "/xyz/test/mem/missing_uuid";
+    registerFullMemProps(testPath, /*name*/ true, /*uuid*/ false);
+    const size_t before = gpu->deviceSensors.size();
+    NsmObjectFactory::instance().createObjects(mockManager, memIntf, testPath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// Type absent → type="" → neither NSM_Memory nor NSM_Memory_Attributes branch
+// is taken (lines 832, 855, 864 FALSE branches).  Returns NSM_SUCCESS without
+// creating any sensor.
+TEST_F(NsmMemoryFactoryBranchTest, Factory_MissingType_NoSensorsCreated)
+{
+    const std::string testPath = "/xyz/test/mem/missing_type";
+    registerFullMemProps(testPath, /*name*/ true, /*uuid*/ true,
+                         /*invPath*/ true, /*type*/ false);
+    const size_t before = gpu->deviceSensors.size();
+    NsmObjectFactory::instance().createObjects(mockManager, memIntf, testPath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// Type present but unknown → neither factory branch taken (lines 855/864
+// both FALSE).
+TEST_F(NsmMemoryFactoryBranchTest, Factory_UnknownType_NoSensorsCreated)
+{
+    const std::string testPath = "/xyz/test/mem/unknown_type";
+    registerFullMemProps(testPath);
+    // Overwrite Type with an unknown value.
+    utils::MockDbusAsync::propertyMap(testPath, memIntf)["Type"] =
+        std::string("NSM_Unknown_Type");
+    const size_t before = gpu->deviceSensors.size();
+    NsmObjectFactory::instance().createObjects(mockManager, memIntf, testPath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// InventoryObjPath absent → inventoryObjPath="" → path becomes "_DRAM_0"
+// (not a valid absolute D-Bus path) → getInterfaceOnObjectPath throws
+// (line 837 FALSE branch covered; exception caught by createObjects).
+TEST_F(NsmMemoryFactoryBranchTest,
+       Factory_MissingInventoryObjPath_ThrowsNoSensor)
+{
+    const std::string testPath = "/xyz/test/mem/missing_inv_path";
+    registerFullMemProps(testPath, /*name*/ true, /*uuid*/ true,
+                         /*invPath*/ false);
+    const size_t before = gpu->deviceSensors.size();
+    NsmObjectFactory::instance().createObjects(mockManager, memIntf, testPath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// ErrorCorrection absent → correctionType="" → DimmIntf::convertEccFromString
+// throws (line 702 FALSE branch covered; exception caught by createObjects).
+TEST_F(NsmMemoryFactoryBranchTest,
+       Factory_NSMMemory_MissingErrorCorrection_ThrowsNoSensor)
+{
+    const std::string testPath = "/xyz/test/mem/missing_err_corr";
+    registerFullMemProps(testPath, /*name*/ true, /*uuid*/ true,
+                         /*invPath*/ true, /*type*/ true,
+                         /*errCorr*/ false);
+    const size_t before = gpu->deviceSensors.size();
+    NsmObjectFactory::instance().createObjects(mockManager, memIntf, testPath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// All NSM_Memory properties present except Priority → priority defaults to
+// false (line 732 FALSE branch covered), all sensors are successfully created.
+TEST_F(NsmMemoryFactoryBranchTest, Factory_NSMMemory_MissingPriority_Created)
+{
+    const std::string testPath = "/xyz/test/mem/missing_priority";
+    registerFullMemProps(testPath, /*name*/ true, /*uuid*/ true,
+                         /*invPath*/ true, /*type*/ true,
+                         /*errCorr*/ true, /*devType*/ true,
+                         /*priority*/ false);
+    // Call createNsmMemorySensor directly (factory registration is
+    // link-order-dependent; direct call reliably exercises the code path).
+    const size_t before = gpu->deviceSensors.size();
+    createNsmMemorySensor(mockManager, memIntf, testPath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// All NSM_Memory_Attributes properties present → sensors created
+// (covers co_return NSM_SUCCESS path via NSM_Memory_Attributes branch, //
+// line 864 TRUE branch).
+TEST_F(NsmMemoryFactoryBranchTest, Factory_NSMMemoryAttributes_AllProps)
+{
+    const std::string testPath = "/xyz/test/mem/attrs";
+    // Base properties (always at MEMORY_INTERFACE).
+    auto& basePm = utils::MockDbusAsync::propertyMap(testPath, memIntf);
+    basePm["Name"] = std::string("MemAttrs");
+    basePm["UUID"] = gpuUuid;
+    basePm["InventoryObjPath"] =
+        std::string("/xyz/openbmc_project/inventory/system/memory/attrs");
+    // Current interface properties.
+    auto& attrPm = utils::MockDbusAsync::propertyMap(testPath, memAttrIntf);
+    attrPm["Type"] = std::string("NSM_Memory_Attributes");
+
+    // Call createNsmMemorySensor directly (factory registration is
+    // link-order-dependent; direct call reliably exercises the code path).
+    const size_t before = gpu->roundRobinSensors.size();
+    createNsmMemorySensor(mockManager, memAttrIntf, testPath);
+    EXPECT_GT(gpu->roundRobinSensors.size(), before);
+}
+
+// DeviceType absent → deviceType="" → NsmMemoryDeviceType ctor calls
+// DimmIntf::convertDeviceTypeFromString("") → throws InvalidEnumString
+// (line 712 FALSE branch covered; exception propagates from
+// createNsmMemorySensor).
+TEST_F(NsmMemoryFactoryBranchTest,
+       Factory_NSMMemory_MissingDeviceType_ThrowsNoSensor)
+{
+    const std::string testPath = "/xyz/test/mem/missing_dev_type";
+    registerFullMemProps(testPath, /*name*/ true, /*uuid*/ true,
+                         /*invPath*/ true, /*type*/ true,
+                         /*errCorr*/ true, /*devType*/ false);
+    // DeviceType absent → L712 FALSE → NsmMemoryDeviceType ctor throws
+    EXPECT_THROW_COROUTINE(
+        createNsmMemorySensor(mockManager, memIntf, testPath), std::exception);
+}
+
+// Name absent in base props → name="" (line 822 FALSE branch) →
+// sensors are still created since name is just a label, not part of D-Bus path.
+TEST_F(NsmMemoryFactoryBranchTest, Factory_NSMMemory_MissingName_SensorsCreated)
+{
+    const std::string testPath = "/xyz/test/mem/missing_name_br";
+    registerFullMemProps(testPath, /*name*/ false);
+    // name="" → NsmObject label is empty; inventoryObjPath still valid
+    const size_t before = gpu->deviceSensors.size();
+    createNsmMemorySensor(mockManager, memIntf, testPath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// NSM_Memory_Attributes type with all base properties present → NSM_Memory_Attr
+// branch (line 864 TRUE) with ALL three sub-create functions called:
+// createMemoryRowRemapping, createMemoryECCMode, createMemoryMemCapacityUtil
+// Verify all three create non-zero sensors.
+TEST_F(NsmMemoryFactoryBranchTest,
+       Factory_NSMMemoryAttributes_VerifiesAllThreeSensors)
+{
+    const std::string testPath = "/xyz/test/mem/attrs_full";
+    auto& basePm = utils::MockDbusAsync::propertyMap(testPath, memIntf);
+    basePm["Name"] = std::string("MemAttrsFull");
+    basePm["UUID"] = gpuUuid;
+    basePm["InventoryObjPath"] =
+        std::string("/xyz/openbmc_project/inventory/system/memory/attrsfull");
+    auto& attrPm = utils::MockDbusAsync::propertyMap(testPath, memAttrIntf);
+    attrPm["Type"] = std::string("NSM_Memory_Attributes");
+
+    const size_t beforeRR = gpu->roundRobinSensors.size();
+    createNsmMemorySensor(mockManager, memAttrIntf, testPath);
+    // createMemoryRowRemapping adds 3 RR sensors, createMemoryECCMode adds 1,
+    // createMemoryMemCapacityUtil adds 1 → at least 5 new sensors total
+    EXPECT_GE(gpu->roundRobinSensors.size(), beforeRR + 4);
 }

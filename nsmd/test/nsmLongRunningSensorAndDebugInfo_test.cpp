@@ -382,7 +382,8 @@ TEST_F(NsmDebugInfoTestB12F, Finish_ClosesFileDescriptor)
         debugInfo.valueInterface = valueInterface;
         debugInfo.fd = -1; // Invalid fd to avoid issues
 
-        // Act & Assert -- finish should not throw with -1 fd
+        // Act & Assert -- finish should not throw with -1 fd //
+
         EXPECT_NO_THROW(debugInfo.finish(AsyncOperationStatusType::Success, 0));
     }
 }
@@ -1008,6 +1009,167 @@ TEST_F(NsmThresholdFactoryTestB12F, Constructor_MultipleInterfaces_AllStored)
     // Assert
     EXPECT_EQ(f1.interface, intf1);
     EXPECT_EQ(f2.interface, intf2);
+}
+
+// ============================================================================
+// NsmThresholdFactory::make() branch coverage
+// ============================================================================
+
+// Minimal concrete NsmNumericSensor for factory tests
+class TFTestNumericSensor : public NsmNumericSensor
+{
+  public:
+    TFTestNumericSensor(const std::string& name) :
+        NsmNumericSensor(name, "NSM_Test", 0, nullptr)
+    {}
+    std::optional<std::vector<uint8_t>> genRequestMsg(eid_t, uint8_t) override
+    {
+        return std::nullopt;
+    }
+    uint8_t handleResponseMsg(const struct nsm_msg*, size_t) override
+    {
+        return 0;
+    }
+    std::string getSensorType() override
+    {
+        return "temperature";
+    }
+};
+
+// Empty service map → getThresholdInterfacesAsync returns empty map
+// → all processThresholdsPair calls skip the if block (false branch)
+TEST_F(NsmThresholdFactoryTestB12F, Make_EmptyServiceMap_NoSensorsAdded)
+{
+    // serviceMap is empty by default (cleared by DBusTest destructor setup)
+    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
+    NsmThresholdFactory factory(mockManager, interface, testObjPath,
+                                numericSensor, info, gpuUuid);
+    size_t initialStaticCount = gpu->staticSensors.size();
+    factory.make();
+    EXPECT_EQ(gpu->staticSensors.size(), initialStaticCount);
+}
+
+// Non-empty service map with "LowerCaution" → processThresholdsPair creates
+// ThresholdWarningIntf and calls createNsmThreshold with dynamic=false.
+// Covers: getThresholdInterfacesAsync loop, processThresholdsPair if-branch,
+// createNsmThreshold static path (addDeviceSensors).
+TEST_F(NsmThresholdFactoryTestB12F, Make_StaticLowerCautionThreshold)
+{
+    const std::string threshIntf = interface +
+                                   ".ThermalParameters.LowerCaution";
+
+    // Set up service map so getThresholdInterfacesAsync finds our interface
+    utils::MockDbusAsync::serviceMap() = {
+        {"xyz.openbmc_project.EntityManager", {threshIntf}}};
+
+    // Set "Name" property for coGetDbusProperty lookup
+    auto& nameProps = utils::MockDbusAsync::propertyMap(testObjPath,
+                                                        threshIntf);
+    nameProps["Name"] = std::string("LowerCaution");
+
+    // Set threshold interface properties for createNsmThreshold
+    nameProps["Dynamic"] = bool(false);
+    nameProps["Value"] = double(45.0);
+
+    auto numericSensor = std::make_shared<TFTestNumericSensor>("TF_B12F_Temp0");
+    info.name = "TF_B12F_Temp0";
+
+    NsmThresholdFactory factory(mockManager, interface, testObjPath,
+                                numericSensor, info, gpuUuid);
+    size_t initialCount = gpu->deviceSensors.size();
+    factory.make();
+    // createNsmThreshold static path adds to addDeviceSensors
+    EXPECT_GT(gpu->deviceSensors.size(), initialCount);
+}
+
+// Dynamic threshold with NSM_ThermalParameter type, non-periodic.
+// Covers: createNsmThreshold dynamic=true path, type check pass,
+// periodicUpdate=false → addStaticSensor + addCapabilityRefreshSensor.
+TEST_F(NsmThresholdFactoryTestB12F, Make_DynamicLowerCritical_NonPeriodic)
+{
+    const std::string threshIntf = interface +
+                                   ".ThermalParameters.LowerCritical";
+
+    utils::MockDbusAsync::serviceMap() = {
+        {"xyz.openbmc_project.EntityManager", {threshIntf}}};
+
+    auto& props = utils::MockDbusAsync::propertyMap(testObjPath, threshIntf);
+    props["Name"] = std::string("LowerCritical");
+    props["Dynamic"] = bool(true);
+    props["Type"] = std::string("NSM_ThermalParameter");
+    props["ParameterId"] = uint64_t(5);
+    // "PeriodicUpdate" not set → getDbusProperty throws → periodicUpdate=false
+
+    auto numericSensor =
+        std::make_shared<TFTestNumericSensor>("TF_B12F_Temp0_Dyn");
+    info.name = "TF_B12F_Temp0_Dyn";
+
+    NsmThresholdFactory factory(mockManager, interface, testObjPath,
+                                numericSensor, info, gpuUuid);
+    size_t initialCount = gpu->staticSensors.size();
+    factory.make();
+    EXPECT_GT(gpu->staticSensors.size(), initialCount);
+}
+
+// Dynamic threshold with unsupported type.
+// Covers: createNsmThreshold type check fail → co_return NSM_ERROR path. //
+
+TEST_F(NsmThresholdFactoryTestB12F, Make_DynamicThreshold_UnsupportedType)
+{
+    const std::string threshIntf = interface +
+                                   ".ThermalParameters.UpperCaution";
+
+    utils::MockDbusAsync::serviceMap() = {
+        {"xyz.openbmc_project.EntityManager", {threshIntf}}};
+
+    auto& props = utils::MockDbusAsync::propertyMap(testObjPath, threshIntf);
+    props["Name"] = std::string("UpperCaution");
+    props["Dynamic"] = bool(true);
+    props["Type"] = std::string("NSM_UnsupportedType"); // wrong type
+
+    auto numericSensor =
+        std::make_shared<TFTestNumericSensor>("TF_B12F_Temp0_Bad");
+    info.name = "TF_B12F_Temp0_Bad";
+
+    NsmThresholdFactory factory(mockManager, interface, testObjPath,
+                                numericSensor, info, gpuUuid);
+    size_t initialCount = gpu->staticSensors.size();
+    factory.make();
+    // Type mismatch → returns NSM_ERROR → no sensors added
+    EXPECT_EQ(gpu->staticSensors.size(), initialCount);
+}
+
+// Dynamic threshold with periodic update + aggregation.
+// Covers: periodicUpdate=true path, Priority/Aggregated properties,
+// NumericSensorFactory::makeAggregatorAndAddSensor,
+// NsmThresholdAggregatorBuilder::makeAggregator.
+TEST_F(NsmThresholdFactoryTestB12F, Make_DynamicThreshold_Periodic_Aggregated)
+{
+    const std::string threshIntf = interface +
+                                   ".ThermalParameters.UpperCritical";
+
+    utils::MockDbusAsync::serviceMap() = {
+        {"xyz.openbmc_project.EntityManager", {threshIntf}}};
+
+    auto& props = utils::MockDbusAsync::propertyMap(testObjPath, threshIntf);
+    props["Name"] = std::string("UpperCritical");
+    props["Dynamic"] = bool(true);
+    props["Type"] = std::string("NSM_ThermalParameter");
+    props["ParameterId"] = uint64_t(7);
+    props["PeriodicUpdate"] = bool(true);
+    props["Priority"] = bool(false);
+    props["Aggregated"] = bool(true);
+
+    auto numericSensor =
+        std::make_shared<TFTestNumericSensor>("TF_B12F_Temp0_Agg");
+    info.name = "TF_B12F_Temp0_Agg";
+
+    NsmThresholdFactory factory(mockManager, interface, testObjPath,
+                                numericSensor, info, gpuUuid);
+    factory.make();
+    // Periodic+aggregated adds via makeAggregatorAndAddSensor
+    // (aggregator map, not directly to staticSensors/deviceSensors)
+    SUCCEED(); // Verifies make() completes without crash
 }
 
 // ============================================================================
@@ -1845,4 +2007,139 @@ TEST(NsmNumericSensorDbusValueB12F, UpdateReading_SameValue_DoesNotUpdate)
     // Third update with different value
     value.updateReading(43.0, 3000);
     EXPECT_EQ(value.valueIntf.value(), 43.0);
+}
+
+// ============================================================================
+// PART 25: NsmLongRunningSensor::updateLongRunningSensor() branch coverage
+// ============================================================================
+
+struct NsmLongRunningSensorUpdateTest :
+    public testing::Test,
+    public SensorManagerTest
+{
+    std::shared_ptr<MockNsmDevice> device =
+        std::make_shared<MockNsmDevice>(0, 0, "MCTP_EID", "5", 0);
+    NsmDeviceTable devices{{device}};
+
+    NsmLongRunningSensorUpdateTest() : SensorManagerTest(devices) {}
+    ~NsmLongRunningSensorUpdateTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+/**
+ * updateLongRunningSensor(): genRequestMsg returns nullopt → returns
+ * NSM_SW_ERROR. Covers L76 TRUE branch.
+ */
+TEST_F(NsmLongRunningSensorUpdateTest,
+       UpdateLongRunning_GenRequestMsgFails_ReturnsError)
+{
+    auto sensor = std::make_shared<MockableLongRunningSensor>(
+        "LR_Upd1", "LongRunning", false, nullptr, 0x05, 0x10);
+
+    EXPECT_CALL(*sensor, genRequestMsg(_, _)).WillOnce(Return(std::nullopt));
+    EXPECT_CALL(*device, sensorIO(_, _, _, _, _)).Times(0);
+
+    auto cr = sensor->updateLongRunningSensor(device);
+    EXPECT_NE(cr.data(), NSM_SW_SUCCESS);
+}
+
+/**
+ * updateLongRunningSensor(): sensorIO returns a non-zero transport error →
+ * returns that error. Covers L90 TRUE branch.
+ */
+TEST_F(NsmLongRunningSensorUpdateTest,
+       UpdateLongRunning_SensorIOFails_ReturnsError)
+{
+    auto sensor = std::make_shared<MockableLongRunningSensor>(
+        "LR_Upd2", "LongRunning", false, nullptr, 0x05, 0x10);
+
+    Request fakeReq(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req), 0);
+    EXPECT_CALL(*sensor, genRequestMsg(_, _)).WillOnce(Return(fakeReq));
+    EXPECT_CALL(*device, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERROR));
+
+    auto cr = sensor->updateLongRunningSensor(device);
+    EXPECT_NE(cr.data(), NSM_SW_SUCCESS);
+}
+
+/**
+ * updateLongRunningSensor(): sensorIO succeeds, decode gives cc == NSM_SUCCESS
+ * → calls handleResponseMsg and sets isLongRunning = false.
+ * Covers L103 TRUE branch.
+ */
+TEST_F(NsmLongRunningSensorUpdateTest,
+       UpdateLongRunning_CcIsNsmSuccess_CallsHandleResponse)
+{
+    auto sensor = std::make_shared<MockableLongRunningSensor>(
+        "LR_Upd3", "LongRunning", true, nullptr, 0x05, 0x10);
+
+    Request fakeReq(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req), 0);
+    EXPECT_CALL(*sensor, genRequestMsg(_, _)).WillOnce(Return(fakeReq));
+
+    // Zero-filled response: completion_code byte = 0 = NSM_SUCCESS
+    Response resp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    EXPECT_CALL(*device, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(resp, NSM_SUCCESS));
+    EXPECT_CALL(*sensor, handleResponseMsg(_, _))
+        .WillOnce(Return(NSM_SW_SUCCESS));
+
+    auto cr = sensor->updateLongRunningSensor(device);
+    EXPECT_EQ(cr.data(), NSM_SW_SUCCESS);
+    EXPECT_FALSE(sensor->isLongRunning); // isLongRunning cleared on NSM_SUCCESS
+}
+
+/**
+ * updateLongRunningSensor(): cc != NSM_SUCCESS, initAcceptInstanceId returns
+ * false (cc = NSM_ERROR, not NSM_ACCEPTED) → rc = NSM_SW_ERROR_COMMAND_FAIL.
+ * Covers L113 TRUE branch.
+ */
+TEST_F(NsmLongRunningSensorUpdateTest,
+       UpdateLongRunning_InitAcceptInstanceIdFails_ReturnsCommandFail)
+{
+    auto sensor = std::make_shared<MockableLongRunningSensor>(
+        "LR_Upd4", "LongRunning", false, nullptr, 0x05, 0x10);
+
+    Request fakeReq(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req), 0);
+    EXPECT_CALL(*sensor, genRequestMsg(_, _)).WillOnce(Return(fakeReq));
+
+    // Set completion_code = NSM_ERROR (1): cc != NSM_SUCCESS, cc !=
+    // NSM_ACCEPTED → initAcceptInstanceId returns false → L115 taken
+    Response resp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    resp[sizeof(nsm_msg_hdr) + 1] = static_cast<uint8_t>(NSM_ERROR);
+    EXPECT_CALL(*device, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(resp, NSM_SUCCESS));
+    EXPECT_CALL(*sensor, handleResponseMsg(_, _)).Times(0);
+
+    auto cr = sensor->updateLongRunningSensor(device);
+    EXPECT_EQ(cr.data(), NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+/**
+ * updateLongRunningSensor(): cc != NSM_SUCCESS but cc == NSM_ACCEPTED and
+ * transport rc == NSM_SW_SUCCESS → initAcceptInstanceId returns true →
+ * L113 FALSE, acceptInstanceId set to the instance_id from the response header.
+ * Covers L113 FALSE branch.
+ */
+TEST_F(NsmLongRunningSensorUpdateTest,
+       UpdateLongRunning_InitAcceptInstanceIdSucceeds_AcceptsInstance)
+{
+    auto sensor = std::make_shared<MockableLongRunningSensor>(
+        "LR_Upd5", "LongRunning", false, nullptr, 0x05, 0x10);
+
+    Request fakeReq(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req), 0);
+    EXPECT_CALL(*sensor, genRequestMsg(_, _)).WillOnce(Return(fakeReq));
+
+    // Set completion_code = NSM_ACCEPTED (0x7d): cc != NSM_SUCCESS,
+    // initAcceptInstanceId(instance_id=0, NSM_ACCEPTED, NSM_SW_SUCCESS) → true
+    // → L113 FALSE, acceptInstanceId = instance_id from header (0)
+    Response resp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    resp[sizeof(nsm_msg_hdr) + 1] = static_cast<uint8_t>(NSM_ACCEPTED);
+    EXPECT_CALL(*device, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(resp, NSM_SUCCESS));
+    EXPECT_CALL(*sensor, handleResponseMsg(_, _)).Times(0);
+
+    auto cr = sensor->updateLongRunningSensor(device);
+    EXPECT_EQ(sensor->acceptInstanceId, 0u); // set to instance_id from header
 }

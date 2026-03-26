@@ -350,3 +350,513 @@ TEST_F(NsmFpgaPortFactoryTest, CreateNsmFpgaPortSensorInvalidUUID)
     // Should have only the automatic first sensor
     EXPECT_EQ(1, fpga->deviceSensors.size());
 }
+
+TEST_F(NsmFpgaPortFactoryTest, CreateNsmFpgaPortSensorPortInfoSuccess)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort.PortInfo";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/fpga/portinfo_factory";
+    const std::string name = "FpgaPortInfoFactory";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/ports/FPGA_PortInfoFactory";
+
+    // Base interface properties (read by coGetCachedBaseProperties)
+    auto& baseMap = utils::MockDbusAsync::propertyMap(
+        objPath, "xyz.openbmc_project.Configuration.NSM_FpgaPort");
+    baseMap["Name"] = name;
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    baseMap["DeviceIndex"] = uint64_t{0};
+
+    // Type-specific interface properties (read by coGetAllDbusProperty)
+    auto& typeMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    typeMap["Type"] = std::string("NSM_PortInfo");
+    typeMap["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    typeMap["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    typeMap["Priority"] = bool{false};
+
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+
+    // 1 auto device sensor + 1 portInfoSensor + 1 pcieECCGroup1 via
+    // addSensorBase
+    EXPECT_EQ(3, fpga->deviceSensors.size());
+    auto portInfo =
+        std::dynamic_pointer_cast<NsmFpgaPortInfo>(fpga->deviceSensors[1]);
+    EXPECT_NE(nullptr, portInfo);
+    EXPECT_EQ(name, portInfo->getName());
+    EXPECT_EQ(std::string("NSM_PortInfo"), portInfo->getType());
+}
+
+TEST_F(NsmFpgaPortFactoryTest, CreateNsmFpgaPortSensorPortStateSuccess)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort.PortState";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/fpga/portstate_factory";
+    const std::string name = "FpgaPortStateFactory";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/ports/FPGA_PortStateFactory";
+
+    // Base interface properties
+    auto& baseMap = utils::MockDbusAsync::propertyMap(
+        objPath, "xyz.openbmc_project.Configuration.NSM_FpgaPort");
+    baseMap["Name"] = name;
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+
+    // Type-specific interface properties
+    auto& typeMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    typeMap["Type"] = std::string("NSM_PortState");
+    typeMap["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+
+    // 1 auto device sensor + 1 portStateSensor
+    EXPECT_EQ(2, fpga->deviceSensors.size());
+    auto portState =
+        std::dynamic_pointer_cast<NsmFpgaPortState>(fpga->deviceSensors[1]);
+    EXPECT_NE(nullptr, portState);
+    EXPECT_EQ(name, portState->getName());
+    EXPECT_EQ(std::string("NSM_PortState"), portState->getType());
+}
+
+TEST_F(NsmFpgaPortFactoryTest, CreateNsmFpgaPortSensorPCIeSuccess)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort.PCIe";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/fpga/pcie_factory";
+    const std::string name = "FpgaPCIeFactory";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/ports/FPGA_PCIeFactory";
+
+    // Base interface properties
+    auto& baseMap = utils::MockDbusAsync::propertyMap(
+        objPath, "xyz.openbmc_project.Configuration.NSM_FpgaPort");
+    baseMap["Name"] = name;
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    baseMap["DeviceIndex"] = uint64_t{0};
+
+    // Type-specific interface properties
+    auto& typeMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    typeMap["Type"] = std::string("NSM_PCIe");
+    typeMap["Priority"] = bool{false};
+
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+
+    // 1 auto device sensor + 3 PCIe ECC groups (Group2, Group3, Group4)
+    // all go through addSensorBase which pushes to deviceSensors
+    EXPECT_EQ(4, fpga->deviceSensors.size());
+}
+
+TEST_F(NsmFpgaPortFactoryTest, CreateNsmFpgaPortSensorExceptionCatch)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort.PortInfo";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/fpga/portinfo_bad";
+    const std::string name = "FpgaPortInfoBad";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/ports/FPGA_PortInfoBad";
+
+    // Base interface properties (valid)
+    auto& baseMap = utils::MockDbusAsync::propertyMap(
+        objPath, "xyz.openbmc_project.Configuration.NSM_FpgaPort");
+    baseMap["Name"] = name;
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    baseMap["DeviceIndex"] = uint64_t{0};
+
+    // Type-specific properties with invalid PortType to trigger exception
+    // in NsmFpgaPortInfo constructor via convertPortTypeFromString
+    auto& typeMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    typeMap["Type"] = std::string("NSM_PortInfo");
+    typeMap["PortType"] = std::string("invalid.PortType.NotInEnum");
+    typeMap["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    typeMap["Priority"] = bool{false};
+
+    // Exception caught inside createNsmFpgaPortSensor, should not propagate
+    EXPECT_NO_THROW(createNsmFpgaPortSensor(mockManager, interface, objPath));
+
+    // No new sensor added — exception was caught and co_return NSM_ERROR //
+
+    EXPECT_EQ(1, fpga->deviceSensors.size());
+}
+
+TEST_F(NsmFpgaPortFactoryTest, CreateNsmFpgaPortSensorBasePropertiesNotFound)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort.PortInfo";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/fpga/portinfo_no_base";
+
+    // Do NOT register the base (FPGA_PORT_INTERFACE) property map.
+    // coGetCachedBaseProperties will return NSM_SW_ERROR (non-success),
+    // exercising the early-return branch at line 82-84.
+
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+
+    // rc != NSM_SUCCESS → co_return rc; no sensor added
+    EXPECT_EQ(1, fpga->deviceSensors.size());
+}
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in createNsmFpgaPortSensor
+// =============================================================================
+
+// NSM_FpgaPort + Health absent → health="" → convertHealthTypeFromString("")
+// throws InvalidEnumString → caught in try/catch → no sensor added
+TEST_F(NsmFpgaPortFactoryTest, NSMFpgaPort_MissingHealth_Throws_NoSensor)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string objPath = "/xyz/test/fpga/port_no_health";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/port_no_health";
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Name"] = std::string("FpgaPort_NoHealth");
+    pm["UUID"] = fpgaUuid;
+    pm["InventoryObjPath"] = inventoryObjPath;
+    pm["Type"] = std::string("NSM_FpgaPort");
+    pm["ChasisPowerState"] =
+        std::string("xyz.openbmc_project.State.Chassis.PowerState.On");
+    // "Health" intentionally omitted → FALSE branch → health="" → throws
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// NSM_FpgaPort + ChasisPowerState absent → chasisState="" →
+// convertPowerStateFromString("") throws → caught → no sensor added
+TEST_F(NsmFpgaPortFactoryTest, NSMFpgaPort_MissingChasisPowerState_Throws)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string objPath = "/xyz/test/fpga/port_no_chasis";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/port_no_chasis";
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Name"] = std::string("FpgaPort_NoChasis");
+    pm["UUID"] = fpgaUuid;
+    pm["InventoryObjPath"] = inventoryObjPath;
+    pm["Type"] = std::string("NSM_FpgaPort");
+    pm["Health"] =
+        std::string("xyz.openbmc_project.State.Decorator.Health.HealthType.OK");
+    // "ChasisPowerState" omitted → FALSE branch → chasisState="" → throws
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// NSM_PortInfo + PortType absent → portType="" → convertPortTypeFromString("")
+// throws → caught → no sensor added
+TEST_F(NsmFpgaPortFactoryTest, NSMPortInfo_MissingPortType_Throws_NoSensor)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortInfo";
+    const std::string objPath = "/xyz/test/fpga/portinfo_no_porttype";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/portinfo_no_porttype";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPortInfo_NoPortType");
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    baseMap["DeviceIndex"] = uint64_t{0};
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PortInfo");
+    pm["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    pm["Priority"] = bool{false};
+    // "PortType" omitted → portType="" → convertPortTypeFromString throws
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// NSM_PortInfo + PortProtocol absent → portProtocol="" →
+// NsmFpgaPortInfo constructor throws → caught → no sensor added
+TEST_F(NsmFpgaPortFactoryTest, NSMPortInfo_MissingPortProtocol_Throws_NoSensor)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortInfo";
+    const std::string objPath = "/xyz/test/fpga/portinfo_no_portproto";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/portinfo_no_portproto";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPortInfo_NoProto");
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    baseMap["DeviceIndex"] = uint64_t{0};
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PortInfo");
+    pm["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    pm["Priority"] = bool{false};
+    // "PortProtocol" omitted → portProtocol="" → throws
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// NSM_PortInfo + Priority absent → priority=false (FALSE branch) →
+// pcieECCGroup1 added to roundRobinSensors; portInfoSensor to deviceSensors
+TEST_F(NsmFpgaPortFactoryTest, NSMPortInfo_MissingPriority_RoundRobinSensor)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortInfo";
+    const std::string objPath = "/xyz/test/fpga/portinfo_no_priority";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/portinfo_no_priority";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPortInfo_NoPriority");
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    baseMap["DeviceIndex"] = uint64_t{0};
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PortInfo");
+    pm["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    pm["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    // "Priority" omitted → priority=false → roundRobin for pcieECCGroup1
+
+    const size_t rrBefore = fpga->roundRobinSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_GT(fpga->roundRobinSensors.size(), rrBefore);
+}
+
+// NSM_PortState + LinkStatus absent → linkStatus="" →
+// convertLinkStatusTypeFromString("") throws → caught → no sensor added
+TEST_F(NsmFpgaPortFactoryTest, NSMPortState_MissingLinkStatus_Throws_NoSensor)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortState";
+    const std::string objPath = "/xyz/test/fpga/portstate_no_linkstatus";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/portstate_no_linkstatus";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPortState_NoLink");
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PortState");
+    // "LinkStatus" omitted → linkStatus="" → convertLinkStatusTypeFromString
+    // throws InvalidEnumString → caught → no sensor
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// NSM_PCIe + Priority absent → priority=false (FALSE branch) →
+// pcieECCGroup2/3/4 added to roundRobinSensors
+TEST_F(NsmFpgaPortFactoryTest, NSMPCIe_MissingPriority_RoundRobinSensors)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PCIe";
+    const std::string objPath = "/xyz/test/fpga/pcie_no_priority";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/pcie_no_priority";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPCIe_NoPriority");
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    baseMap["DeviceIndex"] = uint64_t{0};
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PCIe");
+    // "Priority" omitted → priority=false → roundRobin for all PCIe groups
+
+    const size_t rrBefore = fpga->roundRobinSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_GT(fpga->roundRobinSensors.size(), rrBefore);
+}
+
+// NSM_PortInfo + DeviceIndex absent from base → L164 FALSE → deviceIndex=0
+TEST_F(NsmFpgaPortFactoryTest, NSMPortInfo_MissingDeviceIndex_FalseBranch)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortInfo";
+    const std::string objPath = "/xyz/test/fpga/portinfo_no_devidx";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/portinfo_no_devidx";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPortInfo_NoDevIdx");
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    // "DeviceIndex" omitted → L164 FALSE → deviceIndex stays 0
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PortInfo");
+    pm["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    pm["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    pm["Priority"] = bool{false};
+
+    const size_t rrBefore = fpga->roundRobinSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_GT(fpga->roundRobinSensors.size(), rrBefore);
+}
+
+// NSM_PCIe + DeviceIndex absent from base → L205 FALSE → deviceIndex=0
+TEST_F(NsmFpgaPortFactoryTest, NSMPCIe_MissingDeviceIndex_FalseBranch)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PCIe";
+    const std::string objPath = "/xyz/test/fpga/pcie_no_devidx";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/pcie_no_devidx";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPCIe_NoDevIdx");
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    // "DeviceIndex" omitted → L205 FALSE → deviceIndex stays 0
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PCIe");
+    pm["Priority"] = bool{false};
+
+    const size_t rrBefore = fpga->roundRobinSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_GT(fpga->roundRobinSensors.size(), rrBefore);
+}
+
+// Unknown type (not FpgaPort/PortInfo/PortState/PCIe) → L196 else-if FALSE →
+// no sensor created; execution falls through the else-if chain
+TEST_F(NsmFpgaPortFactoryTest, NSMUnknownType_NoSensor)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortInfo";
+    const std::string objPath = "/xyz/test/fpga/unknown_type";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/unknown_type";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPort_Unknown");
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    baseMap["DeviceIndex"] = uint64_t{0};
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_Unknown"); // triggers FALSE for all else-ifs
+
+    const size_t before = fpga->deviceSensors.size() +
+                          fpga->roundRobinSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_EQ(before,
+              fpga->deviceSensors.size() + fpga->roundRobinSensors.size());
+}
+
+// ============================================================================
+// FALSE-branch coverage: count() checks on allBaseIfaceProperties
+// ============================================================================
+
+// Name absent in base → L89 FALSE → name="" → sensors still created
+TEST_F(NsmFpgaPortFactoryTest, Factory_MissingName_SensorsCreated)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortState";
+    const std::string objPath = "/xyz/test/fpga/missing_name";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/missing_name_inv";
+    // Name absent → L89 FALSE → name stays ""
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PortState");
+    pm["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_GT(fpga->deviceSensors.size(), before);
+}
+
+// UUID absent in base → L94 FALSE → uuid="" → getNsmDeviceFromStaticUUID
+// throws std::runtime_error → caught at L240 → co_return NSM_ERROR //
+
+TEST_F(NsmFpgaPortFactoryTest, Factory_MissingUUID_CatchesException)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortState";
+    const std::string objPath = "/xyz/test/fpga/missing_uuid";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/missing_uuid_inv";
+    // UUID absent → L94 FALSE → uuid="" → throws → caught
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPort_NoUUID");
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PortState");
+    pm["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+
+    // Exception caught inside factory, should not propagate
+    EXPECT_NO_THROW(createNsmFpgaPortSensor(mockManager, interface, objPath));
+}
+
+// InventoryObjPath absent in base → L104 FALSE → inventoryObjPath="" →
+// NsmFpgaPortState ctor with "" → throws SdBusError → caught at L240
+TEST_F(NsmFpgaPortFactoryTest, Factory_MissingInventoryObjPath_CatchesException)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortState";
+    const std::string objPath = "/xyz/test/fpga/missing_inv_path";
+    // InventoryObjPath absent → L104 FALSE → inventoryObjPath="" → throws
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPort_NoInvPath");
+    baseMap["UUID"] = fpgaUuid;
+    // InventoryObjPath intentionally omitted
+
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+    pm["Type"] = std::string("NSM_PortState");
+    pm["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+
+    // Exception caught inside factory, should not propagate
+    EXPECT_NO_THROW(createNsmFpgaPortSensor(mockManager, interface, objPath));
+}
+
+// Type absent in current iface → L99 FALSE → type="" → no type branch taken
+// → factory returns NSM_SUCCESS without creating any sensor
+TEST_F(NsmFpgaPortFactoryTest, Factory_MissingType_NoSensors)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaPort";
+    const std::string interface = baseIntf + ".PortState";
+    const std::string objPath = "/xyz/test/fpga/missing_type";
+    const std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/test/fpga/missing_type_inv";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, baseIntf);
+    baseMap["Name"] = std::string("FpgaPort_NoType");
+    baseMap["UUID"] = fpgaUuid;
+    baseMap["InventoryObjPath"] = inventoryObjPath;
+    // Type absent → L99 FALSE → type="" → no type branch taken
+    (void)utils::MockDbusAsync::propertyMap(objPath, interface);
+
+    const size_t before = fpga->deviceSensors.size() +
+                          fpga->roundRobinSensors.size();
+    createNsmFpgaPortSensor(mockManager, interface, objPath);
+    EXPECT_EQ(before,
+              fpga->deviceSensors.size() + fpga->roundRobinSensors.size());
+}

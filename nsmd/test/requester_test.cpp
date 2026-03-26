@@ -33,7 +33,7 @@
 
 #include "base.h"
 
-#include <sdeventplus/event.hpp>
+#include "common/event.hpp"
 
 #include <coroutine>
 #include <cstdlib>
@@ -268,6 +268,21 @@ TEST_F(DeviceRequestTimeOutTrackerTest, instance_ReturnsSameForSameEid)
     auto& t2 = DeviceRequestTimeOutTracker::instance(55);
     EXPECT_EQ(&t1, &t2);
     EXPECT_EQ(DeviceRequestTimeOutTracker::instances.size(), 1u);
+}
+
+// logTimeOutFailure with no timeout message → Decision 'false' branch at L89
+// (timeoutMessage.has_value() == false → skip the if-body)
+TEST_F(DeviceRequestTimeOutTrackerTest, logTimeOutFailure_NoTimeout_SkipsIfBody)
+{
+    auto req = makeRequest(88);
+    DeviceRequestTimeOutTracker::pushWithoutTimeout(req);
+
+    auto& tracker = DeviceRequestTimeOutTracker::instance(88);
+    EXPECT_FALSE(tracker.timeoutMessage.has_value());
+
+    // Call logTimeOutFailure when timeoutMessage is empty:
+    // the if (timeoutMessage.has_value()) body is skipped (FALSE branch).
+    EXPECT_NO_THROW(tracker.logTimeOutFailure());
 }
 
 // ===========================================================================
@@ -526,7 +541,7 @@ using TestHandler = requester::Handler<requester::Request>;
 class HandlerTest : public ::testing::Test
 {
   protected:
-    sdeventplus::Event event{sdeventplus::Event::get_default()};
+    common::Event event;
     nsm::InstanceIdDb instanceIdDb;
     mctp_socket::Manager socketManager;
     TestHandler handler{event, instanceIdDb, socketManager, false};

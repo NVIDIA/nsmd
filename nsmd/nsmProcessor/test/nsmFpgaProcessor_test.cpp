@@ -342,3 +342,183 @@ TEST_F(NsmFpgaProcessorFactoryTest, AddSensorNsmAltitudePressure)
     fpga->addSensor(sensor, PollingType::RoundRobin);
     EXPECT_GT(fpga->deviceSensors.size(), before);
 }
+
+// createNsmFpgaProcessorSensor: base interface not registered at unique path →
+// coGetCachedBaseProperties returns error → co_return rc (early return //
+// at line 61 in nsmFpgaProcessor.cpp).
+TEST_F(NsmFpgaProcessorFactoryTest,
+       CreateFpgaProcessor_BasePropertiesFail_NoSensor)
+{
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaProcessor";
+    const std::string uniquePath = "/xyz/test/fpgaproc/base_fail_unique";
+    // Register a sub-interface only; leave FPGA_PROCESSOR_INTERFACE absent.
+    auto& other = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                    baseIntf + ".Sub");
+    other["Type"] = std::string("NSM_FpgaProcessor");
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, baseIntf + ".Sub", uniquePath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// =============================================================================
+// Branch coverage: factory property-count and type-check branches
+// =============================================================================
+
+struct NsmFpgaProcessorFactoryBranchTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string intf =
+        "xyz.openbmc_project.Configuration.NSM_FpgaProcessor";
+    const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> fpga;
+
+    NsmFpgaProcessorFactoryBranchTest() : SensorManagerTest(devices)
+    {
+        fpga = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(fpgaUuid));
+        EXPECT_NE(fpga, nullptr);
+    }
+
+    ~NsmFpgaProcessorFactoryBranchTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+
+    dbus::PropertyMap validProps = {
+        {"Name", std::string("FPGA_Branch")},
+        {"UUID", fpgaUuid},
+        {"Type", std::string("NSM_FpgaProcessor")},
+        {"InventoryObjPath",
+         std::string("/xyz/test/fpgaproc/branch/FPGA_Branch")},
+        {"LocationType",
+         std::string("xyz.openbmc_project.Inventory.Decorator.Location."
+                     "LocationTypes.Embedded")},
+        {"FpgaType",
+         std::string("xyz.openbmc_project.Inventory.Decorator.FpgaType."
+                     "FPGAType.Discrete")},
+        {"Health",
+         std::string("xyz.openbmc_project.State.Decorator.Health.HealthType."
+                     "OK")},
+    };
+};
+
+// type != "NSM_FpgaProcessor" → FALSE branch of if(type=="NSM_FpgaProcessor")
+// → no sensor created, no exception
+TEST_F(NsmFpgaProcessorFactoryBranchTest, TypeMismatch_NoSensor)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/type_mismatch";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm["Type"] = std::string("NSM_OtherType"); // not NSM_FpgaProcessor
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// Missing "Name" → FALSE branch for count("Name") → name="" but
+// inventoryObjPath is valid → sensor IS created
+TEST_F(NsmFpgaProcessorFactoryBranchTest, MissingName_SensorCreated)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/missing_name";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm.erase("Name");
+    pm["InventoryObjPath"] =
+        std::string("/xyz/test/fpgaproc/branch/FPGA_NoName"); // unique path
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    EXPECT_GT(fpga->deviceSensors.size(), before);
+}
+
+// Missing "InventoryObjPath" → inventoryObjPath="" → invalid D-Bus path →
+// exception caught by factory try-catch → no sensor
+TEST_F(NsmFpgaProcessorFactoryBranchTest, MissingInventoryObjPath_NoSensor)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/missing_invpath";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm.erase("InventoryObjPath");
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// Missing "LocationType" → locationType="" → invalid enum conversion →
+// exception caught by factory try-catch → no sensor
+TEST_F(NsmFpgaProcessorFactoryBranchTest, MissingLocationType_NoSensor)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/missing_loctype";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm.erase("LocationType");
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// Missing "FpgaType" → fpgaType="" → invalid enum conversion →
+// exception caught by factory try-catch → no sensor
+TEST_F(NsmFpgaProcessorFactoryBranchTest, MissingFpgaType_NoSensor)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/missing_fpgatype";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm.erase("FpgaType");
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// Missing "Health" → health="" → invalid enum conversion →
+// exception caught by factory try-catch → no sensor
+TEST_F(NsmFpgaProcessorFactoryBranchTest, MissingHealth_NoSensor)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/missing_health";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm.erase("Health");
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// Missing "UUID" → count("UUID") FALSE → uuid="" →
+// parseStaticUuid("") throws inside getNsmDeviceFromStaticUUID →
+// caught by factory try-catch → no sensor
+TEST_F(NsmFpgaProcessorFactoryBranchTest, MissingUUID_NoSensor)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/missing_uuid";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm.erase("UUID"); // uuid="" → parseStaticUuid throws → caught
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// Missing "Type" → count("Type") FALSE → type="" →
+// if (type == "NSM_FpgaProcessor") FALSE → no sensor created
+TEST_F(NsmFpgaProcessorFactoryBranchTest, MissingType_NoSensor)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/missing_type";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm.erase("Type"); // type="" → if(type=="NSM_FpgaProcessor") FALSE
+
+    const size_t before = fpga->deviceSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}

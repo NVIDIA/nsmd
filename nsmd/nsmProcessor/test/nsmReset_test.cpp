@@ -261,3 +261,133 @@ TEST_F(NsmResetTest, CreateNsmResetSensorInvalidUUID)
     auto reset = std::dynamic_pointer_cast<NsmReset>(gpu->deviceSensors[0]);
     EXPECT_EQ(nullptr, reset);
 }
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in createNsmResetSensor
+// =============================================================================
+
+static const std::string kResetIntf =
+    "xyz.openbmc_project.Configuration.NSM_GpuReset";
+
+// UUID absent → count("UUID") FALSE → uuid="" → parseStaticUuid("") throws
+// → caught by try/catch → co_return NSM_SUCCESS
+TEST_F(NsmResetTest, Factory_MissingUUID_ExceptionCaught)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/control/processor/reset_no_uuid";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kResetIntf);
+    pm["Name"] = std::string("GpuReset_NoUUID");
+    pm["Type"] = std::string("NSM_GpuReset");
+    pm["InventoryObjPath"] =
+        std::string("/xyz/openbmc_project/control/processor/reset");
+    pm["InstanceNumber"] = uint64_t(0);
+    pm["DeviceIndex"] = uint64_t(0);
+    // "UUID" intentionally omitted → uuid="" → parseStaticUuid throws → caught
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmResetSensor(mockManager, kResetIntf, uniquePath);
+    // Exception was caught → no sensor added
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// Name absent → count("Name") FALSE → name="" → NsmReset created with name=""
+TEST_F(NsmResetTest, Factory_MissingName_SensorCreated)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/control/processor/reset_no_name";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kResetIntf);
+    // "Name" intentionally omitted → name=""
+    pm["Type"] = std::string("NSM_GpuReset");
+    pm["UUID"] = gpuUuid;
+    pm["InventoryObjPath"] =
+        std::string("/xyz/openbmc_project/control/processor/noname_reset");
+    pm["InstanceNumber"] = uint64_t(0);
+    pm["DeviceIndex"] = uint64_t(0);
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmResetSensor(mockManager, kResetIntf, uniquePath);
+    // name="" → NsmReset("", ...) → NsmObject with empty name → still created
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// Type absent → count("Type") FALSE → type="" → NsmReset created with type=""
+TEST_F(NsmResetTest, Factory_MissingType_SensorCreated)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/control/processor/reset_no_type";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kResetIntf);
+    pm["Name"] = std::string("GpuReset_NoType");
+    // "Type" intentionally omitted → type=""
+    pm["UUID"] = gpuUuid;
+    pm["InventoryObjPath"] =
+        std::string("/xyz/openbmc_project/control/processor/notype_reset");
+    pm["InstanceNumber"] = uint64_t(0);
+    pm["DeviceIndex"] = uint64_t(0);
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmResetSensor(mockManager, kResetIntf, uniquePath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// InstanceNumber absent → count("InstanceNumber") FALSE → instanceNumber=0
+// → inventoryObjPath = provided + "0"
+TEST_F(NsmResetTest, Factory_MissingInstanceNumber_DefaultsZero)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/control/processor/reset_no_instnum";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kResetIntf);
+    pm["Name"] = std::string("GpuReset_NoInst");
+    pm["Type"] = std::string("NSM_GpuReset");
+    pm["UUID"] = gpuUuid;
+    pm["InventoryObjPath"] =
+        std::string("/xyz/openbmc_project/control/processor/noinstnum_reset");
+    // "InstanceNumber" intentionally omitted → instanceNumber=0
+    pm["DeviceIndex"] = uint64_t(0);
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmResetSensor(mockManager, kResetIntf, uniquePath);
+    // instanceNumber=0 → inventoryObjPath = "...noinstnum_reset0" → valid path
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// DeviceIndex absent → count("DeviceIndex") FALSE → deviceIndex=0
+// → NsmReset created with deviceIndex=0
+TEST_F(NsmResetTest, Factory_MissingDeviceIndex_DefaultsZero)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/control/processor/reset_no_devindex";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kResetIntf);
+    pm["Name"] = std::string("GpuReset_NoDI");
+    pm["Type"] = std::string("NSM_GpuReset");
+    pm["UUID"] = gpuUuid;
+    pm["InventoryObjPath"] =
+        std::string("/xyz/openbmc_project/control/processor/nodevindex_reset");
+    pm["InstanceNumber"] = uint64_t(0);
+    // "DeviceIndex" intentionally omitted → deviceIndex=0
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmResetSensor(mockManager, kResetIntf, uniquePath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// InventoryObjPath absent → count("InventoryObjPath") FALSE →
+// inventoryObjPath="" → inventoryObjPath = "" + "0" = "0" → invalid D-Bus path
+// → NsmReset ctor throws → caught by try/catch → no sensor added
+TEST_F(NsmResetTest, Factory_MissingInventoryObjPath_ThrowCaught)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/control/processor/reset_no_invpath";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kResetIntf);
+    pm["Name"] = std::string("GpuReset_NoInvPath");
+    pm["Type"] = std::string("NSM_GpuReset");
+    pm["UUID"] = gpuUuid;
+    // "InventoryObjPath" intentionally omitted → inventoryObjPath=""
+    // → inventoryObjPath = "" + "0" = "0" → relative path, sdbusplus throws
+    pm["InstanceNumber"] = uint64_t(0);
+    pm["DeviceIndex"] = uint64_t(0);
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmResetSensor(mockManager, kResetIntf, uniquePath);
+    // Exception thrown in NsmReset ctor, caught in factory → no sensor
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}

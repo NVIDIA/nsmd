@@ -970,3 +970,244 @@ TEST(decode_nsm_get_device_capabilities_v2_resp, testInsufficientTelemetryCount)
 
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+// Branch coverage: encode_nsm_set_event_subscription_req L259
+TEST(DevCapDiscNullBranch, EncodeSetEventSubscriptionReq_NullMsg)
+{
+	auto rc = encode_nsm_set_event_subscription_req(0, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// Branch coverage: encode_nsm_configure_event_acknowledgement_req L336
+TEST(DevCapDiscNullBranch, EncodeConfigureEventAckReq_NullMsg)
+{
+	bitfield8_t mask[8] = {};
+	auto rc =
+	    encode_nsm_configure_event_acknowledgement_req(0, 0, mask, nullptr);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// Branch coverage: encode_nsm_configure_event_acknowledgement_resp L398
+// (new_event_sources_acknowledgement_mask == NULL || msg == NULL)
+TEST(DevCapDiscNullBranch, EncodeConfigureEventAckResp_NullMask)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_nsm_configure_event_acknowledgement_resp(
+	    0, NSM_SUCCESS, nullptr, msg);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+TEST(DevCapDiscNullBranch, EncodeConfigureEventAckResp_NullMsg)
+{
+	bitfield8_t mask[8] = {};
+	auto rc = encode_nsm_configure_event_acknowledgement_resp(
+	    0, NSM_SUCCESS, mask, nullptr);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// Branch coverage: encode_nsm_set_current_event_sources_req L453
+// (event_sources == NULL || msg == NULL)
+TEST(DevCapDiscNullBranch, EncodeSetCurrentEventSourcesReq_NullSources)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_nsm_set_current_event_sources_req(0, 0, nullptr, msg);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DevCapDiscNullBranch, EncodeSetCurrentEventSourcesReq_NullMsg)
+{
+	bitfield8_t sources[8] = {};
+	auto rc =
+	    encode_nsm_set_current_event_sources_req(0, 0, sources, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Branch coverage: encode_nsm_get_event_log_record_req L530
+TEST(DevCapDiscNullBranch, EncodeGetEventLogRecordReq_NullMsg)
+{
+	auto rc = encode_nsm_get_event_log_record_req(0, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// encode_nsm_set_event_subscription_req L259: msg == NULL
+TEST(DevCapDiscNullBranch, EncodeSetEventSubscriptionReq_NullMsg2)
+{
+	auto rc = encode_nsm_set_event_subscription_req(0, 0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// decode_nsm_set_event_subscription_req L289: global_setting == NULL
+TEST(DevCapDiscNullBranch, DecodeSetEventSubscriptionReq_NullGlobalSetting)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t receiver_eid = 0;
+	auto rc = decode_nsm_set_event_subscription_req(msg, buf.size(),
+							nullptr, &receiver_eid);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// decode_nsm_set_event_subscription_resp L314: msg == NULL
+TEST(DevCapDiscNullBranch, DecodeSetEventSubscriptionResp_NullMsg)
+{
+	uint8_t cc = 0;
+	auto rc = decode_nsm_set_event_subscription_resp(nullptr, 0, &cc);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+TEST(DevCapDiscNullBranch, DecodeSetEventSubscriptionResp_NullCc)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 8, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	auto rc =
+	    decode_nsm_set_event_subscription_resp(msg, buf.size(), nullptr);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// decode_nsm_configure_event_acknowledgement_req L368: msg == NULL
+TEST(DevCapDiscNullBranch, DecodeConfigureEventAckReq_NullMsg)
+{
+	uint8_t nvidia_msg_type = 0;
+	bitfield8_t *mask = nullptr;
+	auto rc = decode_nsm_configure_event_acknowledgement_req(
+	    nullptr, 0, &nvidia_msg_type, &mask);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// decode_nsm_configure_event_acknowledgement_resp L429: msg == NULL
+TEST(DevCapDiscNullBranch, DecodeConfigureEventAckResp_NullMsg)
+{
+	uint8_t cc = 0;
+	bitfield8_t *mask = nullptr;
+	auto rc = decode_nsm_configure_event_acknowledgement_resp(nullptr, 0,
+								  &cc, &mask);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+TEST(DevCapDiscNullBranch, DecodeConfigureEventAckResp_NullCc)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	bitfield8_t *mask = nullptr;
+	auto rc = decode_nsm_configure_event_acknowledgement_resp(
+	    msg, buf.size(), nullptr, &mask);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// decode_nsm_set_current_event_sources_req L482: msg == NULL
+TEST(DevCapDiscNullBranch, DecodeSetCurrentEventSourcesReq_NullMsg)
+{
+	uint8_t nvidia_msg_type = 0;
+	bitfield8_t sources[EVENT_SOURCES_LENGTH] = {};
+	auto rc = decode_nsm_set_current_event_sources_req(
+	    nullptr, 0, &nvidia_msg_type, sources);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_nsm_set_current_event_sources_resp L509: msg == NULL
+TEST(DevCapDiscNullBranch, DecodeSetCurrentEventSourcesResp_NullMsg)
+{
+	uint8_t cc = 0;
+	auto rc = decode_nsm_set_current_event_sources_resp(nullptr, 0, &cc);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+TEST(DevCapDiscNullBranch, DecodeSetCurrentEventSourcesResp_NullCc)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 8, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	auto rc =
+	    decode_nsm_set_current_event_sources_resp(msg, buf.size(), nullptr);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// decode_nsm_get_event_log_record_resp L560: msg == NULL
+TEST(DevCapDiscNullBranch, DecodeGetEventLogRecordResp_NullMsg)
+{
+	uint8_t cc = 0, nvidia_msg_type = 0, event_id = 0;
+	uint32_t event_handle = 0;
+	uint64_t timestamp = 0;
+	uint8_t *payload = nullptr;
+	uint16_t payload_len = 0;
+	auto rc = decode_nsm_get_event_log_record_resp(
+	    nullptr, 0, &cc, &nvidia_msg_type, &event_id, &event_handle,
+	    &timestamp, &payload, &payload_len);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+TEST(DevCapDiscNullBranch, DecodeGetEventLogRecordResp_NullCc)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t nvidia_msg_type = 0, event_id = 0;
+	uint32_t event_handle = 0;
+	uint64_t timestamp = 0;
+	uint8_t *payload = nullptr;
+	uint16_t payload_len = 0;
+	auto rc = decode_nsm_get_event_log_record_resp(
+	    msg, buf.size(), nullptr, &nvidia_msg_type, &event_id,
+	    &event_handle, &timestamp, &payload, &payload_len);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// decode_nsm_rediscovery_event L599: msg == NULL
+TEST(DevCapDiscNullBranch, DecodeRediscoveryEvent_NullMsg)
+{
+	uint8_t event_class = 0;
+	uint16_t event_state = 0;
+	auto rc = decode_nsm_rediscovery_event(nullptr, 0, &event_class,
+					       &event_state);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+TEST(DevCapDiscNullBranch, DecodeRediscoveryEvent_NullEventClass)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 16, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint16_t event_state = 0;
+	auto rc = decode_nsm_rediscovery_event(msg, buf.size(), nullptr,
+					       &event_state);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
+// encode_nsm_gpio_state_change_event L778: msg == NULL
+TEST(DevCapDiscNullBranch, EncodeGpioStateChangeEvent_NullMsg)
+{
+	struct nsm_gpio_state_change_event_payload payload = {};
+	auto rc =
+	    encode_nsm_gpio_state_change_event(0, false, &payload, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DevCapDiscNullBranch, EncodeGpioStateChangeEvent_NullPayload)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 64, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_nsm_gpio_state_change_event(0, false, nullptr, msg);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_nsm_gpio_state_change_event L819: event_state == NULL or payload ==
+// NULL
+TEST(DevCapDiscNullBranch, DecodeGpioStateChangeEvent_NullMsg)
+{
+	uint8_t event_class = 0;
+	uint16_t event_state = 0;
+	struct nsm_gpio_state_change_event_payload *payload = nullptr;
+	auto rc = decode_nsm_gpio_state_change_event(nullptr, 0, &event_class,
+						     &event_state, &payload);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DevCapDiscNullBranch, DecodeGpioStateChangeEvent_NullEventClass)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint16_t event_state = 0;
+	struct nsm_gpio_state_change_event_payload *payload = nullptr;
+	auto rc = decode_nsm_gpio_state_change_event(msg, buf.size(), nullptr,
+						     &event_state, &payload);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}

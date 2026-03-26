@@ -460,3 +460,62 @@ TEST_F(NsmXIDEventTest, testHandleXIDEventWithErrorIdAndImpactedComponent)
                          NSM_XID_EVENT, msg, eventMsg.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in createNsmXIDEvent
+// =============================================================================
+
+// Only UUID present → all 9 optional property count() checks return FALSE:
+//   Name, OriginOfCondition, MessageId, LoggingNamespace, Resolution,
+//   MessageArgs, Severity, EventIds, ImpactedComponent all absent →
+//   event created with empty/default values; severity=Level::Critical
+//   (via value_or since severityStr="" → convertStringToLevel returns nullopt)
+TEST_F(NsmXIDEventTest, Factory_MinimalProperties_EventCreatedWithDefaults)
+{
+    const std::string uniquePath = "/xyz/test/xid/minimal_props";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
+    // Only UUID → all other count() checks return 0 (FALSE branches)
+    pm["UUID"] = gpuUuid;
+
+    const size_t before = gpu->deviceEvents.size();
+    createNsmXIDEvent(mockManager, basicIntfName, uniquePath);
+    // Event created with all-default optional fields
+    EXPECT_GT(gpu->deviceEvents.size(), before);
+}
+
+// Covers the FALSE branch of `if (!formattedMessageArgs.empty())` (line 100).
+// When info.messageArgs is empty the for-loop never runs, formattedMessageArgs
+// stays empty, and the if-body is skipped → messageArgs stays "".
+TEST_F(NsmXIDEventTest, testHandleXIDEvent_EmptyMessageArgs_SkipsIfBody)
+{
+    NsmEventInfo info;
+    info.uuid = gpuUuid;
+    info.originOfCondition =
+        "/xyz/openbmc_project/inventory/system/chassis/GPU_1";
+    info.messageId = "NVIDIAGPUDiagnostics.1.0.XIDError";
+    info.loggingNamespace = "GPU_XID";
+    info.resolution = "Check GPU logs";
+    info.messageArgs = {}; // empty → formattedMessageArgs stays empty
+    info.severity = Level::Critical;
+
+    NsmXIDEvent xidEvent(name, "NSM_Event_XID", info);
+
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_xid_event_payload) + 50);
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+
+    nsm_xid_event_payload payload{};
+    payload.sequence_number = 1;
+    payload.flag = 0;
+    payload.reason = 79;
+    payload.timestamp = 1234567890000000;
+
+    const char* messageText = "Empty args test";
+    auto rc = encode_nsm_xid_event(0, false, payload, messageText,
+                                   strlen(messageText), msg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = xidEvent.handle(gpu->getEid(), NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                         NSM_XID_EVENT, msg, eventMsg.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}

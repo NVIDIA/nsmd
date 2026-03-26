@@ -3,16 +3,19 @@
  * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  */
 
-#include "circularQueue.hpp"
-#include "nsmDevice.hpp"
-#include "nsmObject.hpp"
-#include "sensorQueueMap.hpp"
-
 #include <memory>
 #include <stdexcept>
 #include <unordered_map>
 
 #include <gtest/gtest.h>
+
+#define private public
+#define protected public
+
+#include "circularQueue.hpp"
+#include "nsmDevice.hpp"
+#include "nsmObject.hpp"
+#include "sensorQueueMap.hpp"
 
 // For convenience
 using SensorQueueUnorderedMap =
@@ -432,4 +435,38 @@ TEST_F(SensorQueueMapTest, MultiplePollingTypesWithVariousStates)
 
     // Only queue1 has sensors to update
     EXPECT_TRUE(sensorQueueMap.hasSensorsToUpdate());
+}
+
+// ============================================================================
+// SensorQueue (CircularQueue<shared_ptr<NsmObject>>) direct coverage tests
+// These exercise CircularQueue<shared_ptr<NsmObject>> L48/L55/L68 paths
+// ============================================================================
+
+// L48: current() throw path for SensorQueue (empty queue)
+TEST_F(SensorQueueMapTest, SensorQueue_CurrentOnEmpty_Throws)
+{
+    SensorQueue queue;
+    EXPECT_THROW(queue.current(), std::runtime_error);
+}
+
+// L55: currentIndex >= size() reset path for SensorQueue
+TEST_F(SensorQueueMapTest, SensorQueue_CurrentAfterIndexReset)
+{
+    SensorQueue queue;
+    queue.push(sensor1);
+    queue.push(sensor2);
+    queue.currentIndex = 99; // Force out-of-bounds index
+
+    // current() should reset currentIndex to 0 and return sensor1
+    auto& cur = queue.current();
+    EXPECT_EQ(cur, sensor1);
+    EXPECT_EQ(queue.currentIndex, 0u);
+}
+
+// L68: next() else branch (empty queue) for SensorQueue
+TEST_F(SensorQueueMapTest, SensorQueue_NextOnEmpty)
+{
+    SensorQueue queue;
+    queue.next(); // Should not throw; sets currentIndex = 0
+    EXPECT_EQ(queue.currentIndex, 0u);
 }

@@ -75,6 +75,13 @@ TEST(ResetStatisticsAggregator, GenRequestMsg_ReturnsValidRequest)
     EXPECT_EQ(cmd->command, NSM_GET_DEVICE_RESET_STATISTICS);
 }
 
+TEST(ResetStatisticsAggregator, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto agg = makeAggregator("/test/reset_stats/badreq");
+    auto req = agg->genRequestMsg(5, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(req.has_value());
+}
+
 // =============================================================================
 // handleSample – counter tags (0-6)
 // =============================================================================
@@ -246,4 +253,131 @@ TEST(ResetStatisticsAggregator, HandleSample_CounterInvalidData_Fails)
     NsmSensorAggregator::TelemetrySample sample{0, 0, nullptr, true};
     auto rc = agg->handleSample(sample);
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+// =============================================================================
+// handleSample – BootReason all bits set (covers all TRUE branches)
+// =============================================================================
+
+TEST(ResetStatisticsAggregator, HandleSample_BootReason_AllBitsSet)
+{
+    auto agg = makeAggregator("/test/reset_stats/boot_reason_all");
+
+    // Set all named bits in nsm_boot_reason_type_breakdown to 1 so that
+    // every TRUE branch in updateBootReasonProperty is executed.
+    nsm_boot_reason_type_breakdown all_bits = {};
+    all_bits.wake_up = 1;
+    all_bits.power_on = 1;
+    all_bits.voltage_detect = 1;
+    all_bits.warm_reset = 1;
+    all_bits.fatal_error = 1;
+    all_bits.pin = 1;
+    all_bits.debug_access_port = 1;
+    all_bits.reset_timeout = 1;
+    all_bits.low_power_acknowledge_timeout = 1;
+    all_bits.system_clock_generator = 1;
+    all_bits.windowed_watchdog_0 = 1;
+    all_bits.software = 1;
+    all_bits.lockup_reset = 1;
+    all_bits.cpu1 = 1;
+    all_bits.vbat = 1;
+    all_bits.windowed_watchdog_1 = 1;
+    all_bits.code_watchdog_0 = 1;
+    all_bits.code_watchdog_1 = 1;
+    all_bits.jtag = 1;
+    all_bits.security_violation = 1;
+    all_bits.tamper = 1;
+    all_bits.iaccviol = 1;
+    all_bits.daccviol = 1;
+    all_bits.munstkerr = 1;
+    all_bits.mstkerr = 1;
+    all_bits.mmfarvalid = 1;
+    all_bits.bfarvalid = 1;
+    all_bits.stkerr = 1;
+    all_bits.unstkerr = 1;
+    all_bits.imprecise_error = 1;
+    all_bits.precise_error = 1;
+    all_bits.ibuserr = 1;
+    all_bits.undefinstr = 1;
+    all_bits.invstate = 1;
+    all_bits.invpc = 1;
+    all_bits.nocp = 1;
+    all_bits.unaligned = 1;
+    all_bits.devbyzero = 1;
+    all_bits.vecttbl = 1;
+    all_bits.forced = 1;
+    all_bits.debugevt = 1;
+    all_bits.mctp = 1;
+    all_bits.i2c = 1;
+    all_bits.i3c = 1;
+    all_bits.pldm = 1;
+    all_bits.usb = 1;
+    all_bits.flash = 1;
+    all_bits.logger = 1;
+    all_bits.spdm = 1;
+
+    uint64_t bootReasons[4] = {};
+    std::memcpy(bootReasons, &all_bits, sizeof(all_bits));
+
+    std::array<uint8_t, 32> data{};
+    size_t data_len = 0;
+    ASSERT_EQ(encode_reset_count_256data(bootReasons, data.data(), &data_len),
+              NSM_SW_SUCCESS);
+
+    NsmSensorAggregator::TelemetrySample sample{
+        8, static_cast<uint8_t>(data_len), data.data(), true};
+    auto rc = agg->handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto bootReasonList = agg->resetCountersIntf->bootReason();
+    using BRT = ResetCountersIntf::BootReasonTypes;
+    EXPECT_THAT(bootReasonList, Contains(BRT::WakeUp));
+    EXPECT_THAT(bootReasonList, Contains(BRT::PowerOn));
+    EXPECT_THAT(bootReasonList, Contains(BRT::VoltageDetect));
+    EXPECT_THAT(bootReasonList, Contains(BRT::WarmReset));
+    EXPECT_THAT(bootReasonList, Contains(BRT::FatalError));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Pin));
+    EXPECT_THAT(bootReasonList, Contains(BRT::DebugAccessPort));
+    EXPECT_THAT(bootReasonList, Contains(BRT::ResetTimeout));
+    EXPECT_THAT(bootReasonList, Contains(BRT::LowPowerAcknowledgeTimeout));
+    EXPECT_THAT(bootReasonList, Contains(BRT::SystemClockGenerator));
+    EXPECT_THAT(bootReasonList, Contains(BRT::WindowedWatchdog0));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Software));
+    EXPECT_THAT(bootReasonList, Contains(BRT::LockupReset));
+    EXPECT_THAT(bootReasonList, Contains(BRT::CPU1));
+    EXPECT_THAT(bootReasonList, Contains(BRT::VBAT));
+    EXPECT_THAT(bootReasonList, Contains(BRT::WindowedWatchdog1));
+    EXPECT_THAT(bootReasonList, Contains(BRT::CodeWatchdog0));
+    EXPECT_THAT(bootReasonList, Contains(BRT::CodeWatchdog1));
+    EXPECT_THAT(bootReasonList, Contains(BRT::JTAG));
+    EXPECT_THAT(bootReasonList, Contains(BRT::SecurityViolation));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Tamper));
+    EXPECT_THAT(bootReasonList, Contains(BRT::IAccViol));
+    EXPECT_THAT(bootReasonList, Contains(BRT::DAccViol));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Munstkerr));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Mstkerr));
+    EXPECT_THAT(bootReasonList, Contains(BRT::MMFarValid));
+    EXPECT_THAT(bootReasonList, Contains(BRT::BFarValid));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Stkerr));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Unstkerr));
+    EXPECT_THAT(bootReasonList, Contains(BRT::ImpreciseError));
+    EXPECT_THAT(bootReasonList, Contains(BRT::PreciseError));
+    EXPECT_THAT(bootReasonList, Contains(BRT::IBusErr));
+    EXPECT_THAT(bootReasonList, Contains(BRT::UndefInstr));
+    EXPECT_THAT(bootReasonList, Contains(BRT::InvState));
+    EXPECT_THAT(bootReasonList, Contains(BRT::InvPC));
+    EXPECT_THAT(bootReasonList, Contains(BRT::NoCP));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Unaligned));
+    EXPECT_THAT(bootReasonList, Contains(BRT::DevByZero));
+    EXPECT_THAT(bootReasonList, Contains(BRT::VectTbl));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Forced));
+    EXPECT_THAT(bootReasonList, Contains(BRT::DebugEvt));
+    EXPECT_THAT(bootReasonList, Contains(BRT::MCTP));
+    EXPECT_THAT(bootReasonList, Contains(BRT::I2C));
+    EXPECT_THAT(bootReasonList, Contains(BRT::I3C));
+    EXPECT_THAT(bootReasonList, Contains(BRT::PLDM));
+    EXPECT_THAT(bootReasonList, Contains(BRT::USB));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Flash));
+    EXPECT_THAT(bootReasonList, Contains(BRT::Logger));
+    EXPECT_THAT(bootReasonList, Contains(BRT::SPDM));
 }

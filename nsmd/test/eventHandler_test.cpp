@@ -235,3 +235,44 @@ TEST_F(EventManagerTest, testMultipleHandlerRegistration)
 
     EXPECT_EQ(manager.evenTypeHandlers.size(), 2);
 }
+
+// =============================================================================
+// Base EventHandler::unsupportedEvent() coverage tests
+//
+// TestEventHandler overrides unsupportedEvent(), so the base D-Bus logging
+// implementation (lines 71-113 in eventHandler.hpp) is never reached by the
+// tests above.  The class below does NOT override unsupportedEvent(), so the
+// base implementation runs.  In unit tests without a real D-Bus daemon,
+// getService() throws a std::exception that is caught on line 95, exercising
+// the exception path (lines 95-100) and the surrounding code.
+// =============================================================================
+
+class BaseUnsupportedEventHandler : public EventHandler
+{
+  public:
+    uint8_t nsmType() override
+    {
+        return NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+    }
+    // unsupportedEvent() NOT overridden → base D-Bus logging implementation
+    // used
+};
+
+TEST_F(EventHandlerTest, testBaseUnsupportedEvent_ExceptionPath)
+{
+    BaseUnsupportedEventHandler baseHandler;
+
+    // Build a minimal NSM event message; payload[1] holds the event ID.
+    std::vector<uint8_t> eventData(sizeof(nsm_msg_hdr) + sizeof(nsm_event) + 2,
+                                   0);
+    auto* event = reinterpret_cast<nsm_msg*>(eventData.data());
+    event->hdr.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+    event->payload[1] = 42; // unregistered eventId
+
+    // handle() dispatches to base unsupportedEvent() because eventId=42 is
+    // not in handlers.  The base implementation tries getService() which
+    // throws in unit-test environment; the catch block (lines 95-100) handles
+    // it so handle() must NOT propagate the exception.
+    EXPECT_NO_THROW(baseHandler.handle(5, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                       42, event, eventData.size()));
+}

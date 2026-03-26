@@ -669,3 +669,75 @@ TEST_F(NsmCX8ChassisFactoryTest, CreateCX8Chassis_Attributes)
     // device type/role matches CX8
     EXPECT_GE(cx8Dev->deviceSensors.size(), 1u);
 }
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in createNsmChassis
+// =============================================================================
+
+// Name absent in base props → name="" → NsmNVSwitchAndNicChassis constructed
+// with empty name → D-Bus path invalid → SdBusError thrown (no try/catch
+// in createChassisAsset or createNsmChassis)
+TEST_F(NsmNVSwitchChassisTest, CreateChassis_MissingName_Throws)
+{
+    const std::string subPath =
+        "/xyz/openbmc_project/inventory/system/sw_noname";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(subPath, basicIntfName);
+    baseMap["UUID"] = switchUuid;
+    // "Name" intentionally omitted from base props → FALSE branch → name=""
+
+    auto& currMap = utils::MockDbusAsync::propertyMap(
+        subPath, basicIntfName + ".ChassisAttributes");
+    currMap["Type"] = std::string("NSM_Chassis_Attributes");
+
+    EXPECT_THROW_COROUTINE(
+        createNsmChassis(mockManager, basicIntfName + ".ChassisAttributes",
+                         subPath, "NSM_NVSwitch_Chassis"),
+        std::exception);
+}
+
+// Type absent in current props → type="" → neither baseType nor Attributes →
+// no conditional sensors added → co_return NSM_SUCCESS
+TEST_F(NsmNVSwitchChassisTest, CreateChassis_MissingType_NoConditionalSensors)
+{
+    const std::string subPath =
+        "/xyz/openbmc_project/inventory/system/sw_notype";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(subPath, basicIntfName);
+    baseMap["Name"] = std::string("NVSwitch_NoType");
+    baseMap["UUID"] = switchUuid;
+
+    auto& currMap = utils::MockDbusAsync::propertyMap(
+        subPath, basicIntfName + ".ChassisAttributes");
+    (void)currMap;
+    // "Type" intentionally omitted → type="" → if/else-if branches skipped
+
+    const size_t before = nvswitch->staticSensors.size();
+    createNsmChassis(mockManager, basicIntfName + ".ChassisAttributes", subPath,
+                     "NSM_NVSwitch_Chassis");
+    // No conditional sensors added (type doesn't match any branch)
+    EXPECT_EQ(before, nvswitch->staticSensors.size());
+}
+
+// type == baseType but UUID absent in current props → inner uuid="" →
+// chassisUuid created with empty UUID (FALSE branch for inner count("UUID"))
+TEST_F(NsmNVSwitchChassisTest, CreateChassis_BaseTypeNoCurrentUUID)
+{
+    const std::string subPath =
+        "/xyz/openbmc_project/inventory/system/sw_no_curr_uuid";
+    // Base interface (basicIntfName) has Name and UUID (for outer UUID check)
+    auto& baseMap = utils::MockDbusAsync::propertyMap(subPath, basicIntfName);
+    baseMap["Name"] = std::string("NVSwitch_NoCurrUUID");
+    baseMap["UUID"] = switchUuid;
+
+    // Sub-interface has Type == baseType but NO UUID →
+    // inner count("UUID") FALSE → inner uuid="" → chassisUuid with empty UUID
+    auto& currMap =
+        utils::MockDbusAsync::propertyMap(subPath, basicIntfName + ".UuidSub");
+    currMap["Type"] = std::string("NSM_NVSwitch_Chassis");
+    // UUID intentionally omitted from current props
+
+    const size_t before = nvswitch->staticSensors.size();
+    createNsmChassis(mockManager, basicIntfName + ".UuidSub", subPath,
+                     "NSM_NVSwitch_Chassis");
+    // chassisUuid sensor IS added (with empty UUID from inner count FALSE)
+    EXPECT_GT(nvswitch->staticSensors.size(), before);
+}

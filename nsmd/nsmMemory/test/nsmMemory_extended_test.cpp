@@ -36,6 +36,8 @@ using ::testing::Return;
 #undef private
 #undef protected
 
+#include "../../test/mockSensorManager.hpp"
+
 using namespace nsm;
 
 auto bus = sdbusplus::bus::new_default();
@@ -458,6 +460,91 @@ TEST(NsmRowRemappingCounts, HandleResponseMsg_ErrorStatus)
     EXPECT_NE(rc, NSM_SW_SUCCESS);
 }
 
+// handleResponseMsg: decode succeeds but cc == NSM_ERROR → return cc (not rc).
+// This covers the `cc ? cc : rc` true-branch for NsmRowRemapState.
+TEST(NsmRowRemapState, HandleResponseMsg_ErrorCC)
+{
+    auto rowRemapIntf =
+        std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
+    NsmRowRemapState sensor(sensorName, sensorType, rowRemapIntf,
+                            inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_row_remap_state_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    bitfield8_t flags{};
+    uint8_t rc = encode_get_row_remap_state_resp(
+        0, NSM_ERROR, ERR_NOT_SUPPORTED, &flags, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// handleResponseMsg: decode succeeds but cc == NSM_ERROR → return cc.
+// Covers `cc ? cc : rc` true-branch for NsmRemappingAvailabilityBankCount.
+TEST(NsmRemappingAvailabilityBankCount, HandleResponseMsg_ErrorCC)
+{
+    auto rowRemapIntf =
+        std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
+    NsmRemappingAvailabilityBankCount sensor(sensorName, sensorType,
+                                             rowRemapIntf, inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+            sizeof(struct nsm_get_row_remap_availability_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_row_remap_availability data{};
+    uint8_t rc = encode_get_row_remap_availability_resp(
+        0, NSM_ERROR, ERR_NOT_SUPPORTED, &data, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// handleResponseMsg: decode succeeds but cc == NSM_ERROR → return cc.
+// Covers `cc ? cc : rc` true-branch for NsmEccErrorCountsDram.
+TEST(NsmEccErrorCountsDram, HandleResponseMsg_ErrorCC)
+{
+    auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
+                                                     inventoryObjPath.c_str());
+    NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf,
+                                 inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_ECC_error_counts_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_ECC_error_counts counts{};
+    uint8_t rc = encode_get_ECC_error_counts_resp(
+        0, NSM_ERROR, ERR_NOT_SUPPORTED, &counts, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// handleResponseMsg: decode succeeds but cc == NSM_ERROR → return cc.
+// Covers `cc ? cc : rc` true-branch for NsmMemCurrClockFreq.
+TEST(NsmMemCurrClockFreq, HandleResponseMsg_ErrorCC)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
+    NsmMemCurrClockFreq sensor(sensorName, sensorType, dimmIntf,
+                               inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_curr_clock_freq_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint32_t clockFreq = 0;
+    uint8_t rc = encode_get_curr_clock_freq_resp(
+        0, NSM_ERROR, ERR_NOT_SUPPORTED, &clockFreq, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
 TEST(NsmMinMemoryClockLimit, Constructor_ValidParameters)
 {
     auto dimmIntf = std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
@@ -478,4 +565,199 @@ TEST(NsmMaxMemoryClockLimit, Constructor_ValidParameters)
     EXPECT_EQ(maxClock.getName(), sensorName);
     EXPECT_EQ(maxClock.getType(), sensorType);
     EXPECT_NE(maxClock.dimmIntf, nullptr);
+}
+
+// ============================================================================
+// NsmMinMemoryClockLimit / NsmMaxMemoryClockLimit update() Branch Tests
+//
+// Both update() coroutines initialise cc = ERR_NULL (= 0).
+// Short-response test : decode fails → cc stays 0, rc != 0
+//                       → co_return cc ? cc : rc  ← false branch (return rc) //
+//
+// Error-CC test       : decode succeeds but cc = NSM_ERROR (non-zero)
+//                       → co_return cc ? cc : rc  ← true  branch (return cc) //
+//
+// ============================================================================
+
+class NsmMemoryClockLimitTest : public testing::Test, public SensorManagerTest
+{
+  protected:
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+    const std::string clockPath =
+        "/xyz/openbmc_project/inventory/test_memory_clock";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+
+    NsmMemoryClockLimitTest() : SensorManagerTest(devices)
+    {
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    ~NsmMemoryClockLimitTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+// Short response → decode returns NSM_SW_ERROR_LENGTH, cc stays ERR_NULL (0)
+// → co_return cc ? cc : rc → false branch (returns rc).
+TEST_F(NsmMemoryClockLimitTest, NsmMinClockLimit_Update_ShortResp_RcBranch)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(bus, clockPath.c_str());
+    NsmMinMemoryClockLimit sensor(sensorName, sensorType, dimmIntf);
+
+    std::vector<uint8_t> shortResp(sizeof(nsm_msg_hdr) + 2, 0);
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(shortResp));
+
+    sensor.update(gpu);
+}
+
+// Proper-size response with NSM_ERROR CC → decode succeeds but cc != 0
+// → co_return cc ? cc : rc → true branch (returns cc).
+TEST_F(NsmMemoryClockLimitTest, NsmMinClockLimit_Update_ErrorCC_CcBranch)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(bus, clockPath.c_str());
+    NsmMinMemoryClockLimit sensor(sensorName, sensorType, dimmIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_inventory_information_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t dummy_data = 0;
+    uint8_t rc = encode_get_inventory_information_resp(
+        0, NSM_ERROR, ERR_NULL, 0, &dummy_data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseMsg));
+
+    sensor.update(gpu);
+}
+
+// Short response → decode returns NSM_SW_ERROR_LENGTH, cc stays ERR_NULL (0)
+// → co_return cc ? cc : rc → false branch (returns rc).
+TEST_F(NsmMemoryClockLimitTest, NsmMaxClockLimit_Update_ShortResp_RcBranch)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(bus, clockPath.c_str());
+    NsmMaxMemoryClockLimit sensor(sensorName, sensorType, dimmIntf);
+
+    std::vector<uint8_t> shortResp(sizeof(nsm_msg_hdr) + 2, 0);
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(shortResp));
+
+    sensor.update(gpu);
+}
+
+// Proper-size response with NSM_ERROR CC → decode succeeds but cc != 0
+// → co_return cc ? cc : rc → true branch (returns cc).
+TEST_F(NsmMemoryClockLimitTest, NsmMaxClockLimit_Update_ErrorCC_CcBranch)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(bus, clockPath.c_str());
+    NsmMaxMemoryClockLimit sensor(sensorName, sensorType, dimmIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_inventory_information_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t dummy_data = 0;
+    uint8_t rc = encode_get_inventory_information_resp(
+        0, NSM_ERROR, ERR_NULL, 0, &dummy_data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseMsg));
+
+    sensor.update(gpu);
+}
+
+// ============================================================================
+// NsmMinMemoryClockLimit / NsmMaxMemoryClockLimit update() – remaining branches
+//
+// sensorIO-fail test : sensorIO returns NSM_ERROR → if (rc) TRUE branch taken
+//                      → co_return rc immediately (skips decode/update). //
+//
+// success test       : proper 4-byte response with NSM_SUCCESS
+//                      → if (shouldLog(...)) FALSE branch (all-success, no log)
+//                      → if (rc==0 && cc==0 && dataSize==4) TRUE branch
+//                      → updateReading() called → allowedSpeedsMT updated
+//                      → co_return cc ? cc : rc → FALSE branch (both 0) //
+//
+// ============================================================================
+
+// NsmMinMemoryClockLimit – sensorIO returns NSM_ERROR → if (rc) TRUE branch.
+TEST_F(NsmMemoryClockLimitTest,
+       NsmMinClockLimit_Update_SensorIOFail_CoReturnsRc)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(bus, clockPath.c_str());
+    NsmMinMemoryClockLimit sensor(sensorName, sensorType, dimmIntf);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERROR));
+
+    sensor.update(gpu);
+}
+
+// NsmMinMemoryClockLimit – success response → shouldLog FALSE + updateReading.
+TEST_F(NsmMemoryClockLimitTest, NsmMinClockLimit_Update_Success_UpdatesMinSpeed)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(bus, clockPath.c_str());
+    dimmIntf->allowedSpeedsMT(std::vector<uint16_t>(2, 0));
+    NsmMinMemoryClockLimit sensor(sensorName, sensorType, dimmIntf);
+
+    std::vector<uint8_t> responseMsg(256, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint32_t value = 3200;
+    auto rc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, ERR_NULL, sizeof(value),
+        reinterpret_cast<uint8_t*>(&value), response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseMsg));
+
+    sensor.update(gpu);
+
+    auto speeds = dimmIntf->allowedSpeedsMT();
+    EXPECT_EQ(speeds[0], static_cast<uint16_t>(3200));
+}
+
+// NsmMaxMemoryClockLimit – sensorIO returns NSM_ERROR → if (rc) TRUE branch.
+TEST_F(NsmMemoryClockLimitTest,
+       NsmMaxClockLimit_Update_SensorIOFail_CoReturnsRc)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(bus, clockPath.c_str());
+    NsmMaxMemoryClockLimit sensor(sensorName, sensorType, dimmIntf);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERROR));
+
+    sensor.update(gpu);
+}
+
+// NsmMaxMemoryClockLimit – success response → shouldLog FALSE + updateReading.
+TEST_F(NsmMemoryClockLimitTest, NsmMaxClockLimit_Update_Success_UpdatesMaxSpeed)
+{
+    auto dimmIntf = std::make_shared<DimmIntf>(bus, clockPath.c_str());
+    dimmIntf->allowedSpeedsMT(std::vector<uint16_t>(2, 0));
+    NsmMaxMemoryClockLimit sensor(sensorName, sensorType, dimmIntf);
+
+    std::vector<uint8_t> responseMsg(256, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint32_t value = 4800;
+    auto rc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, ERR_NULL, sizeof(value),
+        reinterpret_cast<uint8_t*>(&value), response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(responseMsg));
+
+    sensor.update(gpu);
+
+    auto speeds = dimmIntf->allowedSpeedsMT();
+    EXPECT_EQ(speeds[1], static_cast<uint16_t>(4800));
 }

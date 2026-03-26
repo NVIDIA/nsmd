@@ -152,6 +152,37 @@ TEST_F(NsmLongRunningEventTest, ValidateEvent_DecodeFailure_LogsErrorAndFails)
                 rc != NSM_SW_SUCCESS);
 }
 
+// validateEvent – else-if branch (line 75-78):
+// decode succeeds, timer not expired, acceptInstanceId != 0xFF,
+// isLongRunning == true, but acceptInstanceId != decoded instanceId
+// → returns NSM_SW_ERROR_DATA.
+TEST_F(NsmLongRunningEventTest,
+       ValidateEvent_InstanceIdMismatch_ReturnsErrorData)
+{
+    TestNsmLongRunningEvent event("MismatchEvent", "Type", true);
+
+    // Build a valid long running event message with instanceId = 0x05
+    size_t msg_len = sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                     sizeof(nsm_long_running_resp);
+    std::vector<uint8_t> buf(msg_len, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+
+    auto* evt = reinterpret_cast<nsm_event*>(msg->payload);
+    evt->data_size = sizeof(nsm_long_running_resp);
+
+    auto* resp = reinterpret_cast<nsm_long_running_resp*>(evt->data);
+    resp->instance_id = 0x05;
+    resp->completion_code = NSM_SUCCESS;
+
+    // acceptInstanceId differs from the decoded 0x05
+    event.acceptInstanceId = 0x0A;
+    event.isLongRunning = true;
+    event.timer.isExpired = false;
+
+    int rc = event.validateEvent(10, msg, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
 TEST_F(NsmLongRunningEventTest, ValidateEvent_TimerExpired_LogsTimerError)
 {
     TestNsmLongRunningEvent event("TimerExpiredEvent", "Type", true);
@@ -167,4 +198,64 @@ TEST_F(NsmLongRunningEventTest, ValidateEvent_TimerExpired_LogsTimerError)
     // covers LG2_ERROR line 55
     int rc = event.validateEvent(10, msg, buf.size());
     EXPECT_NE(rc, -1); // should not crash
+}
+
+// validateEvent – !isLongRunning sub-branch (line 71):
+// timer not expired, acceptInstanceId != 0xFF, but isLongRunning == false
+// → condition TRUE → rc = NSM_SW_ERROR_COMMAND_FAIL.
+TEST_F(NsmLongRunningEventTest, ValidateEvent_NotLongRunning_ReturnsCommandFail)
+{
+    // isLongRunning = false (set via constructor argument)
+    TestNsmLongRunningEvent event("NotLREvent", "Type", false);
+
+    // Build a valid long running event message with instanceId = 0x03
+    size_t msg_len = sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                     sizeof(nsm_long_running_resp);
+    std::vector<uint8_t> buf(msg_len, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+
+    auto* evt = reinterpret_cast<nsm_event*>(msg->payload);
+    evt->data_size = sizeof(nsm_long_running_resp);
+
+    auto* resp = reinterpret_cast<nsm_long_running_resp*>(evt->data);
+    resp->instance_id = 0x03;
+    resp->completion_code = NSM_SUCCESS;
+
+    // acceptInstanceId is not 0xFF, timer is not expired, but isLongRunning
+    // is false → the OR condition fires → NSM_SW_ERROR_COMMAND_FAIL
+    event.acceptInstanceId = 0x03;
+    event.timer.isExpired = false;
+
+    int rc = event.validateEvent(10, msg, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+// validateEvent – success path (line 71-78 both FALSE):
+// decode succeeds, timer not expired, acceptInstanceId != 0xFF,
+// isLongRunning == true, acceptInstanceId == decoded instanceId
+// → no if/else taken → returns NSM_SW_SUCCESS (from decode).
+TEST_F(NsmLongRunningEventTest, ValidateEvent_AllConditionsFalse_ReturnsSuccess)
+{
+    TestNsmLongRunningEvent event("SuccessEvent", "Type", true);
+
+    // Build a valid long running event message with instanceId = 0x07
+    size_t msg_len = sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                     sizeof(nsm_long_running_resp);
+    std::vector<uint8_t> buf(msg_len, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+
+    auto* evt = reinterpret_cast<nsm_event*>(msg->payload);
+    evt->data_size = sizeof(nsm_long_running_resp);
+
+    auto* resp = reinterpret_cast<nsm_long_running_resp*>(evt->data);
+    resp->instance_id = 0x07;
+    resp->completion_code = NSM_SUCCESS;
+
+    // acceptInstanceId matches the decoded 0x07 exactly
+    event.acceptInstanceId = 0x07;
+    event.isLongRunning = true;
+    event.timer.isExpired = false;
+
+    int rc = event.validateEvent(10, msg, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }

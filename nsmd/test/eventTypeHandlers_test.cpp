@@ -122,3 +122,13 @@ TEST_F(EventType3HandlerTest, testDelegatedEvents)
     EXPECT_NE(handler->handlers.find(NSM_RESET_REQUIRED_EVENT),
               handler->handlers.end());
 }
+
+// DelegatingEventHandler::enableDelegation() - duplicate handler
+// → NSM_SW_ERROR_DATA
+TEST_F(EventType0HandlerTest, EnableDelegation_Duplicate_ReturnsError)
+{
+    // NSM_REDISCOVERY_EVENT is already registered by the constructor.
+    // Calling enableDelegation() again with the same id must fail.
+    int rc = handler->enableDelegation(NSM_REDISCOVERY_EVENT);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}

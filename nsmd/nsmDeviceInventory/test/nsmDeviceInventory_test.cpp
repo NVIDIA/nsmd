@@ -759,9 +759,9 @@ TEST_F(NsmSwitchDIFactoryTest, badTestMissingBaseProperties)
     auto result = createNsmSwitchDI(mockManager, switchIntf, objPath);
 
     // Assert - function completes without crash/throw when base properties are
-    // missing Note: totalSensors is not asserted as the exact count depends on
-    // internal coroutine scheduling and the double-counting of deviceSensors +
-    // typed queues
+    // missing Note: totalSensors is not asserted as the
+    // exact count depends on internal coroutine scheduling and the
+    // double-counting of deviceSensors + typed queues
     (void)result;
 }
 
@@ -785,8 +785,8 @@ TEST_F(NsmSwitchDIFactoryTest, goodTestUnrecognizedType)
     createNsmSwitchDI(mockManager, unknownIntf, objPath);
 
     // Assert - function completes without crash/throw for unrecognized type
-    // Note: exact sensor count not asserted due to double-counting in
-    // deviceSensors + typed queues
+    // Note: exact sensor count not asserted due to
+    // double-counting in deviceSensors + typed queues
 }
 
 // Test: createNsmSwitchDI with NSM_Switch - missing optional properties
@@ -800,6 +800,7 @@ TEST_F(NsmSwitchDIFactoryTest, goodTestCreateNSMSwitchMinimalProperties)
     const std::string switchIntf = basicIntfName + ".Switch";
     dbus::PropertyMap switchProperties = {
         {"Type", std::string("NSM_Switch")},
+        // SwitchType required; SwitchSupportedProtocols omitted to test minimal
         {"SwitchType",
          std::string(
              "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink")},
@@ -819,15 +820,16 @@ TEST_F(NsmSwitchDIFactoryTest, goodTestCreateNSMSwitchMinimalProperties)
 // Uses a unique objPath to avoid D-Bus vtable collision with the full FM test.
 TEST_F(NsmSwitchDIFactoryTest, goodTestCreateNSMFabricManagerMinimal)
 {
-    // Arrange - use a unique config path to avoid D-Bus "FileExists" clash
-    const std::string minObjPath =
-        "/xyz/openbmc_project/inventory/system/nvswitch_fm_min";
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(minObjPath,
+    // Arrange
+    // Use a unique Name to avoid D-Bus path conflict with
+    // goodTestCreateNSMFabricManager which registers NsmFabricManagerState at
+    // inventoryObjPath + Name. NsmAggregateFabricManagerState singleton
+    // persists across tests so a different Name avoids FileExists on the same
+    // path.
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                               basicIntfName);
     basePropertyMap = basicProperties;
-    basePropertyMap["Name"] = std::string("FM_Min_0");
-    basePropertyMap["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/nvswitch_fm_min/");
+    basePropertyMap["Name"] = std::string("NVSwitch_FM_Minimal");
 
     const std::string fabricMgrIntf = basicIntfName + ".FabricManager";
     dbus::PropertyMap fabricMgrProperties = {
@@ -837,15 +839,90 @@ TEST_F(NsmSwitchDIFactoryTest, goodTestCreateNSMFabricManagerMinimal)
          std::string(
              "/xyz/openbmc_project/inventory/system/nvswitch/fabricmgr_min/")},
     };
-    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(minObjPath,
+    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
                                                                  fabricMgrIntf);
     currentPropertyMap = fabricMgrProperties;
 
     // Act
-    createNsmSwitchDI(mockManager, fabricMgrIntf, minObjPath);
+    createNsmSwitchDI(mockManager, fabricMgrIntf, objPath);
 
     // Assert - sensor created even without optional FM properties
     EXPECT_GE(nvswitch->roundRobinSensors.size(), 1);
+}
+
+// =============================================================================
+// count() FALSE branch tests for createNsmSwitchDI
+// =============================================================================
+
+// NSM_Switch type with SwitchSupportedProtocols absent →
+// count("SwitchSupportedProtocols") = 0 → FALSE branch → switchProtocols
+// stays empty. SwitchType is provided to avoid convertSwitchTypeFromString("").
+TEST_F(NsmSwitchDIFactoryTest, CreateNSMSwitch_ProtocolsAbsent_FalseBranch)
+{
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = basicProperties;
+    basePropertyMap["Name"] = std::string("NVSwitch_SwitchNoProtocols");
+
+    const std::string switchIntf = basicIntfName + ".SwitchNoProtocols";
+    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                                 switchIntf);
+    // SwitchType present, SwitchSupportedProtocols intentionally absent
+    currentPropertyMap["Type"] = std::string("NSM_Switch");
+    currentPropertyMap["SwitchType"] = std::string(
+        "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink");
+
+    createNsmSwitchDI(mockManager, switchIntf, objPath);
+
+    // Sensor still created with empty supported-protocols list
+    EXPECT_GE(nvswitch->roundRobinSensors.size(), 1u);
+}
+
+// NSM_PortDisableFuture type with Priority absent → count("Priority") = 0 →
+// FALSE branch → priority stays false (default) → addSensor(sensor, false). //
+
+TEST_F(NsmSwitchDIFactoryTest,
+       CreateNSMPortDisableFuture_PriorityAbsent_FalseBranch)
+{
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = basicProperties;
+    basePropertyMap["Name"] = std::string("NVSwitch_PortNoPriority");
+
+    const std::string portDisableIntf = basicIntfName + ".PortNoPriority";
+    auto& currentPropertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, portDisableIntf);
+    // Priority intentionally absent → count("Priority") = 0 → FALSE
+    currentPropertyMap["Type"] = std::string("NSM_PortDisableFuture");
+
+    const size_t before = nvswitch->deviceSensors.size();
+    createNsmSwitchDI(mockManager, portDisableIntf, objPath);
+
+    // Sensor still created despite absent Priority
+    EXPECT_GT(nvswitch->deviceSensors.size(), before);
+}
+
+// NSM_PowerMode type with Priority absent → count("Priority") = 0 →
+// FALSE branch → priority stays false → addSensor(sensor, false). //
+
+TEST_F(NsmSwitchDIFactoryTest, CreateNSMPowerMode_PriorityAbsent_FalseBranch)
+{
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = basicProperties;
+    basePropertyMap["Name"] = std::string("NVSwitch_PowerModeNoPriority");
+
+    const std::string powerModeIntf = basicIntfName + ".PowerModeNoPriority";
+    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                                 powerModeIntf);
+    // Priority intentionally absent → count("Priority") = 0 → FALSE
+    currentPropertyMap["Type"] = std::string("NSM_PowerMode");
+
+    const size_t before = nvswitch->roundRobinSensors.size();
+    createNsmSwitchDI(mockManager, powerModeIntf, objPath);
+
+    // Sensor still created despite absent Priority
+    EXPECT_GT(nvswitch->roundRobinSensors.size(), before);
 }
 
 // Test: Multiple types created on the same device
@@ -891,4 +968,97 @@ TEST_F(NsmSwitchDIFactoryTest, goodTestMultipleTypesOnSameDevice)
     // Assert - both types coexist on the same device
     EXPECT_GE(nvswitch->roundRobinSensors.size(), 1);
     EXPECT_GE(nvswitch->staticSensors.size(), staticAfterChassis);
+}
+
+// L713 FALSE: "Type" key absent from current intf properties →
+// type stays "" → no type branch matches → co_return NSM_SUCCESS, no sensors.
+//
+TEST_F(NsmSwitchDIFactoryTest, CreateNsmSwitchDI_TypeKeyAbsent_FalseBranch)
+{
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = basicProperties;
+
+    // Current intf has no "Type" key → L713 FALSE
+    const std::string noTypeIntf = basicIntfName + ".NoType";
+    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                                 noTypeIntf);
+    currentPropertyMap["SwitchType"] = std::string(
+        "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink");
+    // No "Type" key
+
+    const size_t before = nvswitch->deviceSensors.size();
+    createNsmSwitchDI(mockManager, noTypeIntf, objPath);
+
+    // No sensors should be added (type="" doesn't match any branch)
+    EXPECT_EQ(nvswitch->deviceSensors.size(), before);
+}
+
+// L702 FALSE: "Name" key absent from base intf properties →
+// name stays "" → function continues with empty name.
+// Type is also absent (L713 FALSE) to avoid D-Bus object path issues.
+TEST_F(NsmSwitchDIFactoryTest, CreateNsmSwitchDI_NameAbsent_FalseBranch)
+{
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    // Base has UUID and InventoryObjPath but NOT Name → L702 FALSE
+    basePropertyMap["UUID"] = switchUuid;
+    basePropertyMap["InventoryObjPath"] = inventoryObjPath;
+
+    // No "Type" in current intf → type="" → safe fallthrough
+    const std::string noNameIntf = basicIntfName + ".NoName";
+    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                                 noNameIntf);
+    currentPropertyMap = dbus::PropertyMap{};
+
+    const size_t before = nvswitch->deviceSensors.size();
+    createNsmSwitchDI(mockManager, noNameIntf, objPath);
+
+    // No sensors from type="" path; function completes without crash
+    EXPECT_EQ(nvswitch->deviceSensors.size(), before);
+}
+
+// L707 FALSE: "InventoryObjPath" key absent from base intf properties →
+// inventoryObjPath stays "" → function continues with empty inventoryObjPath.
+// Type is also absent (L713 FALSE) to avoid D-Bus object path issues.
+TEST_F(NsmSwitchDIFactoryTest,
+       CreateNsmSwitchDI_InventoryObjPathAbsent_FalseBranch)
+{
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    // Base has Name and UUID but NOT InventoryObjPath → L707 FALSE
+    basePropertyMap["Name"] = name;
+    basePropertyMap["UUID"] = switchUuid;
+
+    // No "Type" in current intf → type="" → safe fallthrough
+    const std::string noInvPathIntf = basicIntfName + ".NoInvPath";
+    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                                 noInvPathIntf);
+    currentPropertyMap = dbus::PropertyMap{};
+
+    const size_t before = nvswitch->deviceSensors.size();
+    createNsmSwitchDI(mockManager, noInvPathIntf, objPath);
+
+    // No sensors from type="" path; function completes without crash
+    EXPECT_EQ(nvswitch->deviceSensors.size(), before);
+}
+
+// L949 FALSE: "SwitchType" key absent from current intf when type="NSM_Switch"
+// → switchType stays "" → convertSwitchTypeFromString("") throws
+// InvalidEnumString.
+TEST_F(NsmSwitchDIFactoryTest, CreateNsmSwitchDI_SwitchTypeAbsent_Throws)
+{
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = basicProperties;
+    basePropertyMap["Name"] = std::string("NVSwitch_NoSwitchType");
+
+    const std::string switchIntf = basicIntfName + ".SwitchNoType";
+    auto& currentPropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                                 switchIntf);
+    // Type = "NSM_Switch" but SwitchType intentionally absent → L949 FALSE
+    currentPropertyMap["Type"] = std::string("NSM_Switch");
+
+    EXPECT_THROW_COROUTINE(createNsmSwitchDI(mockManager, switchIntf, objPath),
+                           sdbusplus::exception::InvalidEnumString);
 }

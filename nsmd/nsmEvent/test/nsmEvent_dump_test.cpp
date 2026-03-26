@@ -217,7 +217,7 @@ TEST_F(NsmResetRequiredEventTest,
     EXPECT_EQ(event.eventData.end(), event.eventData.find("DEVICE_NAME"));
 }
 
-TEST_F(NsmResetRequiredEventTest, DISABLED_Handle_ValidEvent_ReturnsSuccess)
+TEST_F(NsmResetRequiredEventTest, Handle_ValidEvent_ReturnsSuccess)
 {
     NsmResetRequiredEvent event("Evt", "Type", info);
     std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN);
@@ -555,13 +555,14 @@ TEST_F(NsmEraseTraceObjectTest, EraseDebugInfo_WhenInProgress_ThrowsUnavailable)
 }
 
 TEST_F(NsmEraseTraceObjectTest,
-       DISABLED_EraseDebugInfo_UnsupportedType_SetsInternalFailure)
+       EraseDebugInfo_UnsupportedType_SetsInternalFailure)
 {
     NsmEraseTraceObject obj(bus, "EraseTrace6",
                             "/xyz/openbmc_project/inventory/system/test/",
                             "GPU", testUuid);
-    auto invalidType = static_cast<EraseInfoType>(99);
-    obj.eraseDebugInfo(invalidType);
+    // EraseInfoType::Other is defined in the enum but not in the switch →
+    // hits the default: branch → sets InternalFailure and returns.
+    obj.eraseDebugInfo(EraseInfoType::Other);
     auto status = obj.eraseDebugInfoStatus();
     EXPECT_EQ(std::get<0>(status), EraseOperationStatus::InternalFailure);
 }

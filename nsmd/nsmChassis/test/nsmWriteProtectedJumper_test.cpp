@@ -171,3 +171,47 @@ TEST(NsmWriteProtectedJumper, HandleResponseMsg_ErrorCC_ReturnsError)
 
     EXPECT_NE(rc, NSM_SUCCESS);
 }
+
+// Test decode failure path: rc != NSM_SW_SUCCESS hits else branch
+TEST(NsmWriteProtectedJumper, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    std::shared_ptr<SettingsIntf> settingsIntf;
+    auto provider = makeProvider("/test/wp_jumper/decode_fail", settingsIntf);
+    NsmWriteProtectedJumper sensor(provider);
+
+    nsm_fpga_diagnostics_settings_wp_jumper data = {};
+    data.presence = 1;
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_fpga_diagnostics_settings_wp_jumper_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseData.data());
+    auto rc = encode_get_fpga_diagnostics_settings_wp_jumper_resp(
+        0, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Pass size - 1 to trigger NSM_SW_ERROR_LENGTH → else branch
+    rc = sensor.handleResponseMsg(responseMsg, responseData.size() - 1);
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// handleResponseMsg: rc==NSM_SW_SUCCESS but cc!=NSM_SUCCESS → condition is
+// FALSE (else not taken, so pdi NOT updated).  9-byte buffer causes
+// decode_reason_code_and_cc to return NSM_SW_SUCCESS with cc=NSM_ERROR.
+TEST(NsmWriteProtectedJumper,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_ReturnsError)
+{
+    std::shared_ptr<SettingsIntf> settingsIntf;
+    auto provider = makeProvider("/test/wp_jumper/cc_err", settingsIntf);
+    NsmWriteProtectedJumper sensor(provider);
+
+    std::vector<uint8_t> ccErrBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    ccErrBuf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code
+    auto ccErrMsg = reinterpret_cast<const nsm_msg*>(ccErrBuf.data());
+
+    auto rc2 = sensor.handleResponseMsg(ccErrMsg, ccErrBuf.size());
+
+    EXPECT_NE(rc2, NSM_SUCCESS);
+}

@@ -47,7 +47,7 @@ static const std::vector<utils::Association>
 static const std::string physicalContexnt("GPU");
 static const double maxAllowableValue{std::numeric_limits<double>::infinity()};
 static const double maxValue{std::numeric_limits<double>::infinity()};
-static const double minValue{-std::numeric_limits<double>::infinity()};
+static const double minValue{std::numeric_limits<double>::lowest()};
 static const std::string readingBasis("Headroom");
 static const std::string description("dummy_sensor");
 
@@ -795,6 +795,37 @@ TEST(NsmNumericSensorComposite,
     sensor.updateCompositeReading("child1", 60.0); // Update existing child
 }
 
+// When any child value is NaN, updateCompositeReading sets totalValue to NaN
+// (hits the hasNaN branch) and writes NaN to valueIntf.
+TEST(NsmNumericSensorComposite, UpdateCompositeReading_NaNChild_SetsNaN)
+{
+    std::string name = "composite_power4";
+    std::string type = "NSM_Power";
+    std::string path = "/xyz/openbmc_project/sensors/power/composite_test4";
+    std::vector<utils::Association> associations;
+
+    nsm::NsmNumericSensorComposite sensor(compositeBus, name, associations,
+                                          type, path, compositePhysicalContext,
+                                          compositeImplementation
+#ifdef NVIDIA_SHMEM
+                                          ,
+                                          nullptr
+#endif
+    );
+    // First child valid — sets nextUpdateTimestamp to a future value
+    sensor.updateCompositeReading("child1", 50.0);
+
+    // Reset timestamp window so the NaN update reaches valueIntf
+    sensor.nextUpdateTimestamp = 0;
+
+    // Second child is NaN → triggers hasNaN=true branch; totalValue = NaN
+    sensor.updateCompositeReading("child2",
+                                  std::numeric_limits<double>::quiet_NaN());
+
+    // The composite value on the D-Bus interface should now be NaN
+    EXPECT_TRUE(std::isnan(sensor.valueIntf->value()));
+}
+
 // =============================================================================
 // getSensorType() tests — covers inline virtual override in each hpp
 // =============================================================================
@@ -887,6 +918,109 @@ TEST(nsmThreshold, GetSensorType)
 // =============================================================================
 // PeakPowerSensorBuilder::makeAggregator() — public builder in nsmPeakPower.hpp
 // =============================================================================
+
+// genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
+// encode_get_max_observed_power_req fail → if(rc) TRUE → return nullopt.
+// Covers lines 58-61 in nsmPeakPower.cpp.
+TEST(nsmPeakPower, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    nsm::NsmPeakPower sensor{bus, sensorName, sensorType, 1, 1};
+    // NSM_INSTANCE_MAX + 1 causes encode to fail
+    auto request = sensor.genRequestMsg(1, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
+// encode_get_current_power_draw_req fail → if(rc) TRUE → return nullopt.
+// Covers lines 72,74-75 in nsmPower.cpp.
+TEST(nsmPower, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    nsm::NsmPower sensor{bus,
+                         sensorName,
+                         sensorType,
+                         1,
+                         1,
+                         associations,
+                         associations[0].absolutePath,
+                         physicalContexnt,
+                         nullptr,
+                         maxAllowableValue,
+                         maxValue,
+                         minValue,
+                         &readingBasis,
+                         &description};
+    auto request = sensor.genRequestMsg(1, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
+// encode_get_altitude_pressure_req fail → if(rc) TRUE → return nullopt.
+// Covers lines 36,38-39 in nsmAltitudePressure.cpp.
+TEST(nsmAltitudePressure, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    nsm::NsmAltitudePressure sensor{
+        bus,     sensorName,        sensorType, associations, physicalContexnt,
+        nullptr, maxAllowableValue, maxValue,   minValue};
+    auto request = sensor.genRequestMsg(1, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
+// encode_get_current_energy_count_req fail → if(rc) TRUE → return nullopt.
+// Covers lines 67,69-70 in nsmEnergy.cpp.
+TEST(nsmEnergy, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    nsm::NsmEnergy sensor{bus,
+                          sensorName,
+                          sensorType,
+                          1,
+                          associations,
+                          associations[0].absolutePath,
+                          physicalContexnt,
+                          nullptr,
+                          maxAllowableValue,
+                          maxValue,
+                          minValue,
+                          &readingBasis,
+                          &description};
+    auto request = sensor.genRequestMsg(1, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
+// encode_get_temperature_reading_req fail → if(rc) TRUE → return nullopt.
+// Covers lines 66,68-69 in nsmTemp.cpp.
+TEST(nsmTemp, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    nsm::NsmTemp sensor{bus,
+                        sensorName,
+                        sensorType,
+                        1,
+                        associations,
+                        associations[0].absolutePath,
+                        physicalContexnt,
+                        nullptr,
+                        maxAllowableValue,
+                        maxValue,
+                        minValue,
+                        &readingBasis,
+                        &description};
+    auto request = sensor.genRequestMsg(1, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
+// encode_get_voltage_req fail → if(rc) TRUE → return nullopt.
+// Covers lines 57,59-60 in nsmVoltage.cpp.
+TEST(nsmVoltage, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
+                           1,        associations,      physicalContexnt,
+                           nullptr,  maxAllowableValue, maxValue,
+                           minValue, &readingBasis,     &description};
+    auto request = sensor.genRequestMsg(1, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
 
 TEST(nsmPeakPower, PeakPowerBuilder_MakeAggregator)
 {

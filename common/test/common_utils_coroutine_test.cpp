@@ -89,8 +89,18 @@ TEST(CoroutineDestructorTest, DestroyCompletedHandle_NoMemoryLeak)
  *
  * Verifies that operator=(Coroutine&&) calls handle.destroy() on the
  * previously held (suspended) handle so it is not leaked.
+ *
+ * Not applicable in COVERAGE_DISABLE_COROUTINES mode: co_await is a no-op
+ * so suspendedCoroutine() completes immediately and there is no suspended
+ * handle to destroy. The coroutine.hpp move-assignment has a separate
+ * #else branch for coverage mode that transfers promise.data instead.
  */
+#ifndef COVERAGE_DISABLE_COROUTINES
 TEST(CoroutineDestructorTest, MoveAssignment_DestroysOldSuspendedHandle)
+#else
+TEST(CoroutineDestructorTest,
+     DISABLED_MoveAssignment_DestroysOldSuspendedHandle)
+#endif
 {
 #ifdef COVERAGE_DISABLE_COROUTINES
     // In coverage mode co_await is a no-op, so suspendedCoroutine() completes

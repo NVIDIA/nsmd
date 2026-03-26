@@ -1,641 +1,547 @@
 # Blocked Unit Tests
 
-This document tracks tests that cannot be generated due to missing mocks or unmockable dependencies.
-
-## Files Blocked from Test Generation
-
-### nsmd/sensorManager.cpp (0% coverage, 293 lines)
-**Reason**: Extensive unmockable dependencies requiring significant infrastructure
-
-**Missing Mocks/Dependencies**:
-- No mock for `sdeventplus::Event` and event loop infrastructure
-- No mock for `sdbusplus::asio::object_server`
-- No mock for `requester::Handler<requester::Request>`
-- No mock for `mctp_socket::Manager`
-- No mock for `InstanceIdDb`
-- Complex coroutine-based async operations without test harness
-- D-Bus signal matches and property changed handlers
-- MCTP endpoint discovery integration
-
-**Uncovered Functions**:
-- Constructor (SensorManagerImpl)
-- Destructor (~SensorManagerImpl)
-- scanInventory()
-- interfaceAddedHandler()
-- interfaceAddedTask()
-- gpioStatusPropertyChangedHandler()
-- mctpReadinessSigHandler()
-- isEMReady()
-- markEMReady()
-- isMCTPReady()
-- isNSMPollReady()
-- dumpReadinessLogs()
-- dumpNsmDevicesInfo()
-- checkAllDevicesReady()
-- startPolling()
-- updateLongRunningSensor()
-- refreshCommandMatrix()
-- pollPrioritySensors()
-- pollNonPrioritySensors()
-- deviceTask()
-- getNsmDevice()
-- getNsmDeviceFromStaticUUID()
-- getEid()
-
-**Recommended Action**:
-- Create comprehensive mock infrastructure for sdeventplus, sdbusplus::asio, and requester framework
-- Consider integration tests instead of pure unit tests for this component
-- Or test individual methods in isolation after refactoring to reduce dependencies
-
-### nsmd/socket_handler.cpp (0% coverage, 252 lines)
-**Reason**: Socket operations and MCTP protocol handling
-
-**Infrastructure Status**: **PARTIALLY UNBLOCKED** - Socket mocking infrastructure exists (Continuation #13)
-
-**Available Mocks/Infrastructure**:
-- ✅ Socket wrapper abstraction layer: `SocketIoInterface`, `RealSocketIo`, `MockSocketIo`
-- ✅ MCTP test utilities: `MctpMessageCapture`, `NsmMessageBuilder`, `MctpTestFixture`
-- ⚠️ Production code refactoring NOT YET DONE (socket_handler.cpp still uses raw system calls)
-
-**Uncovered Functions** (testable after refactoring):
-- Handler::processRxMsg()
-- DaemonHandler::registerMctpEndpoint()
-- DaemonHandler::initSocket()
-- DaemonHandler::sendMsg()
-- InKernelHandler::sendMsg()
-- Various socket handling utilities
-
-**Recommended Action**:
-- **Next step**: Refactor socket_handler.cpp to use getSocketIo() interface (6-8h effort)
-- **Then**: Generate tests using existing MCTP test infrastructure
-- **Estimated coverage gain**: +400-500 lines (0% → 75-90%)
+This document tracks tests that cannot be generated due to missing mocks or unmockable
+dependencies. Only items that are **currently** blocked are listed here. Previously blocked
+items that have since been resolved are summarized in the History section at the bottom.
 
 ---
 
-### ~~libnsm/requester/mctp.c~~ (COMPLETED: 100% coverage, 88 lines) ✅
-**Status**: **UNBLOCKED** via socket mocking infrastructure (Continuation #13)
+## Current Status (2026-03-25)
 
-**Infrastructure Built**:
-- Socket wrapper abstraction layer: `SocketIoInterface`, `RealSocketIo`, `MockSocketIo`
-- MCTP test utilities: `MctpMessageCapture`, `NsmMessageBuilder`, `MctpTestFixture`
-- Test file: `libnsm/test/libnsm_mctp_requester_test.cpp`
+**411 test binaries, ~55 DISABLED individual tests (infrastructure limitations).**
+**90.0% line coverage · 97.4% function coverage · 76.2% branch coverage**
+(gcovr: 54,531/60,501 lines · 39,098/51,303 branches · 4,747/4,876 functions)
 
-**All Functions Now Covered**:
-- mctp_recv() (static) ✅
-- nsm_recv_any() ✅
-- nsm_recv() ✅
-- nsm_send_recv() ✅
-- nsm_send() ✅
+### Session additions (2026-03-25)
 
-**Coverage Achievement**: 0% → 96% (Continuation #6) → 100% (Continuation #13)
+**12 new branch coverage test files** across 8 modules:
+nsmPcieGroupBranch, nsmLeakDetectionBranch6, nsmGpuClockControlBranch3,
+nsmFpgaPortBranch4, nsmSecurityRBPBranch3, nsmEventConfigDeepBranch,
+nsmApSkuIdBranch, nsmMemoryBranch5, nsmRoTPropertyBranch4,
+nsmDebugTokenNICBranch3, nsmProcessorFactoryBranch9, nsmGpmOemBranch7.
 
-**Commit**: b9c1192f "test: complete mctp.cpp coverage to 100%"
+**8 test files renamed** for consistent naming convention
+(commonBranch→common_branch, branches→branch, _branch→Branch).
 
----
+Coverage delta: +3.8% branches (+1,502), +2.9% lines.
 
-## Batch 2 Blocked Files (Branch Coverage Target 90%)
+### Session additions (2026-03-18)
 
-### nsmd/nsmDebugToken/nsmDebugTokenAggregation.cpp (8.6% coverage, 392 lines)
-**Reason**: File I/O operations and TLV parsing with async operations
-**Uncovered Branches**: 98
+**Production code changes for testability** (2 commits before tests):
 
-**Missing Mocks/Dependencies**:
-- File I/O system calls: open(), read(), lseek(), fstat(), close()
-- TLV (Tag-Length-Value) parsing infrastructure
-- AsyncOperationManager and async status interfaces
-- TokenMap and DebugTokenHeader structures
-- Device management and token installation async operations
+1. **`ed8cf48c` fix: remove static from factory functions** — removed `static`
+   from 40 factory coroutines/helpers in 14 files, enabling tests to
+   forward-declare and call them directly.
 
-**Uncovered Functions/Branches**:
-- installToken() - async file parsing and token installation
-- parseHeader() - file type validation, header reading
-- parseTokenFile() - fstat, file reading, TLV parsing
-- extractSerialNumber() - TLV data extraction
-- parseTlvTokens() - complex TLV iteration and parsing
-- installTokensToDevices() - coroutine-based device iteration
+2. **`51e7ef00` fix: dependency injection for testability** — made
+   MctpDiscovery public methods `virtual` (enabling mock subclasses),
+   made `NsmDevice::discoveryEvents()` virtual with try-catch fallback,
+   guarded `dumpNsmDeviceInfoTask()` MctpDiscovery call.
 
-**Recommended Action**:
-- Create file I/O wrapper layer for mocking
-- Build TLV parsing test infrastructure with sample files
-- Mock AsyncOperationManager for status tracking
-- Consider integration tests with real token files
+**350+ new branch coverage tests** across 14 test files:
+nsmProcessorBranch2 (92), nsmPowerLimitBranch (40), nsmMemoryBranch (22),
+nsmGpmOemBranch2 (25), nsmSwitchBranch (22), nsmPortBranch (27),
+nsmDebugTokenNICBranch (20), nsmProcessorModulePowerControlBranch (30),
+nsmEventConfigBranch (21), nsmCommonBranch (10),
+nsmGpuPresenceAndPowerStatusBranch (15), nsmLeakDetectionBranch (15),
+nsmSetECCModeBranch (5), nsmSetEgmModeBranch (5).
 
----
+### Session additions (2026-03-11)
 
-### nsmd/nsmPort/nsmGpuPciePort.cpp (13.8% coverage, 560 lines)
-**Reason**: Extensive coroutine-based async operations
-**Uncovered Branches**: 95
-**Existing Tests**: 8 tests (constructors only)
+**Branch 12 second-operand coverage** — systematic coverage of the
+`rc == NSM_SW_SUCCESS && cc != NSM_SUCCESS` (second operand of `||`) pattern
+across all `nsmd` source files. Two commits:
 
-**Missing Mocks/Dependencies**:
-- Coroutine/co_await test framework
-- NsmDevice mock with sensorIO/postPatchIO support
-- AsyncOperationManager mock
-- NSM message encoding/decoding for PCIe operations
-- Sensor group mocks (NsmPcieGroup, NsmPCIeECCGroup)
-- DBus property async getters
+**Commit 5c6d932d** — nsmClockOutputEnableState L65, nsmIRoTResponder L77,
+nsmSecurityRBP L118, nsmDebugTokenUnified L702, GPUSWInventory L121.
 
-**Uncovered Functions/Branches**:
-- NsmClearPCIeCounters::update() - coroutine with sensorIO
-- NsmClearPCIeCounters::updateReading() - switch (3 cases), bitfield manipulation
-- NsmClearPCIeIntf::clearPCIeErrorCounter() - complex async clear operation
-- NsmClearPCIeIntf::clearCounter() - async operation management
-- createNsmGpuPcieSensor() - 200+ line coroutine with multiple branches
+**Commit ef5b7cda** — nsmLeakDetection L596, nsmGpuClockControl L301
+(clearReqClockLimit + setRangeClockLimits), nsmProcessorModulePowerControl L187,
+nsmLogInfo L92, nsmDebugInfo L110 + L240, nsmRetimerPort L1201.
 
-**Testable Without Async**:
-- updateReading() switch cases (groups 2, 3, 4, default)
-- findAndUpdateCounter() simple logic
-- addClearCoutnerSensor() insertion logic
-- getClearCounterSensorFromGroup() lookup logic
+Coverage delta: +1.0% branches, +2.3% decisions. 15 new tests added.
 
-**Recommended Action**:
-- Add non-async tests for updateReading(), findAndUpdateCounter()
-- Build coroutine test framework for async functions
-- Mock NsmDevice with co_await support
+### Recently Fixed DISABLED Tests (2026-03-10)
 
----
+Three previously-disabled tests have been fixed and re-enabled:
 
-### nsmd/nsmFirmwareUtils/nsmKeyMgmt.cpp (6.9% coverage, 280 lines)
-**Reason**: Coroutine-based key management operations
-**Uncovered Branches**: 94
-**Existing Tests**: 3 tests (constructor, addSlotObject, getPath)
+| Test | File | Fix |
+|------|------|-----|
+| `CoroutineSemaphoreMock.Contended_DeferFails_WaiterNotResumed` | `common/test/sleep_semaphore_mock_test.cpp` | Fixed memory leak in `coroutineSemaphore.hpp` — `delete awaiterPtr` added on `sd_event_add_defer` failure |
+| `NsmEraseTraceObjectTest.EraseDebugInfo_UnsupportedType_SetsInternalFailure` | `nsmd/nsmEvent/test/nsmEvent_dump_test.cpp` | Changed `static_cast<EraseInfoType>(99)` → `EraseInfoType::Other` to avoid sdbusplus enum-to-string throw |
+| `NsmSwitchIsolationModeHandleResp.HandleResponseMsg_ShortLen_ReturnsError` | `nsmd/nsmChassis/test/nsmSwitchBranch_test.cpp` | Fixed buffer size from `sizeof(nsm_msg_hdr)` → `sizeof(nsm_msg_hdr)+sizeof(nsm_common_non_success_resp)`; cc=0 so decode_reason_code_and_cc succeeds → NSM_SW_ERROR_LENGTH correctly returned |
 
-**Missing Mocks/Dependencies**:
-- Coroutine/co_await test framework
-- NsmDevice mock with postPatchIO support
-- NSM message encoding/decoding for key operations
-- ProgressIntf mock for operation status
-- FirmwareSlot mocks for key distribution
+### Test Infrastructure Available
 
-**Uncovered Functions/Branches**:
-- startOperation() - opInProgress guard branch
-- finishOperation() - status == Completed branch
-- revokeKeys() - multiple request type branches, exception handling
-- revokeKeysAsyncHandler() - coroutine with encode/decode error paths
-- genRequestMsg() - encode failure branch
-- handleResponseMsg() - dual decode calls, error branches, slot loop
+The following mock/test infrastructure is fully functional and available for new tests:
 
-**Branch Patterns**:
-- Request type switching (MostRestrictiveValue, SpecifiedValue)
-- Encode/decode error handling (cc, rc, reasonCode)
-- Exception handling (InvalidArgument, InternalFailure, Unavailable)
-- Bitmap conversion and validation
-
-**Recommended Action**:
-- Build coroutine test framework
-- Mock NsmDevice with async postPatchIO
-- Test synchronous portions (startOperation guard, finishOperation status)
-- Create NSM message mock infrastructure
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `MockNsmDevice` | `nsmd/test/commonMock.hpp` | Mocks all NsmDevice pure virtuals (sensorIO, postPatchIO, updateNsmDevice, doSleep, refreshCapabilitySensor) |
+| `MockSensorManager` | `nsmd/test/mockSensorManager.hpp` | Provides mockManager singleton, `getEid()`, `getObjServer()` |
+| `NullReturnMockSensorManager` | `nsmd/test/mockSensorManager.hpp` | Returns `nullptr` from `getNsmDeviceFromStaticUUID()` to test factory error branches |
+| `SensorManagerTest` fixture | `nsmd/test/mockSensorManager.hpp` | Base class: `mockSensorIO()`, `mockPostPatchIO()`, `cleanupDeviceSensors()` |
+| `MockDbusAsync` | `common/test/mockDBusHandler.hpp` | `propertyMap(objPath, intf)` registers D-Bus property maps; `findPropertyMap()` returns nullptr if absent |
+| `DBusTest` fixture | `common/test/mockDBusHandler.hpp` | Clears D-Bus mock state in destructor |
+| `EXPECT_THROW_COROUTINE` | `nsmd/test/commonMock.hpp` | Works in both `COVERAGE_DISABLE_COROUTINES` mode (direct throw) and normal mode |
+| `MctpTestFixture` | `common/test/mockSocketIo.hpp` | MCTP socket pair infrastructure for socket_handler tests |
+| `COVERAGE_DISABLE_COROUTINES` | build configuration | Makes coroutines execute synchronously; `co_await` → direct call, `co_return` → `return` |
 
 ---
 
-### nsmd/nsmRoTProperty.cpp (7.0% coverage, estimated 300-400 lines)
-**Reason**: Not analyzed (likely similar to nsmKeyMgmt.cpp)
-**Uncovered Branches**: 93
-**Existing Tests**: Unknown
+## Files Genuinely Blocked (Current)
 
-**Status**: Not started due to time/token constraints
-**Likely Complexity**: High (similar patterns to nsmKeyMgmt/nsmGpuPciePort)
+### 1. `requester/mctp_endpoint_discovery.cpp` — 0% coverage, 606 lines
 
-**Recommended Action**:
-- Analyze file structure and dependencies
-- Likely requires coroutine/async mocking
-- Add to appropriate blocker category after analysis
+**Why blocked**: The `MctpDiscovery` class requires a fully-initialized singleton
+(`MctpDiscovery::getInstance()`). The singleton initialization requires:
+- A real `sdeventplus::Event` loop
+- A real `sdbusplus::bus::bus` session
+- A real MCTP socket file descriptor
+- D-Bus service registration for `xyz.openbmc_project.MCTP.Control`
 
----
+In unit tests `MctpDiscovery::getInstance()` throws `std::runtime_error` because the
+singleton is never initialized. There is no way to inject a mock instance.
 
-## Summary
+**Uncovered functionality**: Endpoint discovery, MCTP UUID resolution, device enumeration,
+endpoint state change notifications, service ready detection, all 1,200+ lines of discovery
+logic across `mctp_endpoint_discovery.cpp` and related headers.
 
-**Total Blocked Files**: 7 (4 new from Batch 2, 3 existing)
-**Total Lines of Code**: ~2,400 lines
-**Total Uncovered Branches (Batch 2 only)**: 380
-
-**Common Blocking Issues**:
-1. **Coroutine/async infrastructure** (requester::Coroutine, co_await) - **PRIMARY BLOCKER**
-2. **File I/O system calls** (open, read, lseek, fstat, close)
-3. **Async/coroutine infrastructure** (sdeventplus, requester::Coroutine)
-4. **NsmDevice async operations** (sensorIO, postPatchIO)
-5. **Socket operations and system calls**
-6. **AsyncOperationManager** and status tracking
-7. **D-Bus async server** (sdbusplus::asio::object_server)
-8. **Event loop and signal handling**
-9. **NSM message encoding/decoding** mocks
-10. **MCTP protocol integration**
-11. **TLV parsing infrastructure**
-
-**Batch 2 Impact**:
-- **Files completed**: 2/6 (nsmGpmOem.cpp, nsmLeakDetection.cpp)
-- **Files blocked**: 4/6 (67% of Batch 2)
-- **Tests generated**: 53 (38 + 15)
-- **Branches covered**: ~199 of 579 in Batch 2 (34%)
-
-**Overall Impact**:
-These blocked files represent a mix of infrastructure (sensorManager, socket_handler) and business logic (nsmDebugTokenAggregation, nsmGpuPciePort, nsmKeyMgmt). The **coroutine/async testing infrastructure is the #1 blocker**, affecting 4 of 6 Batch 2 files.
-
-**Path Forward**:
-1. **Short-term**: Focus on synchronous code files in other batches
-2. **Medium-term**: Build coroutine test framework with co_await mocking
-3. **Long-term**: Create NsmDevice mock, AsyncOperationManager mock, file I/O wrappers
-4. **Return to blocked files** once infrastructure exists
-
-See **BATCH2-FINAL-AUTONOMOUS-STATUS.md** for detailed Batch 2 analysis.
+**Recommended action**: Integration tests with a real event loop. Note:
+`MctpDiscovery` methods are now `virtual` (commit `51e7ef00`), enabling mock
+subclasses. A `MockMctpDiscovery` test fixture can now override
+`getNsmDeviceFromEid()`, `discoveryEvents()`, etc. However, the singleton
+`initialize()` pattern still prevents full injection — a `setTestInstance()`
+or constructor-based injection would complete the testability story.
 
 ---
 
-## Batch 1 Blocked Files (Functional Coverage Target 90%)
+### 2. `nsmd/nsmDevice.cpp` — 36% coverage, 411 uncovered lines (of 643)
 
-### nsmd/nsmDevice.cpp (68% coverage, 1215 lines)
-**Session**: 2026-02-13 PM (Batch 1 assessment)
-**Reason**: Extensive coroutine-based async operations
-**Uncovered Functions**: 31
+**Why blocked**: `MockNsmDevice` overrides all pure virtuals — meaning the real
+implementations in `nsmDevice.cpp` are never called. The actual coroutine bodies
+(which contain the real logic) require:
+- A real `requester::Handler<requester::Request>` for `SendRecvNsmMsg`
+- A real `sdeventplus::Event` and `InstanceIdDb` for async MCTP send/receive
+- A real `mctp_socket::Manager` for socket communication
 
-**Missing Mocks/Dependencies**:
-- Coroutine/co_await test framework (`requester::Coroutine`)
-- Mock for `common::Sleep` async sleep implementation
-- Mock for `nsmMsgHandler->SendRecvNsmMsg` async I/O
-- Event loop infrastructure (sdbusplus::asio::object_server)
-- MCTP endpoint discovery mocks
-- Sensor management infrastructure mocks
-- DBus async property interfaces
+The real `SendRecvNsmMsg` is the root call for all sensor I/O, and without a real
+requester handler the entire chain from `sensorIO` → `SendRecvNsmMsg` → MCTP is
+untestable.
 
-**Uncovered Coroutine Functions** (~25 functions):
-- `markSensorsUnrefreshed()` - Async sensor refresh with batch sleep
-- `setOnline()` - Device online transition with async capability refresh
-- `setOffline()` - Device offline transition with async sensor updates
-- `updateSensorsForOffline()` - Batch sensor updates with sleep intervals
-- `waitForNsmDeviceUpdate()` - Async wait loop with timeout
-- `SendRecvNsmMsg()` - Async MCTP message send/receive wrapper
-- `sensorIO()` - Sensor I/O with command validation and async send/recv
-- `postPatchIO()` - Post-patch I/O operations with async wait
-- `updateNsmDevice()` - Full device capability discovery (async)
-- `getSupportedNvidiaMessageType()` - NSM message type query (async)
-- `getSupportedCommandCodes()` - Command code discovery per message type (async)
-- `updateFruDeviceIntf()` - FRU interface update with async inventory query
-- `getFRU()` - FRU data retrieval for multiple properties (async)
-- `getInventoryInformation()` - Single inventory property query (async)
-- `refreshCapabilitySensor()` - Capability sensor refresh loop (async)
-- `refreshCommandMatrix()` - Command matrix refresh (async)
-- `dumpNsmDeviceInfoTask()` - Debug info dump with async operations
+**Uncovered lines (183–1228)**:
 
-**Uncovered Synchronous Functions** (~6 functions):
-May be testable but require complex NsmDevice setup with mocked dependencies:
-- `setEventMode()` / `getEventMode()` - Event mode getter/setter
-- `allCommandCodesAreRetrieved()` - Command matrix validation
-- `isCommandSupported()` - Command matrix lookup
-- `updateMessageTypesToCommandCodeMatrix()` - Matrix population
-- `addSensorBase()` - Sensor registration with polling type
-- `updateDiscoveryIdentifiers()` - Device identifier/EID/UUID updates
-- `registerLongRunningHandler()` / `clearLongRunningHandler()` - Handler registration
-- `invokeLongRunningHandler()` - Event handler dispatch
-- `progressCounters()` / `discoveryEvents()` - Factory methods
+| Lines | Function | Reason |
+|-------|----------|--------|
+| 183–265 | `SendRecvNsmMsg()`, `sensorIO()`, `postPatchIO()` | Real implementations never called — MockNsmDevice overrides these |
+| 359–943 | `updateNsmDevice()`, `getSupportedNvidiaMessageType()`, `getSupportedCommandCodes()`, `waitForNsmDeviceUpdate()`, `setOnline()`, `setOffline()`, `updateSensorsForOffline()`, `markSensorsUnrefreshed()` | All are coroutines calling real sensorIO |
+| 966–1084 | `getFRU()`, `getInventoryInformation()`, `updateFruDeviceIntf()` | Coroutines calling real sensorIO |
+| 1114–1228 | `refreshCapabilitySensor()`, `refreshCommandMatrix()`, `dumpNsmDeviceInfoTask()` | Coroutines calling real sensorIO |
 
-**Testable Patterns**:
-All coroutine functions follow pattern:
+**Recommended action**: Same as mctp_endpoint_discovery.cpp — requires real requester
+infrastructure or a full coroutine executor mock. Note: `discoveryEvents()` is now
+`virtual` with a try-catch fallback (commit `51e7ef00`), and `dumpNsmDeviceInfoTask()`
+guards the MctpDiscovery call. These changes prevent test crashes but don't make the
+real coroutine bodies testable without real MCTP infrastructure.
+
+---
+
+### 3. `nsmd/sensorManager.cpp` — 29% coverage, 290 uncovered lines (of 411)
+
+**Why blocked**: Covered lines (121/411) are the static helper methods that were
+extracted and tested in isolation (`isNSMPollReady`, `dumpReadinessLogs`, `markEMReady`,
+`startPolling`). The remaining 71% consists of event-driven handlers that fire only via
+D-Bus signals and `sdeventplus` event loop callbacks.
+
+**Covered (29%)**:
+- `isNSMPollReady()` (L50-65) — static, tested directly
+- `dumpReadinessLogs()` (L386-415) — static, tested directly
+- `markEMReady()`, `isEMReady()` (partial) — tested via SensorManagerTest
+- `startPolling()`, `pollPrioritySensors()`, `pollNonPrioritySensors()` — tested via
+  deviceTask loop mock in `sensorManager_test.cpp`
+
+**Uncovered (71%) — all require real D-Bus/event-loop infrastructure**:
+
+| Lines | Function | Blocker |
+|-------|----------|---------|
+| 72–358 | Constructor body — D-Bus signal matches, `sd_event` setup, timer callbacks, `sdbusplus::asio::object_server` | `sdbusplus::asio::object_server` not mockable |
+| 461–545 | `scanInventory()` | Requires live EntityManager D-Bus tree |
+| 552–635 | `interfaceAddedHandler()`, `interfaceAddedTask()` | D-Bus signal callbacks, never fire in tests |
+| 639–711 | `gpioStatusPropertyChangedHandler()`, `mctpReadinessSigHandler()` | Signal handlers, never fire |
+| 771–785 | `checkAllDevicesReady()`, `dumpNsmDevicesInfo()` | Called from event handlers |
+
+**Recommended action**: Integration tests. The static helpers are fully covered;
+the async event handlers cannot be unit-tested without a real D-Bus session.
+
+---
+
+### 4. `nsmd/nsmEvent/nsmLongRunningEventHandler.cpp` — 50% coverage, 6 uncovered lines (of 12)
+
+**Why blocked**: `handle()` function (lines 35–44) immediately calls
+`MctpDiscovery::getInstance()` which throws `std::runtime_error` in tests.
+The test `Delegate_MctpDiscoveryNotInit_ThrowsRuntimeError` in `nsmEvent_test.cpp`
+covers the exception path (lines 37–39 via catch). Lines 35, 37, 39–40, 42, 44
+(the success path after getInstance() returns) are permanently unreachable.
+
+**Recommended action**: Refactor `handle()` to accept `MctpDiscovery&` by injection
+instead of using the singleton directly.
+
+---
+
+### 5. `requester/mctp_endpoint_prober.cpp` — 47% coverage, 96 uncovered lines (of 183)
+
+**Why blocked**: `McEndpointProber` requires a real `sendRecvFn` callback
+(actual MCTP socket I/O function pointer). The uncovered half consists of the
+async send/receive paths triggered by the real sendRecvFn:
+- `probe()` body (lines 44–95) — async MCTP probe logic
+- `handleResponse()` (lines 131–185) — response parsing per endpoint
+- Retry/timeout paths (lines 226–301) — require real timer callbacks
+
+The test file `requester_test.cpp` covers the synchronous paths that don't
+require real socket I/O.
+
+**Recommended action**: Inject `sendRecvFn` as a mock lambda in tests.
+
+---
+
+### 6. `requester/handler.hpp` — 50% coverage, 56 uncovered lines (of 112)
+
+**Why blocked**: Template retry/timeout logic (lines 222–339) is tested only
+via the mock path in `requester_test.cpp`. The real paths require:
+- `sdeventplus::Event` for async timer callbacks
+- Real `sd_event_source` for timeout handling
+- `InstanceIdDb` for MCTP instance ID allocation under load
+
+**Uncovered paths**: Retry-after-timeout (lines 222–260), concurrent request
+limiting (lines 312–339), request queue draining (lines 449–513).
+
+---
+
+### 7. `requester/request.hpp` — 8% coverage, 31 uncovered lines (of 34)
+
+**Why blocked**: Template class `Request<ExecutionContext, Handler>` — all paths
+except construction require a live `sdeventplus::Event` loop. The timer-based
+retry/expiry logic (lines 65–234) fires via `sd_event` callbacks that never
+trigger in unit tests.
+
+---
+
+### 8. `common/dBusHandler.cpp` — 27% coverage, 202 uncovered lines (of 279)
+
+**Why blocked**: Real `sdbusplus::bus::bus` D-Bus methods. The 77 covered lines
+are the `MockDBusHandler` dispatch paths. The remaining 73% (lines 26–197 approx)
+are real D-Bus `call()` and `new_method_call()` implementations that require a
+live D-Bus session bus. `MockDBusHandler` intercepts all calls in tests and the
+real implementations are never reached.
+
+---
+
+### 9. `nsmd/nsmPort/nsmRetimerPort.cpp` — **83%** coverage (up from 66%)
+
+**Partially resolved** — static factory functions unblocked.
+
+**9a. Previously blocked static factory functions — NOW RESOLVED**
+
+`createNsmPCIeRetimerPorts()` and `createNsmMultiPCIeRetimerPorts()` had `static`
+linkage. `static` was removed, forward declarations added to test files, and 16 new
+tests were written covering all `count()` FALSE branches, portType switch paths,
+CX9 `includeInboundCounters`, and null-device error paths.
+
+**9b. Remaining uncovered lines (gcov B50/B51 false negatives, lines 23–90)**
+
+Constructor/destructor bodies and string literal continuation lines in `lg2::` calls
+(nsmRetimerPort.hpp constructors, lines 23–90) — appear uncovered in the HTML report
+but ARE executed. This is a tooling artifact, not a real coverage gap.
+
+---
+
+### 10. `nsmd/nsmMsghandler.hpp` — 51% coverage, 13 uncovered lines (of 27)
+
+**Why blocked**: The real `SendRecvNsmMsg` implementation in `NsmMsgHandler` requires
+a live MCTP socket session. Lines 107, 120, 124–138 are the actual send/receive
+coroutine body. In tests, `MockNsmMessageHandler` is used instead.
+
+---
+
+## Individual Branch Blockers
+
+### Remaining `||` second-operand branches (rc==NSM_SW_SUCCESS, cc!=NSM_SUCCESS)
+
+All `if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)` conditions have been
+systematically analysed (2026-03-11). All second operands are now covered
+**except** the items below, which are permanently blocked:
+
+| File | Line | Reason |
+|------|------|--------|
+| `nsmd/nsmDevice.cpp` | L623, L688, L870 | `MockNsmDevice.nsmMsgHandler` is null → `getSupportedNvidiaMessageType`, `getSupportedCommandCodes`, `getInventoryProperty` never called (see §2) |
+| `nsmd/nsmChassis/nsmPCIeFunction.cpp` | L116 | Test binary `nsmPCIeFunction_test` disabled in meson.build (`NsmInterfaceProvider` deleted constructor) |
+| `nsmd/nsmDebugToken/nsmDebugTokenNIC.cpp` | L614 | Dead code: second `decode_nsm_query_device_ids_resp` call (full buffer) after first (size query) already succeeded — same response can't fail the second time |
+| `nsmd/nsmDebugToken/nsmDebugTokenUnified.cpp` | L715 | Dead code: defensive check after `cc == NSM_SUCCESS` already verified at L702 |
+| `nsmd/nsmChassis/nsmIRoTResponder.cpp` | L89 | Dead code: second decode after `cc == NSM_SUCCESS` already verified at L77 |
+
+---
+
+### `nsmd/nsmDumpCollection/nsmLogInfo.cpp` — `default:` in synced_time switch
+
+**Lines**: 121–123 (`default:` branch in `getLogInfoAsyncHandler()`)
+
+**Pattern**:
 ```cpp
-requester::Coroutine FunctionName() {
-    // ... setup ...
-    co_await someAsyncOperation();
-    // ... more logic ...
-    co_return NSM_SW_SUCCESS;
+switch (logInfo.synced_time) {
+    case SYNCED_TIME_TYPE_BOOT:   // = 0
+    case SYNCED_TIME_TYPE_SYNCED: // = 1
+    default: → InternalFailure   // UNREACHABLE
 }
 ```
 
-**Estimated Effort to Unblock**:
-- **Infrastructure development**: 2-3 days
-  - Build coroutine test framework with co_await mocking
-  - Mock `requester::Coroutine` scheduler/executor
-  - Mock `common::Sleep` with test time control
-  - Mock `nsmMsgHandler` with async send/recv
-- **Test generation**: 1-2 days after infrastructure ready
-  - ~31 tests for uncovered functions
-  - ~500-800 lines of test code
-
-**Impact When Unblocked**:
-- Functions covered: +31 (0.8% of 3905 total)
-- Similar patterns used across ~400+ functions repository-wide
-- Infrastructure enables testing of most async-heavy files
-
-**Recommended Action**:
-- **Priority**: HIGH (blocks 400+ functions across repository)
-- **Short-term**: Document as blocked, focus on synchronous code in Batch 2-5
-- **Medium-term**: Build coroutine test infrastructure (one-time investment, large ongoing benefit)
-- **Long-term**: Return to generate tests for all 31 functions after infrastructure ready
+**Why blocked**: `logInfo.synced_time` is a **1-bit bitfield** (`uint8_t synced_time : 1`).
+A 1-bit field holds only values 0 or 1. Any attempt to assign `logInfo.synced_time = 2`
+is silently truncated to 0 by C++ standard. The `default:` branch is structurally
+impossible to reach without changing the struct definition.
 
 ---
 
-### nsmd/nsmChassis/nsmChassis.cpp (91% coverage, 682 lines)
-**Session**: 2026-02-13 PM (Batch 1 assessment)
-**Reason**: Template instantiations with complex setup; already high coverage
-**Uncovered Functions**: 17
-**Priority**: LOW (already 91% covered, diminishing returns)
+### `nsmd/nsmNumericSensor/nsmThresholdFactory.cpp` — error branch in `make()`
 
-**Missing Mocks/Dependencies**:
-- D-Bus interface mocks for each template instantiation
-- Chassis object state management
-- Property change notification mocks
+**Lines**: 58–63 (`if (result != NSM_SW_SUCCESS)` after `getThresholdInterfacesAsync()`)
 
-**Uncovered Template Instantiations** (All 17):
-All are instantiations of `NsmChassis<IntfType>::update`:
-1. `NsmChassis<NsmApSkuIdIntf>::update`
-2. `NsmChassis<NsmAssetIntf>::update`
-3. `NsmChassis<sdbusplus::server::object::object<...>>::update`
-4. `NsmChassis<NsmAvailableIntf>::update`
-5. `NsmChassis<NsmBlinkIntf>::update`
-6. `NsmChassis<NsmButtonIntf>::update`
-7. `NsmChassis<NsmDecorationIntf>::update`
-8. `NsmChassis<NsmFirmwareIntf>::update`
-9. `NsmChassis<NsmIndicatorLedIntf>::update`
-10. `NsmChassis<NsmItemIntf>::update`
-11. `NsmChassis<NsmLastRebootReasonIntf>::update`
-12. `NsmChassis<NsmLocateIntf>::update`
-13. `NsmChassis<NsmManufacturerIntf>::update`
-14. `NsmChassis<NsmModelIntf>::update`
-15. `NsmChassis<NsmPartNumberIntf>::update`
-16. `NsmChassis<NsmSerialNumberIntf>::update`
-17. `NsmChassis<NsmTypeIntf>::update`
-
-**Why Lower Priority**:
-- **Already high coverage**: 91% indicates most critical code paths tested
-- **Template complexity**: Each instantiation requires specific D-Bus interface mock
-- **Similar behavior**: All instantiations likely execute same template code with different types
-- **Low ROI**: 17 functions = 0.4% of 3905 total functions
-- **Diminishing returns**: Testing all 17 instantiations unlikely to find new bugs
-
-**Estimated Effort**:
-- **Per instantiation**: 30-60 minutes (D-Bus mock setup, template instantiation test)
-- **Total**: 8-17 hours for all 17 instantiations
-- **Alternative**: Test 1-2 representative instantiations (~1-2 hours) to verify template logic
-
-**Impact When Completed**:
-- Functions covered: +17 (0.4% of 3905 total)
-- Coverage increase: 91% → ~94% for this file
-- Repository coverage increase: ~0.4%
-
-**Recommended Action**:
-- **Priority**: LOW
-- **Short-term**: Defer in favor of higher-value targets (Batch 2-10)
-- **Medium-term**: Test 1-2 representative instantiations if time permits
-- **Long-term**: Test all 17 only if coverage gap remains after other high-value work complete
+**Why blocked**: `getThresholdInterfacesAsync()` always `co_return NSM_SW_SUCCESS`.
+There is no code path that returns a non-success value. `coGetDbusProperty<string>`
+failure in the mock infrastructure suspends permanently rather than returning an error
+code. So `result` is always `NSM_SW_SUCCESS` and the error branch is dead code.
 
 ---
 
+### `nsmd/nsmEvent.cpp` — blocked decision branches
+
+**Line 93** — `co_return NSM_SW_SUCCESS` (FALSE branch of `if (!logSuccess)` at L85):
+In `COVERAGE_DISABLE_COROUTINES` mode, `-Dco_await=` replaces `co_await` with nothing.
+`coLogEvent` constructor initializes `success = false`. `await_ready()` (which would
+set `success = true`) is never called. So `operator bool()` always returns `false`,
+meaning `!logSuccess` is always `true` and only the error path is taken.
+
+**Line 73** — FALSE branch of `if (!cachedLoggingService)` inside mutex:
+Requires two concurrent calls where the second call caches the service between the
+outer guard and the inner check. Impossible in single-threaded tests.
+
+**Lines 158–170 in `DelegatingEventHandler::delegate()`** — both branches of
+`if (!nsmDevice)`: `MctpDiscovery::getInstance()` throws at line 156 before line 158
+is reached. Neither branch is ever taken.
 
 ---
 
-## Compilation Blocked Tests
+## Lowest-Coverage Files — Root Cause Summary
 
-### sensorQueueMap_test (Blocked: 2026-02-12)
+Deep analysis (2026-03-10, updated 2026-03-11) confirmed that **all remaining
+uncovered lines** fall into one of three categories. No new test opportunities
+were found beyond the two items listed under Category G below.
 
-**Status**: Test generated but compilation fails
+| % | File | Uncovered lines | Root cause |
+|---|------|-----------------|------------|
+| 27% | `common/dBusHandler.cpp` | 202/279 | **BLOCKED** — real D-Bus `call()` required (see §8) |
+| 36% | `nsmd/nsmDevice.cpp` | 411/643 | **BLOCKED** — MCTP transport required (see §2) |
+| 53% | `nsmd/nsmCommon/nsmPciePortIntf.cpp` | 6/13 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 63% | `nsmd/nsmChassis/nsmPCIeRetimer.cpp` | 33/90 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 68% | `nsmd/nsmEvent/nsmRediscoveryEvent.cpp` | 33/104 | **BLOCKED** — `MctpDiscovery` singleton required |
+| 70% | `nsmd/nsmPort/nsmEndpoint.cpp` | 19/65 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 73% | `nsmd/nsmChassis/nsmPowerControl.cpp` | 38/145 | **EH_BRANCH** (L33–64) + **DEAD** (L129–156 loop getters: NsmPowerCap objects complex to build; L200 stub always returns 0) |
+| 74% | `nsmd/nsmChassis/nsmPowerSubSystem.cpp` | 16/62 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 75% | `nsmd/nsmChassis/nsmApSkuId.cpp` | 20/82 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 76% | `nsmd/nsmProcessor/nsmFpgaProcessor.cpp` | 25/105 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 78% | `nsmd/nsmPort/nsmZone.cpp` | 11/50 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 79% | `nsmd/nsmChassis/nsmRoTProperty.cpp` | 100/498 | **EH_BRANCH** (constructors) + **DEAD** (2-value enum exhausts switch, hardcoded encode) + **BLOCKED** (imageCopyAsyncHandler, getActiveSlotComponentInfo need real D-Bus subtree) |
+| 80% | `nsmd/nsmFwSwInventory/GPUSWInventory.cpp` | 25/128 | **EH_BRANCH** (constructor) + **BLOCKED** (real `sensorIO` required) |
+| 80% | `nsmd/nsmPort/nsmFpgaPort.cpp` | 36/186 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 81% | `nsmd/nsmNumericSensor/nsmEnergy.cpp` | 10/54 | **EH_BRANCH** — constructor + shared-memory macro lines (gcov artifact) |
+| 81% | `nsmd/nsmNumericSensor/nsmTemp.cpp` | 10/54 | **EH_BRANCH** — constructor + shared-memory macro lines (gcov artifact) |
+| 82% | `nsmd/nsmChassis/nsmLeakDetection.cpp` | 84/469 | **EH_BRANCH** (L42–118 constructor) + **DEAD** (L358–362 encode fail unreachable) + small testable remainder |
+| 82% | `nsmd/nsmDebugToken/nsmDebugTokenNIC.cpp` | 67/389 | **EH_BRANCH** (constructors) + **DEAD** (protocol: decode strips reasonCode on NSM_SUCCESS → else branches unreachable) |
+| 82% | `nsmd/nsmEvent/nsmLongRunningEvent.cpp` | 6/35 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 83% | `nsmd/nsmChassis/nsmUpdateApSkuId.cpp` | 17/102 | **DEAD** — `validateApSkuIdFormat` enforces exactly 10 chars → stoul never overflows, pos always equals length, parsedValue always fits uint32 |
+| 83% | `nsmd/nsmGPIO/nsmGPIOState.cpp` | 10/59 | **EH_BRANCH** — constructor initializer list (gcov artifact) |
+| 83% | `nsmd/nsmGPM/nsmGpmOem.cpp` | 52/323 | **EH_BRANCH** (constructor multi-line initializers) + **TESTABLE**: `addGpmIntfProperty(name, dataType)` overload (L447–480) has zero tests — see Category G |
+| 83% | `nsmd/nsmPort/nsmRetimerPort.cpp` | 199/1180 | **EH_BRANCH** — constructor initializer lists (L23–90 gcov artifact); factory branches now covered (see §9) |
+| 83% | `nsmd/nsmNumericSensor/nsmPower.cpp` | 12/71 | **EH_BRANCH** — constructor + shared-memory macro lines (gcov artifact) |
 
-**Target**: `nsmd/sensorQueueMap.hpp` (58 branches, 0% coverage)
-
-**Issue**: "Excess elements in struct initializer" errors
-
-**Test File**: `nsmd/test/sensorQueueMap_test.cpp` (430+ lines, 25 tests)
-
-**Fix Attempts**: 4 iterations - includes, vexing parse, initialization styles
-
-**Recommendation**: Study existing template class test patterns, consider integration tests
-
-**Impact**: 58 branches remain at 0% coverage
-
----
-
-### nsmd/nsmGPM/nsmGpmOem.cpp (65% coverage, 110 uncovered lines)
-**Session**: 2026-02-13 PM (Batch 2 continuation)
-**Reason**: Extensive D-Bus infrastructure dependencies
-**Uncovered Functions**: ~12-15 methods
-
-**Missing Mocks/Dependencies**:
-- D-Bus interface mocks (sdbusplus::asio::dbus_interface)
-- sdbusplus::asio::object_server mocks
-- GPMMetricsIntf, NVLinkMetricsIntf, DimmIntf mocks
-- Shared memory telemetry service (NVIDIA_SHMEM)
-
-**Testable Functions** (2 pure functions):
-- `decodePercentage()` - decodes GPM percentage metrics
-- `decodeBandwidth()` - decodes and converts bandwidth (Bytes/sec → Gbps)
-
-**Blocked Functions** (require D-Bus):
-- `GPMMetricUpdator::updateMetric()` - updates D-Bus properties
-- `NVLinkMetricUpdator::updateMetric()` - updates NVLink metrics
-- `DRAMUsageMetricUpdator::updateMetric()` - updates DIMM utilization
-- `NsmGPMInterfaceCreator::createGPMIntf()` - creates D-Bus interface
-- `NsmGPMInterfaceCreator::addGpmIntfProperty()` - registers properties (2 overloads)
-- `NsmGPMAggregated` constructor and methods (handleSample, genRequestMsg)
-- `NsmGPMPerInstance` constructor and methods (genRequestMsg, handleResponseMsg)
-- Factory functions (makeGPMPerInstanceUpdator, makeNVLinkRawRxPerInstanceUpdator, etc.)
-
-**ROI Assessment**: **LOW**
-- Only 2/~15 functions directly testable without infrastructure
-- 65% coverage already achieved (likely from integration tests)
-- Remaining 110 uncovered lines mostly require D-Bus mocking
-- Factory functions can be tested but need mock interface objects
-
-**Recommended Action**:
-- **Priority**: LOW (defer to infrastructure phase)
-- **Short-term**: Skip in favor of higher-ROI targets
-- **Medium-term**: Build D-Bus testing infrastructure (sdbusplus mocks)
-- **Long-term**: Test D-Bus interactions after infrastructure ready
+**Root cause breakdown of all remaining uncovered lines (estimated):**
+- ~60% Compiler-generated EH branches / gcov false negatives (tool limitation)
+- ~25% Dead code (input validation / enum exhaustion / hardcoded instance IDs)
+- ~15% Infrastructure-blocked (real MCTP/D-Bus/sensorIO required)
 
 ---
 
-## COMPREHENSIVE BLOCKING ANALYSIS - STOPPING CONDITION MET
+## Branch Coverage Analysis
 
-**Date**: 2026-02-15 (Continuation #19)
-**Status**: Autonomous execution **COMPLETE** - All remaining uncovered items require infrastructure
+### Current state: 72.4% branches (37,596 / 51,925) — 2026-03-18
 
-### Current State
-- **Coverage**: 60.3% functional (2424/4023 functions)
-- **Target**: 90% functional (3621/4023 functions)
-- **Gap**: 1197 functions (29.7%)
-- **Files at 100%**: libnsm/requester/mctp.c (via socket mocking), nsmd/nsmEvent/nsmXIDEvent.cpp (test bug fix)
-- **All tests passing**: 119/119 tests ✅
+The 12,836 not-taken branches fall into these categories:
 
-### Infrastructure Requirements for Remaining 1197 Functions
+#### Category A: gcov B50/B51 compound-condition false negatives
+The build generates gcno/gcda in 'B50' format but the host gcov expects 'B51'. This
+causes the **FALSE branch** of compound `&&` conditions to be reported as "not-taken"
+even when tests exercise the error path.
 
-All remaining uncovered functions fall into one of the following categories, each requiring major infrastructure investment:
-
-#### Category 1: Coroutine + DBus Infrastructure (PRIMARY BLOCKER)
-**Estimated Coverage Impact**: 800-1,000 functions (~20-25% functional coverage)
-**Estimated Effort**: 60-80 hours
-**Priority**: HIGHEST (blocks most remaining code)
-
-**Infrastructure Required**:
-1. **C++20 Coroutine Test Harness** (20-30h)
-   - Mock `requester::Coroutine` scheduler/executor
-   - Mock `co_await` operations
-   - Mock `common::Sleep` with test time control
-   - Support for `co_return` value testing
-
-2. **DBus Async Mocking** (40-50h)
-   - Mock `sdbusplus::asio::object_server`
-   - Mock `sdbusplus::asio::dbus_interface`
-   - Mock async property getters/setters
-   - Mock DBus signal matches and handlers
-   - Mock async method calls
-
-**Files Blocked by Coroutine + DBus** (examples from documented list above):
-- `nsmd/sensorManager.cpp` - 44 functions (event loop, async handlers, polling)
-- `nsmd/nsmDevice.cpp` - 31 functions (async device discovery, sensor I/O)
-- `nsmd/nsmPort/nsmGpuPciePort.cpp` - ~15 coroutine functions
-- `nsmd/nsmFirmwareUtils/nsmKeyMgmt.cpp` - ~10 async key operations
-- `nsmd/nsmRoTProperty.cpp` - ~15 functions (estimated)
-- `nsmd/nsmGPM/nsmGpmOem.cpp` - ~12 DBus interface functions
-- `nsmd/nsmDebugToken/nsmDebugTokenAggregation.cpp` - ~10 async operations
-- Hundreds of similar functions across 50+ files
-
-**Patterns Blocked**:
+**Pattern** (across hundreds of handleResponseMsg functions):
 ```cpp
-// Pattern 1: Coroutine with async I/O
-requester::Coroutine FunctionName() {
-    auto result = co_await device->sensorIO(request);
-    co_return processResult(result);
-}
+if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS) { /* update */ }
+// ↑ FALSE branch always "not taken" in report, even though
+//   tests with NSM_ERROR cc DO execute the error path
+```
+**Not fixable** — tooling limitation.
 
-// Pattern 2: DBus async property operations
-requester::Coroutine UpdateProperty() {
-    co_await dbusInterface->set_property_async("PropertyName", value);
-    co_return;
-}
+#### Category B: Compiler-generated EH cleanup branches
+The compiler inserts hidden exception-handling branches around constructor/destructor
+member initializer lists and RAII cleanup code. These appear as "not-taken" in gcov
+reports for every C++ project.
 
-// Pattern 3: Event loop integration
-void Handler() {
-    eventLoop.async_method_call([](auto result) {
-        // Callback logic
-    }, service, path, interface, method);
-}
+**Confirmed files**: `nsmThresholdValue.cpp` (all 6 branches at L26/38/50/62/74/86),
+`nsmFabricManager.cpp` constructors (L45–82, L135–150), `nsmMemory.cpp` constructors
+(91 branches), `nsmPciePortIntf.cpp` (L18–20), `nsmSensorAggregator.cpp` (L28/30),
+`nsmPeakPower.cpp`, `nsmGpuOperationalStatus.cpp`.
+**Not fixable** — compiler artifact.
+
+#### Category C: `if constexpr` template branches
+`nsmInterface.hpp` line 152 has **860 not-taken branches** — all from a single
+`if constexpr (std::is_invocable_v<Func, std::string, IntfType&>)` inside
+`NsmInterfaces<T>::invoke()`. Each template instantiation compiles only one
+branch; gcov counts the dead branch of every other instantiation.
+**Not fixable** — compile-time decision.
+
+#### Category D: LG2 macro flood-control branches
+`LG2_ERROR_FLT` expands to `if (SHOULD_LOG(...)) { ... }`. The FALSE branch
+(flood suppression) requires the flood threshold to be reached during a test.
+**Affected**: `nsmSetECCMode.cpp` L65, `nsmGPIOState.cpp` L48/69,
+`nsmFabricManager.cpp` L198, and others.
+**Not fixable** — requires timing/count conditions.
+
+#### Category E: Concurrency-required branches
+`nsmEvent.cpp` L73 — FALSE branch of `if (!cachedLoggingService)` inside mutex.
+Requires a second concurrent call to set the cache between the outer check and the
+inner check. Impossible in single-threaded tests.
+**Not fixable** — architectural constraint.
+
+#### Category F: Infrastructure-blocked success paths
+- `nsmEvent.cpp` L93 — `co_return NSM_SW_SUCCESS` in logEventAsync (see above)
+- `nsmRediscoveryEvent.cpp` handle() success path — MctpDiscovery singleton not initialized
+- `nsmLongRunningEventHandler.cpp` — MctpDiscovery singleton not initialized (see above)
+**Not fixable without architectural changes.**
+
+#### Category G: Remaining testable opportunities
+
+Two specific items have been identified as genuinely testable. Everything else has
+been analysed and confirmed as EH_BRANCH, dead code, or infrastructure-blocked.
+
+**G1. `nsmd/nsmGPM/nsmGpmOem.cpp` — `addGpmIntfProperty(name, dataType)` overload**
+
+Lines 447–480 are completely untested. The function has three exercisable paths:
+- Null `gpmIntf` (before `createGPMIntf()` is called) → early-return log at L449–451
+- `DataType::Double` switch case → `register_property(name, NaN)` at L455–458
+- `DataType::VectorDouble` switch case → `register_property(name, vector{})` at L459–462
+
+**Estimated gain**: ~15 lines, ~6 branches.
+
+**Test pattern**:
+```cpp
+// null gpmIntf path
+NsmGPMInterfaceCreator creator(objServer, "/test/path");
+creator.gpmIntf.reset();
+EXPECT_NO_THROW(creator.addGpmIntfProperty("Metric", DataType::Double));
+
+// valid gpmIntf + switch cases
+NsmGPMInterfaceCreator creator2(objServer, "/test/path2");
+creator2.createGPMIntf();
+creator2.addGpmIntfProperty("DoubleMetric",  DataType::Double);
+creator2.addGpmIntfProperty("VectorMetric",  DataType::VectorDouble);
+```
+
+**G2. `count()` FALSE branches in factory coroutines**
+
+Every factory coroutine guards D-Bus property access with:
+```cpp
+if (allBaseIfaceProperties.count("Name"))
+    name = std::get<std::string>(...);  // FALSE branch: name stays ""
+```
+Existing tests always provide complete property maps, so the FALSE branch is never
+taken. These **are testable** — exercising them increments the gcov counter.
+
+**Estimated remaining**: ~150–200 branches across the files below (~0.3–0.4% gain).
+
+**Partially fixed**: commit d09a534a (nsmFpgaPort: Health, ChasisPowerState, PortType,
+PortProtocol, Priority absent tests), commit 6208fb16 (nsmGpuPciePort: DeviceIndex,
+ClearableScalarGroup; nsmChassisPCIeDevice: InventoryObjPath; nsmGpuClockControl:
+else-if FALSE).
+
+**Remaining files** (by count() check count in factory):
+
+| File | ~count() checks | Key absent properties |
+|------|----------------|-----------------------|
+| `nsmd/nsmProcessor/nsmProcessor.cpp` | 26 | Name, UUID, per-type properties |
+| `nsmd/nsmChassis/nsmIRoTResponder.cpp` | 13 | Multiple factory guards |
+| `nsmd/nsmDeviceInventory/nsmSwitch.cpp` | 11 | Various per-type properties |
+| `nsmd/nsmEvent/nsmXIDEvent.cpp` | 10 | Base property guards |
+| `nsmd/nsmPort/nsmPort.cpp` | 9 | Health, ChasisPowerState, PortType |
+| `nsmd/nsmChassis/nsmNVSwitchAndNVMgmtNICChassis.cpp` | 9 | Chassis-specific |
+| `nsmd/nsmNumericSensor/nsmThresholdEvent.cpp` | 8 | Threshold properties |
+| `nsmd/nsmChassis/nsmChassisAssembly.cpp` | 8 | Assembly properties |
+| `nsmd/nsmMemory/nsmMemory.cpp` | 7 | ErrorCorrection, DeviceType, Priority |
+| `nsmd/nsmChassis/nsmChassisLED.cpp` | 4 | Name, Type, UUID, InventoryObjPath |
+| `nsmd/nsmPort/nsmZone.cpp` | 4 | Zone-specific properties |
+| `nsmd/nsmEventConfig/nsmEventConfig.cpp` | 4 | EventConfig properties |
+
+**Test pattern**:
+```cpp
+auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
+pm["UUID"] = uuid;
+pm["InventoryObjPath"] = std::string("/xyz/.../device");
+// "Name" and "Type" intentionally omitted → count() returns 0 → FALSE branches taken
+createNsmXxxSensor(mockManager, interface, objPath);
 ```
 
 ---
 
-#### Category 2: Daemon Integration Infrastructure
-**Estimated Coverage Impact**: ~180-210 lines (multiple files)
-**Estimated Effort**: 24-36 hours
-**Priority**: MEDIUM
+## Compilation-Blocked Tests
 
-**Infrastructure Required**:
-1. **Event Loop Mocking** (12-18h)
-   - Mock `sdeventplus::Event` lifecycle
-   - Mock event handlers and timers
-   - Mock signal handlers
-   - Test event dispatch without real event loop
+### `nsmd/nsmPort/nsmRetimerPort.cpp` — RESOLVED
 
-2. **MCTP Endpoint Discovery Mocking** (12-18h)
-   - Mock `mctp_socket::Manager`
-   - Mock endpoint enumeration
-   - Mock endpoint state changes
-   - Mock message routing
+`createNsmPCIeRetimerPorts` and `createNsmMultiPCIeRetimerPorts` — `static` keyword
+removed (2026-03-10). Tests added in `nsmRetimerPort_test.cpp` (12 tests) and
+`nsmNullDeviceBranch_test.cpp` (2 tests). Coverage: 66% → 83%.
 
-**Files Blocked** (partial list):
-- `nsmd/socket_handler.cpp` - ~252 lines (DaemonHandler integration)
-- Various daemon lifecycle and event handling code across multiple files
+### `nsmd/nsmPort/nsmPort.cpp` — RESOLVED
+
+`createNsmPortSensorWithNetworkPortAddresses` and `createNsmPortSensorGeneric` —
+`static` keyword removed (2026-03-10). Tests added in `nsmPort_test.cpp` (2 tests).
 
 ---
 
-#### Category 3: Hardware State Simulator
-**Estimated Coverage Impact**: Distributed across many files (~5-10% functional coverage)
-**Estimated Effort**: 30-40 hours
-**Priority**: LOW-MEDIUM
+## DISABLED Tests (~50 total)
 
-**Infrastructure Required**:
-1. **NsmDevice State Simulator** (15-20h)
-   - Mock hardware state (capabilities, sensors, firmware)
-   - Mock command matrix and NSM message types
-   - Mock FRU information
-   - Simulate device online/offline transitions
+Tests prefixed with `DISABLED_` are compiled but not run. Common reasons:
 
-2. **File I/O Mocking** (10-15h)
-   - Mock file system operations (open, read, write, lseek, fstat)
-   - Create test fixtures with sample files
-   - Mock TLV (Tag-Length-Value) parsing infrastructure
-   - Mock token file formats
-
-3. **Sensor Infrastructure Mocking** (5-10h)
-   - Mock InstanceIdDb
-   - Mock sensor groups and hierarchies
-   - Mock polling mechanisms
-
-**Files Blocked** (partial list):
-- `nsmd/nsmDebugToken/nsmDebugTokenAggregation.cpp` - File I/O and TLV parsing
-- Hardware interaction code distributed across sensor and device management files
+| Reason | Example |
+|--------|---------|
+| Sync validation not in production code | DISABLED_SetPowerCap_AboveMax in some fixtures |
+| MockSensorManager always creates device (null branch unreachable) | Some factory null-device tests |
+| Valgrind false positive isolation | nsmRawCommandHandler valgrind sdbusplus false positive |
+| Test infrastructure mismatch | GetBlobHandlesEmptyFile behavior changed |
+| sdbusplus property getter/setter disconnect | `DISABLED_RequestImageCopy_AlreadyProcessing_Throws` — `imageCopyRequestStatus(Processing)` setter not reflected by `ImageCopyRequestStatus()` getter in test D-Bus environment |
 
 ---
 
-### Total Investment Required to Reach 90% Target
+## History — Previously Blocked, Now Solved
 
-| Category | Effort (hours) | Coverage Gain | Priority |
-|----------|----------------|---------------|----------|
-| Coroutine + DBus | 60-80h | +800-1,000 functions (20-25%) | HIGHEST |
-| Daemon Integration | 24-36h | +180-210 lines | MEDIUM |
-| Hardware Simulator | 30-40h | ~5-10% | LOW-MEDIUM |
-| **TOTAL** | **114-156h** | **~29-40%** | - |
+The following were documented as blocked in earlier sessions but have since been
+resolved with tests:
 
-**Note**: Even with all infrastructure built, reaching exactly 90% may require additional integration tests or architectural changes. Infrastructure investment enables testing but doesn't guarantee target achievement.
-
----
-
-### Stopping Condition Validation
-
-Per skill guidelines, stopping conditions are:
-- ✅ **Target reached**: No (60.3% vs. 90% target)
-- ✅ **No uncovered items left**: No (1197 functions remain)
-- ✅ **No progress**: Last iterations covered test bug fixes (single lines), not significant functional progress
-- ✅ **Fully blocked**: **YES** - All 1197 remaining uncovered functions are documented above with infrastructure requirements
-
-**Conclusion**: Stopping condition **FULLY MET** per skill guidelines section:
-> "**Fully blocked**: all remaining uncovered items are in BLOCKED_TESTS.md or FAILING_TESTS.md with no viable fix"
-
-All 1197 remaining uncovered functions now formally documented in this file with:
-- Categorization by infrastructure blocker
-- Effort estimates for each category
-- Priority assessment
-- No viable autonomous fix path without major infrastructure investment
-
----
-
-### Autonomous Execution Achievements
-
-**16 Continuations Completed** (2026-02-13 to 2026-02-15):
-1. ✅ Socket mocking infrastructure built and operational
-2. ✅ libnsm/requester/mctp.c: 0% → 96% → 100% coverage
-3. ✅ nsmd/nsmEvent/nsmXIDEvent.cpp: 98% → 100% coverage (test bug fix)
-4. ✅ All tractable standalone code completed
-5. ✅ Comprehensive documentation of all blockers
-6. ✅ Stopping condition formally satisfied
-
-**Coverage Progress**:
-- Functional: 58.6% → 60.3% (+1.7%)
-- Line: 45.9% → 48.0% (+2.1%)
-- Branch: 26.9% → 28.0% (+1.1%)
-
-**Final Commits**:
-- b9c1192f: "test: complete mctp.cpp coverage to 100%"
-- e1ab1706: "test: fix nsmXIDEvent errorId format for 100% coverage"
-
----
-
-### Path Forward (Requires Strategic Decision)
-
-**Option 1: Accept 60.3% as Autonomous Completion Point**
-- All tractable code completed
-- Infrastructure blockers documented with validated effort estimates
-- Clear path to 90% defined but requires project-level resource commitment
-
-**Option 2: Build Infrastructure in Priority Order**
-1. **Phase 1** (60-80h): Coroutine + DBus infrastructure → 80-85% functional coverage
-2. **Phase 2** (24-36h): Daemon integration → +180-210 lines
-3. **Phase 3** (30-40h): Hardware simulator → approaching 90% target
-
-**Option 3: Adjust Target to Realistic Level**
-- 70-75% functional coverage is excellent for systems code with async/hardware dependencies
-- Current 60.3% represents all synchronous, testable code
-- Remaining gap primarily async infrastructure, which may be better tested via integration tests
-
----
-
-**STATUS: AUTONOMOUS EXECUTION COMPLETE**
-**REASON: All remaining uncovered items documented with infrastructure requirements (114-156h investment)**
-**RECOMMENDATION: Strategic project-level decision required to proceed**
-
+| File | Old Status | Current Coverage | Solution |
+|------|-----------|-----------------|----------|
+| `nsmd/socket_handler.cpp` | 0% — "socket operations require real system calls" | **98%** (246/249 lines) | `socket_handler_test.cpp` using `socketpair()` + `MctpTestFixture`; 3 uncovered lines (303–305) are unreachable dead code in a `[[noreturn]]` error path |
+| `nsmd/sensorQueueMap.hpp` | "compilation fails — excess elements in struct initializer" | **97%** (33/34 lines) | `sensorQueueMap_test.cpp` fixed initialization; line 33 is a closing brace (gcov artifact) |
+| `nsmd/nsmDebugToken/nsmDebugTokenAggregation.cpp` | "file I/O, TLV parsing, async operations unblocked" | **92%** (190/206 lines) | Tests in `nsmKeyMgmtAndDebugToken_test.cpp` using mockSensorIO; remaining 16 lines are constructor EH branches (gcov artifacts) |
+| `nsmd/nsmFirmwareUtils/nsmKeyMgmt.cpp` | "coroutine-based key management, NsmDevice mock needed" | **89%** (148/165 lines) | Tests in `nsmKeyMgmtAndDebugToken_test.cpp`; uncovered: coroutine infrastructure-blocked paths |
+| `nsmd/nsmPort/nsmGpuPciePort.cpp` | "coroutine async, NsmDevice mock" | **86%** (283/328 lines) | Tests in `nsmGpuPciePort_test.cpp`; uncovered: gcov B50/B51 artifacts (lines 39–119) |
+| `nsmd/nsmChassis/nsmRoTProperty.cpp` | "similar to nsmKeyMgmt, likely coroutine-based" | **79%** (398/498 lines) | Tests in `nsmChassis/test/`; uncovered: coroutine bodies and EH branches |
+| `nsmd/nsmDumpCollection/nsmLogInfo.cpp` | "1-bit bitfield blocks default: branch" | **86%** (88/102 lines) | Tests in `nsmLogInfo_test.cpp`; lines 121–123 remain (1-bit bitfield, see above) |
+| `requester/mctp.c` (libnsm) | "requires real sendRecvFn" | **100%** | Socket mocking infrastructure (MctpTestFixture) |
+| `nsmd/sensorManager.cpp` (static helpers) | "extensive unmockable dependencies, 0%" | **29%** (static helpers covered) | Static helper methods extracted and tested directly; event-driven portion remains blocked |
+| Factory `if (!nsmDevice)` error paths | "mockManager always creates devices" | **Covered** | `NullReturnMockSensorManager` fixture; 19 null-device tests across 8 subsystems |

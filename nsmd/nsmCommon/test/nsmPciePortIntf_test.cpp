@@ -74,9 +74,9 @@ TEST_F(NsmPciePortIntfTest, ConstructorWithDifferentNames)
     std::string name1 = "PCIePort_0";
     std::string name2 = "PCIePort_1";
     std::string name3 = "PCIePort_GPU";
-    std::string path1 = "/xyz/openbmc_project/inventory/system/name0";
-    std::string path2 = "/xyz/openbmc_project/inventory/system/name1";
-    std::string path3 = "/xyz/openbmc_project/inventory/system/name2";
+    std::string path1 = "/xyz/openbmc_project/inventory/system/test_name0";
+    std::string path2 = "/xyz/openbmc_project/inventory/system/test_name1";
+    std::string path3 = "/xyz/openbmc_project/inventory/system/test_name2";
 
     NsmPciePortIntf port1(bus, name1, type, path1);
     NsmPciePortIntf port2(bus, name2, type, path2);
@@ -94,9 +94,9 @@ TEST_F(NsmPciePortIntfTest, ConstructorWithDifferentTypes)
     std::string type1 = "PCIePort";
     std::string type2 = "PCIeX16";
     std::string type3 = "PCIeGen4";
-    std::string path1 = "/xyz/openbmc_project/inventory/system/type0";
-    std::string path2 = "/xyz/openbmc_project/inventory/system/type1";
-    std::string path3 = "/xyz/openbmc_project/inventory/system/type2";
+    std::string path1 = "/xyz/openbmc_project/inventory/system/test_type0";
+    std::string path2 = "/xyz/openbmc_project/inventory/system/test_type1";
+    std::string path3 = "/xyz/openbmc_project/inventory/system/test_type2";
 
     NsmPciePortIntf port1(bus, name, type1, path1);
     NsmPciePortIntf port2(bus, name, type2, path2);

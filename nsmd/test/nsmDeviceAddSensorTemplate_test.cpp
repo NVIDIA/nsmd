@@ -538,6 +538,7 @@ TEST(NsmDeviceTemplate, AddStaticSensor_IntfSensor_AddsToStaticQueue)
         "StaticIntfSensor", "StaticIntfType", "/test/static_intf");
 
     // Act: addStaticSensor delegates to addSensor(sensor, PollingType::Static)
+    //
     nsmDevice.addStaticSensor(sensor);
 
     // Assert
@@ -686,7 +687,7 @@ TEST(NsmDeviceTemplate,
         std::vector<uint8_t>{0x10, 0x20});
 
     // Act: calls addSensor(const shared_ptr<T>&, PollingType) which copies
-    // the shared_ptr then delegates to the non-const overload
+    // the shared_ptr then delegates to the non-const overload.
     nsmDevice.addSensor(sensor, PollingType::RoundRobin);
 
     // Assert

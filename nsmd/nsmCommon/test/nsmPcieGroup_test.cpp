@@ -192,3 +192,282 @@ TEST(NsmPCIeGroup4, GoodHandleResp)
     rc = sensor.handleResponseMsg(responseMsg, msg_len);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
+
+// Decode fail tests: 7-byte buffer triggers NSM_SW_ERROR_LENGTH from
+// decode_query_scalar_group_telemetry_v1_group*_resp via decode_common_resp
+
+TEST(NsmPCIeGroup2, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint8_t rc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(NsmPCIeGroup3, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_1";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint8_t rc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(NsmPCIeGroup4, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_2";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint8_t rc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Error-CC tests: decode succeeds but cc = NSM_ERROR (non-zero)
+// → return cc ? cc : rc  takes the true branch (return cc).
+// cc is initialised to ERR_NULL (= 0) so only the decode-fail tests
+// above cover the false branch; these tests cover the true branch.
+
+TEST(NsmPCIeGroup2, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_3";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_2_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    struct nsm_query_scalar_group_telemetry_group_2 data{};
+    uint16_t reason_code = ERR_NULL;
+    uint8_t rc = encode_query_scalar_group_telemetry_v1_group2_resp(
+        0, NSM_ERROR, reason_code, &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(NsmPCIeGroup3, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_4";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_3_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    struct nsm_query_scalar_group_telemetry_group_3 data{};
+    uint16_t reason_code = ERR_NULL;
+    uint8_t rc = encode_query_scalar_group_telemetry_v1_group3_resp(
+        0, NSM_ERROR, reason_code, &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(NsmPCIeGroup4, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_5";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_4_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    struct nsm_query_scalar_group_telemetry_group_4 data{};
+    uint16_t reason_code = ERR_NULL;
+    uint8_t rc = encode_query_scalar_group_telemetry_v1_group4_resp(
+        0, NSM_ERROR, reason_code, &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Test subclass that uses the multi-port NsmPcieGroup constructor
+// (isMultiPciePortEnabled=true) to cover the TRUE branch of genRequestMsg.
+class TestNsmPcieGroupMultiPort : public nsm::NsmPcieGroup
+{
+  public:
+    TestNsmPcieGroupMultiPort() :
+        nsm::NsmPcieGroup("test", "type", 0 /*groupId*/, 0 /*multiPortType*/,
+                          0 /*multiPortIndex*/, 0 /*upstreamPortNumber*/)
+    {}
+    uint8_t handleResponseMsg(const struct nsm_msg*, size_t) override
+    {
+        return NSM_SW_SUCCESS;
+    }
+};
+
+// Covers genRequestMsg if(isMultiPciePortEnabled) TRUE → genMultiPortRequestMsg
+TEST(NsmPcieGroup, MultiPort_GenRequestMsg_CoversTrueBranch)
+{
+    TestNsmPcieGroupMultiPort sensor;
+    auto request = sensor.genRequestMsg(1, 2);
+    EXPECT_TRUE(request.has_value());
+}
+
+// Single-port NsmPcieGroup subclass for testing failure paths
+class TestNsmPcieGroupSinglePort : public nsm::NsmPcieGroup
+{
+  public:
+    TestNsmPcieGroupSinglePort() :
+        nsm::NsmPcieGroup("test", "type", 0 /*deviceId*/, 0 /*groupId*/)
+    {}
+    uint8_t handleResponseMsg(const struct nsm_msg*, size_t) override
+    {
+        return NSM_SW_SUCCESS;
+    }
+};
+
+// instanceId > NSM_INSTANCE_MAX → encode fails → genSinglePortRequestMsg
+// returns nullopt Covers lines 54,57-58 of nsmPcieGroup.cpp
+TEST(NsmPcieGroup, SinglePort_BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    TestNsmPcieGroupSinglePort sensor;
+    auto request = sensor.genRequestMsg(1, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// instanceId > NSM_INSTANCE_MAX → encode fails → genMultiPortRequestMsg
+// returns nullopt Covers lines 81,84-85 of nsmPcieGroup.cpp
+TEST(NsmPcieGroup, MultiPort_BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    TestNsmPcieGroupMultiPort sensor;
+    auto request = sensor.genRequestMsg(1, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// NsmPciGroup2 genRequestMsg failure: instanceId > NSM_INSTANCE_MAX
+TEST(NsmPCIeGroup2, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    uint8_t deviceId = 0;
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             deviceId, inventoryObjPath);
+    auto request = sensor.genRequestMsg(12, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// NsmPciGroup3 genRequestMsg failure: instanceId > NSM_INSTANCE_MAX →
+// encode_query_scalar_group_telemetry_v1_req fails → returns nullopt.
+TEST(NsmPCIeGroup3, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_6";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+    auto request = sensor.genRequestMsg(12, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// NsmPciGroup4 genRequestMsg failure: instanceId > NSM_INSTANCE_MAX →
+// encode_query_scalar_group_telemetry_v1_req fails → returns nullopt.
+TEST(NsmPCIeGroup4, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_7";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+    auto request = sensor.genRequestMsg(12, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// NsmPCIeGroup handleResponseMsg: rc==NSM_SW_SUCCESS, cc!=NSM_SUCCESS.
+// 9-byte buffer: decode_reason_code_and_cc returns NSM_SW_SUCCESS with
+// cc=NSM_ERROR, so the && condition is FALSE (the else/no-update branch).
+
+TEST(NsmPCIeGroup2, HandleResponseMsg_DecodeSuccessNonZeroCC_ReturnsError)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_8";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    uint8_t rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmPCIeGroup3, HandleResponseMsg_DecodeSuccessNonZeroCC_ReturnsError)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_9";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    uint8_t rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmPCIeGroup4, HandleResponseMsg_DecodeSuccessNonZeroCC_ReturnsError)
+{
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_10";
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
+                             0, inventoryObjPath);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    uint8_t rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}

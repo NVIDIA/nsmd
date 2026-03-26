@@ -537,3 +537,156 @@ TEST_F(NsmChassisAssemblyTest, goodTestAssemblyTypeInvalidDefaultsToBoard)
     EXPECT_GE(gpu->staticSensors.size(),
               4); // partNumber, serialNumber, model, buildDate
 }
+
+// base interface not registered → coGetCachedBaseProperties fails →
+// co_return rc immediately (lines 147-150 of nsmChassisAssembly.cpp) //
+
+TEST_F(NsmChassisAssemblyTest, BasePropertiesFail_ReturnsEarly)
+{
+    const std::string uniquePath = "/xyz/test/chassis_asm/base_fail_unique";
+    // Do NOT register basicIntfName for uniquePath → findPropertyMap returns
+    // nullptr → coGetCachedBaseProperties returns NSM_SW_ERROR → early return.
+    auto& map = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".ChassisAttributes");
+    map["Type"] = std::string("NSM_Chassis_Attributes");
+
+    const size_t before = gpu->deviceSensors.size();
+    nsmChassisAssemblyCreateSensors(
+        mockManager, basicIntfName + ".ChassisAttributes", uniquePath);
+    // Function exited via co_return rc — no new sensors created //
+
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// "ChassisName" absent from base properties → chassisName="" (line 160
+// false-branch). Sensors are still created normally with an empty chassis name.
+TEST_F(NsmChassisAssemblyTest, ChassisAttributes_MissingChassisName)
+{
+    const std::string uniquePath =
+        "/xyz/test/chassis_asm/no_chassis_name_unique";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    // No "ChassisName" key → chassisName will be ""
+    baseMap["Name"] = std::string("Assembly1");
+    baseMap["UUID"] = gpuUuid;
+
+    auto& attrMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".ChassisAttributes");
+    attrMap["Type"] = std::string("NSM_Chassis_Attributes");
+
+    const size_t before = gpu->staticSensors.size();
+    nsmChassisAssemblyCreateSensors(
+        mockManager, basicIntfName + ".ChassisAttributes", uniquePath);
+    // Sensors still created; chassisName is just empty string
+    EXPECT_GT(gpu->staticSensors.size(), before);
+}
+
+// "UUID" absent from base properties → uuid="" (line 173 false-branch) →
+// parseStaticUuid("") throws std::runtime_error → propagates out
+TEST_F(NsmChassisAssemblyTest, NSMAssembly_MissingUUID_Throws)
+{
+    const std::string uniquePath = "/xyz/test/chassis_asm/no_uuid";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    // No "UUID" key → uuid="" → getNsmDeviceFromStaticUUID("") throws
+    baseMap["ChassisName"] = chassisName;
+    baseMap["Name"] = name;
+    baseMap["Type"] = std::string("NSM_ChassisAssembly");
+
+    EXPECT_THROW_COROUTINE(
+        nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, uniquePath),
+        std::runtime_error);
+}
+
+// "Name" absent from base properties → name="" (line 165 false-branch) →
+// NsmChassisAssembly D-Bus path invalid → exception propagates
+TEST_F(NsmChassisAssemblyTest, NSMAssembly_MissingName_Throws)
+{
+    const std::string uniquePath = "/xyz/test/chassis_asm/no_name";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    // No "Name" key → name="" → D-Bus path ending with "/" is invalid
+    baseMap["ChassisName"] = chassisName;
+    baseMap["UUID"] = gpuUuid;
+    baseMap["Type"] = std::string("NSM_ChassisAssembly");
+
+    EXPECT_THROW_COROUTINE(
+        nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, uniquePath),
+        std::exception);
+}
+
+// NSM_Chassis_Attributes: "PhysicalContext" absent → line 193 false-branch →
+// createChassisAssemblyArea NOT called; other sensors (Asset, Health) created
+TEST_F(NsmChassisAssemblyTest, ChassisAttributes_MissingPhysicalContext)
+{
+    const std::string uniquePath = "/xyz/test/chassis_asm/no_phys_ctx";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["ChassisName"] = chassisName;
+    baseMap["Name"] = name;
+    baseMap["UUID"] = gpuUuid;
+
+    auto& attrMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".ChassisAttributes");
+    // Intentionally omit "PhysicalContext" → FALSE branch (line 193)
+    attrMap["Type"] = std::string("NSM_Chassis_Attributes");
+    attrMap["LocationType"] = chassisAttributes["LocationType"];
+
+    const size_t staticBefore = gpu->staticSensors.size();
+    nsmChassisAssemblyCreateSensors(
+        mockManager, basicIntfName + ".ChassisAttributes", uniquePath);
+    // Asset + Health + Location sensors created, Area sensor NOT created
+    EXPECT_GT(gpu->staticSensors.size(), staticBefore);
+}
+
+// count("Type") FALSE: Type absent from current interface → type="" →
+// neither "NSM_ChassisAssembly" nor "NSM_Chassis_Attributes" matches →
+// no sensors added (falls through to co_return NSM_SUCCESS) //
+
+TEST_F(NsmChassisAssemblyTest, Factory_MissingType_NoSensorsCreated)
+{
+    const std::string uniquePath = "/xyz/test/chassis_asm/no_type";
+    // Set up base interface with Name, ChassisName, UUID (all present)
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["ChassisName"] = chassisName;
+    baseMap["Name"] = name;
+    baseMap["UUID"] = gpuUuid;
+
+    // Register ChassisAttributes sub-interface WITHOUT "Type" →
+    // count("Type") = 0 → type="" → neither branch matches
+    auto& attrMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".ChassisAttributes");
+    attrMap["PhysicalContext"] = std::string("GPU");
+    // "Type" intentionally omitted → FALSE branch for count("Type") at line 169
+
+    const size_t staticBefore = gpu->staticSensors.size();
+    nsmChassisAssemblyCreateSensors(
+        mockManager, basicIntfName + ".ChassisAttributes", uniquePath);
+    // No sensors added since type="" doesn't match any branch
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore);
+}
+
+// NSM_Chassis_Attributes: "LocationType" absent → line 198 false-branch →
+// createChassisAssemblyLocation NOT called; Area/Asset/Health still created
+TEST_F(NsmChassisAssemblyTest, ChassisAttributes_MissingLocationType)
+{
+    const std::string uniquePath = "/xyz/test/chassis_asm/no_loc_type";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["ChassisName"] = chassisName;
+    baseMap["Name"] = name;
+    baseMap["UUID"] = gpuUuid;
+
+    auto& attrMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".ChassisAttributes");
+    // Intentionally omit "LocationType" → FALSE branch (line 198)
+    attrMap["Type"] = std::string("NSM_Chassis_Attributes");
+    attrMap["PhysicalContext"] = chassisAttributes["PhysicalContext"];
+
+    const size_t staticBefore = gpu->staticSensors.size();
+    nsmChassisAssemblyCreateSensors(
+        mockManager, basicIntfName + ".ChassisAttributes", uniquePath);
+    // Asset + Health + Area sensors created, Location sensor NOT created
+    EXPECT_GT(gpu->staticSensors.size(), staticBefore);
+}

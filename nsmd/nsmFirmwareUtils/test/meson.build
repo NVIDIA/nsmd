@@ -6,7 +6,10 @@ tests = [
     'nsmFirmwareSlot_test',
     'nsmFirmwareUtils_test',
     'nsmFirmwareUtilsCommon_test',
+    'nsmKeyMgmt_test',
     'nsmSecurityRBP_test',
+    'nsmSecurityRBPBranch2_test',
+    'nsmSecurityRBPBranch3_test',
 ]
 
 foreach t : tests

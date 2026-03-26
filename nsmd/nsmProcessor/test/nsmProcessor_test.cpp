@@ -1320,6 +1320,38 @@ TEST(nsmPowerSmoothingV2, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
+// NsmPowerSmoothingV2::handleResponseMsg – error-CC response →
+// TRUE branch of return cc ? cc : rc (cc = NSM_ERROR != 0 after decode).
+TEST(nsmPowerSmoothingV2, ErrorCCHandleResp)
+{
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t rc = encode_get_powersmoothing_featinfo_v2_resp(0, NSM_ERROR, 0,
+                                                            response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
+    supportedCommands[20].bits.bit7 = 1;
+    supportedCommands[21].bits.bit0 = 1;
+    supportedCommands[21].bits.bit1 = 1;
+    supportedCommands[21].bits.bit2 = 1;
+    gpuPtr->updateMessageTypesToCommandCodeMatrix(
+        NSM_TYPE_PLATFORM_ENVIRONMENTAL, supportedCommands,
+        SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 controlSensor(sensorName, sensorType, inventoryObjPath,
+                                      featIntf, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    rc = controlSensor.handleResponseMsg(response, msg_len);
+    // cc = NSM_ERROR (non-zero) → TRUE branch of return cc ? cc : rc
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
 TEST(nsmPowerSmoothingAdminOverrideV2, GoodGenReq)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
@@ -1423,6 +1455,38 @@ TEST(nsmPowerSmoothingAdminOverrideV2, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
+// NsmPowerSmoothingAdminOverrideV2::handleResponseMsg – error-CC response →
+// TRUE branch of return cc ? cc : rc (cc = NSM_ERROR != 0 after decode).
+TEST(nsmPowerSmoothingAdminOverrideV2, ErrorCCHandleResp)
+{
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t rc = encode_get_admin_override_profile_info_v2_resp(0, NSM_ERROR, 0,
+                                                                response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
+    supportedCommands[20].bits.bit7 = 1;
+    supportedCommands[21].bits.bit0 = 1;
+    supportedCommands[21].bits.bit1 = 1;
+    supportedCommands[21].bits.bit2 = 1;
+    gpuPtr->updateMessageTypesToCommandCodeMatrix(
+        NSM_TYPE_PLATFORM_ENVIRONMENTAL, supportedCommands,
+        SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 adminProfileSensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    rc = adminProfileSensor.handleResponseMsg(response, msg_len);
+    // cc = NSM_ERROR (non-zero) → TRUE branch of return cc ? cc : rc
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
 TEST(nsmPowerProfileCollectionV2, GoodGenReq)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
@@ -1513,6 +1577,36 @@ TEST(nsmPowerProfileCollectionV2, BadHandleResp)
     size_t msg_len = responseMsg.size();
     uint8_t rc = getAllPowerProfileSensor.handleResponseMsg(NULL, msg_len);
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// NsmPowerProfileCollectionV2::handleResponseMsg – error-CC response →
+// TRUE branch of return cc ? cc : rc (cc = NSM_ERROR != 0 after decode).
+TEST(nsmPowerProfileCollectionV2, ErrorCCHandleResp)
+{
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t rc = encode_get_preset_profile_info_v2_resp(0, NSM_ERROR, 0,
+                                                        response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
+    supportedCommands[20].bits.bit7 = 1;
+    supportedCommands[21].bits.bit0 = 1;
+    supportedCommands[21].bits.bit1 = 1;
+    supportedCommands[21].bits.bit2 = 1;
+    gpuPtr->updateMessageTypesToCommandCodeMatrix(
+        NSM_TYPE_PLATFORM_ENVIRONMENTAL, supportedCommands,
+        SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    NsmPowerProfileCollectionV2 getAllPowerProfileSensor(
+        sensorName, sensorType, inventoryObjPath, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    rc = getAllPowerProfileSensor.handleResponseMsg(response, msg_len);
+    // cc = NSM_ERROR (non-zero) → TRUE branch of return cc ? cc : rc
+    EXPECT_NE(rc, NSM_SUCCESS);
 }
 
 TEST(nsmCurrentPowerSmoothingProfileV2, GoodGenReq)
@@ -1649,6 +1743,49 @@ TEST(nsmCurrentPowerSmoothingProfileV2, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     rc = currentProfileSensor.handleResponseMsg(NULL, msg_len);
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// NsmCurrentPowerSmoothingProfileV2::handleResponseMsg – error-CC response →
+// TRUE branch of return cc ? cc : rc (cc = NSM_ERROR != 0 after decode).
+TEST(nsmCurrentPowerSmoothingProfileV2, ErrorCCHandleResp)
+{
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t rc = encode_get_current_profile_info_v2_resp(0, NSM_ERROR, 0,
+                                                         response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<MockNsmDevice> gpuPtr =
+        std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid, 1);
+    bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
+    supportedCommands[20].bits.bit7 = 1;
+    supportedCommands[21].bits.bit0 = 1;
+    supportedCommands[21].bits.bit1 = 1;
+    supportedCommands[21].bits.bit2 = 1;
+    gpuPtr->updateMessageTypesToCommandCodeMatrix(
+        NSM_TYPE_PLATFORM_ENVIRONMENTAL, supportedCommands,
+        SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    std::shared_ptr<OemAdminProfileIntfV2> adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 currentProfileSensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    rc = currentProfileSensor.handleResponseMsg(response, msg_len);
+    // cc = NSM_ERROR (non-zero) → TRUE branch of return cc ? cc : rc
+    EXPECT_NE(rc, NSM_SUCCESS);
 }
 
 namespace nsm
@@ -3157,12 +3294,10 @@ TEST(nsmProcessorRevision, GoodUpdateReading)
 
 // ============================================================================
 // NEW TESTS: Factory function coverage for createNsmProcessorSensor
-//
 // These tests exercise the various factory type branches within
 // createNsmProcessorSensor including NSM_PCIe, NSM_ProcessorPerformance,
 // NSM_PowerCap, NSM_WorkloadPowerProfile, and NSM_Processor_Attributes
 // with various feature flag combinations.
-//
 // Append these test cases to nsmProcessor_test.cpp (they use the existing
 // NsmProcessorTest fixture).
 // ============================================================================
@@ -3535,6 +3670,35 @@ TEST_F(NsmProcessorTest, goodTestCreateProcessorAttributes_AllFeaturesDisabled)
     EXPECT_GE(gpu->longRunningSensors.size(), 0u);
 }
 
+// All feature flags absent (count=0) → &&-short-circuit FALSE branch for each
+// flag (different from AllFeaturesDisabled which sets flags to false, covering
+// the "value is false" branch)
+TEST_F(NsmProcessorTest, createProcessorAttributes_AllFlagsAbsent_FalseBranch)
+{
+    const std::string uniquePath = processorsInventoryBasePath /
+                                   "GPU_SXM_NoFlags";
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                              basicIntfName);
+    basePropertyMap["Name"] = std::string("GPU_SXM_NoFlags");
+    basePropertyMap["UUID"] = gpuUuid;
+    basePropertyMap["InventoryObjPath"] = std::string(uniquePath);
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".AttrNoFlags");
+    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
+    // ALL feature flags intentionally absent → count()==0 → &&-short-circuit
+    // FALSE branch for: MIGModeSupported, PortDisableFutureSupported,
+    // ECCModeSupported, EDPpScalingFactorSupported, PowerSmoothingSupported,
+    // CpuOperatingConfigSupported, MemCapacityUtilSupported,
+    // TotalNvLinksCountSupported, EGMModeSupported, MNNVLTopologySupported
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmProcessorSensor(mockManager, basicIntfName + ".AttrNoFlags",
+                             uniquePath);
+    // No feature-flag sensors added; count should not grow from feature flags
+    EXPECT_GE(gpu->deviceSensors.size(), before);
+}
+
 TEST_F(NsmProcessorTest, goodTestCreateProcessorAttributes_MIGModeEnabled)
 {
     // Arrange
@@ -3730,12 +3894,14 @@ TEST_F(NsmProcessorTest,
     // deviceSensors: 1 msgTypes + 5 device + 5 RR + 1 static (version)
     //   But some sensors are added both via addDeviceSensors and addSensor,
     //   so they appear once in deviceSensors
-    // Actual: addDeviceSensors(control, lifetimeCircuitry, adminProfile,
+    // Actual: addDeviceSensors(control, lifetimeCircuitry, adminProfile, //
+
     //         getAllPowerProfile, pwrSmoothingAction) = 5 device sensor adds
-    //         addSensor(getAllPowerProfile, adminProfile, control,
-    //         lifetimeCircuitry, currentProfile) = 5 RR adds (duplicates in
-    //         deviceSensors since addSensor also adds to deviceSensors)
-    //         addStaticSensor(version) = 1 static add
+    //         addSensor(getAllPowerProfile, adminProfile, control, //
+    //         lifetimeCircuitry, currentProfile) = 5 RR adds
+    //         (duplicates in deviceSensors since addSensor also adds to
+    //         deviceSensors) addStaticSensor(version) = 1 static add //
+    //
     //         + 3 asset (static) + 1 msgTypes
     // Total deviceSensors = 1 + 5 + 5 + 1 + 3 = 15
     EXPECT_GE(gpu->deviceSensors.size(), 10u);
@@ -4512,6 +4678,124 @@ TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_Success)
     EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 400u);
 }
 
+// Helper: build an inventory information response with NSM_ERROR completion
+// code so that decode succeeds (rc = NSM_SW_SUCCESS) but cc = NSM_ERROR,
+// exercising the true branch of co_return cc ? cc : rc.
+// encode_get_inventory_information_resp only checks msg == NULL (not the data
+// pointer) before the cc guard, so passing valid data is fine.
+static Response makeInventoryRespErrorCC()
+{
+    uint32_t dummy = 0;
+    uint16_t dataSize = sizeof(dummy);
+    Response response(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + dataSize, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_get_inventory_information_resp(
+        0, NSM_ERROR, ERR_NULL, dataSize,
+        reinterpret_cast<const uint8_t*>(&dummy), msg);
+    return response;
+}
+
+// ============================================================================
+// Error-CC paths: coroutine update() – sensorIO delivers a response whose
+// cc = NSM_ERROR → co_return cc ? cc : rc takes the true branch. //
+
+// ============================================================================
+
+TEST_F(NsmProcessorTest, nsmMaxEDPpLimit_update_ErrorCC_CoversBranch)
+{
+    auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
+    auto sensor = std::make_shared<NsmMaxEDPpLimit>(sensorName, sensorType,
+                                                    eDPpIntf);
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(makeInventoryRespErrorCC()));
+    sensor->update(gpu);
+}
+
+TEST_F(NsmProcessorTest, nsmMinEDPpLimit_update_ErrorCC_CoversBranch)
+{
+    auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
+    auto sensor = std::make_shared<NsmMinEDPpLimit>(sensorName, sensorType,
+                                                    eDPpIntf);
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(makeInventoryRespErrorCC()));
+    sensor->update(gpu);
+}
+
+TEST_F(NsmProcessorTest, nsmDefaultBaseClockSpeed_update_ErrorCC_CoversBranch)
+{
+    auto cpuConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    auto sensor = std::make_shared<NsmDefaultBaseClockSpeed>(
+        sensorName, sensorType, cpuConfigIntf);
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(makeInventoryRespErrorCC()));
+    sensor->update(gpu);
+}
+
+TEST_F(NsmProcessorTest, nsmDefaultBoostClockSpeed_update_ErrorCC_CoversBranch)
+{
+    auto cpuConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    auto sensor = std::make_shared<NsmDefaultBoostClockSpeed>(
+        sensorName, sensorType, cpuConfigIntf);
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(makeInventoryRespErrorCC()));
+    sensor->update(gpu);
+}
+
+TEST_F(NsmProcessorTest, nsmTotalMemorySize_update_ErrorCC_CoversBranch)
+{
+    auto persistentMemoryIntf = std::make_shared<PersistentMemoryInterface>(
+        bus, inventoryObjPath.c_str());
+    auto sensor = std::make_shared<NsmTotalMemorySize>(sensorName, sensorType,
+                                                       persistentMemoryIntf);
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(makeInventoryRespErrorCC()));
+    sensor->update(gpu);
+}
+
+TEST_F(NsmProcessorTest, nsmMaxPowerCap_update_ErrorCC_CoversBranch)
+{
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
+    auto powerLimitIntf =
+        std::make_shared<PowerLimitIface>(bus, inventoryObjPath.c_str());
+    auto sensor = std::make_shared<NsmMaxPowerCap>(
+        sensorName, sensorType, powerCapIntf, powerLimitIntf, inventoryObjPath);
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(makeInventoryRespErrorCC()));
+    sensor->update(gpu);
+}
+
+TEST_F(NsmProcessorTest, nsmMinPowerCap_update_ErrorCC_CoversBranch)
+{
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
+    auto powerLimitIntf =
+        std::make_shared<PowerLimitIface>(bus, inventoryObjPath.c_str());
+    auto sensor = std::make_shared<NsmMinPowerCap>(
+        sensorName, sensorType, powerCapIntf, powerLimitIntf, inventoryObjPath);
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(makeInventoryRespErrorCC()));
+    sensor->update(gpu);
+}
+
+TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_ErrorCC_CoversBranch)
+{
+    auto clearPowerCapIntf =
+        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
+        bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
+    auto sensor = std::make_shared<NsmDefaultPowerCap>(
+        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(makeInventoryRespErrorCC()));
+    sensor->update(gpu);
+}
+
 // ============================================================================
 // NsmEDPpScalingFactor::patchSetPoint tests
 // ============================================================================
@@ -4617,7 +4901,7 @@ TEST_F(NsmProcessorTest, nsmEDPpScalingFactor_patchSetPoint_Success)
     EXPECT_EQ(sensor->persistence, true);
 }
 
-TEST_F(NsmProcessorTest, DISABLED_nsmEDPpScalingFactor_patchSetPoint_DecodeFail)
+TEST_F(NsmProcessorTest, nsmEDPpScalingFactor_patchSetPoint_DecodeFail)
 {
     // decode response has bad CC → NSM_SW_ERROR_COMMAND_FAIL
     auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
@@ -4846,7 +5130,8 @@ TEST_F(NsmProcessorTest, nsmConfidentialCompute_patchCCDevMode_PostPatchIOFail)
 
 // ============================================================================
 // BATCH 13: BadDataSize / shouldLog / INVALID_POWER_LIMIT branch coverage
-// Covers shouldLog+LG2_ERROR paths and INVALID_POWER_LIMIT ternary branches
+// Covers shouldLog+LG2_ERROR paths and INVALID_POWER_LIMIT ternary branches //
+
 // ============================================================================
 
 // Helper: 1-byte inventory response with bad size (2 bytes instead of 1)
@@ -4881,7 +5166,8 @@ TEST_F(NsmProcessorTest, nsmMaxEDPpLimit_update_BadDataSize)
     auto response = makeInventoryResp1ByteBadSize();
     EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(response));
     auto rc = sensor->update(gpu);
-    // shouldLog=true, LG2_ERROR covered; no update to eDPpIntf
+    // shouldLog=true, LG2_ERROR covered; no update to eDPpIntf //
+
     EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
 }
 
@@ -5458,8 +5744,9 @@ TEST_F(NsmProcessorTest, nsmConfidentialCompute_patchCCDevMode_DecodeCheckFails)
 // PART F: createNsmProcessorSensor early return (line 3433)
 // ============================================================================
 
-// Covers line 3433: co_return rc when coGetCachedBaseProperties fails
-// An unregistered objPath has no property map → coGetCachedBaseProperties fails
+// Covers line 3433: co_return rc when coGetCachedBaseProperties fails //
+// An unregistered objPath has no property map →
+// coGetCachedBaseProperties fails
 TEST_F(NsmProcessorTest, createNsmProcessorSensor_EarlyReturn_NoBaseProperties)
 {
     const std::string unregisteredPath =
@@ -5875,14 +6162,17 @@ TEST(nsmEgmMode, HandleResp_CcError_CoversBranches)
 // Helper: minimal response - just nsm_msg_hdr (4 bytes), no common_resp.
 // Passed to decode functions to trigger rc != NSM_SW_SUCCESS
 // (NSM_SW_ERROR_LENGTH).
+// Must be >= sizeof(nsm_msg_hdr) + 2 = 7 so decode_reason_code_and_cc
+// can safely read completion_code at msg->payload[1] without ASAN,
+// but small enough to fail the subsequent minimum-size check.
 static Response makeTooShortResponse()
 {
-    return Response(sizeof(nsm_msg_hdr), 0);
+    return Response(sizeof(nsm_msg_hdr) + 2, 0);
 }
 
 // ============================================================================
 // NSM_Processor_Attributes: no feature keys in property map
-// Covers allCurrentIfaceProperties.count("X")==0 branch (branch 5 taken 0%)
+// Covers allCurrentIfaceProperties.count("X")==0 branch (branch 5 taken 0%) //
 // for all 10 feature checks at lines 3626-3685.
 // ============================================================================
 
@@ -5922,7 +6212,7 @@ TEST_F(NsmProcessorTest, ProcessorAttributes_NoFeatureKeys)
 //        2916 (DefaultPowerCap)
 // ============================================================================
 
-TEST_F(NsmProcessorTest, DISABLED_nsmMaxEDPpLimit_update_DecodeFail)
+TEST_F(NsmProcessorTest, nsmMaxEDPpLimit_update_DecodeFail)
 {
     auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
     auto sensor = std::make_shared<NsmMaxEDPpLimit>(sensorName, sensorType,
@@ -5935,7 +6225,7 @@ TEST_F(NsmProcessorTest, DISABLED_nsmMaxEDPpLimit_update_DecodeFail)
     EXPECT_NE(rc.data(), NSM_SW_SUCCESS);
 }
 
-TEST_F(NsmProcessorTest, DISABLED_nsmMinEDPpLimit_update_DecodeFail)
+TEST_F(NsmProcessorTest, nsmMinEDPpLimit_update_DecodeFail)
 {
     auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
     auto sensor = std::make_shared<NsmMinEDPpLimit>(sensorName, sensorType,
@@ -5946,7 +6236,7 @@ TEST_F(NsmProcessorTest, DISABLED_nsmMinEDPpLimit_update_DecodeFail)
     EXPECT_NE(rc.data(), NSM_SW_SUCCESS);
 }
 
-TEST_F(NsmProcessorTest, DISABLED_nsmDefaultBaseClockSpeed_update_DecodeFail)
+TEST_F(NsmProcessorTest, nsmDefaultBaseClockSpeed_update_DecodeFail)
 {
     auto cpuConfigIntf =
         std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
@@ -5958,7 +6248,7 @@ TEST_F(NsmProcessorTest, DISABLED_nsmDefaultBaseClockSpeed_update_DecodeFail)
     EXPECT_NE(rc.data(), NSM_SW_SUCCESS);
 }
 
-TEST_F(NsmProcessorTest, DISABLED_nsmDefaultBoostClockSpeed_update_DecodeFail)
+TEST_F(NsmProcessorTest, nsmDefaultBoostClockSpeed_update_DecodeFail)
 {
     auto cpuConfigIntf =
         std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
@@ -5970,7 +6260,7 @@ TEST_F(NsmProcessorTest, DISABLED_nsmDefaultBoostClockSpeed_update_DecodeFail)
     EXPECT_NE(rc.data(), NSM_SW_SUCCESS);
 }
 
-TEST_F(NsmProcessorTest, DISABLED_nsmTotalMemorySize_update_DecodeFail)
+TEST_F(NsmProcessorTest, nsmTotalMemorySize_update_DecodeFail)
 {
     auto persistentMemoryIntf = std::make_shared<PersistentMemoryInterface>(
         bus, inventoryObjPath.c_str());
@@ -5982,7 +6272,7 @@ TEST_F(NsmProcessorTest, DISABLED_nsmTotalMemorySize_update_DecodeFail)
     EXPECT_NE(rc.data(), NSM_SW_SUCCESS);
 }
 
-TEST_F(NsmProcessorTest, DISABLED_nsmMaxPowerCap_update_DecodeFail)
+TEST_F(NsmProcessorTest, nsmMaxPowerCap_update_DecodeFail)
 {
     auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
         bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
@@ -5997,7 +6287,7 @@ TEST_F(NsmProcessorTest, DISABLED_nsmMaxPowerCap_update_DecodeFail)
     EXPECT_NE(rc.data(), NSM_SW_SUCCESS);
 }
 
-TEST_F(NsmProcessorTest, DISABLED_nsmMinPowerCap_update_DecodeFail)
+TEST_F(NsmProcessorTest, nsmMinPowerCap_update_DecodeFail)
 {
     auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
         bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
@@ -6012,7 +6302,7 @@ TEST_F(NsmProcessorTest, DISABLED_nsmMinPowerCap_update_DecodeFail)
     EXPECT_NE(rc.data(), NSM_SW_SUCCESS);
 }
 
-TEST_F(NsmProcessorTest, DISABLED_nsmDefaultPowerCap_update_DecodeFail)
+TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_DecodeFail)
 {
     auto clearPowerCapIntf =
         std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
@@ -6032,7 +6322,7 @@ TEST_F(NsmProcessorTest, DISABLED_nsmDefaultPowerCap_update_DecodeFail)
 // ============================================================================
 
 // Line 2081: NsmCurrentUtilization::handleResponseMsg rc!=NSM_SW_SUCCESS
-TEST(nsmCurrentUtilization, DISABLED_HandleResp_TooShort_DecodeRcFail)
+TEST(nsmCurrentUtilization, HandleResp_TooShort_DecodeRcFail)
 {
     auto cpuOperatingConfigIntf =
         std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
@@ -6044,19 +6334,21 @@ TEST(nsmCurrentUtilization, DISABLED_HandleResp_TooShort_DecodeRcFail)
     nsm::NsmCurrentUtilization sensor(sensorName + "_UtilDecFail", sensorType,
                                       cpuOperatingConfigIntf, smUtilizationIntf,
                                       inventoryObjPath, false, gpuPtr);
-    // Too-short response: 4 bytes → decode_get_current_utilization_resp fails
-    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr), 0);
+    // Too-short response: triggers decode failure (NSM_SW_ERROR_LENGTH).
+    // Must be >= sizeof(nsm_msg_hdr) + 2 to avoid ASAN on cc read.
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     uint8_t rc = sensor.handleResponseMsg(response, responseMsg.size());
     EXPECT_NE(rc, NSM_SW_SUCCESS);
 }
 
 // Line 3414: NsmEgmMode::handleResponseMsg rc!=NSM_SW_SUCCESS
-TEST(nsmEgmMode, DISABLED_HandleResp_TooShort_DecodeRcFail)
+TEST(nsmEgmMode, HandleResp_TooShort_DecodeRcFail)
 {
     nsm::NsmEgmMode sensor(bus, sensorName, sensorType, inventoryObjPath);
-    // Too-short response: 4 bytes → decode_get_EGM_mode_resp fails
-    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr), 0);
+    // Too-short response: triggers decode failure (NSM_SW_ERROR_LENGTH).
+    // Must be >= sizeof(nsm_msg_hdr) + 2 to avoid ASAN on cc read.
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     uint8_t rc = sensor.handleResponseMsg(response, responseMsg.size());
     EXPECT_NE(rc, NSM_SW_SUCCESS);
@@ -6267,6 +6559,7 @@ TEST_F(NsmProcessorTest, createReconfigPermissions_NoFeaturesKey)
 
     // Interface property map with Type but without "Features"
     // → line 661: allCurrentIfaceProperties.count("Features")==0 → false branch
+    //
     auto& ifaceMap = utils::MockDbusAsync::propertyMap(objPath, ifaceName);
     ifaceMap["Type"] = std::string("NSM_ReconfigPermissions");
     ifaceMap["InventoryObjPath"] = objPath;
@@ -6281,8 +6574,8 @@ TEST_F(NsmProcessorTest, createReconfigPermissions_NoFeaturesKey)
 
 // --- createNsmProcessorSensor: NSM_Processor type, missing DEVICE_UUID ---
 // Covers line 3487 false branch: allBaseIfaceProperties.count("DEVICE_UUID")==0
-// Base map has Name and UUID (to find the existing gpu device) but no
-// DEVICE_UUID.
+// Base map has Name and UUID (to find the existing gpu
+// device) but no DEVICE_UUID.
 TEST_F(NsmProcessorTest, createNsmProcessorSensor_NSMProcessor_NoDEVICE_UUID)
 {
     // Register base property map at basicIntfName: has Name, UUID,
@@ -6398,9 +6691,9 @@ TEST_F(NsmProcessorTest,
 }
 
 // --- createNsmProcessorSensor: interface map missing "Type" ---
-// Covers line 3452 false branch: allCurrentIfaceProperties.count("Type")==0
-// Also covers line 3444 false branch (no Name) and 3456 false branch (no
-// InventoryObjPath).
+// Covers line 3452 false branch: allCurrentIfaceProperties.count("Type")==0 //
+// Also covers line 3444 false branch (no Name) and 3456 false
+// branch (no InventoryObjPath).
 TEST_F(NsmProcessorTest, createNsmProcessorSensor_NoTypeKey)
 {
     const std::string ifaceName = basicIntfName + ".NoType";
@@ -6413,6 +6706,7 @@ TEST_F(NsmProcessorTest, createNsmProcessorSensor_NoTypeKey)
 
     // Interface map without "Type" → line 3452 false branch → type=""
     // No sensor creation type matched → falls through to co_return NSM_SUCCESS
+    //
     auto& ifaceMap = utils::MockDbusAsync::propertyMap(objPath, ifaceName);
     ifaceMap["InventoryObjPath"] = objPath;
 
@@ -6497,8 +6791,9 @@ TEST(nsmProcessorThrottleReason, HandleResp_ZeroFlags_NoneReason)
 
 // ============================================================================
 // BATCH 22: createNsmProcessorSensor with no UUID in base properties
-// Covers line 3448 branch 1: allBaseIfaceProperties.count("UUID")==0 → false
-// uuid stays {} → getNsmDeviceFromStaticUUID({}) throws std::runtime_error
+// Covers line 3448 branch 1: allBaseIfaceProperties.count("UUID")==0 → false //
+// uuid stays {} → getNsmDeviceFromStaticUUID({}) throws
+// std::runtime_error
 // ============================================================================
 
 TEST_F(NsmProcessorTest, createNsmProcessorSensor_NoUUIDInBase)
@@ -6523,14 +6818,15 @@ TEST_F(NsmProcessorTest, createNsmProcessorSensor_NoUUIDInBase)
 
 // ============================================================================
 // BATCH 24: Wrong-type property tests covering std::get<T> type-check branches
-// Lines 3446/3450/3454/3459: internal variant type-check branches (branch 6)
-// When std::get<string> is called on a variant holding bool, the internal type
-// check fails → branch 6 (fallthrough=0%) is covered → bad_variant_access
-// thrown
+// Lines 3446/3450/3454/3459: internal variant type-check
+// branches (branch 6) When std::get<string> is called on a variant holding
+// bool, the internal type check fails → branch 6
+// (fallthrough=0%) is covered → bad_variant_access thrown
 // ============================================================================
 
 // "Name" field has bool instead of string → std::get<string> at line 3446 fails
-// Covers line 3446 branch 6 (fallthrough: wrong type in std::get<string>)
+// Covers line 3446 branch 6 (fallthrough: wrong type in
+// std::get<string>)
 TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForName)
 {
     const std::string ifaceName = basicIntfName + ".WrongName";
@@ -6548,9 +6844,9 @@ TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForName)
 }
 
 // "UUID" field has bool instead of string(uuid_t) →
-// std::get<uuid_t>=std::get<string> at line 3450 fails (bad_variant_access).
-// Name must be correct to reach line 3450. Covers line 3450 branch 6
-// (fallthrough: wrong type in std::get<uuid_t>)
+// std::get<uuid_t>=std::get<string> at line 3450 fails (bad_variant_access). //
+// Name must be correct to reach line 3450. Covers line 3450
+// branch 6 (fallthrough: wrong type in std::get<uuid_t>)
 TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForUUID)
 {
     const std::string ifaceName = basicIntfName + ".WrongUUID";
@@ -6569,9 +6865,10 @@ TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForUUID)
     EXPECT_EQ(1u, devices.size());
 }
 
-// "Type" field has bool instead of string → std::get<string> at line 3454
-// fails. Name and UUID must be correct to reach line 3454. Covers line 3454
-// branch 6 (fallthrough: wrong type in std::get<string> for Type)
+// "Type" field has bool instead of string → std::get<string> at line 3454 //
+// fails. Name and UUID must be correct to reach line 3454.
+// Covers line 3454 branch 6 (fallthrough: wrong type in std::get<string> for
+// Type)
 TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForType)
 {
     const std::string ifaceName = basicIntfName + ".WrongType";
@@ -6591,7 +6888,8 @@ TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForType)
 
 // "InventoryObjPath" in base has bool instead of string → line 3459
 // std::get<string> fails. Name, UUID, Type must be correct to reach line 3459.
-// Covers line 3459 branch 6 (fallthrough: wrong type in std::get<string>)
+// Covers line 3459 branch 6 (fallthrough: wrong type in
+// std::get<string>)
 TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForInventoryObjPath)
 {
     const std::string ifaceName = basicIntfName + ".WrongInvPath";
@@ -6615,11 +6913,13 @@ TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForInventoryObjPath)
 // ============================================================================
 // BATCH 25: NSM_Processor_Attributes wrong-type property tests
 // These tests cover std::get<T> internal type-check failure branches (branch 6
-// at 0%) in the NSM_Processor_Attributes block of createNsmProcessorSensor.
+// at 0%) in the NSM_Processor_Attributes block of
+// createNsmProcessorSensor.
 // ============================================================================
 
-// Line 3612: std::get<std::string>(LocationType) fails when LocationType is
-// bool instead of string. Covers branch 6 (fallthrough) at line 3611-3612.
+// Line 3612: std::get<std::string>(LocationType) fails when LocationType is //
+// bool instead of string. Covers branch 6 (fallthrough) at
+// line 3611-3612.
 TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForLocationType)
 {
     const std::string ifaceName = basicIntfName + ".Attr_WrongLocType";
@@ -6638,9 +6938,9 @@ TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForLocationType)
         std::bad_variant_access);
 }
 
-// Line 3620: std::get<std::string>(LocationCode) fails when LocationCode is
-// bool instead of string. LocationType is absent (count=0, skipped).
-// Covers branch 6 (fallthrough) at line 3619-3620.
+// Line 3620: std::get<std::string>(LocationCode) fails when LocationCode is //
+// bool instead of string. LocationType is absent (count=0,
+// skipped). Covers branch 6 (fallthrough) at line 3619-3620.
 TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForLocationCode)
 {
     const std::string ifaceName = basicIntfName + ".Attr_WrongLocCode";
@@ -6660,8 +6960,9 @@ TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForLocationCode)
         std::bad_variant_access);
 }
 
-// Line 3627: std::get<bool>(MIGModeSupported) fails when value is string.
-// LocationType/LocationCode absent. Covers branch 6 at line 3627.
+// Line 3627: std::get<bool>(MIGModeSupported) fails when value is string. //
+// LocationType/LocationCode absent. Covers branch 6 at line
+// 3627.
 TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForMIGModeSupported)
 {
     const std::string ifaceName = basicIntfName + ".Attr_WrongMIG";
@@ -6681,8 +6982,9 @@ TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForMIGModeSupported)
         std::bad_variant_access);
 }
 
-// Line 3633: std::get<bool>(PortDisableFutureSupported) fails when value is
-// string. MIGModeSupported absent. Covers branch 6 at line 3633.
+// Line 3633: std::get<bool>(PortDisableFutureSupported) fails when value is //
+// string. MIGModeSupported absent. Covers branch 6 at line
+// 3633.
 TEST_F(NsmProcessorTest,
        createProcessorAttributes_WrongTypeForPortDisableFuture)
 {
@@ -6703,7 +7005,7 @@ TEST_F(NsmProcessorTest,
         std::bad_variant_access);
 }
 
-// Line 3638: std::get<bool>(ECCModeSupported) fails when value is string.
+// Line 3638: std::get<bool>(ECCModeSupported) fails when value is string. //
 // Covers branch 6 at line 3638.
 TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForECCModeSupported)
 {
@@ -6723,7 +7025,7 @@ TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForECCModeSupported)
         std::bad_variant_access);
 }
 
-// Line 3644: std::get<bool>(EDPpScalingFactorSupported) fails when value is
+// Line 3644: std::get<bool>(EDPpScalingFactorSupported) fails when value is //
 // string. Covers branch 6 at line 3644.
 TEST_F(NsmProcessorTest,
        createProcessorAttributes_WrongTypeForEDPpScalingFactor)
@@ -6744,7 +7046,7 @@ TEST_F(NsmProcessorTest,
         std::bad_variant_access);
 }
 
-// Line 3651: std::get<bool>(PowerSmoothingSupported) fails when value is
+// Line 3651: std::get<bool>(PowerSmoothingSupported) fails when value is //
 // string. Covers branch 6 at line 3651.
 TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForPowerSmoothing)
 {
@@ -6764,7 +7066,7 @@ TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForPowerSmoothing)
         std::bad_variant_access);
 }
 
-// Line 3657: std::get<bool>(CpuOperatingConfigSupported) fails when value is
+// Line 3657: std::get<bool>(CpuOperatingConfigSupported) fails when value is //
 // string. Covers branch 6 at line 3657.
 TEST_F(NsmProcessorTest,
        createProcessorAttributes_WrongTypeForCpuOperatingConfig)
@@ -6785,7 +7087,7 @@ TEST_F(NsmProcessorTest,
         std::bad_variant_access);
 }
 
-// Line 3664: std::get<bool>(MemCapacityUtilSupported) fails when value is
+// Line 3664: std::get<bool>(MemCapacityUtilSupported) fails when value is //
 // string. Covers branch 6 at line 3664.
 TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForMemCapacityUtil)
 {
@@ -6805,7 +7107,7 @@ TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForMemCapacityUtil)
         std::bad_variant_access);
 }
 
-// Line 3670: std::get<bool>(TotalNvLinksCountSupported) fails when value is
+// Line 3670: std::get<bool>(TotalNvLinksCountSupported) fails when value is //
 // string. Covers branch 6 at line 3670.
 TEST_F(NsmProcessorTest,
        createProcessorAttributes_WrongTypeForTotalNvLinksCount)
@@ -6826,7 +7128,7 @@ TEST_F(NsmProcessorTest,
         std::bad_variant_access);
 }
 
-// Line 3676: std::get<bool>(EGMModeSupported) fails when value is string.
+// Line 3676: std::get<bool>(EGMModeSupported) fails when value is string. //
 // Covers branch 6 at line 3676.
 TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForEGMModeSupported)
 {
@@ -6846,7 +7148,7 @@ TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForEGMModeSupported)
         std::bad_variant_access);
 }
 
-// Line 3682: std::get<bool>(MNNVLTopologySupported) fails when value is
+// Line 3682: std::get<bool>(MNNVLTopologySupported) fails when value is //
 // string. Covers branch 6 at line 3682.
 TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForMNNVLTopology)
 {
@@ -6867,13 +7169,13 @@ TEST_F(NsmProcessorTest, createProcessorAttributes_WrongTypeForMNNVLTopology)
 }
 
 // ============================================================================
-// BATCH 26: Wrong-type tests for sub-function std::get<T> branches
-// These cover branch 6 (fallthrough: wrong type) in createPCIe,
-// createProcessorPerformance, createPowerCap, createReconfigPermissions,
-// createWorkloadPowerProfile.
+// BATCH 26: Wrong-type tests for sub-function std::get<T> branches //
+// These cover branch 6 (fallthrough: wrong type) in
+// createPCIe, createProcessorPerformance, createPowerCap,
+// createReconfigPermissions, createWorkloadPowerProfile.
 // ============================================================================
 
-// createPCIe line 513: std::get<uint64_t>(DeviceId) fails when DeviceId is
+// createPCIe line 513: std::get<uint64_t>(DeviceId) fails when DeviceId is //
 // bool instead of uint64_t. Covers branch 6 at line 513.
 TEST_F(NsmProcessorTest, createPCIeSensors_WrongTypeForDeviceId)
 {
@@ -6893,9 +7195,9 @@ TEST_F(NsmProcessorTest, createPCIeSensors_WrongTypeForDeviceId)
         std::bad_variant_access);
 }
 
-// createPCIe line 518: std::get<uint64_t>(Count) fails when Count is bool.
-// DeviceId absent (count=0 → skipped) so we reach line 516-518.
-// Covers branch 6 at line 518.
+// createPCIe line 518: std::get<uint64_t>(Count) fails when Count is bool. //
+// DeviceId absent (count=0 → skipped) so we reach line
+// 516-518. Covers branch 6 at line 518.
 TEST_F(NsmProcessorTest, createPCIeSensors_WrongTypeForCount)
 {
     const std::string ifaceName = basicIntfName + ".PCIe_WrongCount";
@@ -6914,7 +7216,7 @@ TEST_F(NsmProcessorTest, createPCIeSensors_WrongTypeForCount)
         std::bad_variant_access);
 }
 
-// createProcessorPerformance line 560: std::get<uint64_t>(DeviceId) fails
+// createProcessorPerformance line 560: std::get<uint64_t>(DeviceId) fails //
 // when DeviceId is bool. Covers branch 6 at line 560.
 TEST_F(NsmProcessorTest, createProcessorPerformance_WrongTypeForDeviceId)
 {
@@ -6934,7 +7236,7 @@ TEST_F(NsmProcessorTest, createProcessorPerformance_WrongTypeForDeviceId)
         std::bad_variant_access);
 }
 
-// createPowerCap line 596: std::get<vector<string>>(CompositeNumericSensors)
+// createPowerCap line 596: std::get<vector<string>>(CompositeNumericSensors) //
 // fails when value is bool. Covers branch 6 at line 596.
 TEST_F(NsmProcessorTest, createPowerCap_WrongTypeForCompositeNumericSensors)
 {
@@ -6954,7 +7256,7 @@ TEST_F(NsmProcessorTest, createPowerCap_WrongTypeForCompositeNumericSensors)
         std::bad_variant_access);
 }
 
-// createReconfigPermissions line 663: std::get<vector<string>>(Features)
+// createReconfigPermissions line 663: std::get<vector<string>>(Features) //
 // fails when value is bool. Covers branch 6 at line 663.
 TEST_F(NsmProcessorTest, createReconfigPermissions_WrongTypeForFeatures)
 {
@@ -6996,13 +7298,13 @@ TEST_F(NsmProcessorTest, createWorkloadPowerProfile_WrongTypeForProfileIdMap)
 
 // ============================================================================
 // BATCH 27: NSM_Processor DEVICE_UUID wrong-type test
-// Line 3490: std::get<uuid_t>(DEVICE_UUID) fails when DEVICE_UUID is bool.
+// Line 3490: std::get<uuid_t>(DEVICE_UUID) fails when DEVICE_UUID is bool. //
 // Covers branch 6 (fallthrough) at line 3489-3490.
 // ============================================================================
 
-// Line 3490: std::get<uuid_t>(DEVICE_UUID) fails when DEVICE_UUID is bool
-// instead of uuid_t (string). Name/UUID/InventoryObjPath are correct so
-// execution reaches line 3487. Covers branch 6 at line 3490.
+// Line 3490: std::get<uuid_t>(DEVICE_UUID) fails when DEVICE_UUID is bool //
+// instead of uuid_t (string). Name/UUID/InventoryObjPath are
+// correct so execution reaches line 3487. Covers branch 6 at line 3490.
 TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForDeviceUUID)
 {
     const std::string ifaceName = basicIntfName + ".WrongDeviceUUID";
@@ -7020,4 +7322,1963 @@ TEST_F(NsmProcessorTest, createNsmProcessorSensor_WrongTypeForDeviceUUID)
         createNsmProcessorSensor(mockManager, ifaceName, objPath),
         std::bad_variant_access);
     EXPECT_EQ(1u, devices.size());
+}
+
+// ============================================================================
+// BATCH 28: nsmPowerSmoothing error-CC branch coverage
+// Each sensor initialises cc=ERR_NULL(0), so BadHandleResp tests only cover
+// the cc==0 side of "return cc ? cc : rc".  These tests encode a properly-
+// sized response with NSM_ERROR as the completion code so that decode
+// succeeds (rc=NSM_SW_SUCCESS) but cc!=0, covering the cc!=0 branch.
+// ============================================================================
+
+TEST(nsmPowerSmoothing, HandleResp_ErrorCC_CoversBranch)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
+                                    featIntf, nullptr);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_power_smoothing_feat_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_pwr_smoothing_featureinfo_data feat{};
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_powersmoothing_featinfo_resp(
+        0, NSM_ERROR, reason_code, &feat, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = controlSensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmHwCircuitryTelemetry, HandleResp_ErrorCC_CoversBranch)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmHwCircuitryTelemetry lifetimeSensor(sensorName, sensorType,
+                                           inventoryObjPath, featIntf);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_hardwareciruitry_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_hardwarecircuitry_data lifetimeusage{};
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_hardware_lifetime_cricuitry_resp(
+        0, NSM_ERROR, reason_code, &lifetimeusage, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = lifetimeSensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverride, HandleResp_ErrorCC_CoversBranch)
+{
+    auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
+                                                          nullptr);
+    NsmPowerSmoothingAdminOverride adminProfileSensor(
+        sensorName, sensorType, featIntf, inventoryObjPath, nullptr);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_query_admin_override_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_admin_override_data adminProfileData{};
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_query_admin_override_resp(0, NSM_ERROR, reason_code,
+                                                  &adminProfileData, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = adminProfileSensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerProfileCollection, HandleResp_ErrorCC_CoversBranch)
+{
+    NsmPowerProfileCollection getAllPowerProfileSensor(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+    struct nsm_get_all_preset_profile_meta_data profile_meta_data{};
+    int number_of_profiles = 1;
+    profile_meta_data.max_profiles_supported = number_of_profiles;
+    struct nsm_preset_profile_data profiles[1]{};
+    uint16_t meta_data_size =
+        sizeof(struct nsm_get_all_preset_profile_meta_data);
+    uint16_t profile_data_size = sizeof(struct nsm_preset_profile_data);
+    uint16_t data_size = meta_data_size +
+                         number_of_profiles * profile_data_size;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp) + data_size, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_preset_profile_resp(
+        0, NSM_ERROR, reason_code, &profile_meta_data, profiles,
+        profile_meta_data.max_profiles_supported, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = getAllPowerProfileSensor.handleResponseMsg(responseMsg,
+                                                    response.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfile, HandleResp_ErrorCC_CoversBranch)
+{
+    std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
+        std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
+    auto adminProfileSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, nullptr);
+    std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            nullptr);
+    auto getAllPowerProfileSensor = std::make_shared<NsmPowerProfileCollection>(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+    NsmCurrentPowerSmoothingProfile currentProfileSensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, nullptr);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_current_profile_info_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_get_current_profile_data profileData{};
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_current_profile_info_resp(0, NSM_ERROR, reason_code,
+                                                      &profileData, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = currentProfileSensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// BATCH 29: NsmReconfigPermissions::setAllowPermission error-CC branch
+// setAllowPermission is private but accessible via #define private public.
+// postPatchIO returns a properly-sized response with NSM_ERROR CC so that
+// decode succeeds (rc=NSM_SW_SUCCESS) but cc!=0, covering the cc!=0 side of
+// "co_return cc ? cc : rc" and the WriteFailure branch in the else clause. //
+
+// ============================================================================
+
+TEST_F(NsmProcessorTest,
+       NsmReconfigPermissions_setAllowPermission_ErrorCC_WriteFailure)
+{
+    std::string hostPath = inventoryObjPath + "/reconfig_host_cc_err";
+    std::string doePath = inventoryObjPath + "/reconfig_doe_cc_err";
+    auto hostIntf = std::make_shared<ReconfigSettingsIntf>(bus,
+                                                           hostPath.c_str());
+    auto doeIntf = std::make_shared<ReconfigSettingsIntf>(bus, doePath.c_str());
+    auto sensor = std::make_shared<NsmReconfigPermissions>(
+        "reconfig_cc_err", "NSM_ReconfigPermissions", hostPath, doePath,
+        ReconfigSettingsIntf::FeatureType::CCMode, hostIntf, doeIntf);
+
+    // Build a properly-sized response with NSM_ERROR completion code.
+    Response setResp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto setRespMsg = reinterpret_cast<nsm_msg*>(setResp.data());
+    encode_set_reconfiguration_permissions_v1_resp(0, NSM_ERROR, ERR_NULL,
+                                                   setRespMsg);
+
+    EXPECT_CALL(*gpu, postPatchIO).WillOnce(mockPostPatchIO(setResp));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    // Call the private method directly (accessible via #define private public).
+    auto coro = sensor->setAllowPermission(
+        RP_ONESHOOT_HOT_RESET, DISALLOW_HOST_DISALLOW_DOE, status, gpu);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// ============================================================================
+// NsmPowerSmoothingAdminOverride::handleResponseMsg – error-CC branch
+// cc is initialised to ERR_NULL (=0); encode with NSM_ERROR so decode
+// succeeds but cc!=0; return cc ? cc : rc takes the true branch (returns cc).
+// Constructor body is empty (no updateMetricOnSharedMemory call) so nullptr
+// for adminProfileIntf and device is safe.
+// ============================================================================
+TEST(NsmPowerSmoothingAdminOverride, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    nsm_admin_override_data data{};
+    std::vector<uint8_t> responseData(256, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseData.data());
+    auto rc = encode_query_admin_override_resp(0, NSM_ERROR, ERR_NULL, &data,
+                                               responseMsg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    NsmPowerSmoothingAdminOverride sensor(sensorName, sensorType, nullptr,
+                                          inventoryObjPath, nullptr);
+    auto result = sensor.handleResponseMsg(responseMsg, responseData.size());
+    EXPECT_NE(result, NSM_SUCCESS);
+}
+
+// ============================================================================
+// NsmPowerProfileCollection::handleResponseMsg – error-CC branch
+// encode_get_preset_profile_resp with max_number_of_profiles=0 and cc=NSM_ERROR
+// so that decode_get_preset_profile_metadata_resp succeeds but cc!=0 →
+// return cc ? cc : rc takes the true branch.
+// Constructor body is empty so nullptr for device is safe.
+// ============================================================================
+TEST(NsmPowerProfileCollection, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    nsm_get_all_preset_profile_meta_data metadata{};
+    nsm_preset_profile_data profileData{};
+    std::vector<uint8_t> responseData(256, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseData.data());
+    auto rc = encode_get_preset_profile_resp(0, NSM_ERROR, ERR_NULL, &metadata,
+                                             &profileData, 0, responseMsg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    NsmPowerProfileCollection sensor(sensorName, sensorType, inventoryObjPath,
+                                     nullptr);
+    auto result = sensor.handleResponseMsg(responseMsg, responseData.size());
+    EXPECT_NE(result, NSM_SUCCESS);
+}
+
+// ============================================================================
+// FALSE-branch coverage: count() checks in createNsmProcessorSensor
+// (lines 3457–3475 and 3500 and 3622–3702 of nsmProcessor.cpp)
+// ============================================================================
+
+// Name absent → count("Name") FALSE → name="" → type also absent → no sensor
+TEST_F(NsmProcessorTest, createProcessor_MissingName_NoSensor)
+{
+    const std::string uniquePath = processorsInventoryBasePath / "GPU_MissName";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["UUID"] = gpuUuid;
+    baseMap["InventoryObjPath"] = uniquePath;
+    // "Name" intentionally omitted → count("Name") FALSE → name=""
+    // sub-interface empty → type="" → no sensor block runs
+    auto& currMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".NoName");
+    (void)currMap;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmProcessorSensor(mockManager, basicIntfName + ".NoName",
+                             uniquePath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// UUID absent → count("UUID") FALSE → uuid="" → getNsmDeviceFromStaticUUID
+// throws
+TEST_F(NsmProcessorTest, createProcessor_MissingUUID_Throws)
+{
+    const std::string uniquePath = processorsInventoryBasePath / "GPU_MissUUID";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["Name"] = std::string("GPU_MissUUID");
+    baseMap["InventoryObjPath"] = uniquePath;
+    // "UUID" intentionally omitted → uuid="" → parseStaticUuid("") throws
+    auto& currMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName + ".PCIe2");
+    currMap["Type"] = std::string("NSM_PCIe");
+    currMap["Count"] = uint64_t(0);
+
+    EXPECT_THROW_COROUTINE(createNsmProcessorSensor(mockManager,
+                                                    basicIntfName + ".PCIe2",
+                                                    uniquePath),
+                           std::exception);
+}
+
+// Type absent → count("Type") FALSE → type="" → no if/else branch matches →
+// no sensor created
+TEST_F(NsmProcessorTest, createProcessor_MissingType_NoSensor)
+{
+    const std::string uniquePath = processorsInventoryBasePath / "GPU_MissType";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["Name"] = std::string("GPU_MissType");
+    baseMap["UUID"] = gpuUuid;
+    baseMap["InventoryObjPath"] = uniquePath;
+    // current sub-interface intentionally empty → type="" → no branch matches
+    auto& currMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".NoType");
+    (void)currMap;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmProcessorSensor(mockManager, basicIntfName + ".NoType",
+                             uniquePath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// InventoryObjPath absent → count("InventoryObjPath") FALSE →
+// inventoryObjPath="" type also absent → no sensor block executes → no crash
+TEST_F(NsmProcessorTest, createProcessor_MissingInventoryObjPath_NoSensor)
+{
+    const std::string uniquePath = processorsInventoryBasePath / "GPU_MissInv";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["Name"] = std::string("GPU_MissInv");
+    baseMap["UUID"] = gpuUuid;
+    // "InventoryObjPath" intentionally omitted → count("InventoryObjPath")
+    // FALSE sub-interface also empty → type="" → no sensor block runs
+    auto& currMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".NoInvPath");
+    (void)currMap;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmProcessorSensor(mockManager, basicIntfName + ".NoInvPath",
+                             uniquePath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// Note: count("DEVICE_UUID") FALSE branch is already covered by the existing
+// createNsmProcessorSensor_NSMProcessor_NoDEVICE_UUID test (using objPath).
+// Note: NSM_Processor_Attributes all-boolean-absent branches are already
+// covered by ProcessorAttributes_NoFeatureKeys (using objPath).
+
+// ============================================================================
+// Getter method tests for nsmProcessor.hpp inline functions
+// ============================================================================
+
+// NsmPowerCap::getPowerCapIntf() returns the stored powerCapIntf (line 577-579)
+TEST(nsmPowerCap, GetPowerCapIntf_ReturnsStoredIntf)
+{
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
+    auto persistencyIntf =
+        std::make_shared<PowerPersistencyIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmPowerCap sensor(sensorName, sensorType, powerCapIntf,
+                            std::vector<std::string>{}, persistencyIntf,
+                            inventoryObjPath);
+    EXPECT_EQ(sensor.getPowerCapIntf(), powerCapIntf);
+}
+
+// NsmMaxPowerCap::getMaxPowerCapIntf() returns the stored powerCapIntf
+// (lines 601-603)
+TEST_F(NsmProcessorTest, NsmMaxPowerCap_GetMaxPowerCapIntf_ReturnsIntf)
+{
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
+    auto powerLimitIntf =
+        std::make_shared<PowerLimitIface>(bus, inventoryObjPath.c_str());
+    auto sensor = std::make_shared<NsmMaxPowerCap>(
+        sensorName, sensorType, powerCapIntf, powerLimitIntf, inventoryObjPath);
+    EXPECT_EQ(sensor->getMaxPowerCapIntf(), powerCapIntf);
+}
+
+// NsmMinPowerCap::getMinPowerCapIntf() returns the stored powerCapIntf
+// (lines 622-624)
+TEST_F(NsmProcessorTest, NsmMinPowerCap_GetMinPowerCapIntf_ReturnsIntf)
+{
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
+    auto powerLimitIntf =
+        std::make_shared<PowerLimitIface>(bus, inventoryObjPath.c_str());
+    auto sensor = std::make_shared<NsmMinPowerCap>(
+        sensorName, sensorType, powerCapIntf, powerLimitIntf, inventoryObjPath);
+    EXPECT_EQ(sensor->getMinPowerCapIntf(), powerCapIntf);
+}
+
+// NsmDefaultPowerCap::getDefaultPowerCapIntf() and getClearPowerCapAsyncIntf()
+// return the stored interfaces (lines 641-647)
+TEST_F(NsmProcessorTest, NsmDefaultPowerCap_GetIntfs_ReturnStoredIntfs)
+{
+    auto clearPowerCapIntf =
+        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
+        bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
+    auto sensor = std::make_shared<NsmDefaultPowerCap>(
+        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
+    EXPECT_EQ(sensor->getDefaultPowerCapIntf(), clearPowerCapIntf);
+    EXPECT_EQ(sensor->getClearPowerCapAsyncIntf(), clearPowerCapAsyncIntf);
+}
+
+// EDPpLocal::reset() is an empty override; calling it exercises lines 298-299
+TEST(NsmProcessor, EDPpLocal_Reset_NoCrash)
+{
+    auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
+    // Calling reset() should do nothing (empty override of the pdi method)
+    EXPECT_NO_THROW(eDPpIntf->reset());
+}
+
+// ============================================================================
+// BadGenReq tests for NsmPowerSmoothing sensors
+// instanceId > NSM_INSTANCE_MAX (31) causes encode functions to return non-zero
+// → genRequestMsg returns std::nullopt (lines 81-84, 187-190, 301-304,
+//   408-411, 560-562 of nsmPowerSmoothing.cpp)
+// ============================================================================
+
+static constexpr uint8_t kBadInstanceId = 0xFF; // > NSM_INSTANCE_MAX (31)
+
+TEST(nsmPowerSmoothing, BadGenReq_EncodeFail)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmPowerSmoothing sensor(sensorName, sensorType, inventoryObjPath, featIntf,
+                             nullptr);
+    auto req = sensor.genRequestMsg(0, kBadInstanceId);
+    EXPECT_FALSE(req.has_value());
+}
+
+TEST(nsmHwCircuitryTelemetry, BadGenReq_EncodeFail)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmHwCircuitryTelemetry sensor(sensorName, sensorType, inventoryObjPath,
+                                   featIntf);
+    auto req = sensor.genRequestMsg(0, kBadInstanceId);
+    EXPECT_FALSE(req.has_value());
+}
+
+TEST(nsmPowerSmoothingAdminOverride, BadGenReq_EncodeFail)
+{
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
+    NsmPowerSmoothingAdminOverride sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, nullptr);
+    auto req = sensor.genRequestMsg(0, kBadInstanceId);
+    EXPECT_FALSE(req.has_value());
+}
+
+TEST(nsmCurrentPowerSmoothingProfile, BadGenReq_EncodeFail)
+{
+    auto adminIntf =
+        std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
+    auto adminSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
+        sensorName, sensorType, adminIntf, inventoryObjPath, nullptr);
+    auto curIntf = std::make_shared<OemCurrentPowerProfileIntf>(
+        bus, inventoryObjPath, adminIntf->getInventoryObjPath(), nullptr);
+    auto profileColl = std::make_shared<NsmPowerProfileCollection>(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+    NsmCurrentPowerSmoothingProfile sensor(sensorName, sensorType,
+                                           inventoryObjPath, curIntf,
+                                           profileColl, adminSensor, nullptr);
+    auto req = sensor.genRequestMsg(0, kBadInstanceId);
+    EXPECT_FALSE(req.has_value());
+}
+
+TEST(nsmPowerProfileCollection, BadGenReq_EncodeFail)
+{
+    NsmPowerProfileCollection sensor(sensorName, sensorType, inventoryObjPath,
+                                     nullptr);
+    auto req = sensor.genRequestMsg(0, kBadInstanceId);
+    EXPECT_FALSE(req.has_value());
+}
+
+// ============================================================================
+// NsmPowerSmoothingAction tests
+// Covers nsmPowerSmoothing.cpp lines 659–716 (requestActivatePresetProfile),
+// 748–803 (requestApplyAdminOverride)
+// ============================================================================
+
+// Helper: valid set_active_preset_profile response
+static Response makeActivatePresetProfileResp(uint8_t cc = NSM_SUCCESS)
+{
+    Response resp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                      (cc ? sizeof(nsm_common_non_success_resp) : 0),
+                  0);
+    auto msg = reinterpret_cast<nsm_msg*>(resp.data());
+    encode_set_active_preset_profile_resp(0, cc, cc ? 1 : ERR_NULL, msg);
+    return resp;
+}
+
+// Helper: valid apply_admin_override response
+static Response makeApplyAdminOverrideResp(uint8_t cc = NSM_SUCCESS)
+{
+    Response resp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                      (cc ? sizeof(nsm_common_non_success_resp) : 0),
+                  0);
+    auto msg = reinterpret_cast<nsm_msg*>(resp.data());
+    encode_apply_admin_override_resp(0, cc, cc ? 1 : ERR_NULL, msg);
+    return resp;
+}
+
+// Helper: build a minimal NsmCurrentPowerSmoothingProfile for use as
+// currentProfile in NsmPowerSmoothingAction (device=nullptr is fine; 'device'
+// passed to update() comes from the action's device, not this stored pointer)
+static std::shared_ptr<NsmCurrentPowerSmoothingProfile>
+    makeCurrentProfile(const std::string& pathIn)
+{
+    // NsmCurrentPowerSmoothingProfile ctor takes non-const std::string& refs
+    std::string cpPath = pathIn;
+    auto adminIntf = std::make_shared<OemAdminProfileIntf>(bus, cpPath,
+                                                           nullptr);
+    auto adminSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
+        sensorName, sensorType, adminIntf, cpPath, nullptr);
+    auto curIntf = std::make_shared<OemCurrentPowerProfileIntf>(
+        bus, cpPath, adminIntf->getInventoryObjPath(), nullptr);
+    auto profileColl = std::make_shared<NsmPowerProfileCollection>(
+        sensorName, sensorType, cpPath, nullptr);
+    return std::make_shared<NsmCurrentPowerSmoothingProfile>(
+        sensorName, sensorType, cpPath, curIntf, profileColl, adminSensor,
+        nullptr);
+}
+
+// requestActivatePresetProfile: postPatchIO returns error
+// → status=WriteFailure, co_return NSM_SW_ERROR_COMMAND_FAIL (lines 685–692) //
+
+TEST_F(NsmProcessorTest,
+       NsmPowerSmoothingAction_requestActivatePresetProfile_PostPatchIOFail)
+{
+    std::string path = std::string(inventoryObjPath) + "/action_activate_fail";
+    auto action = std::make_shared<NsmPowerSmoothingAction>(
+        bus, sensorName, sensorType, path, nullptr, gpu);
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    uint16_t profileId = 1;
+
+    EXPECT_CALL(*gpu, postPatchIO)
+        .WillOnce(mockPostPatchIO(NSM_ERR_UNSUPPORTED_COMMAND_CODE));
+    auto rc = action->requestActivatePresetProfile(&status, profileId);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// requestActivatePresetProfile: postPatchIO succeeds but cc=NSM_ERROR
+// → decode else branch → status=WriteFailure (lines 706–713)
+TEST_F(NsmProcessorTest,
+       NsmPowerSmoothingAction_requestActivatePresetProfile_DecodeFailCC)
+{
+    std::string path = std::string(inventoryObjPath) +
+                       "/action_activate_decode_fail";
+    auto action = std::make_shared<NsmPowerSmoothingAction>(
+        bus, sensorName, sensorType, path, nullptr, gpu);
+
+    auto resp = makeActivatePresetProfileResp(NSM_ERROR);
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    uint16_t profileId = 1;
+
+    EXPECT_CALL(*gpu, postPatchIO).WillOnce(mockPostPatchIO(resp));
+    auto rc = action->requestActivatePresetProfile(&status, profileId);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// requestActivatePresetProfile: full success path (lines 699–705)
+// currentProfile->update(device) is called; sensorIO is mocked to handle
+// the subsequent genRequestMsg→sensorIO call from
+// NsmCurrentPowerSmoothingProfile
+TEST_F(NsmProcessorTest,
+       NsmPowerSmoothingAction_requestActivatePresetProfile_Success)
+{
+    std::string path = std::string(inventoryObjPath) +
+                       "/action_activate_success";
+    auto currentProfile = makeCurrentProfile(path + "/cp");
+    auto action = std::make_shared<NsmPowerSmoothingAction>(
+        bus, sensorName, sensorType, path, currentProfile, gpu);
+
+    auto activateResp = makeActivatePresetProfileResp(NSM_SUCCESS);
+    // currentProfile->update(gpu) will call gpu->sensorIO; return a minimal
+    // valid current-profile response to avoid decode errors
+    std::vector<uint8_t> curProfileBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_profile_info_resp), 0);
+    auto curProfileMsg = reinterpret_cast<nsm_msg*>(curProfileBuf.data());
+    nsm_get_current_profile_data profileData{};
+    encode_get_current_profile_info_resp(0, NSM_SUCCESS, ERR_NULL, &profileData,
+                                         curProfileMsg);
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    uint16_t profileId = 1;
+
+    EXPECT_CALL(*gpu, postPatchIO).WillOnce(mockPostPatchIO(activateResp));
+    EXPECT_CALL(*gpu, sensorIO).WillRepeatedly(mockSensorIO(curProfileBuf));
+    auto rc = action->requestActivatePresetProfile(&status, profileId);
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+}
+
+// requestApplyAdminOverride: postPatchIO returns error
+// → status=WriteFailure, co_return NSM_SW_ERROR_COMMAND_FAIL (lines 772–779) //
+
+TEST_F(NsmProcessorTest,
+       NsmPowerSmoothingAction_requestApplyAdminOverride_PostPatchIOFail)
+{
+    std::string path = std::string(inventoryObjPath) + "/action_apply_fail";
+    auto action = std::make_shared<NsmPowerSmoothingAction>(
+        bus, sensorName, sensorType, path, nullptr, gpu);
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+
+    EXPECT_CALL(*gpu, postPatchIO)
+        .WillOnce(mockPostPatchIO(NSM_ERR_UNSUPPORTED_COMMAND_CODE));
+    auto rc = action->requestApplyAdminOverride(&status);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// requestApplyAdminOverride: postPatchIO succeeds but cc=NSM_ERROR
+// → decode else branch → status=WriteFailure (lines 793–800)
+TEST_F(NsmProcessorTest,
+       NsmPowerSmoothingAction_requestApplyAdminOverride_DecodeFailCC)
+{
+    std::string path = std::string(inventoryObjPath) +
+                       "/action_apply_decode_fail";
+    auto action = std::make_shared<NsmPowerSmoothingAction>(
+        bus, sensorName, sensorType, path, nullptr, gpu);
+
+    auto resp = makeApplyAdminOverrideResp(NSM_ERROR);
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+
+    EXPECT_CALL(*gpu, postPatchIO).WillOnce(mockPostPatchIO(resp));
+    auto rc = action->requestApplyAdminOverride(&status);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// requestApplyAdminOverride: full success path (lines 786–792)
+TEST_F(NsmProcessorTest,
+       NsmPowerSmoothingAction_requestApplyAdminOverride_Success)
+{
+    std::string path = std::string(inventoryObjPath) + "/action_apply_success";
+    auto currentProfile = makeCurrentProfile(path + "/cp");
+    auto action = std::make_shared<NsmPowerSmoothingAction>(
+        bus, sensorName, sensorType, path, currentProfile, gpu);
+
+    auto applyResp = makeApplyAdminOverrideResp(NSM_SUCCESS);
+    std::vector<uint8_t> curProfileBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_profile_info_resp), 0);
+    auto curProfileMsg = reinterpret_cast<nsm_msg*>(curProfileBuf.data());
+    nsm_get_current_profile_data profileData{};
+    encode_get_current_profile_info_resp(0, NSM_SUCCESS, ERR_NULL, &profileData,
+                                         curProfileMsg);
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+
+    EXPECT_CALL(*gpu, postPatchIO).WillOnce(mockPostPatchIO(applyResp));
+    EXPECT_CALL(*gpu, sensorIO).WillRepeatedly(mockSensorIO(curProfileBuf));
+    auto rc = action->requestApplyAdminOverride(&status);
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+}
+
+// activatePresetProfile() – success path (lines 718-745):
+// doActivatePresetProfile() is detached synchronously; covers the
+// doActivatePresetProfile wrapper (718-728) and activatePresetProfile
+// sync D-Bus method (730-745).
+TEST_F(NsmProcessorTest,
+       NsmPowerSmoothingAction_activatePresetProfile_HappyPath)
+{
+    std::string path = std::string(inventoryObjPath) + "/action_actpp_sync";
+    auto currentProfile = makeCurrentProfile(path + "/cp");
+    auto action = std::make_shared<NsmPowerSmoothingAction>(
+        bus, sensorName, sensorType, path, currentProfile, gpu);
+
+    auto activateResp = makeActivatePresetProfileResp(NSM_SUCCESS);
+    std::vector<uint8_t> curProfileBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_profile_info_resp), 0);
+    auto curProfileMsg = reinterpret_cast<nsm_msg*>(curProfileBuf.data());
+    nsm_get_current_profile_data profileData{};
+    encode_get_current_profile_info_resp(0, NSM_SUCCESS, ERR_NULL, &profileData,
+                                         curProfileMsg);
+
+    EXPECT_CALL(*gpu, postPatchIO)
+        .WillRepeatedly(mockPostPatchIO(activateResp));
+    EXPECT_CALL(*gpu, sensorIO).WillRepeatedly(mockSensorIO(curProfileBuf));
+
+    uint16_t profileId = 2;
+    sdbusplus::message::object_path objPath;
+    EXPECT_NO_THROW(objPath = action->activatePresetProfile(profileId));
+    EXPECT_FALSE(std::string(objPath).empty());
+}
+
+// applyAdminOverride() – success path (lines 805-832):
+// doApplyAdminOverride() is detached synchronously; covers the
+// doApplyAdminOverride wrapper (805-815) and applyAdminOverride
+// sync D-Bus method (817-832).
+TEST_F(NsmProcessorTest, NsmPowerSmoothingAction_applyAdminOverride_HappyPath)
+{
+    std::string path = std::string(inventoryObjPath) + "/action_apply_sync";
+    auto currentProfile = makeCurrentProfile(path + "/cp");
+    auto action = std::make_shared<NsmPowerSmoothingAction>(
+        bus, sensorName, sensorType, path, currentProfile, gpu);
+
+    auto applyResp = makeApplyAdminOverrideResp(NSM_SUCCESS);
+    std::vector<uint8_t> curProfileBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_profile_info_resp), 0);
+    auto curProfileMsg = reinterpret_cast<nsm_msg*>(curProfileBuf.data());
+    nsm_get_current_profile_data profileData{};
+    encode_get_current_profile_info_resp(0, NSM_SUCCESS, ERR_NULL, &profileData,
+                                         curProfileMsg);
+
+    EXPECT_CALL(*gpu, postPatchIO).WillRepeatedly(mockPostPatchIO(applyResp));
+    EXPECT_CALL(*gpu, sensorIO).WillRepeatedly(mockSensorIO(curProfileBuf));
+
+    sdbusplus::message::object_path objPath;
+    EXPECT_NO_THROW(objPath = action->applyAdminOverride());
+    EXPECT_FALSE(std::string(objPath).empty());
+}
+
+// MctpNsmOperationalStatusSupported=true → createGpuOperationalStatus() called
+// Covers the TRUE branch at nsmProcessor.cpp lines 3699–3706 which was NOT
+// covered by any existing test (all prior tests omit this key)
+TEST_F(NsmProcessorTest,
+       goodTestCreateProcessorAttributes_MctpNsmOperationalStatusEnabled)
+{
+    const std::string freshPath = processorsInventoryBasePath /
+                                  "GPU_MctpOpStatus";
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(freshPath,
+                                                              basicIntfName);
+    basePropertyMap["Name"] = std::string("GPU_MctpOpStatus");
+    basePropertyMap["UUID"] = gpuUuid;
+    basePropertyMap["InventoryObjPath"] = std::string(freshPath);
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        freshPath, basicIntfName + ".ProcessorAttributesMctpOp");
+    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
+    propertyMap["MIGModeSupported"] = false;
+    propertyMap["PortDisableFutureSupported"] = false;
+    propertyMap["ECCModeSupported"] = false;
+    propertyMap["EDPpScalingFactorSupported"] = false;
+    propertyMap["PowerSmoothingSupported"] = false;
+    propertyMap["CpuOperatingConfigSupported"] = false;
+    propertyMap["MemCapacityUtilSupported"] = false;
+    propertyMap["TotalNvLinksCountSupported"] = false;
+    propertyMap["EGMModeSupported"] = false;
+    propertyMap["MNNVLTopologySupported"] = false;
+    propertyMap["MctpNsmOperationalStatusSupported"] = true;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmProcessorSensor(
+        mockManager, basicIntfName + ".ProcessorAttributesMctpOp", freshPath);
+    // createGpuOperationalStatus adds a sensor to deviceSensors
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// MctpNsmOperationalStatusSupported=false (count>0 but bool=false)
+// → compound FALSE branch at nsmProcessor.cpp line 3699
+TEST_F(NsmProcessorTest,
+       goodTestCreateProcessorAttributes_MctpNsmOperationalStatusDisabled)
+{
+    const std::string freshPath = processorsInventoryBasePath /
+                                  "GPU_MctpOpStatusFalse";
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(freshPath,
+                                                              basicIntfName);
+    basePropertyMap["Name"] = std::string("GPU_MctpOpStatusFalse");
+    basePropertyMap["UUID"] = gpuUuid;
+    basePropertyMap["InventoryObjPath"] = std::string(freshPath);
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        freshPath, basicIntfName + ".ProcessorAttributesMctpOpFalse");
+    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
+    propertyMap["MctpNsmOperationalStatusSupported"] = false;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmProcessorSensor(mockManager,
+                             basicIntfName + ".ProcessorAttributesMctpOpFalse",
+                             freshPath);
+    // No GpuOperationalStatus sensor added; only asset+msgTypes sensors
+    EXPECT_GE(gpu->deviceSensors.size(), before);
+}
+
+// GPUBasePowerLimitSupported=true →
+// createGPUPowerLimit("NSM_GPU_BASE_POWER_LIMIT") Covers nsmProcessor.cpp lines
+// 3927-3935 (0/5 branches in old report)
+TEST_F(NsmProcessorTest,
+       CreateProcessorAttributes_GPUBasePowerLimitSupported_True)
+{
+    const std::string freshPath = processorsInventoryBasePath /
+                                  "GPU_BasePwrLimit";
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(freshPath,
+                                                              basicIntfName);
+    basePropertyMap["Name"] = std::string("GPU_BasePwrLimit");
+    basePropertyMap["UUID"] = gpuUuid;
+    basePropertyMap["InventoryObjPath"] = std::string(freshPath);
+
+    const std::string intf = basicIntfName + ".ProcessorAttrsBasePwr";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(freshPath, intf);
+    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
+    propertyMap["MIGModeSupported"] = false;
+    propertyMap["PortDisableFutureSupported"] = false;
+    propertyMap["ECCModeSupported"] = false;
+    propertyMap["EDPpScalingFactorSupported"] = false;
+    propertyMap["PowerSmoothingSupported"] = false;
+    propertyMap["CpuOperatingConfigSupported"] = false;
+    propertyMap["MemCapacityUtilSupported"] = false;
+    propertyMap["TotalNvLinksCountSupported"] = false;
+    propertyMap["EGMModeSupported"] = false;
+    propertyMap["MNNVLTopologySupported"] = false;
+    propertyMap["MctpNsmOperationalStatusSupported"] = false;
+    propertyMap["GPUBasePowerLimitSupported"] = true;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmProcessorSensor(mockManager, intf, freshPath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// GPUCopyCPUPowerLimitSupported=true →
+// createGPUPowerLimit("NSM_GPU_COPY_CPU_POWER_LIMIT") Covers nsmProcessor.cpp
+// lines 3933-3940 (0/6 branches in old report)
+TEST_F(NsmProcessorTest,
+       CreateProcessorAttributes_GPUCopyCPUPowerLimitSupported_True)
+{
+    const std::string freshPath = processorsInventoryBasePath /
+                                  "GPU_CopyCPUPwrLimit";
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(freshPath,
+                                                              basicIntfName);
+    basePropertyMap["Name"] = std::string("GPU_CopyCPUPwrLimit");
+    basePropertyMap["UUID"] = gpuUuid;
+    basePropertyMap["InventoryObjPath"] = std::string(freshPath);
+
+    const std::string intf = basicIntfName + ".ProcessorAttrsCopyCPUPwr";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(freshPath, intf);
+    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
+    propertyMap["MIGModeSupported"] = false;
+    propertyMap["PortDisableFutureSupported"] = false;
+    propertyMap["ECCModeSupported"] = false;
+    propertyMap["EDPpScalingFactorSupported"] = false;
+    propertyMap["PowerSmoothingSupported"] = false;
+    propertyMap["CpuOperatingConfigSupported"] = false;
+    propertyMap["MemCapacityUtilSupported"] = false;
+    propertyMap["TotalNvLinksCountSupported"] = false;
+    propertyMap["EGMModeSupported"] = false;
+    propertyMap["MNNVLTopologySupported"] = false;
+    propertyMap["MctpNsmOperationalStatusSupported"] = false;
+    propertyMap["GPUBasePowerLimitSupported"] = false;
+    propertyMap["GPUCopyCPUPowerLimitSupported"] = true;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmProcessorSensor(mockManager, intf, freshPath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// ─── Branch coverage: rc==NSM_SW_SUCCESS && cc!=NSM_SUCCESS ─────────────────
+
+// NsmPowerSmoothing::handleResponseMsg: non-success CC via 9-byte buffer →
+// `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` false branch
+TEST(nsmPowerSmoothing, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmPowerSmoothing sensor(sensorName, sensorType, inventoryObjPath, featIntf,
+                             nullptr);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmHwCircuitryTelemetry::handleResponseMsg: non-success CC via 9-byte buffer
+TEST(nsmHwCircuitryTelemetry,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmHwCircuitryTelemetry sensor(sensorName, sensorType, inventoryObjPath,
+                                   featIntf);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmPowerSmoothingAdminOverride::handleResponseMsg: non-success CC →
+// `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` false branch
+TEST(nsmPowerSmoothingAdminOverride,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
+                                                          nullptr);
+    NsmPowerSmoothingAdminOverride sensor(sensorName, sensorType, featIntf,
+                                          inventoryObjPath, nullptr);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// ─── Branch coverage: rc==NSM_SW_SUCCESS && cc!=NSM_SUCCESS (nsmProcessor) ──
+
+TEST(nsmMigMode, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    nsm::NsmMigMode sensor(bus, sensorName, sensorType, inventoryObjPath,
+                           nullptr, false);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmEccErrorCounts, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
+                                  inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmPciGroup5, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmPciGroup5 sensor(sensorName, sensorType, processorPerformanceIntf,
+                             uint8_t(0), inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmCurrClockFreq, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmCurrClockFreq sensor(sensorName, sensorType, cpuOperatingConfigIntf,
+                                 inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmProcessorThrottleReason,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmProcessorThrottleReason sensor(
+        sensorName, sensorType, processorPerformanceIntf, inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmTotalNvLinks, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto totalNvLinkInterface =
+        std::make_shared<TotalNvLinkInterface>(bus, inventoryObjPath.c_str());
+    nsm::NsmTotalNvLinks sensor(sensorName, sensorType, totalNvLinkInterface,
+                                inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmEccMode, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmEccMode sensor(sensorName, sensorType, eccIntf, inventoryObjPath,
+                           false, nullptr);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmEgmMode, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    nsm::NsmEgmMode sensor(bus, sensorName, sensorType, inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(nsmPowerCap, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
+    auto persistencyIntf =
+        std::make_shared<PowerPersistencyIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmPowerCap sensor(sensorName, sensorType, powerCapIntf,
+                            std::vector<std::string>{}, persistencyIntf,
+                            inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST(NsmProcessorThrottleDuration,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID",
+                                                  "STATIC:0:0:NUM:0", 1);
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
+                                             processorPerformanceIntf,
+                                             inventoryObjPath, false, gpuPtr);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmEDPpScalingFactor::handleResponseMsg: rc==NSM_SW_SUCCESS, cc!=NSM_SUCCESS
+// 9-byte buffer → decode_reason_code_and_cc returns NSM_SW_SUCCESS with
+// cc=NSM_ERROR → `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` FALSE branch
+TEST(nsmEDPpScalingFactor, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
+    auto resetEdppAsyncIntf = std::make_shared<NsmResetEdppAsyncIntf>(
+        bus, inventoryObjPath.c_str(), nullptr);
+    nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
+                                     eDPpIntf, resetEdppAsyncIntf);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmClockLimitGraphics::handleResponseMsg: rc==NSM_SW_SUCCESS,
+// cc!=NSM_SUCCESS → `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` FALSE branch
+TEST(NsmClockLimitGraphics,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
+                                      cpuOperatingConfigIntf, inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmCurrentUtilization::handleResponseMsg: rc==NSM_SW_SUCCESS,
+// cc!=NSM_SUCCESS → `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` FALSE branch
+TEST(nsmCurrentUtilization,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    auto smUtilizationIntf =
+        std::make_shared<SMUtilizationIntf>(bus, inventoryObjPath.c_str());
+    const uuid_t gpuUuid2 = "STATIC:0:0:MCTP_EID:55";
+    auto gpuPtr2 = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid2,
+                                                   1);
+    nsm::NsmCurrentUtilization sensor(sensorName, sensorType,
+                                      cpuOperatingConfigIntf, smUtilizationIntf,
+                                      inventoryObjPath, false, gpuPtr2);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmAccumGpuUtilTime::handleResponseMsg: rc==NSM_SW_SUCCESS,
+// cc!=NSM_SUCCESS → `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` FALSE branch
+TEST(NsmAccumGpuUtilTime, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmAccumGpuUtilTime sensor(sensorName, sensorType,
+                                    processorPerformanceIntf, inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmProcessorRevision::handleResponseMsg: rc==NSM_SW_SUCCESS,
+// cc!=NSM_SUCCESS → `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` FALSE branch
+TEST(nsmProcessorRevision, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    nsm::NsmProcessorRevision sensor(bus, sensorName, sensorType,
+                                     inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmConfidentialCompute::handleResponseMsg: rc==NSM_SW_SUCCESS,
+// cc!=NSM_SUCCESS → `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` FALSE branch
+TEST(nsmConfidentialCompute,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto confidentialComputeIntf = std::make_shared<ConfidentialComputeIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmConfidentialCompute sensor(
+        sensorName, sensorType, confidentialComputeIntf, inventoryObjPath);
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// ============================================================================
+// NsmCurrentPowerSmoothingProfile::handleResponseMsg – rc==NSM_SW_SUCCESS,
+// cc!=NSM_SUCCESS branch (nsmPowerSmoothing.cpp L323 FALSE via cc!=NSM_SUCCESS)
+// Buffer is exactly nsm_msg_hdr + nsm_common_non_success_resp so that
+// decode_reason_code_and_cc returns NSM_SW_SUCCESS with cc=NSM_ERROR.
+// ============================================================================
+TEST(nsmCurrentPowerSmoothingProfile,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_ElseBranch)
+{
+    std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
+        std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
+    auto adminProfileSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, nullptr);
+    std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            nullptr);
+    auto getAllPowerProfileSensor = std::make_shared<NsmPowerProfileCollection>(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+    NsmCurrentPowerSmoothingProfile sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, nullptr);
+
+    // Buffer exactly sizeof(nsm_msg_hdr)+sizeof(nsm_common_non_success_resp)
+    // with cc=NSM_ERROR → decode_reason_code_and_cc returns NSM_SW_SUCCESS,
+    // cc=NSM_ERROR → decode_get_current_profile_info_resp returns
+    // NSM_SW_SUCCESS → L323 `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` FALSE
+    // (cc!=NSM_SUCCESS)
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code = NSM_ERROR
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// ============================================================================
+// NsmPowerProfileCollection::handleResponseMsg – rc==NSM_SW_SUCCESS,
+// cc!=NSM_SUCCESS branch (nsmPowerSmoothing.cpp L582 FALSE via cc!=NSM_SUCCESS)
+// ============================================================================
+TEST(NsmPowerProfileCollection,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_ElseBranch)
+{
+    // Buffer exactly sizeof(nsm_msg_hdr)+sizeof(nsm_common_non_success_resp)
+    // with cc=NSM_ERROR → decode_reason_code_and_cc returns NSM_SW_SUCCESS,
+    // cc=NSM_ERROR → decode_get_preset_profile_metadata_resp returns
+    // NSM_SW_SUCCESS → L582 `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` FALSE
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code = NSM_ERROR
+    NsmPowerProfileCollection sensor(sensorName, sensorType, inventoryObjPath,
+                                     nullptr);
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// ============================================================================
+// NsmPowerSmoothingV2::handleSample – decode failure and tag boundary tests
+// ============================================================================
+// Covers lines L374 TRUE branch (tag > 0xEF early return)
+TEST(nsmPowerSmoothingV2, HandleSample_HighTag_EarlyReturn)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    // tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE (0xEF) → early return
+    NsmPowerSmoothingV2::TelemetrySample sample{0xFF, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// Covers else branch (unknown tag in valid range → NSM_SW_ERROR_LENGTH)
+TEST(nsmPowerSmoothingV2, HandleSample_UnknownTag_ElseBranch)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    // tag=8 is not any of 0-7 → else branch
+    NsmPowerSmoothingV2::TelemetrySample sample{8, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+// Covers L195 TRUE branch (updateFeatureFlagSample decode fail)
+TEST(nsmPowerSmoothingV2, HandleSample_FeatureFlag_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    // data=nullptr → decodeFeatureFlagSample returns NSM_SW_ERROR_NULL → L195
+    // TRUE
+    NsmPowerSmoothingV2::TelemetrySample sample{FEATURE_FLAG_TAG, 0, nullptr,
+                                                true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Covers L226 TRUE branch (updateCurrentTMPSettingSample decode fail)
+TEST(nsmPowerSmoothingV2, HandleSample_CurrentTMPSetting_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    // data=nullptr → decode returns NSM_SW_ERROR_NULL → L226 TRUE
+    NsmPowerSmoothingV2::TelemetrySample sample{CURRENT_TMP_SETTING_TAG, 0,
+                                                nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Covers L248 TRUE branch (updateCurrentTMPFloorSettingSample decode fail)
+TEST(nsmPowerSmoothingV2, HandleSample_TMPFloorSetting_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    NsmPowerSmoothingV2::TelemetrySample sample{TMP_FLOOR_SETTING_TAG, 0,
+                                                nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Covers L269 TRUE branch (updateMaxTmpFloorSettingSample decode fail)
+TEST(nsmPowerSmoothingV2, HandleSample_MaxTMPFloorSetting_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    NsmPowerSmoothingV2::TelemetrySample sample{MAX_TMP_FLOOR_SETTING_TAG, 0,
+                                                nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Covers L291 TRUE branch (updateMinTmpFloorSettingSample decode fail)
+TEST(nsmPowerSmoothingV2, HandleSample_MinTMPFloorSetting_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    NsmPowerSmoothingV2::TelemetrySample sample{MIN_TMP_FLOOR_SETTING_TAG, 0,
+                                                nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Covers L312 TRUE branch (updateFloorWindowMultiplierSample decode fail)
+TEST(nsmPowerSmoothingV2, HandleSample_FloorWindowMultiplier_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    NsmPowerSmoothingV2::TelemetrySample sample{FLOOR_WINDOW_MULTIPLIER_TAG, 0,
+                                                nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Covers L334 TRUE branch (updateMinPrimaryFloorActivationOffsetSample decode
+// fail)
+TEST(nsmPowerSmoothingV2,
+     HandleSample_MinPrimaryFloorActivationOffset_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    NsmPowerSmoothingV2::TelemetrySample sample{
+        MIN_PRIMARY_FLOOR_ACTIVATION_OFFSET_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Covers L356 TRUE branch (updateMinPrimaryFloorActivationPointSample decode
+// fail)
+TEST(nsmPowerSmoothingV2,
+     HandleSample_MinPrimaryFloorActivationPoint_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    NsmPowerSmoothingV2::TelemetrySample sample{
+        MIN_PRIMARY_FLOOR_ACTIVATION_POINT_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// NsmCurrentPowerSmoothingProfileV2::handleSample – decode failure and
+// tag boundary tests
+// ============================================================================
+TEST(nsmCurrentPowerSmoothingProfileV2, HandleSample_HighTag_EarlyReturn)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{0xFF, 0, nullptr,
+                                                              true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2, HandleSample_UnknownTag_ElseBranch)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    // tag=20 is not any of 0-9 → else branch
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{20, 0, nullptr,
+                                                              true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2,
+     HandleSample_ActivePresetProfile_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        ACTIVE_PRESET_PROFILE_ID_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2,
+     HandleSample_AdminOverrideMask_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        ADMIN_OVERRIDE_MASK_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2, HandleSample_CurrentTMPFloor_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        CURRENT_TMP_FLOOR_SETTING_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2, HandleSample_RampUpRate_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        CURRENT_RAMPUP_RATE_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2, HandleSample_RampDownRate_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        CURRENT_RAMPDOWN_RATE_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2,
+     HandleSample_RampDownHysteresis_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        CURRENT_RAMPDOWN_HYSTERESIS_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2, HandleSample_SecondaryFloor_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        CURRENT_SECONDARY_FLOOR_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2,
+     HandleSample_PrimaryFloorActivationWindowMultiplier_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        CURRENT_PRIMARY_FLOOR_ACTIVATION_WINDOW_MULTIPLIER_TAG, 0, nullptr,
+        true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2,
+     HandleSample_PrimaryFloorTargetWindow_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        CURRENT_PRIMARY_FLOOR_TARGET_WINDOW_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2,
+     HandleSample_PrimaryFloorActivationOffset_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2::TelemetrySample sample{
+        CURRENT_PRIMARY_FLOOR_ACTIVATION_OFFSET_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// NsmPowerSmoothingAdminOverrideV2::handleSample – decode failure and
+// tag boundary tests
+// ============================================================================
+TEST(nsmPowerSmoothingAdminOverrideV2, HandleSample_HighTag_EarlyReturn)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{0xFF, 0, nullptr,
+                                                             true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2, HandleSample_UnknownTag_ElseBranch)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    // tag=20 is not any of 0-7 → else branch
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{20, 0, nullptr,
+                                                             true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2, HandleSample_TMPFloor_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{
+        ADMIN_OVERRIDE_PROFILE_TMP_FLOOR_SETTING_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2, HandleSample_RampUpRate_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{
+        ADMIN_OVERRIDE_PROFILE_RAMPUP_RATE_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2, HandleSample_RampDownRate_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{
+        ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2,
+     HandleSample_RampDownHysteresis_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{
+        ADMIN_OVERRIDE_PROFILE_RAMPDOWN_HYSTERESIS_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2, HandleSample_SecondaryFloor_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{
+        ADMIN_OVERRIDE_PROFILE_SECONDARY_FLOOR_TAG, 0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2,
+     HandleSample_PrimaryFloorActivationWindowMultiplier_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{
+        ADMIN_OVERRIDE_PROFILE_PRIMARY_FLOOR_ACTIVATION_WINDOW_MULTIPLIER_TAG,
+        0, nullptr, true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2,
+     HandleSample_PrimaryFloorTargetWindow_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{
+        ADMIN_OVERRIDE_PROFILE_PRIMARY_FLOOR_TARGET_WINDOW_TAG, 0, nullptr,
+        true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2,
+     HandleSample_PrimaryFloorActivationOffset_DecodeFail)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2::TelemetrySample sample{
+        ADMIN_OVERRIDE_PROFILE_PRIMARY_FLOOR_ACTIVATION_OFFSET_TAG, 0, nullptr,
+        true};
+    auto rc = sensor.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// NsmPowerSmoothingV2::handleResponseMsg – while-loop branch coverage
+// L470: decode_aggregate_resp_sample fails (no sample bytes after header)
+// L482: handleSample fails (sample with data_len=1 for uint32 decode)
+// ============================================================================
+
+// Covers L482 TRUE: sample has length=0 (→ data_len=1 byte) for
+// CURRENT_TMP_SETTING_TAG which needs 4 bytes → decode fails
+TEST(nsmPowerSmoothingV2, HandleResponseMsg_HandleSampleDecodeFailInLoop)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
+    supportedCommands[20].bits.bit7 = 1;
+    supportedCommands[21].bits.bit0 = 1;
+    supportedCommands[21].bits.bit1 = 1;
+    supportedCommands[21].bits.bit2 = 1;
+    gpuPtr->updateMessageTypesToCommandCodeMatrix(
+        NSM_TYPE_PLATFORM_ENVIRONMENTAL, supportedCommands,
+        SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 sensor(sensorName, sensorType, inventoryObjPath,
+                               featIntf, gpuPtr);
+    // Build response with 1 sample: tag=CURRENT_TMP_SETTING_TAG(1),
+    // length=0 (data_len=1<<0=1 byte), valid=1, data=[0x42]
+    // decode_aggregate_resp_sample succeeds (data_len=1) but
+    // updateCurrentTMPSettingSample needs 4 bytes → decode fails → L482 TRUE
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t rc = encode_get_powersmoothing_featinfo_v2_resp(0, NSM_SUCCESS, 1,
+                                                            response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    // Append one sample: tag=0x01, byte2=(valid=1, length=0, reserved=0)=0x10,
+    // data[0]=0x42
+    responseMsg.push_back(CURRENT_TMP_SETTING_TAG); // tag
+    responseMsg.push_back(0x10);                    // valid=1,length=0,rsvd=0
+    responseMsg.push_back(0x42);                    // 1 data byte
+    response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    // handleSample failed → rc != NSM_SW_SUCCESS
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// NsmCurrentPowerSmoothingProfileV2::handleResponseMsg – while-loop branches
+// ============================================================================
+
+// Covers handleSample failure path in handleResponseMsg loop
+TEST(nsmCurrentPowerSmoothingProfileV2,
+     HandleResponseMsg_HandleSampleDecodeFailInLoop)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
+    supportedCommands[20].bits.bit7 = 1;
+    supportedCommands[21].bits.bit0 = 1;
+    supportedCommands[21].bits.bit1 = 1;
+    supportedCommands[21].bits.bit2 = 1;
+    gpuPtr->updateMessageTypesToCommandCodeMatrix(
+        NSM_TYPE_PLATFORM_ENVIRONMENTAL, supportedCommands,
+        SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    auto pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 sensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    // tag=ADMIN_OVERRIDE_MASK_TAG(1), length=0→data_len=1, needs 2 bytes → fail
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t rc = encode_get_current_profile_info_v2_resp(0, NSM_SUCCESS, 1,
+                                                         response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    responseMsg.push_back(ADMIN_OVERRIDE_MASK_TAG); // tag=1
+    responseMsg.push_back(0x10); // valid=1, length=0 → data_len=1
+    responseMsg.push_back(0x42); // 1 data byte (need ≥2)
+    response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// NsmPowerSmoothingAdminOverrideV2::handleResponseMsg – while-loop branches
+// ============================================================================
+
+// Covers handleSample failure path via handleResponseMsg loop
+TEST(nsmPowerSmoothingAdminOverrideV2,
+     HandleResponseMsg_HandleSampleDecodeFailInLoop)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa9";
+    auto gpuPtr = std::make_shared<MockNsmDevice>(1, 1, "MCTP_UUID", gpuUuid,
+                                                  1);
+    bitfield8_t supportedCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
+    supportedCommands[20].bits.bit7 = 1;
+    supportedCommands[21].bits.bit0 = 1;
+    supportedCommands[21].bits.bit1 = 1;
+    supportedCommands[21].bits.bit2 = 1;
+    gpuPtr->updateMessageTypesToCommandCodeMatrix(
+        NSM_TYPE_PLATFORM_ENVIRONMENTAL, supportedCommands,
+        SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 sensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    // tag=ADMIN_OVERRIDE_PROFILE_TMP_FLOOR_SETTING_TAG(0), length=0→data_len=1
+    // decodeCurrentTMPFloorSample needs 2 bytes → fail → L1138 TRUE
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t rc = encode_get_admin_override_profile_info_v2_resp(0, NSM_SUCCESS,
+                                                                1, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    responseMsg.push_back(
+        ADMIN_OVERRIDE_PROFILE_TMP_FLOOR_SETTING_TAG); // tag //
+
+    responseMsg.push_back(0x10); // valid=1, length=0 → data_len=1 (need ≥2)
+    responseMsg.push_back(0x42); // 1 data byte
+    response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
 }

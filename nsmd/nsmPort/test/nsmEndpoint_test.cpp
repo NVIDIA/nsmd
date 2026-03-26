@@ -192,6 +192,54 @@ TEST_F(NsmEndpointFactoryTest, CreateNsmEndpointsInvalidUUID)
     EXPECT_EQ(nullptr, endpoint);
 }
 
+// =============================================================================
+// FALSE-branch coverage: count() checks in createNsmEndpoints
+// =============================================================================
+
+// FabricsObjPath absent → fabricsObjPath="" → inventoryObjPath="/Endpoints/X"
+// (valid D-Bus path starting with "/") → sensor IS created
+TEST_F(NsmEndpointFactoryTest,
+       CreateEndpoints_MissingFabricsObjPath_SensorCreated)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FabricsEndpoint";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/endpoint_no_fabrics";
+    const std::string name = "Endpoint_NoFabrics";
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    propertyMap["Name"] = name;
+    propertyMap["UUID"] = gpuUuid;
+    // "FabricsObjPath" intentionally omitted → fabricsObjPath="" → FALSE branch
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmEndpoints(mockManager, interface, objPath);
+    // inventoryObjPath = "/Endpoints/Endpoint_NoFabrics" → valid path
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// Name absent → name="" → inventoryObjPath = fabricsObjPath + "/Endpoints/"
+// (trailing slash) → sdbusplus throws SdBusError (InvalidArgs) →
+// propagates out of coroutine (no try/catch in factory)
+TEST_F(NsmEndpointFactoryTest, CreateEndpoints_MissingName_Throws)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FabricsEndpoint";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/endpoint_no_name";
+    const std::string fabricsObjPath =
+        "/xyz/openbmc_project/inventory/system/fabric_no_name";
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    propertyMap["FabricsObjPath"] = fabricsObjPath;
+    propertyMap["UUID"] = gpuUuid;
+    // "Name" intentionally omitted → FALSE branch for count("Name") → name=""
+    // → NsmEndpoint registers D-Bus at path ending with "/" → SdBusError
+
+    EXPECT_THROW_COROUTINE(createNsmEndpoints(mockManager, interface, objPath),
+                           std::exception);
+}
+
 TEST_F(NsmEndpointFactoryTest, CreateNsmEndpointsMultipleAssociations)
 {
     const std::string interface =
@@ -237,4 +285,26 @@ TEST_F(NsmEndpointFactoryTest, CreateNsmEndpointsMultipleAssociations)
         std::dynamic_pointer_cast<NsmEndpoint>(gpu->deviceSensors[1]);
     EXPECT_NE(nullptr, endpoint);
     EXPECT_EQ(name, endpoint->getName());
+}
+
+// UUID absent → count("UUID") FALSE → uuid="" → parseStaticUuid("") throws
+// std::runtime_error
+TEST_F(NsmEndpointFactoryTest, CreateEndpoints_MissingUUID_Throws)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FabricsEndpoint";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/endpoint_no_uuid";
+    const std::string name = "Endpoint_NoUUID";
+    const std::string fabricsObjPath =
+        "/xyz/openbmc_project/inventory/system/fabric_no_uuid";
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    propertyMap["Name"] = name;
+    propertyMap["FabricsObjPath"] = fabricsObjPath;
+    // "UUID" intentionally omitted → count("UUID") FALSE → uuid="" →
+    // parseStaticUuid("") throws std::runtime_error
+
+    EXPECT_THROW_COROUTINE(createNsmEndpoints(mockManager, interface, objPath),
+                           std::runtime_error);
 }

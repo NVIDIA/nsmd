@@ -8,6 +8,11 @@
 
 #include "utils.hpp"
 
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <sdbusplus/exception.hpp>
+
 #include <gtest/gtest.h>
 
 using namespace utils;
@@ -134,11 +139,8 @@ TEST(CommonUtilsBranch, Int64ToDoubleSafeConvertNegativeMin)
 {
     int64_t value = -(1LL << 53);
     double result = int64ToDoubleSafeConvert(value);
-    // Note: Production code bug - negating uint64_t MAX_SAFE_INTEGER_IN_DOUBLE
-    // wraps to positive Should return -9007199254740991, but returns ~1.84e19
-    // due to unsigned negation wrap Matching existing test pattern from
-    // common_utils_bitfield_test.cpp line 304
-    EXPECT_DOUBLE_EQ(result, static_cast<double>(-((1ULL << 53) - 1)));
+    // Use 1LL (signed) to get correct negative value; 1ULL would wrap around
+    EXPECT_DOUBLE_EQ(result, static_cast<double>(-((1LL << 53) - 1)));
 }
 
 TEST(CommonUtilsBranch, Int64ToDoubleSafeConvertExceedsPositiveMax)
@@ -196,4 +198,130 @@ TEST(CommonUtilsBranch, GetDeviceTypeAndRoleZeroCombined)
     getDeviceTypeAndRole(0, &deviceType, &deviceRole);
     EXPECT_EQ(deviceType, 0);
     EXPECT_EQ(deviceRole, 0);
+}
+
+// ============================================================================
+// Branch coverage: readFdToBuffer / writeBufferToFd error paths
+// ============================================================================
+
+// Line 763: lseek fails on a pipe → readFdToBuffer throws
+TEST(CommonUtilsBranch, ReadFdToBuffer_LseekFails_Throws)
+{
+    int pipefd[2];
+    ASSERT_EQ(pipe(pipefd), 0);
+
+    std::vector<uint8_t> buffer;
+    EXPECT_THROW(utils::readFdToBuffer(pipefd[0], buffer), std::runtime_error);
+
+    close(pipefd[0]);
+    close(pipefd[1]);
+}
+
+// Lines 779-780: lseek OK (regular file), but read() returns EBADF on
+// a write-only fd → readFdToBuffer throws
+TEST(CommonUtilsBranch, ReadFdToBuffer_ReadFails_Throws)
+{
+    char tmpPath[] = "/tmp/utils_branch_test_XXXXXX";
+    int tmpFd = mkstemp(tmpPath);
+    ASSERT_GE(tmpFd, 0);
+    const uint8_t data[] = {0xAA, 0xBB, 0xCC};
+    ASSERT_EQ(::write(tmpFd, data, sizeof(data)), (ssize_t)sizeof(data));
+    close(tmpFd);
+
+    // Reopen write-only: lseek and fstat succeed, but read() fails with EBADF
+    int fd = open(tmpPath, O_WRONLY);
+    unlink(tmpPath);
+    ASSERT_GE(fd, 0);
+
+    std::vector<uint8_t> buffer;
+    EXPECT_THROW(utils::readFdToBuffer(fd, buffer), std::runtime_error);
+
+    close(fd);
+}
+
+// Line 797: lseek fails on a pipe → writeBufferToFd throws
+TEST(CommonUtilsBranch, WriteBufferToFd_LseekFails_Throws)
+{
+    int pipefd[2];
+    ASSERT_EQ(pipe(pipefd), 0);
+
+    std::vector<uint8_t> buffer = {1, 2, 3};
+    EXPECT_THROW(utils::writeBufferToFd(pipefd[1], buffer), std::runtime_error);
+
+    close(pipefd[0]);
+    close(pipefd[1]);
+}
+
+// Lines 806-807: lseek OK (regular file), but write() returns EBADF on
+// a read-only fd with non-empty buffer → writeBufferToFd throws
+TEST(CommonUtilsBranch, WriteBufferToFd_WriteFails_Throws)
+{
+    char tmpPath[] = "/tmp/utils_branch_write_XXXXXX";
+    int tmpFd = mkstemp(tmpPath);
+    ASSERT_GE(tmpFd, 0);
+    close(tmpFd);
+
+    // Reopen read-only: lseek succeeds, write() fails with EBADF
+    int fd = open(tmpPath, O_RDONLY);
+    unlink(tmpPath);
+    ASSERT_GE(fd, 0);
+
+    std::vector<uint8_t> buffer = {1, 2, 3};
+    EXPECT_THROW(utils::writeBufferToFd(fd, buffer), std::runtime_error);
+
+    close(fd);
+}
+
+// Test for IDBusHandler::tryGetDbusProperty catch block (L269-271 in utils.hpp)
+// Create a concrete subclass of IDBusHandler that throws sdbusplus::exception
+// from getDbusPropertyVariant to cover the catch block.
+
+struct ThrowingSdBusHandler : public IDBusHandler
+{
+    std::string getService(const char*, const char*) const override
+    {
+        return "";
+    }
+    MapperServiceMap getServiceMap(const char*,
+                                   const dbus::Interfaces&) const override
+    {
+        return {};
+    }
+    GetSubTreeResponse getSubtree(const std::string&, int,
+                                  const dbus::Interfaces&) const override
+    {
+        return {};
+    }
+    void setDbusProperty(const DBusMapping&,
+                         const PropertyValue&) const override
+    {}
+    PropertyValue getDbusPropertyVariant(const char*, const char*,
+                                         const char*) const override
+    {
+        // Throw a concrete sdbusplus exception to exercise the catch block
+        // in tryGetDbusProperty
+        throw sdbusplus::exception::InvalidEnumString{};
+    }
+    PropertyValuesCollection getDbusProperties(const char*,
+                                               const char*) const override
+    {
+        return {};
+    }
+    GetAssociatedObjectsResponse
+        getAssociatedObjects(const std::string&,
+                             const std::string&) const override
+    {
+        return {};
+    }
+};
+
+// L269-271: tryGetDbusProperty catch block
+// When getDbusPropertyVariant throws sdbusplus::exception, returns defValue
+TEST(CommonUtilsBranch, TryGetDbusProperty_SdBusException_ReturnsDefault)
+{
+    ThrowingSdBusHandler handler;
+    const std::string defValue = "default";
+    auto result = handler.tryGetDbusProperty<std::string>("path", "prop",
+                                                          "intf", defValue);
+    EXPECT_EQ(result, defValue);
 }

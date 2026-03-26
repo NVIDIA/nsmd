@@ -6,8 +6,14 @@ tests = [
     'nsmSetWriteProtected_test',
     'asyncOperationManager_test',
     'nsmSetECCMode_test',
+    'nsmSetECCModeBranch_test',
     'nsmSetErrorInjection_test',
+    'nsmSetErrorInjectionBranch_test',
+    'nsmSetEgmMode_test',
+    'nsmSetEgmModeBranch_test',
     'nsmSetMigMode_test',
+    'nsmSetCpuOperatingConfig_test',
+    'nsmSetAsyncBranch_test',
 ]
 foreach t : tests
     test(

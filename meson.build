@@ -38,6 +38,7 @@ if get_option('tests').enabled()
     gtest = gtest.as_system('system')
     gmock = gmock.as_system('system')
 
+    # Mocking coroutines for building coverage reports
     if get_option('b_coverage')
         tests_cpp_args = [
             '-DCOVERAGE_DISABLE_COROUTINES',

@@ -48,7 +48,7 @@ class NsmNumericSensorValueAggregateTest : public ::testing::Test
     std::string physicalContext = "GPU";
     double maxAllowableValue = std::numeric_limits<double>::infinity();
     double maxValue = std::numeric_limits<double>::infinity();
-    double minValue = -std::numeric_limits<double>::infinity();
+    double minValue = std::numeric_limits<double>::lowest();
     std::string readingBasis = "Headroom";
     std::string description = "test sensor description";
 };

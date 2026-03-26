@@ -611,3 +611,37 @@ TEST(DebugTokenUtilsTest, unmappedTokenInputsReturnNone)
     EXPECT_EQ(tokenSubtypeToEnum(1, 0x00000001, "UnknownDevice"),
               TokenSubtypeEnum::None);
 }
+
+// ============================================================================
+// tokenSubtypeBitmapToEnumArray: TRUE branch of
+//   if (enumValue != TokenSubtypeEnum::None || bitMask == 0)
+//
+// All prior tests used combinations where tokenSubtypeToEnum() returns None,
+// so push_back() was never called (FALSE branch).
+// GPU type=1 (DebugFirmwareUnlock), subtype=0x1 maps to TokenSubtypeEnum::VBIOS
+// (non-None) → TRUE branch → VBIOS is pushed into the result.
+// ============================================================================
+
+TEST(DebugTokenUtilsTest,
+     TokenSubtypeBitmapToEnumArray_GPU_Type1_Bit0_PushesVBIOS)
+{
+    // tokenSubtype=0x1 → bit 0 set → bitMask=1
+    // tokenSubtypeToEnum(1, 1, "GPU") → VBIOS (non-None)
+    // → TRUE branch → VBIOS pushed
+    auto result = tokenSubtypeBitmapToEnumArray(1, 0x1, "GPU");
+
+    ASSERT_FALSE(result.empty());
+    EXPECT_EQ(result[0], TokenSubtypeEnum::VBIOS);
+}
+
+TEST(DebugTokenUtilsTest,
+     TokenSubtypeBitmapToEnumArray_GPU_Type1_MultipleBits_PushesMultipleEnums)
+{
+    // tokenSubtype=0x3 → bits 0 and 1 set
+    // bit 0 → bitMask=1 → VBIOS; bit 1 → bitMask=2 → FSPRT
+    auto result = tokenSubtypeBitmapToEnumArray(1, 0x3, "GPU");
+
+    ASSERT_EQ(result.size(), 2u);
+    EXPECT_EQ(result[0], TokenSubtypeEnum::VBIOS);
+    EXPECT_EQ(result[1], TokenSubtypeEnum::FSPRT);
+}

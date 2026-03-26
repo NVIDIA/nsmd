@@ -1083,3 +1083,211 @@ TEST(getDataTypeEnumTest, DefaultBoundary)
     auto result = getDataTypeEnum(100);
     EXPECT_EQ(result, BucketDataTypes::Unknown);
 }
+
+// Error-CC path: decode succeeds but cc = NSM_ERROR (non-zero)
+// → if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS) is false
+// → return cc ? cc : rc; takes the true branch (return cc).
+TEST(NsmHistogramFormat, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    auto formatIntf = std::make_shared<FormatIntf>(bus,
+                                                   inventoryObjPath.c_str());
+    auto bucketInfoIntf =
+        std::make_shared<BucketInfoIntf>(bus, inventoryObjPath.c_str());
+
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    uint32_t histogramId = 1;
+    uint16_t parameter = 0;
+
+    NsmHistogramFormat sensor(bus, sensorName, sensorType, formatIntf,
+                              bucketInfoIntf, inventoryObjPath,
+                              associationsList, histogramId, parameter);
+
+    std::vector<uint8_t> responseMsg(256, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    struct nsm_histogram_format_metadata metaData = {};
+    uint8_t bucketOffsets[4] = {};
+    uint8_t rc = encode_get_histogram_format_resp(
+        0, NSM_ERROR, ERR_NULL, &metaData, bucketOffsets, sizeof(bucketOffsets),
+        response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// NsmHistogramData::genRequestMsg failure path (invalid instanceId)
+TEST(NsmHistogramDataTest, GenRequestMsg_InvalidInstanceId)
+{
+    auto formatIntf = std::make_shared<FormatIntf>(bus,
+                                                   inventoryObjPath.c_str());
+    auto bucketInfoIntf =
+        std::make_shared<BucketInfoIntf>(bus, inventoryObjPath.c_str());
+    uint32_t histogramId = 2;
+    uint16_t parameter = 1;
+
+    NsmHistogramData sensor(sensorName, sensorType, formatIntf, bucketInfoIntf,
+                            histogramId, parameter);
+
+    const uint8_t eid = 12;
+    auto request = sensor.genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// Default (unknown) unit-of-measure → both switch default branches in
+// NsmHistogramFormat::handleResponseMsg (first sets formatIntf, second sets
+// bucketInfoIntf to BucketUnits::Others).
+TEST(NsmHistogramFormatTest, HandleResponseMsg_DefaultUnit_Others)
+{
+    auto formatIntf = std::make_shared<FormatIntf>(bus,
+                                                   inventoryObjPath.c_str());
+    auto bucketInfoIntf =
+        std::make_shared<BucketInfoIntf>(bus, inventoryObjPath.c_str());
+
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    uint32_t histogramId = 1;
+    uint16_t parameter = 0;
+
+    NsmHistogramFormat sensor(bus, sensorName, sensorType, formatIntf,
+                              bucketInfoIntf, inventoryObjPath,
+                              associationsList, histogramId, parameter);
+
+    uint16_t numBuckets = 2;
+    struct nsm_histogram_format_metadata metadata = {
+        .num_of_buckets = numBuckets,
+        .min_sampling_time = 100,
+        .accumulation_cycle = 10,
+        .reserved0 = 0,
+        .increment_duration = 10,
+        .bucket_unit_of_measure = 0xFF, // non-standard → default branch
+        .reserved1 = 0,
+        .bucket_data_type = NvU8,
+        .reserved2 = 0};
+
+    // 2 NvU8 buckets = 2 bytes (valid size)
+    std::vector<uint8_t> bucketOffsets = {0, 50};
+    std::vector<uint8_t> responseMsg(256, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t rc = encode_get_histogram_format_resp(
+        0, NSM_SUCCESS, ERR_NULL, &metadata, bucketOffsets.data(),
+        bucketOffsets.size(), response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+
+    // Both switches hit the default → BucketUnits::Others
+    EXPECT_EQ(formatIntf->unitOfMeasure(), BucketUnits::Others);
+    EXPECT_EQ(bucketInfoIntf->unit(), BucketUnits::Others);
+}
+
+// checkSizeOfBucketArrayIsValid failure within
+// NsmHistogramFormat::handleResponseMsg. We encode 3 NvU8 buckets but report
+// bucket_offsets_size=5 (wrong; should be 3). Decode restores
+// bucket_offsets_size=5, so the size check fails. Calling twice exercises both
+// branches of the inner if (shouldLog(...)).
+TEST(NsmHistogramFormatTest, HandleResponseMsg_CheckSizeMismatch_ShouldLog)
+{
+    auto formatIntf = std::make_shared<FormatIntf>(bus,
+                                                   inventoryObjPath.c_str());
+    auto bucketInfoIntf =
+        std::make_shared<BucketInfoIntf>(bus, inventoryObjPath.c_str());
+
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    uint32_t histogramId = 1;
+    uint16_t parameter = 0;
+
+    NsmHistogramFormat sensor(bus, sensorName, sensorType, formatIntf,
+                              bucketInfoIntf, inventoryObjPath,
+                              associationsList, histogramId, parameter);
+
+    uint16_t numBuckets = 3;
+    struct nsm_histogram_format_metadata metadata = {
+        .num_of_buckets = numBuckets,
+        .min_sampling_time = 100,
+        .accumulation_cycle = 10,
+        .reserved0 = 0,
+        .increment_duration = 10,
+        .bucket_unit_of_measure = NSM_BUCKET_UNIT_WATTS,
+        .reserved1 = 0,
+        .bucket_data_type = NvU8, // valid size = 3 bytes
+        .reserved2 = 0};
+
+    // Intentionally 5 bytes instead of 3 → data_size field encodes 5 →
+    // decode sets bucket_offsets_size=5 →
+    // checkSizeOfBucketArrayIsValid(5,3,NvU8) fails
+    std::vector<uint8_t> offsetData(5, 0);
+    std::vector<uint8_t> responseMsg(256, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t rc = encode_get_histogram_format_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                  &metadata, offsetData.data(),
+                                                  offsetData.size(), response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    size_t msg_len = responseMsg.size();
+
+    // First call: shouldLog returns true (state: false→true)
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    // Second call: shouldLog returns false (already in error state)
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+// checkSizeOfBucketArrayIsValid failure within
+// NsmHistogramData::handleResponseMsg. Format expects 3 NvU8 buckets (3 bytes).
+// Response encodes 3 NvU8 buckets but bucket_data_size=5 (wrong).  Calling
+// twice exercises both shouldLog branches.
+TEST(NsmHistogramDataTest, HandleResponseMsg_CheckSizeMismatch_ShouldLog)
+{
+    auto formatIntf = std::make_shared<FormatIntf>(bus,
+                                                   inventoryObjPath.c_str());
+    auto bucketInfoIntf =
+        std::make_shared<BucketInfoIntf>(bus, inventoryObjPath.c_str());
+
+    uint32_t histogramId = 2;
+    uint16_t parameter = 1;
+
+    NsmHistogramData sensor(sensorName, sensorType, formatIntf, bucketInfoIntf,
+                            histogramId, parameter);
+
+    uint16_t numBuckets = 3;
+    formatIntf->numOfBuckets(numBuckets);
+    formatIntf->bucketDataType(BucketDataTypes::NvU8);
+
+    std::vector<std::tuple<uint16_t, std::tuple<double, double, double>>>
+        bucketData;
+    for (uint16_t i = 0; i < numBuckets; i++)
+    {
+        bucketData.push_back(
+            std::make_tuple(i, std::make_tuple(0.0, 0.0, 0.0)));
+    }
+    bucketInfoIntf->bucketData(bucketData);
+
+    // Encode 3 NvU8 buckets but claim 5 bytes of data → decode returns
+    // total_bucket_data_size=5, which != 3*1=3 → checkSize fails.
+    std::vector<uint8_t> wrongData(5, 0);
+    std::vector<uint8_t> responseMsg(256, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t rc = encode_get_histogram_data_resp(0, NSM_SUCCESS, ERR_NULL, NvU8,
+                                                numBuckets, wrongData.data(),
+                                                wrongData.size(), response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    size_t msg_len = responseMsg.size();
+
+    // First call: shouldLog returns true
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    // Second call: shouldLog returns false (no state change)
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}

@@ -111,6 +111,59 @@ TEST_F(NsmEventConfigTest, badTestInvalidUUID)
         std::runtime_error);
 }
 
+// Missing "Name" → FALSE branch for count("Name") → name="" used;
+// sensor IS still created with empty name
+TEST_F(NsmEventConfigTest, Factory_MissingName_SensorCreated)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/inventory/system/eventconfig_noname";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                          basicIntfName);
+    dbus::PropertyMap props = basicProperties;
+    props.erase("Name");
+    propertyMap = props;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmEventConfig(mockManager, basicIntfName, uniquePath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// Missing "MessageType" → FALSE branch for count("MessageType") →
+// default 0 used; sensor IS still created
+TEST_F(NsmEventConfigTest, Factory_MissingMessageType_SensorCreated)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/inventory/system/eventconfig_nomsgtype";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                          basicIntfName);
+    dbus::PropertyMap props = basicProperties;
+    props["Name"] = std::string("EventConfig_NoMsgType"); // unique name
+    props.erase("MessageType");
+    propertyMap = props;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmEventConfig(mockManager, basicIntfName, uniquePath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// Missing "SubscribedEventIDs" → FALSE branch for count("SubscribedEventIDs")
+// → empty vector used; sensor IS still created
+TEST_F(NsmEventConfigTest, Factory_MissingSubscribedEventIDs_SensorCreated)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/inventory/system/eventconfig_nosubevents";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                          basicIntfName);
+    dbus::PropertyMap props = basicProperties;
+    props["Name"] = std::string("EventConfig_NoSubEvents"); // unique name
+    props.erase("SubscribedEventIDs");
+    propertyMap = props;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmEventConfig(mockManager, basicIntfName, uniquePath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
 TEST_F(NsmEventConfigTest, testNsmEventConfigUpdate)
 {
     std::vector<uint64_t> srcEventIds = {1, 2, 3};
@@ -454,6 +507,23 @@ TEST_F(NsmEventConfigTest, testConfigureEventAcknowledgementError)
         gpu, NSM_TYPE_PLATFORM_ENVIRONMENTAL, eventConfig.ackEventMask);
 }
 
+// configureEventAcknowledgement: wrong-size mask → early return (line 132)
+TEST_F(NsmEventConfigTest, ConfigureEventAck_WrongSizeMask_EarlyReturn)
+{
+    std::vector<uint64_t> srcEventIds = {1, 2};
+    std::vector<uint64_t> ackEventIds = {};
+    NsmEventConfig eventConfig(name, "NSM_EventConfig_Ack_Sz",
+                               NSM_TYPE_PLATFORM_ENVIRONMENTAL, srcEventIds,
+                               ackEventIds);
+
+    // Wrong size (4 instead of EVENT_SOURCES_LENGTH=8) → early co_return //
+
+    std::vector<bitfield8_t> wrongSizeMask(4);
+    // No sensorIO call expected (function returns early)
+    eventConfig.configureEventAcknowledgement(
+        gpu, NSM_TYPE_PLATFORM_ENVIRONMENTAL, wrongSizeMask);
+}
+
 TEST_F(NsmEventConfigTest, testEventConfigWithLargeEventIds)
 {
     // Test with event IDs at the boundary (0-63)
@@ -524,6 +594,24 @@ TEST_F(NsmEventConfigTest, testUpdateUnsupportedCommand)
     eventConfig.update(gpu);
 }
 
+// update() error path: sensorIO returns NSM_ERROR (not UNSUPPORTED) →
+// setCurrentEventSources co_returns NSM_ERROR (line 113) →
+// update() enters if (rc != NSM_SW_SUCCESS) with rc != UNSUPPORTED →
+// lg2::error is called (lines 71, 73-74 in nsmEventConfig.cpp). //
+
+TEST_F(NsmEventConfigTest, Update_SensorIOError_LogsError)
+{
+    std::vector<uint64_t> srcEventIds = {1, 2};
+    std::vector<uint64_t> ackEventIds = {};
+    NsmEventConfig eventConfig(name, "NSM_EventConfig",
+                               NSM_TYPE_PLATFORM_ENVIRONMENTAL, srcEventIds,
+                               ackEventIds);
+
+    // sensorIO itself fails with NSM_ERROR (not just bad completion code)
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
+    eventConfig.update(gpu);
+}
+
 TEST_F(NsmEventConfigTest, testEventConfigConstructor)
 {
     std::vector<uint64_t> srcEventIds = {5, 10, 15};
@@ -537,4 +625,132 @@ TEST_F(NsmEventConfigTest, testEventConfigConstructor)
     EXPECT_EQ(eventConfig.messageType, NSM_TYPE_FIRMWARE);
     EXPECT_EQ(eventConfig.srcEventMask.size(), 8);
     EXPECT_EQ(eventConfig.ackEventMask.size(), 8);
+}
+
+// NsmGetEventConfig::update(): sensorIO returns NSM_ERROR (transport failure)
+// → if (rc) at line 225 taken → lg2::debug at 227-229 → co_return rc at 231 //
+
+TEST_F(NsmEventConfigTest, GetEventConfig_Update_SensorIOError)
+{
+    std::vector<uint64_t> srcEventIds = {1, 2};
+    std::vector<uint64_t> ackEventIds = {};
+    auto eventConfig = std::make_shared<NsmEventConfig>(
+        name, "NSM_EventConfig", NSM_TYPE_PLATFORM_ENVIRONMENTAL, srcEventIds,
+        ackEventIds);
+
+    NsmGetEventConfig getEventConfig(name, "NSM_GetEventConfig",
+                                     NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                     srcEventIds, eventConfig);
+
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
+    getEventConfig.update(gpu);
+}
+
+// configureEventAcknowledgement(): sensorIO returns NSM_ERROR (transport
+// failure) → if (rc) at line 157 taken → co_return rc at 160 //
+
+TEST_F(NsmEventConfigTest, ConfigureEventAck_SensorIOError)
+{
+    std::vector<uint64_t> srcEventIds = {};
+    std::vector<uint64_t> ackEventIds = {1, 2};
+    NsmEventConfig eventConfig(name, "NSM_EventConfig",
+                               NSM_TYPE_PLATFORM_ENVIRONMENTAL, srcEventIds,
+                               ackEventIds);
+
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
+    eventConfig.configureEventAcknowledgement(
+        gpu, NSM_TYPE_PLATFORM_ENVIRONMENTAL, eventConfig.ackEventMask);
+}
+
+// createNsmEventConfig: base interface not registered at unique path →
+// coGetCachedBaseProperties returns error → co_return rc (early return //
+// at line 303 in nsmEventConfig.cpp).
+TEST_F(NsmEventConfigTest, CreateEventConfig_BasePropertiesFail_NoSensor)
+{
+    const std::string uniquePath = "/xyz/test/eventcfg/base_fail_unique";
+    // Register a sub-interface only; leave basicIntfName absent.
+    auto& other = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                    basicIntfName + ".Sub");
+    other["Type"] = std::string("NSM_EventConfig");
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmEventConfig(mockManager, basicIntfName, uniquePath);
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+// NsmEventConfig::update(): setCurrentEventSources returns
+// NSM_ERR_UNSUPPORTED_COMMAND_CODE via transport error → outer if=TRUE but
+// inner if=FALSE (error suppressed). Covers the FALSE branch of
+// (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE) at line 71.
+TEST_F(NsmEventConfigTest, Update_UnsupportedCmdTransportError_Suppressed)
+{
+    std::vector<uint64_t> srcEventIds = {1};
+    std::vector<uint64_t> ackEventIds = {};
+    NsmEventConfig eventConfig(name, "NSM_EventConfig",
+                               NSM_TYPE_PLATFORM_ENVIRONMENTAL, srcEventIds,
+                               ackEventIds);
+
+    // sensorIO returns NSM_ERR_UNSUPPORTED_COMMAND_CODE (=5) as transport
+    // error. setCurrentEventSources returns 5 at the early-return rc check. In
+    // update(): outer if=TRUE (5 != 0), inner if=FALSE (5 == 5) → no log.
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(NSM_ERR_UNSUPPORTED_COMMAND_CODE));
+    eventConfig.update(gpu);
+}
+
+// NsmGetEventConfig::update(): validation fails (some configured event ID not
+// supported by device) → !validationPassed TRUE → eventConfig->update() called
+// Also covers shouldLog(clearloggerMsg, isNotSupported=true) TRUE branch.
+TEST_F(NsmEventConfigTest,
+       GetEventConfig_Update_ValidationFails_CallsEventConfigUpdate)
+{
+    // Configure event IDs {1, 2, 3} → need bits 1, 2, 3 supported
+    std::vector<uint64_t> srcEventIds = {1, 2, 3};
+    std::vector<uint64_t> ackEventIds = {};
+    auto eventConfig = std::make_shared<NsmEventConfig>(
+        name, "NSM_EventConfig", NSM_TYPE_PLATFORM_ENVIRONMENTAL, srcEventIds,
+        ackEventIds);
+
+    NsmGetEventConfig getEventConfig(name, "NSM_GetEventConfig",
+                                     NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                     srcEventIds, eventConfig);
+
+    // Device reports bits 1 and 3 set but NOT bit 2 (0x0A = 0b00001010)
+    // → event ID 2 is NOT supported → validateEventIds returns false
+    // → !validationPassed TRUE branch taken → eventConfig->update() called
+    const Response getEventSourceResp{0x10,
+                                      0xDE,
+                                      0x00,
+                                      0x89,
+                                      NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                      NSM_GET_CURRENT_EVENT_SOURCES,
+                                      NSM_SUCCESS,
+                                      0,
+                                      0,
+                                      8,
+                                      0,
+                                      0x0A, // bits 1,3 set; bit 2 NOT set
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      0};
+
+    // Second sensorIO call comes from eventConfig->update() →
+    // setCurrentEventSources() trying to reconfigure the device
+    const Response setEventSourceResp{0x10,
+                                      0xDE,
+                                      0x00,
+                                      0x89,
+                                      NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                      NSM_SET_CURRENT_EVENT_SOURCES,
+                                      NSM_SUCCESS};
+
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(getEventSourceResp, Response{}))
+        .WillOnce(mockSensorIO(setEventSourceResp, Response{}));
+
+    getEventConfig.update(gpu);
 }

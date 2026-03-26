@@ -210,6 +210,7 @@ if get_option('tests').enabled()
     nsmd_test = static_library(
         'nsmd_test',
         '../common/test/mockDBusHandler.cpp',
+        '../common/test/mockSocketIo.cpp',
         implicit_include_directories: false,
         include_directories: include_directories(tests_include_dirs),
         dependencies: [deps, gmock],
@@ -226,6 +227,7 @@ if get_option('tests').enabled()
     subdir('test')
     subdir('nsmRawCommand/test')
     subdir('nsmEvent/test')
+    subdir('nsmLongRunning/test')
     subdir('nsmSetAsync/test')
     subdir('nsmCommon/test')
     subdir('nsmProgressCounters/test')

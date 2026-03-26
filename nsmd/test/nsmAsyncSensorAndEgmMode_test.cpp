@@ -130,7 +130,8 @@ struct NsmAsyncSensorTest : public testing::Test, public SensorManagerTest
 };
 
 /**
- * set() with null status pointer must throw InvalidArgument.
+ * set() with null status pointer must throw InvalidArgument. //
+ *
  */
 TEST_F(NsmAsyncSensorTest, setNullStatusThrows)
 {

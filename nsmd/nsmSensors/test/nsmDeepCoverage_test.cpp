@@ -22,7 +22,8 @@
  * 1. nsmInventoryProperty.hpp - Uncovered template specializations
  *    (AssetTagIntf, VersionIntf, RevisionIntf, NsmMNNVLinkTopologyIntf,
  *     additional NsmAssetIntf branches, DimensionIntf remaining branches,
- *     PowerLimitIntf remaining branches, default/throw branches)
+ *     PowerLimitIntf remaining branches, default/throw branches) //
+ *
  * 2. nsmDevice.cpp - invokeLongRunningHandler with valid handler, additional
  *    findAggregatorByType scenarios, updateDiscoveryIdentifiers edge cases
  * 3. nsmChassisPCIeDevice.cpp - Standalone factory function tests

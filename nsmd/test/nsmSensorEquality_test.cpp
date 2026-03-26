@@ -29,6 +29,7 @@
 #include "base.h"
 #include "platform-environmental.h"
 
+#include "test/mockSensorManager.hpp"
 #include "utils.hpp"
 
 #include <sdbusplus/bus.hpp>
@@ -44,6 +45,7 @@
 #undef protected
 
 using namespace nsm;
+using namespace ::testing;
 
 // ============================================================================
 // Test helpers
@@ -72,6 +74,28 @@ class NullRequestSensor : public NsmSensor
         genRequestMsg(eid_t /*eid*/, uint8_t /*instanceId*/) override
     {
         return std::nullopt;
+    }
+
+    uint8_t handleResponseMsg(const struct nsm_msg* /*responseMsg*/,
+                              size_t /*responseLen*/) override
+    {
+        return NSM_SW_SUCCESS;
+    }
+};
+
+// Minimal NsmSensor subclass that returns a valid (non-nullopt) request
+class ValidRequestSensor : public NsmSensor
+{
+  public:
+    ValidRequestSensor(const std::string& name, const std::string& type) :
+        NsmSensor(name, type)
+    {}
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t /*eid*/, uint8_t /*instanceId*/) override
+    {
+        // Return a minimal 20-byte non-nullopt request buffer
+        return std::vector<uint8_t>(20, 0);
     }
 
     uint8_t handleResponseMsg(const struct nsm_msg* /*responseMsg*/,
@@ -294,4 +318,73 @@ TEST(NsmSensorOperatorEqual, SelfComparison_ReturnsTrue)
                    &description};
 
     EXPECT_TRUE(sensor == sensor);
+}
+
+// ============================================================================
+// NsmSensor::update() branch coverage
+// ============================================================================
+
+// Fixture providing a MockNsmDevice for update() tests.
+struct NsmSensorUpdateTest : public testing::Test, public SensorManagerTest
+{
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> mockDevice;
+
+    NsmSensorUpdateTest() : SensorManagerTest(devices) {}
+
+    void SetUp() override
+    {
+        mockDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(
+                "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0"));
+        ASSERT_NE(mockDevice, nullptr);
+    }
+
+    ~NsmSensorUpdateTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+// NsmSensor::update(): genRequestMsg returns nullopt
+// → if (!requestMsg.has_value()) TRUE → co_return NSM_SW_ERROR //
+
+TEST_F(NsmSensorUpdateTest, Update_NulloptRequest_ReturnsError)
+{
+    NullRequestSensor sensor("null_sensor", "test_type");
+    auto rc = sensor.update(mockDevice).data();
+    EXPECT_EQ(rc, NSM_SW_ERROR);
+}
+
+// NsmSensor::update(): sensorIO returns non-zero error code
+// → if (rc) TRUE branch (nsmSensor.cpp line 49-53) → early co_return rc //
+
+TEST_F(NsmSensorUpdateTest, Update_SensorIOFails_EarlyReturnWithError)
+{
+    ValidRequestSensor sensor("valid_sensor", "test_type");
+
+    // Make sensorIO return a non-zero completion code (error)
+    EXPECT_CALL(*mockDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERR_UNSUPPORTED_COMMAND_CODE));
+
+    auto rc = sensor.update(mockDevice).data();
+    // rc should be the error code from sensorIO (non-zero)
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// NsmSensor::update(): sensorIO returns success → falls through to
+// handleResponseMsg (nsmSensor.cpp line 55) → co_return its rc //
+
+TEST_F(NsmSensorUpdateTest, Update_SensorIOSuccess_CallsHandleResponse)
+{
+    ValidRequestSensor sensor("valid_sensor2", "test_type");
+
+    // Provide a minimal response buffer so allocMessage doesn't crash
+    std::vector<uint8_t> resp(sizeof(nsm_msg_hdr), 0);
+    EXPECT_CALL(*mockDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(resp, NSM_SUCCESS));
+
+    auto rc = sensor.update(mockDevice).data();
+    // handleResponseMsg always returns NSM_SW_SUCCESS in ValidRequestSensor
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }

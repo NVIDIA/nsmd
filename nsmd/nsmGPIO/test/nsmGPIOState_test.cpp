@@ -343,3 +343,152 @@ TEST_F(NsmGPIOStateTest, HandleResponseMsg_AllOnes)
         EXPECT_EQ(states[i], true) << "GPIO " << i << " should be true";
     }
 }
+
+// Test success with zero-length GPIO data: gpioStateMap is empty →
+// the `if (gpioStateIntf != nullptr && !gpioStateMap.empty())` false branch
+TEST_F(NsmGPIOStateTest, HandleResponseMsg_EmptyGPIOData_NoLineStateUpdate)
+{
+    std::string name = "TestGPIO_Empty";
+    std::string type = "GPIO";
+    std::string inventoryObjPath = "/xyz/openbmc_project/gpio/empty";
+    std::vector<std::tuple<std::string, std::string, std::string>> associations;
+
+    auto gpioStateIntf = std::make_shared<GPIOStateIntf>(
+        utils::DBusHandler::getBus(), inventoryObjPath.c_str());
+
+    auto gpioStateSensor = std::make_shared<NsmGPIOState>(
+        utils::DBusHandler::getBus(), type, name, inventoryObjPath,
+        associations, gpioStateIntf);
+
+    // Pre-set lineStates to verify they are NOT updated
+    std::map<uint16_t, bool> preStates{{0, true}, {1, false}};
+    gpioStateIntf->lineStates(preStates);
+
+    // Send a valid response with 0 GPIO bytes: gpioValuesSize = 0 → map stays
+    // empty encode_get_gpio_state_resp requires non-null gpio_values even for 0
+    // bytes
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+                                     sizeof(nsm_get_gpio_state_resp));
+    auto responseMsgPtr = reinterpret_cast<struct nsm_msg*>(responseMsg.data());
+    uint8_t dummyBuf = 0;
+
+    auto rc = encode_get_gpio_state_resp(0, NSM_SUCCESS, ERR_NULL, 0, 0,
+                                         &dummyBuf, 0, responseMsgPtr);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto result = gpioStateSensor->handleResponseMsg(responseMsgPtr,
+                                                     responseMsg.size());
+
+    EXPECT_EQ(result, NSM_SUCCESS);
+    // lineStates should NOT have been updated (map was empty)
+    auto states = gpioStateIntf->lineStates();
+    EXPECT_EQ(states, preStates);
+}
+
+// genRequestMsg failure: instanceId > NSM_INSTANCE_MAX → encode fails →
+// if (rc != NSM_SW_SUCCESS) TRUE → return nullopt.
+// Covers lines 48-50 in nsmGPIOState.cpp.
+TEST_F(NsmGPIOStateTest, GenRequestMsg_InvalidInstanceId_ReturnsNullopt)
+{
+    std::vector<std::tuple<std::string, std::string, std::string>> assoc;
+    auto gpioStateIntf = std::make_shared<GPIOStateIntf>(
+        utils::DBusHandler::getBus(), objPath.c_str());
+    auto sensor = std::make_shared<NsmGPIOState>(utils::DBusHandler::getBus(),
+                                                 type, name, objPath, assoc,
+                                                 gpioStateIntf);
+
+    // NSM_INSTANCE_MAX + 1 makes encode_get_gpio_state_req fail
+    auto request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+// handleResponseMsg – decode failure: too-short buffer
+TEST_F(NsmGPIOStateTest, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    std::vector<std::tuple<std::string, std::string, std::string>> associations;
+
+    auto gpioStateIntf = std::make_shared<GPIOStateIntf>(
+        utils::DBusHandler::getBus(), objPath.c_str());
+
+    auto gpioStateSensor =
+        std::make_shared<NsmGPIOState>(utils::DBusHandler::getBus(), type, name,
+                                       objPath, associations, gpioStateIntf);
+
+    // 7-byte buffer: safely reads cc=0 at payload[1] but too short for
+    // nsm_get_gpio_state_resp which embeds nsm_common_resp. decode_common_resp
+    // requires at least sizeof(nsm_msg_hdr)+sizeof(nsm_common_resp)=11 bytes.
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responsePtr = reinterpret_cast<struct nsm_msg*>(responseMsg.data());
+
+    auto result = gpioStateSensor->handleResponseMsg(responsePtr,
+                                                     responseMsg.size());
+
+    EXPECT_NE(result, NSM_SUCCESS);
+}
+
+// handleResponseMsg: decode returns NSM_SW_SUCCESS but cc != NSM_SUCCESS.
+// Uses 9-byte buffer so decode_reason_code_and_cc returns NSM_SW_SUCCESS
+// with cc=NSM_ERR_INVALID_DATA → L73 "rc==success && cc!=success" branch.
+TEST_F(NsmGPIOStateTest, HandleResponseMsg_DecodeSuccessNonZeroCC_ReturnsCC)
+{
+    std::vector<std::tuple<std::string, std::string, std::string>> associations;
+
+    auto gpioStateIntf = std::make_shared<GPIOStateIntf>(
+        utils::DBusHandler::getBus(), objPath.c_str());
+
+    auto gpioStateSensor =
+        std::make_shared<NsmGPIOState>(utils::DBusHandler::getBus(), type, name,
+                                       objPath, associations, gpioStateIntf);
+
+    // sizeof(nsm_msg_hdr)+sizeof(nsm_common_non_success_resp)=9 bytes:
+    // decode_reason_code_and_cc returns NSM_SW_SUCCESS with cc=error
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    responseMsg[sizeof(nsm_msg_hdr) + 1] = NSM_ERR_INVALID_DATA;
+
+    auto responsePtr = reinterpret_cast<struct nsm_msg*>(responseMsg.data());
+
+    auto result = gpioStateSensor->handleResponseMsg(responsePtr,
+                                                     responseMsg.size());
+
+    EXPECT_EQ(result, NSM_ERR_INVALID_DATA);
+}
+
+// handleResponseMsg with gpioStateIntf = nullptr: decode succeeds and
+// gpioStateMap is non-empty, but the `gpioStateIntf != nullptr` guard on
+// line 90 of nsmGPIOState.cpp short-circuits to false → lineStates update
+// is skipped. Covers the FALSE branch of the first condition.
+TEST_F(NsmGPIOStateTest, HandleResponseMsg_NullGpioStateIntf_SkipsLineStates)
+{
+    std::vector<std::tuple<std::string, std::string, std::string>> associations;
+
+    auto gpioStateIntf = std::make_shared<GPIOStateIntf>(
+        utils::DBusHandler::getBus(), objPath.c_str());
+
+    auto sensor = std::make_shared<NsmGPIOState>(utils::DBusHandler::getBus(),
+                                                 type, name, objPath,
+                                                 associations, gpioStateIntf);
+
+    // Null out the interface (exposed by #define private public)
+    sensor->gpioStateIntf = nullptr;
+
+    // Build a valid response with 1 byte of GPIO data (8 pins)
+    std::vector<uint8_t> gpioData = {0xFF};
+    uint16_t respOffset = 0;
+    uint16_t length = static_cast<uint16_t>(gpioData.size());
+
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+                                     sizeof(nsm_get_gpio_state_resp) - 1 +
+                                     gpioData.size());
+    auto responseMsgPtr = reinterpret_cast<struct nsm_msg*>(responseMsg.data());
+
+    ASSERT_EQ(encode_get_gpio_state_resp(0, NSM_SUCCESS, ERR_NULL, respOffset,
+                                         length, gpioData.data(),
+                                         gpioData.size(), responseMsgPtr),
+              NSM_SW_SUCCESS);
+
+    // gpioStateIntf is nullptr → the `gpioStateIntf != nullptr` check is
+    // false → lineStates() is never called → returns success
+    auto result = sensor->handleResponseMsg(responseMsgPtr, responseMsg.size());
+    EXPECT_EQ(result, NSM_SUCCESS);
+}

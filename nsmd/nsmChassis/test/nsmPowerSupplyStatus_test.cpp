@@ -91,6 +91,15 @@ TEST(NsmPowerSupplyStatus, GenRequestMsg_ReturnsValidRequest)
     EXPECT_EQ(cmd->data_index, GET_POWER_SUPPLY_STATUS);
 }
 
+TEST(NsmPowerSupplyStatus, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    std::shared_ptr<PowerStateIntf> powerIntf;
+    auto provider = makeProvider("/test/psu_status/badreq", powerIntf);
+    NsmPowerSupplyStatus sensor(provider, 0);
+    auto request = sensor.genRequestMsg(5, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
 // =============================================================================
 // handleResponse – success, bit set → On
 // =============================================================================
@@ -162,6 +171,51 @@ TEST(NsmPowerSupplyStatus, HandleResponse_ErrorCC_SetsPowerStateUnknown)
     rc = sensor.handleResponse(responseMsg, responseData.size());
 
     EXPECT_NE(rc, NSM_SUCCESS);
+    EXPECT_EQ(powerIntf->currentPowerState(),
+              PowerStateIntf::PowerState::Unknown);
+}
+
+// Test decode failure path (rc != NSM_SW_SUCCESS): also hits else branch
+// Covers the short-circuit false branch of the && condition
+TEST(NsmPowerSupplyStatus, HandleResponse_DecodeFail_SetsPowerStateUnknown)
+{
+    std::shared_ptr<PowerStateIntf> powerIntf;
+    auto provider = makeProvider("/test/psu_status/decode_fail", powerIntf);
+    NsmPowerSupplyStatus sensor(provider, 0);
+
+    // Use proper buffer but pass size - 1 to trigger NSM_SW_ERROR_LENGTH
+    uint8_t status = 0xFF;
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_supply_status_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseData.data());
+    auto rc = encode_get_power_supply_status_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                  status, responseMsg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponse(responseMsg, responseData.size() - 1);
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+    EXPECT_EQ(powerIntf->currentPowerState(),
+              PowerStateIntf::PowerState::Unknown);
+}
+
+// handleResponse: rc==NSM_SW_SUCCESS but cc!=NSM_SUCCESS → else branch sets
+// PowerState::Unknown.  9-byte buffer: decode_reason_code_and_cc returns
+// NSM_SW_SUCCESS with cc=NSM_ERROR.
+TEST(NsmPowerSupplyStatus, HandleResponse_DecodeSuccessNonZeroCC_SetsUnknown)
+{
+    std::shared_ptr<PowerStateIntf> powerIntf;
+    auto provider = makeProvider("/test/psu_status/cc_err", powerIntf);
+    NsmPowerSupplyStatus sensor(provider, 0);
+
+    std::vector<uint8_t> ccErrBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    ccErrBuf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code
+    auto ccErrMsg = reinterpret_cast<nsm_msg*>(ccErrBuf.data());
+
+    auto rc2 = sensor.handleResponse(ccErrMsg, ccErrBuf.size());
+
+    EXPECT_NE(rc2, NSM_SUCCESS);
     EXPECT_EQ(powerIntf->currentPowerState(),
               PowerStateIntf::PowerState::Unknown);
 }

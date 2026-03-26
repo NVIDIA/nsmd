@@ -2375,5 +2375,84 @@ TEST(SetLeakDetectionThresholds, DecodeRespNullParams)
 }
 
 // ============================================================================
-// PART 29: Set Programmable EDPp Scaling Factor
+// PART 29: Decode Set Leak Detection Thresholds Request
+// ============================================================================
+
+TEST(SetLeakDetectionThresholds, DecodeReqNullParams)
+{
+	std::vector<uint8_t> msgBuf(256, 0);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t ns = 0, nt = 0;
+	std::vector<uint8_t> dst(64, 0);
+	size_t dst_len = 0;
+
+	EXPECT_EQ(decode_set_leak_detection_thresholds_req(
+		      nullptr, 256, &ns, &nt, dst.data(), &dst_len),
+		  NSM_SW_ERROR_NULL);
+	EXPECT_EQ(decode_set_leak_detection_thresholds_req(
+		      msg, 256, nullptr, &nt, dst.data(), &dst_len),
+		  NSM_SW_ERROR_NULL);
+	EXPECT_EQ(decode_set_leak_detection_thresholds_req(
+		      msg, 256, &ns, nullptr, dst.data(), &dst_len),
+		  NSM_SW_ERROR_NULL);
+	EXPECT_EQ(decode_set_leak_detection_thresholds_req(msg, 256, &ns, &nt,
+							   nullptr, &dst_len),
+		  NSM_SW_ERROR_NULL);
+	EXPECT_EQ(decode_set_leak_detection_thresholds_req(msg, 256, &ns, &nt,
+							   dst.data(), nullptr),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(SetLeakDetectionThresholds, DecodeReqLengthError)
+{
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(nsm_set_leak_detection_thresholds_req) - 1,
+	    0);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	uint8_t ns = 0, nt = 0;
+	std::vector<uint8_t> dst(64, 0);
+	size_t dst_len = 0;
+
+	EXPECT_EQ(decode_set_leak_detection_thresholds_req(
+		      msg, msgBuf.size(), &ns, &nt, dst.data(), &dst_len),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(SetLeakDetectionThresholds, DecodeReqSuccess)
+{
+	// 1 sensor, 1 threshold level to exercise both inner/outer loops
+	nsm_leak_detection_thresholds_data sensorData{};
+	sensorData.sensor_id = 5;
+	sensorData.reserved = 0;
+	sensorData.thresholds[0] = 1000;
+
+	size_t thresholds_data_len = sizeof(sensorData);
+
+	// thresholds_data[1] is a 1-byte placeholder, so subtract 1
+	size_t msgBufSize = sizeof(nsm_msg_hdr) +
+			    sizeof(nsm_set_leak_detection_thresholds_req) +
+			    thresholds_data_len - 1;
+	std::vector<uint8_t> msgBuf(msgBufSize, 0);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+
+	auto rc = encode_set_leak_detection_thresholds_req(
+	    0, 1, 1, reinterpret_cast<uint8_t *>(&sensorData),
+	    thresholds_data_len, msg);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t ns = 0, nt = 0;
+	std::vector<uint8_t> dst(64, 0);
+	size_t dst_len = 0;
+
+	rc = decode_set_leak_detection_thresholds_req(msg, msgBufSize, &ns, &nt,
+						      dst.data(), &dst_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(ns, 1);
+	EXPECT_EQ(nt, 1);
+	EXPECT_EQ(dst_len, thresholds_data_len);
+}
+
+// ============================================================================
+// PART 30: Set Programmable EDPp Scaling Factor
 // ============================================================================

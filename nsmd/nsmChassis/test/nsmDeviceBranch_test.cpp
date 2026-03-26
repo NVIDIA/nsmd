@@ -34,6 +34,7 @@ using namespace ::testing;
 
 #include "nsmDevice.hpp"
 #include "nsmEvent/nsmLongRunningEvent.hpp"
+#include "nsmFwSwInventory/GPUSWInventory.hpp"
 #include "nsmNumericSensor/nsmNumericAggregator.hpp"
 #include "nsmSetAsync/asyncOperationManager.hpp"
 
@@ -374,6 +375,60 @@ TEST(NsmDeviceBatch9, ProgressCounters_LazyInitialized)
     (void)counters;
 }
 
+// Cover progressCounters() FALSE branch (line 1075): second call returns the
+// cached ProgressCounters without re-creating it.
+TEST(NsmDeviceBatch9, ProgressCounters_SecondCall_ReturnsCached)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 0, "MCTP_UUID", uuid, 0);
+
+    auto& c1 = device.progressCounters();
+    auto* ptr1 = &c1;
+
+    // Second call must hit the FALSE branch of if (!sensorProgressCounters)
+    auto& c2 = device.progressCounters();
+    auto* ptr2 = &c2;
+
+    EXPECT_EQ(ptr1, ptr2); // Same underlying object
+}
+
+// Cover clearLongRunningHandler() early-return path: when no handler is set,
+// !longRunningHandler.has_value() is true → return without touching the value.
+TEST(NsmDeviceBatch9, ClearLongRunningHandler_AlreadyClear_NoOp)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 0, "MCTP_UUID", uuid, 0);
+
+    EXPECT_FALSE(device.longRunningHandler.has_value());
+    // Must not throw and must leave the optional empty
+    EXPECT_NO_THROW(device.clearLongRunningHandler());
+    EXPECT_FALSE(device.longRunningHandler.has_value());
+}
+
+// Cover setOffline() TRUE branch of `if (gpuDriverSensor)` (lines 229-235):
+// attach a real NsmGPUSWInventoryDriverVersionAndStatus, call setOffline(),
+// and verify driverState is reset to 0.
+TEST(NsmDeviceBatch9, SetOffline_WithGpuDriverSensor_SetsStateZero)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid,
+                         NSM_DEV_ROLE_RESERVED);
+
+    auto driverSensor =
+        std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
+            bus, "TestDriverSensor_SetOffline",
+            std::vector<utils::Association>{}, "GPUDriver", "NVIDIA");
+    driverSensor->driverState = 2; // Non-zero before offline
+    device.addGpuDriverSensor(driverSensor);
+
+    EXPECT_NE(device.gpuDriverSensor, nullptr);
+
+    device.setOffline();
+
+    EXPECT_EQ(driverSensor->driverState, 0u);
+    EXPECT_FALSE(device.isDeviceActive);
+}
+
 // ============================================================================
 // PART 8: NsmProcessor factory - remaining coverage
 // ============================================================================
@@ -450,8 +505,7 @@ TEST_F(NsmProcessorBatch9Test,
     EXPECT_GE(gpu->longRunningSensors.size(), 0u);
 }
 
-TEST_F(NsmProcessorBatch9Test,
-       DISABLED_CreateProcessorAttributes_AllFeaturesEnabled)
+TEST_F(NsmProcessorBatch9Test, CreateProcessorAttributes_AllFeaturesEnabled)
 {
     // Arrange - ALL features enabled simultaneously
     auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
@@ -484,6 +538,37 @@ TEST_F(NsmProcessorBatch9Test,
 
     // Assert - very large number of sensors created
     EXPECT_GE(gpu->deviceSensors.size(), 10u);
+}
+
+// NSM_Processor_Attributes with NO "Supported" flags at all → all 11
+// count() FALSE branches: MIGModeSupported, PortDisableFutureSupported,
+// ECCModeSupported, EDPpScalingFactorSupported, PowerSmoothingSupported,
+// CpuOperatingConfigSupported, MemCapacityUtilSupported,
+// TotalNvLinksCountSupported, EGMModeSupported, MNNVLTopologySupported,
+// MctpNsmOperationalStatusSupported all absent → skipped.
+// Also LocationType and LocationCode absent → those count() FALSE branches.
+TEST_F(NsmProcessorBatch9Test,
+       CreateProcessorAttributes_NoSupportedFlags_AllFALSEBranches)
+{
+    const std::string uniquePath =
+        std::string(processorsInventoryBasePath / "GPU_SXM_NoFlags");
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                              basicIntfName);
+    basePropertyMap["Name"] = std::string("GPU_SXM_NoFlags");
+    basePropertyMap["UUID"] = gpuUuid;
+    basePropertyMap["InventoryObjPath"] = uniquePath;
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".ProcessorAttributes");
+    // Type only — all optional properties absent (no Supported flags,
+    // no LocationType, no LocationCode) → all count() checks return 0
+    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
+
+    createNsmProcessorSensor(
+        mockManager, basicIntfName + ".ProcessorAttributes", uniquePath);
+
+    // Asset sensors still created even with no optional features
+    EXPECT_GE(gpu->staticSensors.size(), 1u);
 }
 
 TEST_F(NsmProcessorBatch9Test, DISABLED_CreateNSMProcessor_BaseType)
@@ -739,4 +824,70 @@ TEST(NsmDeviceBatch9, UpdateCommandCodeMatrix_ZeroSize_NoCommands)
 
     // Assert
     EXPECT_FALSE(device.isCommandSupported(0, 0));
+}
+
+// ============================================================================
+// PART 13: updateDiscoveryIdentifiers — fruDeviceManager.reset() branch
+// (line 464): this->eid != eid && this->uuid.size() != 0 → TRUE
+// ============================================================================
+
+TEST(NsmDeviceBatch9,
+     UpdateDiscoveryIdentifiers_NewEid_NonEmptyUuid_ResetsFruManager)
+{
+    // Arrange: device already has uuid + eid set
+    uuid_t uuid = "00000000-0000-0000-0000-000000000001";
+    MockNsmDevice device(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid,
+                         NSM_DEV_ROLE_RESERVED);
+
+    // Directly set the fields to simulate a previously discovered device
+    std::string medium = "xyz.openbmc_project.MCTP.Endpoint.MediaTypes.PCIe";
+    std::string binding = "xyz.openbmc_project.MCTP.Binding.BindingTypes.PCIe";
+    device.uuid = uuid; // non-empty → this->uuid.size() != 0 is TRUE
+    device.eid = 10;    // current eid
+    device.mctpMedium = medium;
+    device.mctpBinding = binding;
+
+    // Mark as initialized so we can observe the reset
+    std::set<std::string> props = {"BOARD_PART_NUMBER"};
+    device.fruDeviceManager.markInitialized(props);
+    EXPECT_TRUE(device.fruDeviceManager.initialized);
+
+    // Act: call with a DIFFERENT eid (20 != 10) → if branch at line 462 is TRUE
+    // → fruDeviceManager.reset() is called
+    uuid_t newUuid = "00000000-0000-0000-0000-000000000002";
+    std::string path = "/some/path";
+    bool isPreferred = device.updateDiscoveryIdentifiers(20, newUuid, 0, path,
+                                                         medium, binding, 30);
+
+    // Assert: isPreferred=true (same medium/binding → same priority),
+    // eid and uuid updated, fruDeviceManager was reset
+    EXPECT_TRUE(isPreferred);
+    EXPECT_EQ(device.getEid(), 20);
+    EXPECT_EQ(device.uuid, newUuid);
+    EXPECT_FALSE(device.fruDeviceManager.initialized);
+}
+
+// ============================================================================
+// PART 14: FruInterfaceManager::updateAllPropertyValues — null interface
+// → if (!interface) return; early return covers the TRUE branch (line 1129).
+// ============================================================================
+
+TEST(FruInterfaceManager, UpdateAllPropertyValues_NullInterface_EarlyReturn)
+{
+    // Arrange: FruInterfaceManager with no interface created
+    FruInterfaceManager mgr = {};
+    EXPECT_FALSE(mgr.interface); // interface is null initially
+
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    auto device = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, NSM_DEV_ROLE_RESERVED);
+    nsm::InventoryProperties properties;
+
+    // Act: call with null interface → if (!interface) return; hits TRUE branch
+    // Should not crash
+    mgr.updateAllPropertyValues(device, properties);
+
+    // Assert: state unchanged, no crash
+    EXPECT_FALSE(mgr.initialized);
+    EXPECT_FALSE(mgr.interface);
 }

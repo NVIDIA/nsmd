@@ -43,6 +43,13 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
                                          const std::string& interface,
                                          const std::string& objPath,
                                          bool enableNetworkPortAddresses);
+requester::Coroutine
+    createNsmPortSensorWithNetworkPortAddresses(SensorManager& manager,
+                                                const std::string& interface,
+                                                const std::string& objPath);
+requester::Coroutine createNsmPortSensorGeneric(SensorManager& manager,
+                                                const std::string& interface,
+                                                const std::string& objPath);
 } // namespace nsm
 
 // Helper to create NsmPortMetrics for reuse
@@ -133,6 +140,19 @@ TEST(NsmPortMetrics, GoodGenRequestMsg)
     EXPECT_GT(request->size(), sizeof(nsm_msg_hdr));
 }
 
+TEST(NsmPortMetrics, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    // instanceId > NSM_INSTANCE_MAX -> encode fails -> return nullopt
+    auto request = portTel.genRequestMsg(12, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
 TEST(NsmPortMetrics, GoodHandleResponseMsg)
 {
     NsmPortMetricsHelper h;
@@ -181,6 +201,35 @@ TEST(NsmPortMetrics, BadHandleResponseMsg)
 
     auto cc = portTel.handleResponseMsg(responseMsg, response.size());
     EXPECT_NE(cc, NSM_SUCCESS);
+}
+
+// NsmPortMetrics: rc==NSM_SW_SUCCESS but cc==NSM_ERROR (L1134 second-operand
+// FALSE branch). decode_reason_code_and_cc returns NSM_SW_SUCCESS (header ok)
+// but sets cc=NSM_ERROR -> `&&` second operand evaluated and FALSE.
+TEST(NsmPortMetrics, HandleResponseMsg_DecodeSuccessNonZeroCC_NoUpdate)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    // Build a properly-encoded non-success response:
+    // header + nsm_common_non_success_resp with cc=NSM_ERROR so that
+    // decode_reason_code_and_cc returns NSM_SW_SUCCESS (length ok) but cc!=OK.
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_common_non_success_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    nsm_header_info hdrInfo = {};
+    hdrInfo.nsm_msg_type = NSM_RESPONSE;
+    hdrInfo.instance_id = 0;
+    hdrInfo.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+    pack_nsm_header(&hdrInfo, &responseMsg->hdr);
+    encode_reason_code(NSM_ERROR, ERR_NULL, NSM_GET_PORT_TELEMETRY_COUNTER,
+                       responseMsg);
+
+    auto cc = portTel.handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(cc, NSM_ERROR);
 }
 
 TEST(NsmPortMetrics, UpdateCounterValuesNullPortData)
@@ -329,6 +378,25 @@ TEST(NsmPortCharacteristics, GoodConstructAndGenReq)
 
     auto request = sensor.genRequestMsg(10, 20);
     EXPECT_TRUE(request.has_value());
+}
+
+TEST(NsmPortCharacteristics, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"char_port_bad"};
+    uint8_t portNum = 2;
+    std::string type = "CharType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/char_port_bad";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+    auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+
+    nsm::NsmPortCharacteristics sensor(
+        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+    // instanceId > NSM_INSTANCE_MAX -> encode fails -> return nullopt
+    auto request = sensor.genRequestMsg(10, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
 }
 
 TEST(NsmPortCharacteristics, GoodHandleResponseMsg)
@@ -1732,7 +1800,7 @@ TEST(NsmPCIeErrors, Constructor_Group4)
 
     EXPECT_EQ(errors.getName(), name);
     EXPECT_EQ(errors.getType(), type);
-    // GROUP_ID_4 constructor calls initHandleResponse(3) → l0ToRecoveryCount=0
+    // GROUP_ID_4 constructor calls initHandleResponse(3) -> l0ToRecoveryCount=0
     EXPECT_EQ(pcieEccIntf->l0ToRecoveryCount(), 0u);
 }
 
@@ -1821,8 +1889,190 @@ TEST(NsmPCIeErrors, HandleResponseMsg_ErrorResponse)
 
     uint8_t cc = errors.handleResponseMsg(response, responseMsg.size());
     EXPECT_EQ(cc, NSM_ERROR);
-    // else branch: handleResponse called with zeroed data → ceCount stays 0
+    // else branch: handleResponse called with zeroed data -> ceCount stays 0
     EXPECT_EQ(pcieEccIntf->ceCount(), 0u);
+}
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in createNsmPCIePort
+// =============================================================================
+
+// InventoryObjPath absent -> inventoryObjPath="" -> NsmPCIePort<T>("") calls
+// sd_bus_add_object_vtable with empty path -> SdBusError (InvalidArgs)
+TEST_F(NsmPCIePortTest, PCIePort_MissingInventoryObjPath_Throws)
+{
+    const std::string testObjPath = "/xyz/test/pcieport/no_inv_path";
+    auto& pm = utils::MockDbusAsync::propertyMap(testObjPath, basicIntfName);
+    pm["UUID"] = cx7Uuid;
+    pm["Health"] =
+        std::string("xyz.openbmc_project.State.Decorator.Health.HealthType.OK");
+    pm["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    pm["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    pm["LinkState"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStates.Enabled");
+    pm["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+    // "InventoryObjPath" intentionally omitted -> inventoryObjPath="" ->
+    // NsmPCIePort<T>("") throws SdBusError
+
+    EXPECT_THROW_COROUTINE(
+        createNsmPCIePort(mockManager, basicIntfName, testObjPath),
+        std::exception);
+}
+
+// UUID absent -> uuid="" -> parseStaticUuid("") throws std::runtime_error
+// before NsmPCIePort objects are created (no D-Bus registration occurs)
+TEST_F(NsmPCIePortTest, PCIePort_MissingUUID_Throws)
+{
+    const std::string testObjPath = "/xyz/test/pcieport/no_uuid";
+    const std::string testInvPath =
+        "/xyz/openbmc_project/inventory/test/pcieport/no_uuid";
+    auto& pm = utils::MockDbusAsync::propertyMap(testObjPath, basicIntfName);
+    pm["InventoryObjPath"] = testInvPath;
+    pm["Health"] =
+        std::string("xyz.openbmc_project.State.Decorator.Health.HealthType.OK");
+    pm["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    pm["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    pm["LinkState"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStates.Enabled");
+    pm["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+    // "UUID" intentionally omitted -> uuid="" -> parseStaticUuid("") throws
+
+    EXPECT_THROW_COROUTINE(
+        createNsmPCIePort(mockManager, basicIntfName, testObjPath),
+        std::exception);
+}
+
+// Health absent -> health="" -> convertHealthTypeFromString("") throws
+// after NsmPCIePort objects are registered (then destroyed on unwind)
+TEST_F(NsmPCIePortTest, PCIePort_MissingHealth_Throws)
+{
+    const std::string testObjPath = "/xyz/test/pcieport/no_health";
+    const std::string testInvPath =
+        "/xyz/openbmc_project/inventory/test/pcieport/no_health";
+    auto& pm = utils::MockDbusAsync::propertyMap(testObjPath, basicIntfName);
+    pm["UUID"] = cx7Uuid;
+    pm["InventoryObjPath"] = testInvPath;
+    pm["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    pm["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    pm["LinkState"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStates.Enabled");
+    pm["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+    // "Health" intentionally omitted -> health="" ->
+    // convertHealthTypeFromString throws after D-Bus objects created at
+    // testInvPath
+
+    EXPECT_THROW_COROUTINE(
+        createNsmPCIePort(mockManager, basicIntfName, testObjPath),
+        std::exception);
+}
+
+// PortType absent -> portType="" -> convertPortTypeFromString("") throws
+// Health must be valid to reach the portType invoke()
+TEST_F(NsmPCIePortTest, PCIePort_MissingPortType_Throws)
+{
+    const std::string testObjPath = "/xyz/test/pcieport/no_porttype";
+    const std::string testInvPath =
+        "/xyz/openbmc_project/inventory/test/pcieport/no_porttype";
+    auto& pm = utils::MockDbusAsync::propertyMap(testObjPath, basicIntfName);
+    pm["UUID"] = cx7Uuid;
+    pm["InventoryObjPath"] = testInvPath;
+    pm["Health"] =
+        std::string("xyz.openbmc_project.State.Decorator.Health.HealthType.OK");
+    pm["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    pm["LinkState"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStates.Enabled");
+    pm["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+    // "PortType" intentionally omitted -> portType="" -> throws
+
+    EXPECT_THROW_COROUTINE(
+        createNsmPCIePort(mockManager, basicIntfName, testObjPath),
+        std::exception);
+}
+
+// PortProtocol absent -> portProtocol="" -> convertPortProtocolFromString
+// throws Health and PortType must be valid to reach the portProtocol invoke()
+TEST_F(NsmPCIePortTest, PCIePort_MissingPortProtocol_Throws)
+{
+    const std::string testObjPath = "/xyz/test/pcieport/no_portprotocol";
+    const std::string testInvPath =
+        "/xyz/openbmc_project/inventory/test/pcieport/no_portprotocol";
+    auto& pm = utils::MockDbusAsync::propertyMap(testObjPath, basicIntfName);
+    pm["UUID"] = cx7Uuid;
+    pm["InventoryObjPath"] = testInvPath;
+    pm["Health"] =
+        std::string("xyz.openbmc_project.State.Decorator.Health.HealthType.OK");
+    pm["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    pm["LinkState"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStates.Enabled");
+    pm["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+    // "PortProtocol" intentionally omitted -> portProtocol="" -> throws
+
+    EXPECT_THROW_COROUTINE(
+        createNsmPCIePort(mockManager, basicIntfName, testObjPath),
+        std::exception);
+}
+
+// LinkState absent -> linkState="" -> convertLinkStatesFromString("") throws
+// Health, PortType, PortProtocol must be valid to reach linkState invoke()
+TEST_F(NsmPCIePortTest, PCIePort_MissingLinkState_Throws)
+{
+    const std::string testObjPath = "/xyz/test/pcieport/no_linkstate";
+    const std::string testInvPath =
+        "/xyz/openbmc_project/inventory/test/pcieport/no_linkstate";
+    auto& pm = utils::MockDbusAsync::propertyMap(testObjPath, basicIntfName);
+    pm["UUID"] = cx7Uuid;
+    pm["InventoryObjPath"] = testInvPath;
+    pm["Health"] =
+        std::string("xyz.openbmc_project.State.Decorator.Health.HealthType.OK");
+    pm["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    pm["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    pm["LinkStatus"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp");
+    // "LinkState" intentionally omitted -> linkState="" -> throws
+
+    EXPECT_THROW_COROUTINE(
+        createNsmPCIePort(mockManager, basicIntfName, testObjPath),
+        std::exception);
+}
+
+// LinkStatus absent -> linkStatus="" -> convertLinkStatusTypeFromString throws
+// All prior properties must be valid to reach the linkStatus invoke()
+TEST_F(NsmPCIePortTest, PCIePort_MissingLinkStatus_Throws)
+{
+    const std::string testObjPath = "/xyz/test/pcieport/no_linkstatus";
+    const std::string testInvPath =
+        "/xyz/openbmc_project/inventory/test/pcieport/no_linkstatus";
+    auto& pm = utils::MockDbusAsync::propertyMap(testObjPath, basicIntfName);
+    pm["UUID"] = cx7Uuid;
+    pm["InventoryObjPath"] = testInvPath;
+    pm["Health"] =
+        std::string("xyz.openbmc_project.State.Decorator.Health.HealthType.OK");
+    pm["PortType"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort");
+    pm["PortProtocol"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe");
+    pm["LinkState"] = std::string(
+        "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStates.Enabled");
+    // "LinkStatus" intentionally omitted -> linkStatus="" -> throws
+
+    EXPECT_THROW_COROUTINE(
+        createNsmPCIePort(mockManager, basicIntfName, testObjPath),
+        std::exception);
 }
 
 TEST_F(NsmPCIePortTest, TearDown)
@@ -1934,6 +2184,43 @@ TEST_F(NsmPortSensorCreateTestFixture, testPortStatusUpdate)
         .WillOnce(mockSensorIO(portStatusResp, Response{}));
 
     portStatus.update(gpu);
+}
+
+// NsmPortStatus::update – error-CC response -> TRUE branch of
+// co_return cc ? cc : rc (cc = NSM_ERROR != 0 after decode). //
+
+TEST_F(NsmPortSensorCreateTestFixture, testPortStatusUpdate_ErrorCC)
+{
+    using namespace nsm;
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "NVLink_0";
+    uint8_t portNum = 1;
+    std::string type = "NSM_NVLink";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/ports/nvlink_ec";
+
+    auto portMetricsOem3Intf =
+        std::make_shared<PortMetricsOem3Intf>(bus, inventoryObjPath.c_str());
+
+    NsmPortStatus portStatus(bus, portName, portNum, type, portMetricsOem3Intf,
+                             inventoryObjPath);
+
+    // Build a port-status response with NSM_ERROR completion code.
+    // decode_query_port_status_resp will set cc = NSM_ERROR (non-zero);
+    // the final "co_return cc ? cc : rc" takes the TRUE branch (return cc).
+
+    std::vector<uint8_t> errorResp(256, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(errorResp.data());
+    ASSERT_EQ(encode_query_port_status_resp(0, NSM_ERROR, ERR_NULL,
+                                            NSM_PORTSTATE_UP,
+                                            NSM_PORTSTATUS_ENABLED, msg),
+              NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(errorResp, Response{}));
+
+    portStatus.update(gpu);
+    // cc = NSM_ERROR -> true branch of co_return cc ? cc : rc //
 }
 
 TEST_F(NsmPortSensorCreateTestFixture, testPortCharacteristicsUpdate)
@@ -2410,4 +2697,1199 @@ TEST_F(NsmPortSensorCreateTestFixture, badTestPortStatusUpdateDecodeError)
     EXPECT_CALL(*mockGpu, sensorIO).WillOnce(mockSensorIO(badResp, Response{}));
 
     portStatus.update(mockGpu);
+}
+
+// Decode fail: 7-byte buffer is too short for
+// decode_get_port_telemetry_counter_resp -> returns error.
+TEST(NsmPortMetrics, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    auto rc = portTel.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// Decode fail: 7-byte buffer is too short for
+// decode_query_port_characteristics_resp -> returns error.
+TEST(NsmPortCharacteristics, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"char_decode_fail"};
+    uint8_t portNum = 5;
+    std::string type = "CharType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/char_decode_fail";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+    auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+    nsm::NsmPortCharacteristics sensor(
+        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    auto rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// Decode fail: 7-byte buffer is too short for decode_aggregate_resp in
+// NsmNetworkAddressAggregator::handleResponseMsg -> returns error.
+TEST(NsmNetworkAddressAggregator, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"naa_decode_fail2"};
+    std::string type = "NAAType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/naa_decode_fail2";
+    std::string nodeGuidObjPath = objPath + "/NodeGuid";
+    std::string ethernetMacObjPath = objPath + "/EthMac";
+    std::string permanentMacObjPath = objPath + "/PermMac";
+    uint16_t portNumber = 2;
+    nsm::NsmNetworkAddressAggregator sensor(bus, name, type, objPath,
+                                            nodeGuidObjPath, ethernetMacObjPath,
+                                            permanentMacObjPath, portNumber);
+
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    auto rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// Decode fail: 7-byte buffer is too short for decode_aggregate_resp in
+// NsmGetPortECCCounters::handleResponseMsg -> returns error.
+TEST(NsmGetPortECCCounters, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string name{"ecc_decode_fail"};
+    std::string type = "ECCType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/ecc_decode_fail";
+    uint8_t portNumber = 2;
+    nsm::NsmGetPortECCCounters sensor(bus, name, type, objPath, portNumber);
+
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    auto rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// Error-CC path: handleResponseMsg – decode succeeds but cc = NSM_ERROR
+// -> return cc ? cc : rc; takes the true branch.
+// Note: encode_query_port_characteristics_resp checks data != NULL before cc,
+// so a valid (non-null) data struct must be provided.
+TEST(NsmPortCharacteristics, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"char_errcc"};
+    uint8_t portNum = 7;
+    std::string type = "CharType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/char_errcc";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+    auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+    nsm::NsmPortCharacteristics sensor(
+        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+
+    std::vector<uint8_t> response(256, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    struct nsm_port_characteristics_data charData = {};
+    auto encRc = encode_query_port_characteristics_resp(0, NSM_ERROR, ERR_NULL,
+                                                        &charData, responseMsg);
+    ASSERT_EQ(encRc, NSM_SW_SUCCESS);
+
+    auto cc = sensor.handleResponseMsg(responseMsg, response.size());
+    // cc = NSM_ERROR -> true branch of return cc ? cc : rc
+    EXPECT_EQ(cc, NSM_ERROR);
+}
+
+// Error-CC path: handleResponseMsg – decode succeeds but cc = NSM_ERROR
+// -> return cc ? cc : rc; takes the true branch.
+// Note: encode_get_port_telemetry_counter_resp checks data != NULL before cc,
+// so a valid (non-null) data struct must be provided.
+TEST(NsmPortMetrics, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    std::vector<uint8_t> response(256, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    struct nsm_port_counter_data portData = {};
+    auto encRc = encode_get_port_telemetry_counter_resp(0, NSM_ERROR, ERR_NULL,
+                                                        &portData, responseMsg);
+    ASSERT_EQ(encRc, NSM_SW_SUCCESS);
+
+    auto cc = portTel.handleResponseMsg(responseMsg, response.size());
+    // cc = NSM_ERROR -> true branch of return cc ? cc : rc
+    EXPECT_EQ(cc, NSM_ERROR);
+}
+
+// createNsmPortSensor with enableNetworkPortAddresses=true covers line 1790
+// TRUE branch (adds NsmNetworkAddressAggregator sensor)
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_EnableNetworkAddresses)
+{
+    using namespace nsm;
+
+    const std::string netAddrObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_net";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_Net")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu1")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(netAddrObjPath, basicIntfName);
+    pm = properties;
+
+    size_t initialCount = gpu->deviceSensors.size();
+    createNsmPortSensor(mockManager, basicIntfName, netAddrObjPath, true);
+
+    // Network address aggregator + port status + characteristics + metrics
+    EXPECT_GT(gpu->deviceSensors.size(), initialCount);
+}
+
+// createNsmPortSensor with a PCIE_BRIDGE+CX8 device covers:
+//   - line 1818 FALSE branch (deviceType != NSM_DEV_ID_GPU, no Status/Char)
+//   - lines 1849-1858 TRUE branch (adds NsmGetPortECCCounters)
+//   - lines 1872-1881 TRUE branch (adds EthPortTelemetryAggregator)
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX8)
+{
+    using namespace nsm;
+
+    // n1 = (CX8_role=2 << 8) | PCIE_BRIDGE=2 = 514
+    const uuid_t bridgeUuid = "STATIC:514:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+    const std::string bridgeObjPath =
+        "/xyz/openbmc_project/inventory/system/cx80/port_cx8";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("CX8Port")},
+        {"UUID", bridgeUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_PCIE_BRIDGE)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/cx80")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(bridgeObjPath, basicIntfName);
+    pm = properties;
+
+    createNsmPortSensor(mockManager, basicIntfName, bridgeObjPath, false);
+
+    auto bridgeDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(bridgeUuid));
+    ASSERT_NE(bridgeDevice, nullptr);
+    // No Status/Characteristics (deviceType!=GPU); has Metrics + ECC + Eth
+    EXPECT_GE(bridgeDevice->deviceSensors.size(), 3u);
+}
+
+// createNsmPortSensor with PCIE_BRIDGE+CX9 device covers:
+//   - line 1851 TRUE branch: getDeviceRole() == CX9 is evaluated (CX8 FALSE,
+//     so short-circuit doesn't prevent CX9 check) and returns TRUE ->
+//     NsmGetPortECCCounters + EthPortTelemetryAggregator added
+//   - line 1874 TRUE branch: same condition repeated for Eth sensor
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX9)
+{
+    using namespace nsm;
+
+    // combined = (NSM_PCIE_BRIDGE_DEV_ROLE_CX9=3 << 8) |
+    // NSM_DEV_ID_PCIE_BRIDGE=2
+    //          = 770
+    const uuid_t cx9Uuid = "STATIC:770:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+    const std::string cx9ObjPath =
+        "/xyz/openbmc_project/inventory/system/cx90/port_cx9";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("CX9Port")},
+        {"UUID", cx9Uuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_PCIE_BRIDGE)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/cx90")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(cx9ObjPath, basicIntfName);
+    pm = properties;
+
+    createNsmPortSensor(mockManager, basicIntfName, cx9ObjPath, false);
+
+    auto cx9Device = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(cx9Uuid));
+    ASSERT_NE(cx9Device, nullptr);
+    EXPECT_EQ(cx9Device->getDeviceRole(), NSM_PCIE_BRIDGE_DEV_ROLE_CX9);
+    // Like CX8: no Status/Characteristics; has Metrics + ECC + Eth aggregator
+    EXPECT_GE(cx9Device->deviceSensors.size(), 3u);
+}
+
+// createNsmPortSensor with PCIE_BRIDGE+CX7 device covers:
+//   - line 1851 FALSE branch: getDeviceRole() == CX9 is evaluated (CX8 FALSE)
+//     and returns FALSE -> NsmGetPortECCCounters NOT added
+//   - line 1874 FALSE branch: same, EthPortTelemetryAggregator NOT added
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX7)
+{
+    using namespace nsm;
+
+    // combined = (NSM_PCIE_BRIDGE_DEV_ROLE_CX7=1 << 8) |
+    // NSM_DEV_ID_PCIE_BRIDGE=2
+    //          = 258
+    const uuid_t cx7Uuid = "STATIC:258:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+    const std::string cx7ObjPath =
+        "/xyz/openbmc_project/inventory/system/cx70/port_cx7";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("CX7Port")},
+        {"UUID", cx7Uuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_PCIE_BRIDGE)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/cx70")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(cx7ObjPath, basicIntfName);
+    pm = properties;
+
+    createNsmPortSensor(mockManager, basicIntfName, cx7ObjPath, false);
+
+    auto cx7Device = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(cx7Uuid));
+    ASSERT_NE(cx7Device, nullptr);
+    EXPECT_EQ(cx7Device->getDeviceRole(), NSM_PCIE_BRIDGE_DEV_ROLE_CX7);
+    // CX7 is PCIE_BRIDGE but not CX8/CX9: no ECC or Eth aggregator added
+    // Only port metrics sensor is created
+    EXPECT_GE(cx7Device->deviceSensors.size(), 1u);
+}
+
+// createNsmPortSensor with count=0 covers the loop body not executing
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_ZeroCount)
+{
+    using namespace nsm;
+
+    const std::string zeroCountObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_zero";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_Zero")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(0)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(zeroCountObjPath,
+                                                 basicIntfName);
+    pm = properties;
+
+    size_t initialCount = gpu->deviceSensors.size();
+    createNsmPortSensor(mockManager, basicIntfName, zeroCountObjPath, false);
+
+    // count=0 -> loop body never executes -> no sensors added
+    EXPECT_EQ(gpu->deviceSensors.size(), initialCount);
+}
+
+// getTopologyObjPath with NSM_DEV_ID_SWITCH covers "SWITCH/" case (line 24-25)
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_SwitchDeviceType)
+{
+    using namespace nsm;
+
+    const std::string switchObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_switch";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_Switch")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_SWITCH)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/switch0")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(switchObjPath, basicIntfName);
+    pm = properties;
+
+    size_t initialCount = gpu->deviceSensors.size();
+    createNsmPortSensor(mockManager, basicIntfName, switchObjPath, false);
+    // DeviceType=SWITCH -> getTopologyObjPath uses "SWITCH/" branch;
+    // no Status/Characteristics sensors (deviceType != GPU)
+    EXPECT_GE(gpu->deviceSensors.size(), initialCount);
+}
+
+// getTopologyObjPath with NSM_DEV_ID_EROT covers "EROT/" case (line 30-32)
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_EROTDeviceType)
+{
+    using namespace nsm;
+
+    const std::string erotObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_erot";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_EROT")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_EROT)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/erot0")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(erotObjPath, basicIntfName);
+    pm = properties;
+
+    size_t initialCount = gpu->deviceSensors.size();
+    createNsmPortSensor(mockManager, basicIntfName, erotObjPath, false);
+    // DeviceType=EROT -> getTopologyObjPath uses "EROT/" branch
+    EXPECT_GE(gpu->deviceSensors.size(), initialCount);
+}
+
+// getTopologyObjPath with NSM_DEV_ID_CPU covers "CPU/" case (line 33-35)
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_CPUDeviceType)
+{
+    using namespace nsm;
+
+    const std::string cpuObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_cpu";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_CPU")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_CPU)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/cpu0")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(cpuObjPath, basicIntfName);
+    pm = properties;
+
+    size_t initialCount = gpu->deviceSensors.size();
+    createNsmPortSensor(mockManager, basicIntfName, cpuObjPath, false);
+    // DeviceType=CPU -> getTopologyObjPath uses "CPU/" branch
+    EXPECT_GE(gpu->deviceSensors.size(), initialCount);
+}
+
+// getTopologyObjPath with unknown type covers default branch (lines 36-39)
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_UnknownDeviceType)
+{
+    using namespace nsm;
+
+    const std::string unknownObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_unknown";
+    constexpr uint64_t unknownDeviceType = 99;
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_Unknown")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", unknownDeviceType},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/unknown0")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(unknownObjPath, basicIntfName);
+    pm = properties;
+
+    // Unknown deviceType -> getTopologyObjPath logs error and returns ""
+    // factory still proceeds with empty topologyObjPath
+    EXPECT_NO_THROW(
+        createNsmPortSensor(mockManager, basicIntfName, unknownObjPath, false));
+}
+
+// coGetTopologyData body (lines 61-112) covered by populating serviceMap with
+// a NVLinkTopology interface entry; also covers deviceTopologies match path
+// (lines 1779-1782 in factory).
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_WithTopologyData)
+{
+    using namespace nsm;
+
+    const std::string topoParentPath =
+        "/xyz/openbmc_project/inventory/system/gpu_topo_test";
+    const std::string topoObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_topo_test";
+    const std::string topoInterface =
+        "xyz.openbmc_project.Configuration.NVLinkTopology.Topology0";
+    // topologyObjPath computed by factory:
+    //   deviceName = "gpu_topo_test"
+    //   topologyObjPath = ".../linktopology/GPU/gpu_topo_test"
+    const std::string topologyObjPath =
+        "/xyz/openbmc_project/inventory/system/linktopology/GPU/gpu_topo_test";
+    // portObjPath for i=0: parentObjPath + "/Ports/" + name + "_0"
+    const std::string portObjPath = topoParentPath + "/Ports/NVLinkTopo_0";
+
+    // Populate service map with a topology interface entry
+    auto& sm = utils::MockDbusAsync::serviceMap();
+    sm.clear();
+    sm.push_back(
+        {"xyz.openbmc_project.EntityManager", dbus::Interfaces{topoInterface}});
+
+    // Populate topology property map so coGetAllDbusProperty finds it
+    auto& topoPropertyMap = utils::MockDbusAsync::propertyMap(topologyObjPath,
+                                                              topoInterface);
+    topoPropertyMap["InventoryObjPath"] = std::string(portObjPath);
+    topoPropertyMap["LogicalPortNumber"] = uint64_t(2);
+    topoPropertyMap["Associations"] = std::vector<std::string>{"fwd", "bwd",
+                                                               "/abs/path"};
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLinkTopo")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath", topoParentPath},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(topoObjPath, basicIntfName);
+    pm = properties;
+
+    createNsmPortSensor(mockManager, basicIntfName, topoObjPath, false);
+
+    // Cleanup static service map so it doesn't affect other tests
+    sm.clear();
+
+    // Topology data was populated -> deviceTopologies non-empty ->
+    // logicalPortNum taken from topology (value 2) rather than default (i+1 =
+    // 1)
+    EXPECT_GE(gpu->deviceSensors.size(), 1u);
+}
+
+// coGetTopologyData with topology interface present but no optional properties
+// -> count("InventoryObjPath"), count("LogicalPortNumber"),
+//    count("Associations") all return 0 -> FALSE branches at L71/L77/L83.
+TEST_F(NsmPortSensorCreateTestFixture,
+       createPortSensor_TopologyNoOptionalFields)
+{
+    using namespace nsm;
+
+    const std::string topoParentPath =
+        "/xyz/openbmc_project/inventory/system/gpu_topo_noopt";
+    const std::string topoObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_topo_noopt";
+    const std::string topoInterface =
+        "xyz.openbmc_project.Configuration.NVLinkTopology.Topology0";
+    const std::string topologyObjPath =
+        "/xyz/openbmc_project/inventory/system/linktopology/GPU/gpu_topo_noopt";
+
+    auto& sm = utils::MockDbusAsync::serviceMap();
+    sm.clear();
+    sm.push_back(
+        {"xyz.openbmc_project.EntityManager", dbus::Interfaces{topoInterface}});
+
+    // Register topology map with NO optional properties (no InventoryObjPath,
+    // no LogicalPortNumber, no Associations) -> all three FALSE branches taken
+    auto& topoPropertyMap = utils::MockDbusAsync::propertyMap(topologyObjPath,
+                                                              topoInterface);
+    topoPropertyMap.clear(); // empty - none of the three properties present
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLinkTopoNoOpt")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath", topoParentPath},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(topoObjPath, basicIntfName);
+    pm = properties;
+
+    createNsmPortSensor(mockManager, basicIntfName, topoObjPath, false);
+
+    sm.clear();
+}
+
+// coGetTopologyData with Associations count not multiple of 3 -> L89 TRUE
+// (error log branch: "Association in topology must follow (fwd, bck, abs)")
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_TopologyInvalidAssoc)
+{
+    using namespace nsm;
+
+    const std::string topoParentPath =
+        "/xyz/openbmc_project/inventory/system/gpu_topo_badassoc";
+    const std::string topoObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_topo_badassoc";
+    const std::string topoInterface =
+        "xyz.openbmc_project.Configuration.NVLinkTopology.Topology0";
+    const std::string topologyObjPath =
+        "/xyz/openbmc_project/inventory/system/linktopology/GPU/"
+        "gpu_topo_badassoc";
+    const std::string portObjPath = topoParentPath +
+                                    "/Ports/NVLinkTopoInvalidAssoc_0";
+
+    auto& sm = utils::MockDbusAsync::serviceMap();
+    sm.clear();
+    sm.push_back(
+        {"xyz.openbmc_project.EntityManager", dbus::Interfaces{topoInterface}});
+
+    auto& topoPropertyMap = utils::MockDbusAsync::propertyMap(topologyObjPath,
+                                                              topoInterface);
+    topoPropertyMap["InventoryObjPath"] = std::string(portObjPath);
+    topoPropertyMap["LogicalPortNumber"] = uint64_t(1);
+    // Only 2 entries (not a multiple of 3) -> associations.size() % 3 != 0 ->
+    // TRUE branch at L89 logs error
+    topoPropertyMap["Associations"] = std::vector<std::string>{"fwd_only",
+                                                               "bwd_only"};
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLinkTopoInvalidAssoc")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath", topoParentPath},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(topoObjPath, basicIntfName);
+    pm = properties;
+
+    createNsmPortSensor(mockManager, basicIntfName, topoObjPath, false);
+
+    sm.clear();
+}
+
+// Cover port state switch branches: SLEEP, RESERVED, TRAINING_FAILURE_LOCKED,
+// PHYSICAL_UP, unknown default, and portStatus unknown default
+TEST_F(NsmPortSensorCreateTestFixture, testPortStatusAdditionalStates)
+{
+    using namespace nsm;
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "NVLink_Extra";
+    std::string type = "NSM_NVLink";
+    std::string baseObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/ports/extra";
+
+    // Each entry: {portState, portStatus}
+    std::vector<std::pair<uint8_t, uint8_t>> states = {
+        {NSM_PORTSTATE_SLEEP, NSM_PORTSTATUS_DISABLED},
+        {NSM_PORTSTATE_RESERVED, NSM_PORTSTATUS_ENABLED},
+        {NSM_PORTSTATE_TRAINING_FAILURE_LOCKED, NSM_PORTSTATUS_ENABLED},
+        {NSM_PORTSTATE_PHYSICAL_UP, NSM_PORTSTATUS_ENABLED},
+        {0xFF, NSM_PORTSTATUS_ENABLED}, // unknown state -> default branch
+        {NSM_PORTSTATE_UP, 0xFF},       // unknown status -> default branch
+    };
+
+    for (size_t i = 0; i < states.size(); i++)
+    {
+        uint8_t portNum = static_cast<uint8_t>(100 + i);
+        std::string path = baseObjPath + std::to_string(i);
+
+        auto portMetricsOem3Intf =
+            std::make_shared<PortMetricsOem3Intf>(bus, path.c_str());
+        NsmPortStatus portStatus(bus, portName, portNum, type,
+                                 portMetricsOem3Intf, path);
+
+        Response portStatusResp(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_status_resp), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(portStatusResp.data());
+        auto rc = encode_query_port_status_resp(
+            0, NSM_SUCCESS, ERR_NULL, states[i].first, states[i].second, msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS) << "state=" << (int)states[i].first;
+
+        EXPECT_CALL(*gpu, sensorIO)
+            .WillOnce(mockSensorIO(portStatusResp, Response{}));
+        portStatus.update(gpu);
+    }
+}
+
+// Cover updateLinkDownCode switch: all remaining uncovered reason codes
+// (UNKNOWN through PEER_RESET_EVENT and default)
+TEST_F(NsmPortSensorCreateTestFixture,
+       testPortCharacteristicsLinkDownReasonCodesRemaining)
+{
+    using namespace nsm;
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "NVLink_LinkDownAll";
+    uint8_t portNum = 10;
+    std::string type = "NSM_NVLink";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/ports/linkdown_all";
+
+    auto portMetricsOem3Intf =
+        std::make_shared<PortMetricsOem3Intf>(bus, inventoryObjPath.c_str());
+    auto iBPortIntf = std::make_shared<IBPortIntf>(bus,
+                                                   inventoryObjPath.c_str());
+
+    NsmPortCharacteristics portChar(bus, portName, portNum, type,
+                                    portMetricsOem3Intf, iBPortIntf,
+                                    inventoryObjPath);
+
+    std::vector<uint32_t> reasonCodes = {
+        NSM_PORT_DOWN_REASON_CODE_UNKNOWN,
+        NSM_PORT_DOWN_REASON_CODE_PLL_LOCK_LOSS,
+        NSM_PORT_DOWN_REASON_CODE_FIFO_OVERFLOW,
+        NSM_PORT_DOWN_REASON_CODE_FALSE_SKIP_CONDITION,
+        NSM_PORT_DOWN_REASON_CODE_MINOR_ERR_THRESHOLD,
+        NSM_PORT_DOWN_REASON_CODE_PHY_LAYER_RETRANSMIT_TIMEOUT,
+        NSM_PORT_DOWN_REASON_CODE_HEARTBEAT_ERRORS,
+        NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_CREDIT_MON_WD,
+        NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_INTEGRITY_THRESHOLD,
+        NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_BUFFER_OVERRUN,
+        NSM_PORT_DOWN_REASON_CODE_OOB_CMD_LINK_HEALTHY,
+        NSM_PORT_DOWN_REASON_CODE_OOB_CMD_LINK_HI_BER,
+        NSM_PORT_DOWN_REASON_CODE_INBAND_CMD_LINK_HEALTHY,
+        NSM_PORT_DOWN_REASON_CODE_INBAND_CMD_LINK_HI_BER,
+        NSM_PORT_DOWN_REASON_CODE_DOWN_BY_VERIFICATION_GW,
+        NSM_PORT_DOWN_REASON_CODE_RECEIVED_REMOTE_FAULT,
+        NSM_PORT_DOWN_REASON_CODE_RECEIEVED_TS1,
+        NSM_PORT_DOWN_REASON_CODE_DOWN_BY_MGMT_CMD,
+        NSM_PORT_DOWN_REASON_CODE_CABLE_ACCESS_ISSUES,
+        NSM_PORT_DOWN_REASON_CODE_CURRENT_ISSUE,
+        NSM_PORT_DOWN_REASON_CODE_POWER_BUDGET,
+        NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_RAW_BER,
+        NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_EFFECTIVE_BER,
+        NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_SYMBOL_BER,
+        NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_CREDIT_WATCHDOG,
+        NSM_PORT_DOWN_REASON_CODE_PEER_SLEEP,
+        NSM_PORT_DOWN_REASON_CODE_PEER_DISABLE,
+        NSM_PORT_DOWN_REASON_CODE_PEER_DISABLE_LOCK,
+        NSM_PORT_DOWN_REASON_CODE_PEER_THERMAL_EVENT,
+        NSM_PORT_DOWN_REASON_CODE_PEER_FORCE_EVENT,
+        NSM_PORT_DOWN_REASON_CODE_PEER_RESET_EVENT,
+        0xFFFF, // unknown code -> default branch
+    };
+
+    for (auto reasonCode : reasonCodes)
+    {
+        Response portCharResp(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_query_port_characteristics_resp),
+                              0);
+        auto msg = reinterpret_cast<nsm_msg*>(portCharResp.data());
+
+        nsm_port_characteristics_data data = {};
+        data.nv_port_line_rate_mbps = 50000;
+        data.nv_port_data_rate_kbps = 45000000;
+        data.status_lane_info = 0x02;
+        data.port_status.port_down_reason_code = reasonCode;
+
+        auto rc = encode_query_port_characteristics_resp(0, NSM_SUCCESS,
+                                                         ERR_NULL, &data, msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+        auto result = portChar.handleResponseMsg(msg, portCharResp.size());
+        EXPECT_EQ(result, NSM_SW_SUCCESS) << "reason_code=" << reasonCode;
+    }
+}
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in createNsmPortSensor
+// =============================================================================
+
+// Name absent -> name="" -> portName="_0" -> valid D-Bus path component
+// count("Name") FALSE branch taken
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_MissingName_Succeeds)
+{
+    using namespace nsm;
+
+    const std::string missingNamePath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_no_name";
+
+    dbus::PropertyMap properties = {
+        // "Name" intentionally omitted -> name="" -> count("Name") FALSE
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0_noname")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(missingNamePath,
+                                                 basicIntfName);
+    pm = properties;
+
+    const size_t initialCount = gpu->deviceSensors.size();
+    EXPECT_NO_THROW(createNsmPortSensor(mockManager, basicIntfName,
+                                        missingNamePath, false));
+    // portName="_0", objPath=parentObjPath+"/Ports/_0" -> valid -> sensors
+    // added
+    EXPECT_GT(gpu->deviceSensors.size(), initialCount);
+}
+
+// ParentObjPath absent -> parentObjPath="" -> deviceName="" -> topologyObjPath
+// computed from empty deviceName; portObjPath = "/Ports/NVLink_0"
+// count("ParentObjPath") FALSE branch taken
+TEST_F(NsmPortSensorCreateTestFixture,
+       createPortSensor_MissingParentObjPath_Succeeds)
+{
+    using namespace nsm;
+
+    const std::string missingParentPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_no_parent";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_NoParent")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        // "ParentObjPath" intentionally omitted -> parentObjPath=""
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(missingParentPath,
+                                                 basicIntfName);
+    pm = properties;
+
+    const size_t initialCount = gpu->deviceSensors.size();
+    EXPECT_NO_THROW(createNsmPortSensor(mockManager, basicIntfName,
+                                        missingParentPath, false));
+    // portObjPath="/Ports/NVLink_NoParent_0" -> valid -> sensors added
+    EXPECT_GT(gpu->deviceSensors.size(), initialCount);
+}
+
+// DeviceType absent -> deviceType=0 = NSM_DEV_ID_GPU -> GPU branch executes
+// count("DeviceType") FALSE branch taken (deviceType stays 0)
+TEST_F(NsmPortSensorCreateTestFixture,
+       createPortSensor_MissingDeviceType_DefaultsToGPU)
+{
+    using namespace nsm;
+
+    const std::string missingDTypePath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_no_dtype";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_NoDType")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        // "DeviceType" intentionally omitted -> deviceType=0=NSM_DEV_ID_GPU
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0_nodtype")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(missingDTypePath,
+                                                 basicIntfName);
+    pm = properties;
+
+    const size_t initialCount = gpu->deviceSensors.size();
+    EXPECT_NO_THROW(createNsmPortSensor(mockManager, basicIntfName,
+                                        missingDTypePath, false));
+    // deviceType=0=GPU -> Status+Characteristics+Metrics sensors added
+    EXPECT_GT(gpu->deviceSensors.size(), initialCount);
+}
+
+// Priority absent -> count("Priority") FALSE branch -> priority=false (default)
+// Sensor created with priority=false (non-priority queue)
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_MissingPriority_Success)
+{
+    using namespace nsm;
+
+    const std::string noPriorityPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_no_priority";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_NoPrio")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0_noprio")},
+        // "Priority" intentionally omitted -> count("Priority") FALSE ->
+        // priority=false
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(noPriorityPath, basicIntfName);
+    pm = properties;
+
+    const size_t initialCount = gpu->deviceSensors.size();
+    EXPECT_NO_THROW(
+        createNsmPortSensor(mockManager, basicIntfName, noPriorityPath, false));
+    // priority defaults to false -> sensor added to deviceSensors (not
+    // priority)
+    EXPECT_GT(gpu->deviceSensors.size(), initialCount);
+}
+
+// checkPortCharactersticRCAndPopulateRuntimeErr: characteristics decode
+// succeeds (cc=NSM_SUCCESS) -> else branch at nsmPort.cpp line 283 ->
+// runtimeError(false) set.
+TEST_F(NsmPortSensorCreateTestFixture,
+       testPortStatusDownLockSuccessfulCharacteristics)
+{
+    using namespace nsm;
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "NVLink_DLSuccess";
+    uint8_t portNum = 33;
+    std::string type = "NSM_NVLink";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/ports/downlock_success";
+
+    auto portMetricsOem3Intf =
+        std::make_shared<PortMetricsOem3Intf>(bus, inventoryObjPath.c_str());
+    portMetricsOem3Intf->runtimeError(true); // start with true
+
+    NsmPortStatus portStatus(bus, portName, portNum, type, portMetricsOem3Intf,
+                             inventoryObjPath);
+
+    // Port status response: DOWN_LOCK -> triggers checkPortCharacteristic call
+    Response portStatusResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_status_resp), 0);
+    auto statusMsg = reinterpret_cast<nsm_msg*>(portStatusResp.data());
+    encode_query_port_status_resp(0, NSM_SUCCESS, ERR_NULL,
+                                  NSM_PORTSTATE_DOWN_LOCK,
+                                  NSM_PORTSTATUS_ENABLED, statusMsg);
+
+    // Port characteristics response: SUCCESS -> else branch ->
+    // runtimeError(false)
+    Response portCharResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_characteristics_resp), 0);
+    auto charMsg = reinterpret_cast<nsm_msg*>(portCharResp.data());
+    nsm_port_characteristics_data data = {};
+    data.nv_port_line_rate_mbps = 50000;
+    encode_query_port_characteristics_resp(0, NSM_SUCCESS, ERR_NULL, &data,
+                                           charMsg);
+
+    testing::InSequence seq;
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(portStatusResp, Response{}));
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(portCharResp, Response{}));
+
+    auto result = portStatus.update(gpu);
+    EXPECT_EQ(result.data(), NSM_SW_SUCCESS);
+
+    // Successful characteristics decode -> else branch -> runtimeError cleared
+    EXPECT_FALSE(portMetricsOem3Intf->runtimeError());
+}
+
+// NsmPortStatus::update – sensorIO returns error -> if (rc) TRUE at L159,
+// early co_return without decoding.
+TEST_F(NsmPortSensorCreateTestFixture, testPortStatusUpdate_SensorIOFail)
+{
+    using namespace nsm;
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "NVLink_SIOFail";
+    uint8_t portNum = 97;
+    std::string type = "NSM_NVLink";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/ports/siofail";
+
+    auto portMetricsOem3Intf =
+        std::make_shared<PortMetricsOem3Intf>(bus, inventoryObjPath.c_str());
+    NsmPortStatus portStatus(bus, portName, portNum, type, portMetricsOem3Intf,
+                             inventoryObjPath);
+
+    // sensorIO returns NSM_ERROR -> if (rc) TRUE -> early return
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
+    auto result = portStatus.update(gpu);
+    EXPECT_NE(result.data(), NSM_SW_SUCCESS);
+}
+
+// checkPortCharactersticRCAndPopulateRuntimeErr – second sensorIO fails ->
+// if (rc) TRUE at L262, early co_return without populating runtimeError. //
+
+TEST_F(NsmPortSensorCreateTestFixture,
+       testPortStatusDownLock_CharacteristicsSensorIOFail)
+{
+    using namespace nsm;
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "NVLink_DLSIOFail";
+    uint8_t portNum = 98;
+    std::string type = "NSM_NVLink";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/ports/dlsiofail";
+
+    auto portMetricsOem3Intf =
+        std::make_shared<PortMetricsOem3Intf>(bus, inventoryObjPath.c_str());
+    NsmPortStatus portStatus(bus, portName, portNum, type, portMetricsOem3Intf,
+                             inventoryObjPath);
+
+    // First sensorIO: DOWN_LOCK port status -> triggers characteristics call
+    Response portStatusResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_status_resp), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(portStatusResp.data());
+    encode_query_port_status_resp(0, NSM_SUCCESS, ERR_NULL,
+                                  NSM_PORTSTATE_DOWN_LOCK,
+                                  NSM_PORTSTATUS_ENABLED, msg);
+
+    testing::InSequence seq;
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(portStatusResp, Response{}));
+    // Second sensorIO (characteristics): fails -> if (rc) TRUE early return
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
+
+    auto result = portStatus.update(gpu);
+    // update itself returns NSM_SW_SUCCESS (from status decode), but
+    // characteristics sensorIO error is propagated via co_return rc in
+    // checkPortCharactersticRCAndPopulateRuntimeErr (the caller ignores it)
+    (void)result.data();
+}
+
+// EthPortTelemetryAggregator::updateCounterValues – tag not in tagToPropertyMap
+// (tags 0-20 are mapped; tag 255 is not) -> if (it != end()) FALSE branch.
+TEST_F(NsmPortSensorCreateTestFixture, testEthPortTelemetry_UnknownTag)
+{
+    using namespace nsm;
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "EthPort_UnknownTag";
+    uint16_t portNumber = 7;
+    std::string type = "NSM_EthPort";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/ethport_unknown";
+
+    auto portMetricsOem2Intf =
+        std::make_shared<PortMetricsOem2Intf>(bus, inventoryObjPath.c_str());
+    auto portPacketCountersIntf =
+        std::make_shared<PortPacketCountersIntf>(bus, inventoryObjPath.c_str());
+
+    EthPortTelemetryAggregator ethPort(bus, portName, portNumber, type,
+                                       inventoryObjPath, portMetricsOem2Intf,
+                                       portPacketCountersIntf);
+
+    nsm_ethernet_port_counter_data counterValue = {};
+    counterValue.ethernet_port_counter_data_64bit = 12345;
+    // Tag 255 is NOT in tagToPropertyMap (only 0-20 are mapped) ->
+    // tagToPropertyMap.find() returns end() -> FALSE branch taken, no update
+    ethPort.updateCounterValues(uint8_t(255), &counterValue);
+}
+
+// Count absent -> count("Count") FALSE branch -> count=0 -> loop runs 0 times
+// Same result as ZeroCount test but exercises the FALSE branch of
+// count("Count")
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_MissingCount_NoSensors)
+{
+    using namespace nsm;
+
+    const std::string noCountPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_no_count";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_NoCount")},
+        {"UUID", gpuUuid},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0_nocount")},
+        {"Priority", false},
+        // "Count" intentionally omitted -> count("Count") FALSE -> count=0
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(noCountPath, basicIntfName);
+    pm = properties;
+
+    const size_t initialCount = gpu->deviceSensors.size();
+    EXPECT_NO_THROW(
+        createNsmPortSensor(mockManager, basicIntfName, noCountPath, false));
+    // count=0 -> for loop never runs -> no port sensors added
+    EXPECT_EQ(gpu->deviceSensors.size(), initialCount);
+}
+
+// =============================================================================
+// createNsmPortSensorWithNetworkPortAddresses and createNsmPortSensorGeneric
+// wrapper tests (static removed from nsmPort.cpp to allow forward declaration)
+// These thin wrappers call createNsmPortSensor with enableNetworkPortAddresses
+// set to true or false respectively.
+// =============================================================================
+
+// createNsmPortSensorWithNetworkPortAddresses calls createNsmPortSensor(true)
+// Covers lines 1927–1932 in nsmPort.cpp
+TEST_F(NsmPortSensorCreateTestFixture,
+       createPortSensorWithNetworkPortAddresses_CallsWithTrue)
+{
+    using namespace nsm;
+
+    const std::string netAddrWrapPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_netaddr_wrap";
+    const std::string netAddrIntf =
+        "xyz.openbmc_project.Configuration.NSM_NVLinkWithNetworkPortAddresses";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_NetAddrWrap")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0_netaddr")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(netAddrWrapPath, netAddrIntf);
+    pm = properties;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmPortSensorWithNetworkPortAddresses(mockManager, netAddrIntf,
+                                                netAddrWrapPath);
+    // enableNetworkPortAddresses=true -> NetworkPortAddresses sensor added
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// createNsmPortSensorGeneric calls createNsmPortSensor(false)
+// Covers lines 1935–1941 in nsmPort.cpp
+TEST_F(NsmPortSensorCreateTestFixture, createPortSensorGeneric_CallsWithFalse)
+{
+    using namespace nsm;
+
+    const std::string genericWrapPath =
+        "/xyz/openbmc_project/inventory/system/gpu/port_generic_wrap";
+    const std::string genericIntf =
+        "xyz.openbmc_project.Configuration.NSM_NVLink";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("NVLink_GenericWrap")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t(1)},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0_generic")},
+        {"Priority", false},
+    };
+
+    auto& pm = utils::MockDbusAsync::propertyMap(genericWrapPath, genericIntf);
+    pm = properties;
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmPortSensorGeneric(mockManager, genericIntf, genericWrapPath);
+    // enableNetworkPortAddresses=false -> no NetworkPortAddresses sensor
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// ─── Branch coverage: rc==NSM_SW_SUCCESS && cc!=NSM_SUCCESS ─────────────────
+
+// NsmPortMetrics::handleResponseMsg: non-success CC via 9-byte buffer ->
+// `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` false branch
+TEST(NsmPortMetrics, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    NsmPortMetricsHelper h;
+    nsm::NsmPortMetrics portTel(
+        h.bus, h.pName, h.portNum, h.type, h.deviceType, h.associations,
+        h.parentObjPath, h.inventoryObjPath, h.iBPortIntf,
+        h.portMetricsOem2Intf, h.portPacketCountersIntf);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = portTel.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmPortCharacteristics::handleResponseMsg: non-success CC via 9-byte buffer
+TEST(NsmPortCharacteristics,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName{"cc_char_port"};
+    uint8_t portNum = 3;
+    std::string type = "CharType";
+    std::string objPath =
+        "/xyz/openbmc_project/inventory/system/dummy/cc_char_port";
+    auto portMetricsOem3Intf =
+        std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+    auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+    nsm::NsmPortCharacteristics sensor(
+        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmPortStatus::update: rc==NSM_SW_SUCCESS, cc==NSM_ERROR ->
+// L183 FALSE branch via cc!=NSM_SUCCESS (distinct from ErrorCC test
+// which uses a full 256-byte buffer causing decode_reason_code_and_cc
+// to return NSM_SW_ERROR_LENGTH, covering rc!=NSM_SW_SUCCESS instead)
+TEST_F(NsmPortSensorCreateTestFixture,
+       testPortStatusUpdate_DecodeSuccessNonZeroCC_ElseBranch)
+{
+    using namespace nsm;
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "NVLink_0";
+    uint8_t portNum = 1;
+    std::string type = "NSM_NVLink";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/ports/nvlink_cc_br";
+
+    auto portMetricsOem3Intf =
+        std::make_shared<PortMetricsOem3Intf>(bus, inventoryObjPath.c_str());
+    NsmPortStatus portStatus(bus, portName, portNum, type, portMetricsOem3Intf,
+                             inventoryObjPath);
+
+    // Exactly-sized non-success buffer: decode_reason_code_and_cc returns
+    // NSM_SW_SUCCESS with cc=NSM_ERROR -> L183 FALSE via cc!=NSM_SUCCESS
+    std::vector<uint8_t> errorResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    errorResp[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(errorResp, Response{}));
+    portStatus.update(gpu);
+}
+
+// checkPortCharactersticRCAndPopulateRuntimeErr L277:
+// if (cc != NSM_SUCCESS && reasonCode != ERR_NULL)
+// Branch 2: cc!=NSM_SUCCESS, reasonCode==ERR_NULL ->
+// second operand FALSE -> else -> runtimeError(false)
+//
+// 9-byte buffer: decode_reason_code_and_cc returns NSM_SW_SUCCESS
+// with cc=NSM_ERROR (byte 6 set), reasonCode=0=ERR_NULL -> else branch
+TEST_F(NsmPortSensorCreateTestFixture,
+       testPortStatusDownLock_CharacteristicsNonZeroCCNullReason)
+{
+    using namespace nsm;
+
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "NVLink_DLNullReason";
+    uint8_t portNum = 99;
+    std::string type = "NSM_NVLink";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/ports/dlnullreason";
+
+    auto portMetricsOem3Intf =
+        std::make_shared<PortMetricsOem3Intf>(bus, inventoryObjPath.c_str());
+    portMetricsOem3Intf->runtimeError(true); // start true, expect false after
+
+    NsmPortStatus portStatus(bus, portName, portNum, type, portMetricsOem3Intf,
+                             inventoryObjPath);
+
+    // First sensorIO: DOWN_LOCK -> triggers checkPortCharactersticRCAndPopulate
+    Response portStatusResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_status_resp), 0);
+    auto statusMsg = reinterpret_cast<nsm_msg*>(portStatusResp.data());
+    encode_query_port_status_resp(0, NSM_SUCCESS, ERR_NULL,
+                                  NSM_PORTSTATE_DOWN_LOCK,
+                                  NSM_PORTSTATUS_ENABLED, statusMsg);
+
+    // Second sensorIO: 9-byte buffer -> decode_reason_code_and_cc returns
+    // NSM_SW_SUCCESS with cc=NSM_ERROR, reasonCode=0=ERR_NULL
+    // -> L277 AND second operand FALSE -> else -> runtimeError(false)
+    Response portCharResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    portCharResp[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // cc = NSM_ERROR
+    // reasonCode bytes [2,3] remain 0 = ERR_NULL
+
+    testing::InSequence seq;
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(portStatusResp, Response{}));
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(mockSensorIO(portCharResp, Response{}));
+
+    portStatus.update(gpu);
+
+    // cc!=NSM_SUCCESS but reasonCode==ERR_NULL -> else -> runtimeError cleared
+    EXPECT_FALSE(portMetricsOem3Intf->runtimeError());
 }

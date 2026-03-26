@@ -439,6 +439,116 @@ TEST_F(ProgressCountersTest, MixedReturnCodes)
     EXPECT_EQ(progressCounters.totalCount, 5);
 }
 
+// ============================================================================
+// DiscoveryEvents branch coverage
+// ============================================================================
+
+// DiscoveryEvents::increment – default case: passing an invalid
+// DiscoveryEventType throws std::runtime_error (lines 220-221 in
+// progressCounters.cpp).
+TEST(DiscoveryEventsTest, Increment_InvalidType_Throws)
+{
+    DiscoveryEvents discoveryEvents{42};
+    auto invalidType = static_cast<DiscoveryEventType>(0xFF);
+    EXPECT_THROW(discoveryEvents.increment(invalidType), std::runtime_error);
+}
+
+// DiscoveryEvents::setValue – when ConnectivityAvailable is set and
+// InterfaceAddedSignal counter is > 0, updateCounters() is called
+// (covers lines 233-240 in progressCounters.cpp).
+TEST(DiscoveryEventsTest,
+     SetValue_ConnectivityAvailable_WithSignalCounterPositive)
+{
+    DiscoveryEvents discoveryEvents{43};
+    // Increment InterfaceAddedSignal once: counter goes from -1 to 1 (> 0).
+    discoveryEvents.increment(DiscoveryEventType::InterfaceAddedSignal);
+    // Now setValue with ConnectivityAvailable triggers the conditional
+    // updateCounters() at lines 233-240.
+    discoveryEvents.setValue(DiscoveryEventType::ConnectivityAvailable, 1);
+    EXPECT_EQ(discoveryEvents.counters[static_cast<uint32_t>(
+                  DiscoveryEventType::ConnectivityAvailable)],
+              1);
+}
+
+// DiscoveryEvents::flushIfNeeded(time): timeThreshold==0 → line 60 FALSE
+// branch → always returns false.  DiscoveryEvents passes no thresholds to
+// ProgressCountersBase so both default to 0.
+TEST(DiscoveryEventsTest, FlushIfNeeded_ZeroTimeThreshold_ReturnsFalse)
+{
+    DiscoveryEvents discoveryEvents{44};
+    bool flushed = discoveryEvents.flushIfNeeded(1000000000ULL);
+    EXPECT_FALSE(flushed);
+}
+
+// DiscoveryEvents::flushIfNeeded(): countThreshold==0 → line 70 FALSE branch
+// → always returns false.
+TEST(DiscoveryEventsTest, FlushIfNeeded_ZeroCountThreshold_ReturnsFalse)
+{
+    DiscoveryEvents discoveryEvents{45};
+    bool flushed = discoveryEvents.flushIfNeeded();
+    EXPECT_FALSE(flushed);
+}
+
+// DiscoveryEvents::increment – second call when InterfaceAddedSignal counter
+// is already > 0 → compound condition TRUE → updateCounters() called →
+// dumpIteration incremented (line 207-209 TRUE branch).
+TEST(DiscoveryEventsTest,
+     Increment_InterfaceAddedSignal_SecondCall_TriggersFlush)
+{
+    DiscoveryEvents discoveryEvents{46};
+    // First call: counter goes from -1 → 0 → 1.
+    discoveryEvents.increment(DiscoveryEventType::InterfaceAddedSignal);
+    const uint32_t iterAfterFirst = discoveryEvents.dumpIteration;
+    // Second call: InterfaceAddedSignal > 0 → TRUE → updateCounters().
+    discoveryEvents.increment(DiscoveryEventType::InterfaceAddedSignal);
+    EXPECT_GT(discoveryEvents.dumpIteration, iterAfterFirst);
+}
+
+// DiscoveryEvents::increment – InterfaceRemovedSignal counter > 0 causes
+// flush on the next InterfaceAddedSignal call (covers the
+// counters[InterfaceRemovedSignal] > 0 sub-branch of the OR condition).
+TEST(DiscoveryEventsTest,
+     Increment_InterfaceRemovedSignalPositive_TriggersFlushOnNext)
+{
+    DiscoveryEvents discoveryEvents{47};
+    // InterfaceRemovedSignal: -1 → 0 → 1.
+    discoveryEvents.increment(DiscoveryEventType::InterfaceRemovedSignal);
+    const uint32_t iterAfterFirst = discoveryEvents.dumpIteration;
+    // InterfaceAddedSignal: InterfaceRemovedSignal > 0 → TRUE → flush.
+    discoveryEvents.increment(DiscoveryEventType::InterfaceAddedSignal);
+    EXPECT_GT(discoveryEvents.dumpIteration, iterAfterFirst);
+}
+
+// DiscoveryEvents::increment – ConnectivityAvailable != -1 causes flush on
+// the next signal increment (covers the ConnectivityAvailable != -1
+// sub-branch of the OR condition at line 206).
+TEST(DiscoveryEventsTest,
+     Increment_AfterSetValue_ConnectivityAvailable_TriggersFlush)
+{
+    DiscoveryEvents discoveryEvents{48};
+    // No signals → setValue line 233 FALSE → line 244: counter was -1 → FALSE
+    // → counter set to 0 (not -1 any more).
+    discoveryEvents.setValue(DiscoveryEventType::ConnectivityAvailable, 0);
+    const uint32_t iterAfterSetValue = discoveryEvents.dumpIteration;
+    // Now ConnectivityAvailable != -1 → increment sees TRUE → flush.
+    discoveryEvents.increment(DiscoveryEventType::InterfaceAddedSignal);
+    EXPECT_GT(discoveryEvents.dumpIteration, iterAfterSetValue);
+}
+
+// DiscoveryEvents::setValue – counter already set (line 244 TRUE branch):
+// second setValue when counter is not -1 → updateCounters() called.
+TEST(DiscoveryEventsTest, SetValue_ConnectivityAvailable_AlreadySet_Flushes)
+{
+    DiscoveryEvents discoveryEvents{49};
+    // First setValue: no signals active → L233 FALSE → L244 counter is -1
+    // → FALSE → just stores value.
+    discoveryEvents.setValue(DiscoveryEventType::ConnectivityAvailable, 0);
+    const uint32_t iterAfterFirst = discoveryEvents.dumpIteration;
+    // Second setValue: counter is now 0 (not -1) → L244 TRUE → flush.
+    discoveryEvents.setValue(DiscoveryEventType::ConnectivityAvailable, 1);
+    EXPECT_GT(discoveryEvents.dumpIteration, iterAfterFirst);
+}
+
 #else
 
 // If NVIDIA_PROGRESS_COUNTER is not defined, test that increment does nothing

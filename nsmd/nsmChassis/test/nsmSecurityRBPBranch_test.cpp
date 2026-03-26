@@ -262,3 +262,61 @@ TEST_F(NsmMinSecVersionBatch11F,
     // Cleanup
     sensor->minSecVersion->mutex.unlock();
 }
+
+// ============================================================================
+// NsmSecurityCfgObject::handleResponseMsg FALSE branch:
+// cc != NSM_SUCCESS → if-guard is false → updateState NOT called
+// ============================================================================
+
+TEST_F(NsmSecurityRBPBatch11F, HandleResponseMsg_ErrorCC_SkipsUpdateState)
+{
+    // Encode a valid-length response with cc=NSM_ERROR so decode returns
+    // NSM_SW_SUCCESS but cc != NSM_SUCCESS → FALSE branch of the if-guard
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_irreversible_config_request_0_resp_command),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    struct nsm_firmware_irreversible_config_request_0_resp cfg_state = {};
+    cfg_state.irreversible_config_state = 1;
+    auto rc = encode_nsm_firmware_irreversible_config_request_0_resp(
+        0, NSM_ERROR, ERR_INVALID_RQD, &cfg_state, responseMsg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*fpga, sensorIO).WillOnce(mockSensorIO(response));
+
+    sensor->update(fpga);
+
+    // updateState was NOT called (irreversibleConfigState stays at default 0)
+    EXPECT_FALSE(sensor->securityCfgObject->irreversibleConfigState());
+}
+
+// ============================================================================
+// NsmMinSecVersionObject::handleResponseMsg FALSE branch:
+// cc != NSM_SUCCESS → if-guard is false → updateProperties NOT called
+// ============================================================================
+
+TEST_F(NsmMinSecVersionBatch11F,
+       HandleResponseMsg_ErrorCC_SkipsUpdateProperties)
+{
+    // Encode a valid-length response with cc=NSM_ERROR so decode returns
+    // NSM_SW_SUCCESS but cc != NSM_SUCCESS → FALSE branch of the if-guard
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_security_version_number_resp_command),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    struct nsm_firmware_security_version_number_resp sec_info = {};
+    sec_info.minimum_security_version = htole16(42);
+    sec_info.pending_minimum_security_version = htole16(99);
+    auto rc = encode_nsm_query_firmware_security_version_number_resp(
+        0, NSM_ERROR, ERR_INVALID_RQD, &sec_info, responseMsg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*fpga, sensorIO).WillOnce(mockSensorIO(response));
+
+    sensor->update(fpga);
+
+    // updateProperties was NOT called — version stays at default 0, not 42
+    EXPECT_EQ(sensor->minSecVersion->securityVersionObject->version(), 0);
+}

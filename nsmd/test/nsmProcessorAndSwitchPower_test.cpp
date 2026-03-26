@@ -809,6 +809,7 @@ TEST_F(NsmSwitchDIPowerModeSetTest,
     AsyncSetOperationValueType value = patchValues;
 
     // Act - exception caught by coroutine internally (direct throw in coverage)
+    //
     EXPECT_NO_THROW_COROUTINE(
         pm->setL1PowerModePatch(value, &status, nvswitch));
 }
@@ -832,6 +833,7 @@ TEST_F(NsmSwitchDIPowerModeSetTest,
     AsyncSetOperationValueType value = patchValues;
 
     // Act - exception caught by coroutine internally (direct throw in coverage)
+    //
     EXPECT_NO_THROW_COROUTINE(
         pm->setL1PowerModePatch(value, &status, nvswitch));
 }

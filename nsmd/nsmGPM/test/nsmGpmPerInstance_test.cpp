@@ -114,6 +114,17 @@ TEST_F(NsmGPMPerInstanceTest, testGenRequest)
     EXPECT_EQ(command->metric_id, 11);
 }
 
+TEST_F(NsmGPMPerInstanceTest, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+    const std::vector<bitfield8_t> instanceBitfield{{.byte = 0xFF}};
+    NsmGPMPerInstance perInstance("GPM_PerInst_Bad", "GPMPerInstance", 2, 0, 0,
+                                  10, instanceBitfield,
+                                  GPMMetricsUnit::PERCENTAGE, updator);
+    auto request = perInstance.genRequestMsg(10, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
 TEST_F(NsmGPMPerInstanceTest, testHandleResponseSuccess)
 {
     auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
@@ -289,4 +300,75 @@ TEST_F(NsmGPMPerInstanceTest, AddSensorNsmGPMPerInstance)
     size_t before = gpu->deviceSensors.size();
     gpu->addSensor(sensor, PollingType::RoundRobin);
     EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+TEST_F(NsmGPMPerInstanceTest, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    const std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
+
+    NsmGPMPerInstance perInstance("GPM_PerInst_Fail", "GPMPerInstance", 2, 0, 0,
+                                  10, instanceBitfield,
+                                  GPMMetricsUnit::PERCENTAGE, updator);
+
+    // 7-byte buffer: decode_aggregate_resp requires 9 bytes minimum so the
+    // short buffer triggers NSM_SW_ERROR_LENGTH before accessing any fields
+    std::vector<uint8_t> responseBuffer(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+
+    auto rc = perInstance.handleResponseMsg(responseMsg, responseBuffer.size());
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// ============================================================================
+// handleResponseMsg: duplicate tag → L682 Decision 'false' branch
+// (tag < metrics.size() → skip resize, FALSE branch of if (tag >=
+// metrics.size()))
+//
+// Response has telemetryCount=2 with both samples using tag=0.
+// After processing the first sample: metrics.size()=1.
+// Processing the second sample: tag=0 < metrics.size()=1 → FALSE branch taken.
+// ============================================================================
+
+TEST_F(NsmGPMPerInstanceTest, HandleResponseMsg_DuplicateTag_SkipsResize)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    const std::vector<bitfield8_t> instanceBitfield{
+        {.byte = 0x01}, {.byte = 0x00}, {.byte = 0x00}, {.byte = 0x00}};
+
+    NsmGPMPerInstance perInstance("GPM_DupTag", "GPMPerInstance", 2, 0, 0, 10,
+                                  instanceBitfield, GPMMetricsUnit::PERCENTAGE,
+                                  updator);
+
+    // Expect updateMetric called once with metrics containing 1 value
+    EXPECT_CALL(*updator, updateMetric(_)).Times(1);
+
+    const size_t data_len = 4;
+    // Build response with 2 samples, both with tag=0
+    std::vector<uint8_t> responseBuffer(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp) +
+        2 * (sizeof(nsm_aggregate_resp_sample) - 1 + data_len));
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 2; // two samples
+
+    auto sample_ptr = reinterpret_cast<uint8_t*>(payload + 1);
+    for (int i = 0; i < 2; i++)
+    {
+        auto sample = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+        sample->tag = 0; // same tag for both → second triggers FALSE branch
+        sample->valid = 1;
+        sample->length = std::log2(data_len);
+        uint32_t value = 1000;
+        memcpy(sample->data, &value, data_len);
+        sample_ptr += sizeof(nsm_aggregate_resp_sample) - 1 + data_len;
+    }
+
+    auto rc = perInstance.handleResponseMsg(responseMsg, responseBuffer.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }

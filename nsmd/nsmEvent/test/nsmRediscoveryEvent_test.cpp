@@ -30,6 +30,7 @@
  */
 
 #include "test/mockDBusHandler.hpp"
+#include "test/mockSensorManager.hpp"
 
 using namespace ::testing;
 
@@ -37,8 +38,11 @@ using namespace ::testing;
 #define protected public
 
 #include "device-capability-discovery.h"
+#include "platform-environmental.h"
 
 #include "nsmEvent/nsmRediscoveryEvent.hpp"
+#include "nsmFwSwInventory/GPUSWInventory.hpp"
+#include "nsmObjectFactory.hpp"
 
 using namespace nsm;
 
@@ -119,4 +123,269 @@ TEST(NsmRediscoveryEvent, Handle_ShortBuffer_ReturnsError)
     auto rc = event.handle(5, {}, {}, msg, buf.size());
 
     EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Valid rediscovery event buffer (decode succeeds) — MctpDiscovery not
+// initialized → throws before nsmDevice lookup.
+// logging=false → covers line 76 FALSE branch, skips logEventAsync block.
+TEST(NsmRediscoveryEvent, Handle_ValidDecode_LoggingFalse_ThrowsMctpDiscovery)
+{
+    auto info = makeRediscoveryInfo(false); // logging = false
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_nsm_rediscovery_event(0, false, msg);
+    const auto* cmsg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    EXPECT_THROW(event.handle(5, {}, {}, cmsg, buf.size()), std::runtime_error);
+}
+
+// logging=true → covers lines 76-81 TRUE branch (logEventAsync + detach),
+// then throws at MctpDiscovery::getInstance().
+TEST(NsmRediscoveryEvent, Handle_ValidDecode_LoggingTrue_ThrowsMctpDiscovery)
+{
+    auto info = makeRediscoveryInfo(true); // logging = true
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_nsm_rediscovery_event(0, false, msg);
+    const auto* cmsg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    EXPECT_THROW(event.handle(5, {}, {}, cmsg, buf.size()), std::runtime_error);
+}
+
+// =============================================================================
+// handleRediscovery tests
+// =============================================================================
+
+// isRediscoveryRequired=false → while body never executes → returns
+// immediately. Covers the while(isRediscoveryRequired) false branch.
+TEST(NsmRediscoveryEvent, HandleRediscovery_NotRequired_LoopSkipped)
+{
+    auto info = makeRediscoveryInfo();
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
+
+    auto mockDevice = std::make_shared<NiceMock<MockNsmDevice>>(
+        uint8_t(0), uint8_t(0), std::string("NSM_DEVICE_INSTANCE_NUMBER"),
+        std::string("0"), uint8_t(0));
+
+    event.isRediscoveryRequired = false;
+
+    EXPECT_CALL(*mockDevice, updateNsmDevice()).Times(0);
+    EXPECT_CALL(*mockDevice, refreshCapabilitySensor()).Times(0);
+
+    event.handleRediscovery(mockDevice);
+
+    EXPECT_FALSE(event.isRediscoveryRequired);
+}
+
+// isRediscoveryRequired=true, gpuDriverSensor=nullptr → else branch:
+// calls updateNsmDevice() then refreshCapabilitySensor().
+// After one iteration isRediscoveryRequired is set to false → loop exits.
+TEST(NsmRediscoveryEvent,
+     HandleRediscovery_Required_NoGpuDriver_CallsUpdateAndRefresh)
+{
+    auto info = makeRediscoveryInfo();
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
+
+    auto mockDevice = std::make_shared<NiceMock<MockNsmDevice>>(
+        uint8_t(0), uint8_t(0), std::string("NSM_DEVICE_INSTANCE_NUMBER"),
+        std::string("0"), uint8_t(0));
+    // gpuDriverSensor is nullptr by default
+
+    event.isRediscoveryRequired = true;
+
+    EXPECT_CALL(*mockDevice, updateNsmDevice())
+        .WillOnce([]() -> requester::Coroutine { co_return NSM_SW_SUCCESS; });
+    EXPECT_CALL(*mockDevice, refreshCapabilitySensor())
+        .WillOnce([]() -> requester::Coroutine { co_return NSM_SW_SUCCESS; });
+
+    event.handleRediscovery(mockDevice);
+
+    EXPECT_FALSE(event.isRediscoveryRequired);
+}
+
+// isRediscoveryRequired=true, gpuDriverSensor!=nullptr → if branch (line 123):
+// calls gpuDriverSensor->update() which calls sensorIO (mocked to NSM_ERROR).
+// Covers the if(nsmDevice->gpuDriverSensor) TRUE branch in handleRediscovery.
+// Uses NsmRediscoveryEventFactoryTest fixture for access to mockSensorIO.
+struct HandleRediscovery_WithGpuDriverFixture :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> mockDevice;
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+
+    HandleRediscovery_WithGpuDriverFixture() : SensorManagerTest(devices)
+    {
+        mockDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        EXPECT_NE(mockDevice, nullptr);
+    }
+    ~HandleRediscovery_WithGpuDriverFixture()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+TEST_F(HandleRediscovery_WithGpuDriverFixture,
+       HandleRediscovery_Required_WithGpuDriver_CallsDriverUpdate)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    auto info = makeRediscoveryInfo();
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
+
+    // Attach a real GPU driver sensor → exercises the if(gpuDriverSensor) TRUE
+    std::vector<utils::Association> associations;
+    auto driverSensor =
+        std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
+            bus, "GPU_Driver_RedisTest", associations, "NSM_GPUSWInventory",
+            "NVIDIA");
+    driverSensor->nsmDeviceFound =
+        std::static_pointer_cast<NsmDevice>(mockDevice);
+    mockDevice->gpuDriverSensor = driverSensor;
+
+    event.isRediscoveryRequired = true;
+
+    // Mock sensorIO so the driver update coroutine exits early
+    EXPECT_CALL(*mockDevice, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERROR));
+
+    event.handleRediscovery(std::static_pointer_cast<NsmDevice>(mockDevice));
+
+    EXPECT_FALSE(event.isRediscoveryRequired);
+}
+
+// =============================================================================
+// createNsmRediscoveryEvent factory tests (via NsmObjectFactory dispatch)
+// =============================================================================
+
+struct NsmRediscoveryEventFactoryTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string interfaceName =
+        "xyz.openbmc_project.Configuration.NSM_Event_Rediscovery";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/rediscovery0";
+    const std::string name = "Rediscovery_Test";
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+
+    NsmRediscoveryEventFactoryTest() : SensorManagerTest(devices)
+    {
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    ~NsmRediscoveryEventFactoryTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+
+    dbus::PropertyMap basicProperties = {
+        {"Name", name},
+        {"UUID", gpuUuid},
+        {"OriginOfCondition",
+         std::string("/xyz/openbmc_project/inventory/system/chassis/GPU_1")},
+        {"MessageId", std::string("ResourceEvent.1.0.ResourceChanged")},
+        {"LoggingNamespace", std::string("GPU_Rediscovery")},
+        {"Resolution", std::string("No action required")},
+        {"MessageArgs", std::vector<std::string>{"GPU_1"}},
+        {"Severity", std::string("Informational")},
+    };
+};
+
+// Full property map with valid UUID → event registered on device
+TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_Success)
+{
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          interfaceName);
+    propertyMap = basicProperties;
+
+    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
+                                               objPath);
+
+    EXPECT_GE(gpu->deviceEvents.size(), 1);
+}
+
+// Missing UUID → empty string → parseStaticUuid fails → exception caught
+// internally
+TEST_F(NsmRediscoveryEventFactoryTest, Factory_MissingUUID_NoEvent)
+{
+    const std::string uniquePath =
+        "/xyz/openbmc_project/inventory/system/rediscovery_no_uuid";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                          interfaceName);
+    dbus::PropertyMap props = basicProperties;
+    props.erase("UUID");
+    propertyMap = props;
+
+    const size_t before = gpu->deviceEvents.size();
+
+    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
+                                               uniquePath);
+
+    EXPECT_EQ(before, gpu->deviceEvents.size());
+}
+
+// With Severity=Warning → severityEnum has_value() → value_or uses actual value
+TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_WithSeverityWarning)
+{
+    const std::string testPath =
+        "/xyz/openbmc_project/inventory/system/rediscovery_warning";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
+                                                          interfaceName);
+    dbus::PropertyMap props = basicProperties;
+    props["Severity"] = std::string("Warning");
+    propertyMap = props;
+
+    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
+                                               testPath);
+
+    EXPECT_GE(gpu->deviceEvents.size(), 1);
+}
+
+// Only UUID and Name → all other optional property checks hit FALSE branches
+// Missing Severity → severityEnum empty → value_or(Level::Critical) used
+TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_MinimalProperties)
+{
+    const std::string testPath =
+        "/xyz/openbmc_project/inventory/system/rediscovery_minimal";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
+                                                          interfaceName);
+    propertyMap = {
+        {"Name", name},
+        {"UUID", gpuUuid},
+    };
+
+    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
+                                               testPath);
+
+    EXPECT_GE(gpu->deviceEvents.size(), 1);
+}
+
+// With MessageArgs present → covers the MessageArgs branch
+TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_WithMessageArgs)
+{
+    const std::string testPath =
+        "/xyz/openbmc_project/inventory/system/rediscovery_msgargs";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
+                                                          interfaceName);
+    dbus::PropertyMap props = basicProperties;
+    props["MessageArgs"] = std::vector<std::string>{"arg1", "arg2"};
+    propertyMap = props;
+
+    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
+                                               testPath);
+
+    EXPECT_GE(gpu->deviceEvents.size(), 1);
 }

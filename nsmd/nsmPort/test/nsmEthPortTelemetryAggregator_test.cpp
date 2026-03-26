@@ -106,6 +106,30 @@ TEST_F(EthPortTelemetryAggregatorTest, testGenRequest)
                   sizeof(nsm_get_ethernet_port_telemetry_counter_req));
 }
 
+TEST_F(EthPortTelemetryAggregatorTest,
+       BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "EthPort_BadReq";
+    uint16_t portNumber = 2;
+    std::string type = "NSM_EthPort";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/ethport_badreq";
+
+    auto portMetricsOem2Intf =
+        std::make_shared<PortMetricsOem2Intf>(bus, inventoryObjPath.c_str());
+    auto portPacketCountersIntf =
+        std::make_shared<PortPacketCountersIntf>(bus, inventoryObjPath.c_str());
+
+    EthPortTelemetryAggregator ethPort(bus, portName, portNumber, type,
+                                       inventoryObjPath, portMetricsOem2Intf,
+                                       portPacketCountersIntf);
+
+    // instanceId > NSM_INSTANCE_MAX → encode fails → return nullopt
+    auto request = ethPort.genRequestMsg(10, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
 TEST_F(EthPortTelemetryAggregatorTest, testHandleSampleRXBytes)
 {
     auto& bus = utils::DBusHandler::getBus();
@@ -303,6 +327,22 @@ TEST_F(NsmGetPortECCCountersTest, testGenRequest)
               sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_ecc_counters_req));
 }
 
+TEST_F(NsmGetPortECCCountersTest, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "Port_ECC_BadReq";
+    std::string type = "NSM_Port";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/port_ecc_badreq";
+    uint8_t portNumber = 2;
+
+    NsmGetPortECCCounters eccCounters(bus, portName, type, inventoryObjPath,
+                                      portNumber);
+    // instanceId > NSM_INSTANCE_MAX → encode fails → return nullopt
+    auto request = eccCounters.genRequestMsg(10, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
 TEST_F(NsmGetPortECCCountersTest, testHandleResponseAllTags)
 {
     auto& bus = utils::DBusHandler::getBus();
@@ -463,4 +503,26 @@ TEST_F(NsmGetPortECCCountersTest, testHandleResponseInvalidTag)
 
     auto rc = eccCounters.handleResponseMsg(responseMsg, responseBuffer.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS); // Should skip reserved tags
+}
+
+TEST_F(NsmGetPortECCCountersTest, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string portName = "Port_ECC_Fail";
+    std::string type = "NSM_Port";
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/port_ecc_fail";
+    uint8_t portNumber = 9;
+
+    NsmGetPortECCCounters eccCounters(bus, portName, type, inventoryObjPath,
+                                      portNumber);
+
+    // 7-byte buffer: decode_aggregate_resp requires 9 bytes minimum so the
+    // short buffer triggers NSM_SW_ERROR_LENGTH before accessing any fields
+    std::vector<uint8_t> responseBuffer(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<struct nsm_msg*>(responseBuffer.data());
+
+    auto rc = eccCounters.handleResponseMsg(responseMsg, responseBuffer.size());
+
+    EXPECT_NE(rc, NSM_SUCCESS);
 }

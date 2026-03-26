@@ -202,3 +202,88 @@ TEST_F(CircularQueueTest, goodTestStringQueue)
     queue.next();
     EXPECT_EQ(queue.current(), "first");
 }
+
+// Cover currentIndex >= size() TRUE branch for CircularQueue<std::string>
+// (same path as goodTestCurrentAfterSizeChange but for the string
+// instantiation)
+TEST_F(CircularQueueTest, goodTestCurrentAfterSizeChange_String)
+{
+    CircularQueue<std::string> queue;
+    queue.push("alpha");
+    queue.push("beta");
+    queue.currentIndex = 10; // Force invalid index
+
+    // current() should detect currentIndex >= size(), reset to 0, return
+    // "alpha"
+    EXPECT_EQ(queue.current(), "alpha");
+    EXPECT_EQ(queue.currentIndex, 0u);
+}
+
+// Cover next() empty-queue path for CircularQueue<std::string>
+TEST_F(CircularQueueTest, goodTestNextOnEmpty_String)
+{
+    CircularQueue<std::string> queue;
+    queue.next();
+    EXPECT_EQ(queue.currentIndex, 0u);
+}
+
+// Exercise CircularQueue<double> to add a third template instantiation,
+// covering the push/current/next branches for that type.
+TEST_F(CircularQueueTest, goodTestDoubleQueue_WrapAround)
+{
+    CircularQueue<double> queue;
+    queue.push(1.1);
+    queue.push(2.2);
+    queue.push(3.3);
+
+    EXPECT_DOUBLE_EQ(queue.current(), 1.1);
+    queue.next();
+    EXPECT_DOUBLE_EQ(queue.current(), 2.2);
+    queue.next();
+    EXPECT_DOUBLE_EQ(queue.current(), 3.3);
+    queue.next(); // wrap
+    EXPECT_DOUBLE_EQ(queue.current(), 1.1);
+}
+
+// Cover currentIndex >= size() TRUE path for CircularQueue<double>
+TEST_F(CircularQueueTest, goodTestCurrentAfterSizeChange_Double)
+{
+    CircularQueue<double> queue;
+    queue.push(9.9);
+    queue.currentIndex = 99; // Force invalid index
+    EXPECT_DOUBLE_EQ(queue.current(), 9.9);
+    EXPECT_EQ(queue.currentIndex, 0u);
+}
+
+// Cover push() rvalue overload for int (ensures move-path branch is taken)
+TEST_F(CircularQueueTest, goodTestPushRvalue_Int)
+{
+    CircularQueue<int> queue;
+    int val = 42;
+    queue.push(std::move(val));
+    EXPECT_EQ(queue.current(), 42);
+}
+
+// Cover line 48: throw path for empty CircularQueue<std::string> //
+
+TEST_F(CircularQueueTest, badTestCurrentOnEmpty_String)
+{
+    CircularQueue<std::string> queue;
+    EXPECT_THROW(queue.current(), std::runtime_error);
+}
+
+// Cover line 48: throw path for empty CircularQueue<double> //
+
+TEST_F(CircularQueueTest, badTestCurrentOnEmpty_Double)
+{
+    CircularQueue<double> queue;
+    EXPECT_THROW(queue.current(), std::runtime_error);
+}
+
+// Cover line 68: next() empty path for CircularQueue<double>
+TEST_F(CircularQueueTest, goodTestNextOnEmpty_Double)
+{
+    CircularQueue<double> queue;
+    queue.next();
+    EXPECT_EQ(queue.currentIndex, 0u);
+}

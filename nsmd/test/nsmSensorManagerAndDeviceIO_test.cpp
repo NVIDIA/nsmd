@@ -188,7 +188,8 @@ TEST_F(CheckAllDevicesReadyTest,
 
     // Act & Assert - verify devices are ready and readiness flag is set
     // (cannot call SensorManagerImpl::checkAllDevicesReady on
-    // MockSensorManager - dynamic_cast would throw bad_cast)
+    // MockSensorManager - dynamic_cast would throw bad_cast) //
+
     EXPECT_TRUE(gpu0->isReady());
     EXPECT_TRUE(gpu1->isReady());
     EXPECT_TRUE(SensorManagerImpl::isReadyForReadinessCheck);
@@ -508,8 +509,8 @@ TEST(NsmDeviceSensorIO, DeviceInactive_ReturnsUnsupportedCommandCode)
                                                 responseLen, false);
 
     // Assert - device inactive returns unsupported command code
-    // The coroutine co_returns NSM_ERR_UNSUPPORTED_COMMAND_CODE
-    // We check it completed without throwing
+    // The coroutine co_returns NSM_ERR_UNSUPPORTED_COMMAND_CODE.
+    // We check it completed without throwing.
     EXPECT_NO_THROW((void)coroutine);
 }
 

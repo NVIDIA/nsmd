@@ -1080,3 +1080,239 @@ TEST(UtilsTest, GetAssociationsWithSpecialCharacters)
     EXPECT_EQ(std::get<1>(result[0]), "backward\\path");
     EXPECT_EQ(std::get<2>(result[0]), "/special/!@#$%^&*()");
 }
+
+// ============================================================================
+// Branch coverage: readFdToBuffer / writeBufferToFd / appendBufferToFd
+// ============================================================================
+
+TEST(UtilsTest, ReadFdToBuffer_InvalidFd_Throws)
+{
+    std::vector<uint8_t> buffer;
+    EXPECT_THROW(utils::readFdToBuffer(-1, buffer), std::runtime_error);
+}
+
+TEST(UtilsTest, ReadFdToBuffer_Success)
+{
+    int fd = memfd_create("test_read", 0);
+    ASSERT_GE(fd, 0);
+    const uint8_t data[] = {1, 2, 3, 4, 5};
+    ASSERT_EQ(::write(fd, data, sizeof(data)), (ssize_t)sizeof(data));
+
+    std::vector<uint8_t> buffer;
+    EXPECT_NO_THROW(utils::readFdToBuffer(fd, buffer));
+    ASSERT_EQ(buffer.size(), 5u);
+    for (int i = 0; i < 5; i++)
+    {
+        EXPECT_EQ(buffer[i], (uint8_t)(i + 1));
+    }
+    close(fd);
+}
+
+TEST(UtilsTest, ReadFdToBuffer_EmptyFile)
+{
+    int fd = memfd_create("test_empty", 0);
+    ASSERT_GE(fd, 0);
+    std::vector<uint8_t> buffer = {99, 100};
+    EXPECT_NO_THROW(utils::readFdToBuffer(fd, buffer));
+    EXPECT_TRUE(buffer.empty());
+    close(fd);
+}
+
+TEST(UtilsTest, WriteBufferToFd_InvalidFd_Throws)
+{
+    std::vector<uint8_t> buffer = {1, 2, 3};
+    EXPECT_THROW(utils::writeBufferToFd(-1, buffer), std::runtime_error);
+}
+
+TEST(UtilsTest, WriteBufferToFd_Success)
+{
+    int fd = memfd_create("test_write", 0);
+    ASSERT_GE(fd, 0);
+
+    std::vector<uint8_t> buffer = {10, 20, 30, 40, 50};
+    EXPECT_NO_THROW(utils::writeBufferToFd(fd, buffer));
+
+    std::vector<uint8_t> readBack;
+    EXPECT_NO_THROW(utils::readFdToBuffer(fd, readBack));
+    ASSERT_EQ(readBack.size(), 5u);
+    EXPECT_EQ(readBack, buffer);
+    close(fd);
+}
+
+TEST(UtilsTest, AppendBufferToFd_InvalidFd_Throws)
+{
+    std::vector<uint8_t> buffer = {1, 2, 3};
+    EXPECT_THROW(utils::appendBufferToFd(-1, buffer), std::runtime_error);
+}
+
+TEST(UtilsTest, AppendBufferToFd_Success)
+{
+    int fd = memfd_create("test_append", 0);
+    ASSERT_GE(fd, 0);
+
+    std::vector<uint8_t> buf1 = {1, 2, 3};
+    std::vector<uint8_t> buf2 = {4, 5, 6};
+    EXPECT_NO_THROW(utils::appendBufferToFd(fd, buf1));
+    EXPECT_NO_THROW(utils::appendBufferToFd(fd, buf2));
+
+    lseek(fd, 0, SEEK_SET);
+    uint8_t result[6] = {};
+    EXPECT_EQ(::read(fd, result, 6), 6);
+    EXPECT_EQ(result[0], 1);
+    EXPECT_EQ(result[5], 6);
+    close(fd);
+}
+
+// ============================================================================
+// Branch coverage: CustomFD
+// ============================================================================
+
+TEST(UtilsTest, CustomFD_InvalidFd_Throws)
+{
+    EXPECT_THROW((void)utils::CustomFD(-1), std::runtime_error);
+}
+
+TEST(UtilsTest, CustomFD_ValidFd_OperationsWork)
+{
+    int fd = memfd_create("test_customfd", 0);
+    ASSERT_GE(fd, 0);
+    // Pre-allocate so write can work (pos <= fileSize check)
+    ASSERT_EQ(ftruncate(fd, 16), 0);
+
+    utils::CustomFD cfd(fd);
+    EXPECT_EQ(cfd.size(), 16u);
+
+    // write: pos > fileSize → return false
+    uint8_t buf[4] = {1, 2, 3, 4};
+    EXPECT_FALSE(cfd.write(20, buf, 4)); // pos 20 > fileSize 16
+
+    // write: null data → return false
+    EXPECT_FALSE(cfd.write(0, nullptr, 4));
+
+    // write: size == 0 → return false
+    EXPECT_FALSE(cfd.write(0, buf, 0));
+
+    // write success
+    EXPECT_TRUE(cfd.write(0, buf, 4));
+
+    // read: pos+size > fileSize → return false
+    uint8_t rbuf[4] = {};
+    EXPECT_FALSE(cfd.read(14, rbuf, 4)); // 14+4=18 > 16
+
+    // read: null data → return false
+    EXPECT_FALSE(cfd.read(0, nullptr, 4));
+
+    // read: size == 0 → return false
+    EXPECT_FALSE(cfd.read(0, rbuf, 0));
+
+    // read success
+    EXPECT_TRUE(cfd.read(0, rbuf, 4));
+    EXPECT_EQ(rbuf[0], 1);
+    EXPECT_EQ(rbuf[3], 4);
+    // fd is closed by CustomFD destructor
+}
+
+// ============================================================================
+// Branch coverage: bitMapToBitfield256_t wrong size → returns zero bitfield
+// ============================================================================
+
+TEST(UtilsTest, BitMapToBitfield256t_WrongSize_ReturnsZero)
+{
+    std::vector<uint8_t> wrongSizeBitmap(16, 0xFF); // should be 32
+    bitfield256_t result = utils::bitMapToBitfield256_t(wrongSizeBitmap);
+    for (int i = 0; i < 8; i++)
+    {
+        EXPECT_EQ(result.fields[i].byte, 0u);
+    }
+}
+
+// ============================================================================
+// Branch coverage: isPreferred with unknown medium/binding
+// (triggers defaultPriority = INT_MIN path in getMediumPriority lambda)
+// ============================================================================
+
+TEST(UtilsTest, IsPreferred_UnknownMedium_UsesDefaultPriority)
+{
+    // Current medium unknown (INT_MIN), new medium PCIe (0)
+    // INT_MIN != 0 → else: INT_MIN >= 0 → false
+    std::tuple<MctpMedium, MctpBinding> current = {
+        "unknown_medium_type",
+        "xyz.openbmc_project.MCTP.Binding.BindingTypes.PCIe"};
+    std::tuple<MctpMedium, MctpBinding> newInfo = {
+        "xyz.openbmc_project.MCTP.Endpoint.MediaTypes.PCIe",
+        "xyz.openbmc_project.MCTP.Binding.BindingTypes.PCIe"};
+    EXPECT_FALSE(utils::isPreferred(current, newInfo));
+}
+
+TEST(UtilsTest, IsPreferred_BothUnknownMedium_FallsToBinding)
+{
+    // Both mediums unknown (INT_MIN == INT_MIN) → compare binding
+    // Current binding unknown (INT_MIN), new binding PCIe (0)
+    // INT_MIN >= 0 → false
+    std::tuple<MctpMedium, MctpBinding> current = {"unknown_medium_type",
+                                                   "unknown_binding_type"};
+    std::tuple<MctpMedium, MctpBinding> newInfo = {
+        "unknown_medium_type",
+        "xyz.openbmc_project.MCTP.Binding.BindingTypes.PCIe"};
+    EXPECT_FALSE(utils::isPreferred(current, newInfo));
+}
+
+// ============================================================================
+// Branch coverage: isValidDbusString overlong 3-byte and 4-byte encodings
+// ============================================================================
+
+TEST(UtilsTest, IsValidDbusString_Overlong3Byte)
+{
+    // 0xE0 0x80 0xBF: 3-byte encoding of codepoint 63 (< 0x800) → overlong
+    EXPECT_FALSE(utils::isValidDbusString("\xE0\x80\xBF"));
+}
+
+TEST(UtilsTest, IsValidDbusString_Overlong4Byte)
+{
+    // 0xF0 0x80 0x80 0xBF: 4-byte encoding of codepoint 63 (< 0x10000) →
+    // overlong
+    EXPECT_FALSE(utils::isValidDbusString("\xF0\x80\x80\xBF"));
+}
+
+// ============================================================================
+// Branch coverage: parseStaticUuid n1/n2 out-of-range paths
+// ============================================================================
+
+TEST(ParseStaticUuid, N1Negative_ReturnsMinusOne)
+{
+    uuid_t uuid = "STATIC:-1:0:PROP:VAL";
+    uint8_t deviceType = 0, instanceNumber = 0, deviceRole = 0;
+    std::string remapPropName;
+    std::vector<std::string> remapPropValues;
+
+    int result = utils::parseStaticUuid(uuid, deviceType, instanceNumber,
+                                        deviceRole, remapPropName,
+                                        remapPropValues);
+    EXPECT_EQ(result, -1);
+}
+
+TEST(ParseStaticUuid, N1TooLarge_ReturnsMinusOne)
+{
+    uuid_t uuid = "STATIC:65536:0:PROP:VAL"; // 65536 > 0xffff
+    uint8_t deviceType = 0, instanceNumber = 0, deviceRole = 0;
+    std::string remapPropName;
+    std::vector<std::string> remapPropValues;
+
+    int result = utils::parseStaticUuid(uuid, deviceType, instanceNumber,
+                                        deviceRole, remapPropName,
+                                        remapPropValues);
+    EXPECT_EQ(result, -1);
+}
+
+TEST(ParseStaticUuid, N2TooLarge_ReturnsMinusTwo)
+{
+    uuid_t uuid = "STATIC:0:256:PROP:VAL"; // 256 > 0xff
+    uint8_t deviceType = 0, instanceNumber = 0, deviceRole = 0;
+    std::string remapPropName;
+    std::vector<std::string> remapPropValues;
+
+    int result = utils::parseStaticUuid(uuid, deviceType, instanceNumber,
+                                        deviceRole, remapPropName,
+                                        remapPropValues);
+    EXPECT_EQ(result, -2);
+}

@@ -219,3 +219,100 @@ TEST_F(NsmZoneFactoryTest, CreateNsmZonesInvalidUUID)
     auto zone = std::dynamic_pointer_cast<NsmZone>(gpu->deviceSensors[0]);
     EXPECT_EQ(nullptr, zone);
 }
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in createNsmZones
+// =============================================================================
+
+// Name absent → name="" → NsmZone created with empty name → sensor IS added
+TEST_F(NsmZoneFactoryTest, CreateZones_MissingName_SensorCreated)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/zone_no_name";
+    const std::string fabricsObjPath =
+        "/xyz/openbmc_project/inventory/test/zone/fabric_no_name";
+    const std::string zoneType =
+        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfZones";
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    propertyMap["ZoneType"] = zoneType;
+    propertyMap["FabricsObjPath"] = fabricsObjPath;
+    propertyMap["UUID"] = gpuUuid;
+    // "Name" intentionally omitted → FALSE branch → name="" → sensor added
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmZones(mockManager, interface, objPath);
+    // NsmZone constructed with empty name → no throw in test env → sensor added
+    //
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// ZoneType absent → zoneType="" → convertZoneTypeFromString("") throws in
+// NsmZone constructor → propagates (no try/catch in factory)
+TEST_F(NsmZoneFactoryTest, CreateZones_MissingZoneType_Throws)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/zone_no_zonetype";
+    const std::string fabricsObjPath =
+        "/xyz/openbmc_project/inventory/test/zone/fabric_no_zonetype";
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    propertyMap["Name"] = std::string("Zone_NoType");
+    propertyMap["FabricsObjPath"] = fabricsObjPath;
+    propertyMap["UUID"] = gpuUuid;
+    // "ZoneType" intentionally omitted → zoneType="" →
+    // convertZoneTypeFromString("") throws
+
+    EXPECT_THROW_COROUTINE(createNsmZones(mockManager, interface, objPath),
+                           std::exception);
+}
+
+// FabricsObjPath absent → fabricsObjPath="" → inventoryObjPath="/zones/0"
+// (valid D-Bus path starting with "/") → sensor IS created
+TEST_F(NsmZoneFactoryTest, CreateZones_MissingFabricsObjPath_SensorCreated)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/zone_no_fabrics";
+    const std::string zoneType =
+        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfZones";
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    propertyMap["Name"] = std::string("Zone_NoFabrics");
+    propertyMap["ZoneType"] = zoneType;
+    propertyMap["UUID"] = gpuUuid;
+    // "FabricsObjPath" intentionally omitted → fabricsObjPath="" →
+    // inventoryObjPath="/zones/0" → valid path → sensor IS created
+
+    const size_t before = gpu->deviceSensors.size();
+    createNsmZones(mockManager, interface, objPath);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// UUID absent → uuid="" → parseStaticUuid("") throws std::runtime_error
+// before NsmZone is created
+TEST_F(NsmZoneFactoryTest, CreateZones_MissingUUID_Throws)
+{
+    const std::string interface =
+        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/zone_no_uuid";
+    const std::string fabricsObjPath =
+        "/xyz/openbmc_project/inventory/test/zone/fabric_no_uuid";
+    const std::string zoneType =
+        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfZones";
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
+    propertyMap["Name"] = std::string("Zone_NoUUID");
+    propertyMap["ZoneType"] = zoneType;
+    propertyMap["FabricsObjPath"] = fabricsObjPath;
+    // "UUID" intentionally omitted → uuid="" → parseStaticUuid("") throws
+
+    EXPECT_THROW_COROUTINE(createNsmZones(mockManager, interface, objPath),
+                           std::exception);
+}

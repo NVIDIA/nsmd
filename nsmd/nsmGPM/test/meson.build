@@ -2,7 +2,20 @@
 # nsmGPM is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
 # All sources already compiled into nsmd_test, no need to recompile
 
-tests = ['nsmGpmOem_test', 'nsmGpmPerInstance_test', 'nsmGpmOemFactory_test']
+tests = [
+    'nsmGpmOem_test',
+    'nsmGpmPerInstance_test',
+    'nsmGpmOemFactory_test',
+    'nsmGpmOemBranch_test',
+    'nsmGpmOemBranch2_test',
+    'nsmGpmOemBranch3_test',
+    'nsmGpmOemFactoryBranch_test',
+    'nsmGpmOemBranch4_test',
+    'nsmGpmOemBranch5_test',
+    'nsmGpmOemBranch6_test',
+    'nsmGPMBranch_test',
+    'nsmGpmOemBranch7_test',
+]
 
 foreach t : tests
     test(

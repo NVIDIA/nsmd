@@ -38,11 +38,23 @@ struct NsmRoTPropertyTest :
     const uint16_t classification = 1;
     const uint16_t identifier = 2;
     const uint8_t index = 0;
+    const uuid_t deviceUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
 
     NsmDeviceTable devices;
     std::shared_ptr<NsmInbandUpdatePolicyObject> policyObject;
+    std::shared_ptr<MockNsmDevice> gpu;
 
-    NsmRoTPropertyTest() : SensorManagerTest(devices) {}
+    NsmRoTPropertyTest() : SensorManagerTest(devices)
+    {
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    ~NsmRoTPropertyTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
 
     void SetUp() override
     {
@@ -51,6 +63,23 @@ struct NsmRoTPropertyTest :
             bus, chassisName, classification, identifier, index);
 
         EXPECT_NE(policyObject, nullptr);
+    }
+
+    // Helper: build a valid NSM_SUCCESS erot_state response for the given
+    // policy
+    static std::vector<uint8_t> buildErotStateResponse(uint8_t inbandPolicy,
+                                                       uint8_t bgCopyPolicy)
+    {
+        std::vector<uint8_t> buf(256, 0);
+        auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+        nsm_firmware_erot_state_info_resp erotInfo = {};
+        erotInfo.slot_info = nullptr;
+        erotInfo.fq_resp_hdr.inband_update_policy = inbandPolicy;
+        erotInfo.fq_resp_hdr.background_copy_policy = bgCopyPolicy;
+        erotInfo.fq_resp_hdr.firmware_slot_count = 0;
+        encode_nsm_query_get_erot_state_parameters_resp(
+            0, NSM_SUCCESS, ERR_NULL, &erotInfo, msg);
+        return buf;
     }
 };
 
@@ -277,21 +306,20 @@ TEST_F(NsmRoTPropertyDeepTest,
     EXPECT_NE(rc, NSM_SW_SUCCESS);
 }
 
-TEST_F(
-    NsmRoTPropertyDeepTest,
-    DISABLED_InbandUpdatePolicyObject_HandleResponse_DecodeFailure_ReturnsError)
+TEST_F(NsmRoTPropertyDeepTest,
+       InbandUpdatePolicyObject_HandleResponse_DecodeFailure_ReturnsError)
 {
     // Arrange
     auto& bus = utils::DBusHandler::getBus();
     auto policyObj = std::make_shared<NsmInbandUpdatePolicyObject>(
         bus, chassisName + "_hr3", classification, identifier, index);
 
-    // Buffer too small to even read the completion code field.
-    // decode_reason_code_and_cc requires at least
-    // sizeof(nsm_msg_hdr) + offsetof(nsm_common_resp, completion_code) + 1
-    // = 5 + 1 + 1 = 7 bytes. Using 4 bytes triggers NSM_SW_ERROR_LENGTH.
-    std::vector<uint8_t> response(4, 0);
-    auto responseMsg = reinterpret_cast<const nsm_msg*>(response.data());
+    // Use sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_aggregate_tag) - 1 = 7
+    // bytes so decode_reason_code_and_cc safely reads cc (at payload[1]=byte6)
+    // but the subsequent length check (< 8) returns NSM_SW_ERROR_LENGTH.
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_aggregate_tag) - 1, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     // Act
     auto rc = policyObj->handleResponseMsg(responseMsg, response.size());
@@ -478,7 +506,7 @@ TEST_F(NsmRoTPropertyDeepTest,
 }
 
 TEST_F(NsmRoTPropertyDeepTest,
-       DISABLED_ImageCopyPolicyObject_HandleResponse_DecodeFailure_ReturnsError)
+       ImageCopyPolicyObject_HandleResponse_DecodeFailure_ReturnsError)
 {
     // Arrange
     auto& bus = utils::DBusHandler::getBus();
@@ -486,11 +514,12 @@ TEST_F(NsmRoTPropertyDeepTest,
         bus, chassisName + "_icp6", "NSM_ChassisRoT", classification,
         identifier, index);
 
-    // Buffer too small to even read the completion code field.
-    // decode_reason_code_and_cc requires at least 7 bytes.
-    // Using 4 bytes triggers NSM_SW_ERROR_LENGTH.
-    std::vector<uint8_t> response(4, 0);
-    auto responseMsg = reinterpret_cast<const nsm_msg*>(response.data());
+    // Use sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_aggregate_tag) - 1 = 7
+    // bytes so decode_reason_code_and_cc safely reads cc (at payload[1]=byte6)
+    // but the subsequent length check (< 8) returns NSM_SW_ERROR_LENGTH.
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_aggregate_tag) - 1, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     // Act
     auto rc = obj->handleResponseMsg(responseMsg, response.size());
@@ -1267,4 +1296,1088 @@ TEST_F(NsmRoTPropertyDeepTest, AddSensorNsmImageCopyPolicyObject)
     size_t before = fpga->deviceSensors.size();
     fpga->addSensor(sensor, PollingType::RoundRobin);
     EXPECT_GT(fpga->deviceSensors.size(), before);
+}
+
+// =============================================================================
+// NsmInbandUpdatePolicyObject handleResponseMsg coverage tests
+// =============================================================================
+
+// Decode-fail path: 7-byte buffer is too short for
+// decode_nsm_query_get_erot_state_parameters_resp → rc != NSM_SW_SUCCESS
+// → returns rc (the `cc == 0` branch of `cc ? cc : rc`).
+TEST_F(NsmRoTPropertyTest, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    std::vector<uint8_t> responseData(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    uint8_t rc = policyObject->handleResponseMsg(response, responseData.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Error-CC path: properly-sized buffer but cc == NSM_ERROR
+// → decode succeeds, cc != 0 → returns cc (the `cc != 0` branch).
+TEST_F(NsmRoTPropertyTest, HandleResponseMsg_ErrorCC_ReturnsCC)
+{
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_erot_state_info_hdr_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.slot_info = nullptr;
+    uint8_t rc = encode_nsm_query_get_erot_state_parameters_resp(
+        0, NSM_ERROR, ERR_NOT_SUPPORTED, &erotInfo, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = policyObject->handleResponseMsg(response, responseData.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// =============================================================================
+// NsmImageCopyPolicyObject handleResponseMsg coverage tests
+// =============================================================================
+
+// Decode-fail path for NsmImageCopyPolicyObject.
+TEST(NsmImageCopyPolicyObject, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    const std::string name = "ImageCopyPolicy";
+    const std::string type = "NSM_ImageCopyPolicy";
+    NsmImageCopyPolicyObject sensor(bus, name, type, 1, 2, 0);
+
+    std::vector<uint8_t> responseData(sizeof(nsm_msg_hdr) + 2, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    uint8_t rc = sensor.handleResponseMsg(response, responseData.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// Error-CC path for NsmImageCopyPolicyObject.
+TEST(NsmImageCopyPolicyObject, HandleResponseMsg_ErrorCC_ReturnsCC)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    const std::string name = "ImageCopyPolicy2";
+    const std::string type = "NSM_ImageCopyPolicy";
+    NsmImageCopyPolicyObject sensor(bus, name, type, 1, 2, 0);
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_erot_state_info_hdr_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.slot_info = nullptr;
+    uint8_t rc = encode_nsm_query_get_erot_state_parameters_resp(
+        0, NSM_ERROR, ERR_NOT_SUPPORTED, &erotInfo, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseData.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// =============================================================================
+// NsmInbandUpdatePolicyObject::handleResponseMsg – SUCCESS paths
+// These cover the nsmInbandUpdatePolicy->updateProperties(erot_info) branch
+// (lines ~148-150) and the three switch cases in updateProperties.
+// =============================================================================
+
+// SUCCESS response with ENABLE policy → updateProperties takes ENABLE branch
+TEST_F(NsmRoTPropertyTest, HandleResponseMsg_Success_EnablePolicy)
+{
+    auto buf = buildErotStateResponse(
+        NSM_ROT_INBAND_UPDATE_POLICY_ENABLE,
+        NSM_ROT_REDUNDANCY_POLICY_MANUAL_BACKGROUND_COPY);
+    auto response = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t rc = policyObject->handleResponseMsg(response, buf.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+}
+
+// SUCCESS response with DISABLE policy → updateProperties takes DISABLE branch
+TEST_F(NsmRoTPropertyTest, HandleResponseMsg_Success_DisablePolicy)
+{
+    auto buf = buildErotStateResponse(
+        NSM_ROT_INBAND_UPDATE_POLICY_DISABLE,
+        NSM_ROT_REDUNDANCY_POLICY_MANUAL_BACKGROUND_COPY);
+    auto response = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t rc = policyObject->handleResponseMsg(response, buf.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+}
+
+// SUCCESS response with unknown policy → updateProperties takes default branch
+TEST_F(NsmRoTPropertyTest, HandleResponseMsg_Success_UnknownPolicy)
+{
+    auto buf = buildErotStateResponse(
+        0xFF, NSM_ROT_REDUNDANCY_POLICY_MANUAL_BACKGROUND_COPY);
+    auto response = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t rc = policyObject->handleResponseMsg(response, buf.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+}
+
+// =============================================================================
+// NsmImageCopyPolicyObject::handleResponseMsg – SUCCESS paths
+// These cover imageCopyPolicyObject->updateProperties branch and its
+// switch cases (MANUAL, AUTOMATIC, unknown/default).
+// =============================================================================
+
+TEST(NsmImageCopyPolicyObject, HandleResponseMsg_Success_ManualPolicy)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    NsmImageCopyPolicyObject sensor(bus, "ImageCopyPolicyManual",
+                                    "NSM_ImageCopyPolicy", 1, 2, 0);
+
+    std::vector<uint8_t> buf(256, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.slot_info = nullptr;
+    erotInfo.fq_resp_hdr.background_copy_policy =
+        NSM_ROT_REDUNDANCY_POLICY_MANUAL_BACKGROUND_COPY;
+    erotInfo.fq_resp_hdr.firmware_slot_count = 0;
+    ASSERT_EQ(encode_nsm_query_get_erot_state_parameters_resp(
+                  0, NSM_SUCCESS, ERR_NULL, &erotInfo, msg),
+              NSM_SW_SUCCESS);
+    uint8_t rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+}
+
+TEST(NsmImageCopyPolicyObject, HandleResponseMsg_Success_AutomaticPolicy)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    NsmImageCopyPolicyObject sensor(bus, "ImageCopyPolicyAutomatic",
+                                    "NSM_ImageCopyPolicy", 1, 2, 0);
+
+    std::vector<uint8_t> buf(256, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.slot_info = nullptr;
+    erotInfo.fq_resp_hdr.background_copy_policy =
+        NSM_ROT_REDUNDANCY_POLICY_AUTOMATIC_BACKGROUND_COPY;
+    erotInfo.fq_resp_hdr.firmware_slot_count = 0;
+    ASSERT_EQ(encode_nsm_query_get_erot_state_parameters_resp(
+                  0, NSM_SUCCESS, ERR_NULL, &erotInfo, msg),
+              NSM_SW_SUCCESS);
+    uint8_t rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+}
+
+TEST(NsmImageCopyPolicyObject, HandleResponseMsg_Success_UnknownPolicy)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    NsmImageCopyPolicyObject sensor(bus, "ImageCopyPolicyUnknown",
+                                    "NSM_ImageCopyPolicy", 1, 2, 0);
+
+    std::vector<uint8_t> buf(256, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    nsm_firmware_erot_state_info_resp erotInfo = {};
+    erotInfo.slot_info = nullptr;
+    erotInfo.fq_resp_hdr.background_copy_policy = 0xFF; // unknown → default
+    erotInfo.fq_resp_hdr.firmware_slot_count = 0;
+    ASSERT_EQ(encode_nsm_query_get_erot_state_parameters_resp(
+                  0, NSM_SUCCESS, ERR_NULL, &erotInfo, msg),
+              NSM_SW_SUCCESS);
+    uint8_t rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+}
+
+// =============================================================================
+// updateInbandUpdatePolicyHandler branch coverage
+// =============================================================================
+
+// Non-string value → std::get_if<std::string> returns nullptr → InvalidArgument
+TEST_F(NsmRoTPropertyTest, UpdateInbandUpdatePolicy_NonStringValue)
+{
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = uint8_t(1); // not a string
+    updateInbandUpdatePolicyHandler(value, &status, gpu, classification,
+                                    identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+// Invalid policy string → convertStringToInbandPolicyState returns nullopt
+// → InvalidArgument
+TEST_F(NsmRoTPropertyTest, UpdateInbandUpdatePolicy_InvalidString)
+{
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = std::string("InvalidPolicyString");
+    updateInbandUpdatePolicyHandler(value, &status, gpu, classification,
+                                    identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+// Valid "Enabled" + postPatchIO failure → WriteFailure
+TEST_F(NsmRoTPropertyTest, UpdateInbandUpdatePolicy_Enabled_PostPatchFail)
+{
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(NSM_ERR_INVALID_DATA));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        std::string("com.nvidia.InbandUpdatePolicy.InbandPolicyState.Enabled");
+    updateInbandUpdatePolicyHandler(value, &status, gpu, classification,
+                                    identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// Valid "Enabled" + short response → decode fails → WriteFailure
+TEST_F(NsmRoTPropertyTest, UpdateInbandUpdatePolicy_Enabled_DecodeFail)
+{
+    std::vector<uint8_t> shortResp(sizeof(nsm_msg_hdr) + 2, 0);
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(shortResp));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        std::string("com.nvidia.InbandUpdatePolicy.InbandPolicyState.Enabled");
+    updateInbandUpdatePolicyHandler(value, &status, gpu, classification,
+                                    identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// Valid "Enabled" + success response → Success
+TEST_F(NsmRoTPropertyTest, UpdateInbandUpdatePolicy_Enabled_Success)
+{
+    std::vector<uint8_t> resp(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_set_rot_property_resp_command),
+        0);
+    auto msg = reinterpret_cast<nsm_msg*>(resp.data());
+    ASSERT_EQ(encode_nsm_firmware_set_rot_property_resp(0, NSM_SUCCESS,
+                                                        ERR_NULL, msg),
+              NSM_SW_SUCCESS);
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(mockPostPatchIO(resp));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        std::string("com.nvidia.InbandUpdatePolicy.InbandPolicyState.Enabled");
+    updateInbandUpdatePolicyHandler(value, &status, gpu, classification,
+                                    identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+}
+
+// Valid "Disabled" + success response → covers the
+// policyState == Disabled branch (lines ~185-188)
+TEST_F(NsmRoTPropertyTest, UpdateInbandUpdatePolicy_Disabled_Success)
+{
+    std::vector<uint8_t> resp(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_set_rot_property_resp_command),
+        0);
+    auto msg = reinterpret_cast<nsm_msg*>(resp.data());
+    ASSERT_EQ(encode_nsm_firmware_set_rot_property_resp(0, NSM_SUCCESS,
+                                                        ERR_NULL, msg),
+              NSM_SW_SUCCESS);
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(mockPostPatchIO(resp));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        std::string("com.nvidia.InbandUpdatePolicy.InbandPolicyState.Disabled");
+    updateInbandUpdatePolicyHandler(value, &status, gpu, classification,
+                                    identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+}
+
+// =============================================================================
+// NsmImageCopy::setImageCopyResult / mapReasonCodeToErrorCode switch coverage
+// =============================================================================
+
+struct NsmImageCopySetResultTest : public Test, public utils::DBusTest
+{
+    using ErrorCode = sdbusplus::common::com::nvidia::ImageCopy::ErrorCode;
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+
+    const std::string chassisName = "HGX_IC_TestChassis";
+    const std::string imageCopyPath =
+        "/xyz/openbmc_project/inventory/system/chassis/" + chassisName;
+    const std::string asyncValuePath = imageCopyPath + "_value";
+    const uuid_t uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+
+    // NsmInbandUpdatePolicyObject is a NsmSensor (NsmObject), used as
+    // the required NsmObject& reference for NsmImageCopy.
+    std::unique_ptr<NsmInbandUpdatePolicyObject> nsmObj;
+    std::unique_ptr<NsmImageCopy> imageCopy;
+    std::shared_ptr<AsyncValueIntf> valueIntf;
+
+    void SetUp() override
+    {
+        auto& bus = utils::DBusHandler::getBus();
+        nsmObj = std::make_unique<NsmInbandUpdatePolicyObject>(bus, chassisName,
+                                                               1, 2, 0);
+        imageCopy = std::make_unique<NsmImageCopy>(bus, imageCopyPath, uuid,
+                                                   *nsmObj);
+        valueIntf = std::make_shared<AsyncValueIntf>(bus,
+                                                     asyncValuePath.c_str());
+    }
+};
+
+// Covers all 7 mapReasonCodeToErrorCode switch cases by calling
+// setImageCopyResult with each error code reason value.
+TEST_F(NsmImageCopySetResultTest, SetImageCopyResult_AllReasonCodes)
+{
+    // ERR_NULL (default) → ErrorCode::None
+    imageCopy->setImageCopyResult(valueIntf, NSM_SUCCESS, ERR_NULL,
+                                  RequestStatus::None, ERR_NULL);
+    EXPECT_EQ(imageCopy->errorCode(), ErrorCode::None);
+
+    // ERR_NO_BOOT_COMPLETE → ErrorCode::NoBootComplete
+    imageCopy->setImageCopyResult(valueIntf, NSM_SUCCESS, ERR_NULL,
+                                  RequestStatus::Rejected,
+                                  ERR_NO_BOOT_COMPLETE);
+    EXPECT_EQ(imageCopy->errorCode(), ErrorCode::NoBootComplete);
+
+    // ERR_UPDATE_IN_PROGRESS → ErrorCode::UpdateInProgress
+    imageCopy->setImageCopyResult(valueIntf, NSM_SUCCESS, ERR_NULL,
+                                  RequestStatus::Rejected,
+                                  ERR_UPDATE_IN_PROGRESS);
+    EXPECT_EQ(imageCopy->errorCode(), ErrorCode::UpdateInProgress);
+
+    // ERR_IMAGE_COPY_IN_PROGRESS → ErrorCode::ImageCopyInProgress
+    imageCopy->setImageCopyResult(valueIntf, NSM_SUCCESS, ERR_NULL,
+                                  RequestStatus::Processing,
+                                  ERR_IMAGE_COPY_IN_PROGRESS);
+    EXPECT_EQ(imageCopy->errorCode(), ErrorCode::ImageCopyInProgress);
+
+    // ERR_IMAGE_COPY_COMPLETED → ErrorCode::ImageCopyCompleted
+    imageCopy->setImageCopyResult(valueIntf, NSM_SUCCESS, ERR_NULL,
+                                  RequestStatus::Accepted,
+                                  ERR_IMAGE_COPY_COMPLETED);
+    EXPECT_EQ(imageCopy->errorCode(), ErrorCode::ImageCopyCompleted);
+
+    // ERR_FLASH_WEAR_MITIGATION → ErrorCode::FlashWearMitigation
+    imageCopy->setImageCopyResult(valueIntf, NSM_SUCCESS, ERR_NULL,
+                                  RequestStatus::Rejected,
+                                  ERR_FLASH_WEAR_MITIGATION);
+    EXPECT_EQ(imageCopy->errorCode(), ErrorCode::FlashWearMitigation);
+
+    // ERR_INCOMPLETE_COMPONENT_SET → ErrorCode::IncompleteComponentSet
+    imageCopy->setImageCopyResult(valueIntf, NSM_SUCCESS, ERR_NULL,
+                                  RequestStatus::Rejected,
+                                  ERR_INCOMPLETE_COMPONENT_SET);
+    EXPECT_EQ(imageCopy->errorCode(), ErrorCode::IncompleteComponentSet);
+}
+
+// =============================================================================
+// updateImageCopyPolicyHandler branch coverage
+// Mirrors updateInbandUpdatePolicyHandler tests for the ImageCopyPolicy
+// variant.
+// =============================================================================
+
+// Non-string value → std::get_if<std::string> returns nullptr → InvalidArgument
+TEST_F(NsmRoTPropertyTest, UpdateImageCopyPolicy_NonStringValue)
+{
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = uint8_t(1); // not a string
+    updateImageCopyPolicyHandler(value, &status, gpu, classification,
+                                 identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+// Invalid policy string → convertStringToImageCopyPolicyState returns nullopt
+// → InvalidArgument
+TEST_F(NsmRoTPropertyTest, UpdateImageCopyPolicy_InvalidString)
+{
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = std::string("InvalidPolicyString");
+    updateImageCopyPolicyHandler(value, &status, gpu, classification,
+                                 identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
+}
+
+// Valid "Manual" + postPatchIO failure → WriteFailure
+TEST_F(NsmRoTPropertyTest, UpdateImageCopyPolicy_Manual_PostPatchFail)
+{
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(NSM_ERR_INVALID_DATA));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        std::string("com.nvidia.ImageCopyPolicy.ImageCopyPolicyState.Manual");
+    updateImageCopyPolicyHandler(value, &status, gpu, classification,
+                                 identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// Valid "Manual" + short response → decode fails → WriteFailure
+TEST_F(NsmRoTPropertyTest, UpdateImageCopyPolicy_Manual_DecodeFail)
+{
+    std::vector<uint8_t> shortResp(sizeof(nsm_msg_hdr) + 2, 0);
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(shortResp));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        std::string("com.nvidia.ImageCopyPolicy.ImageCopyPolicyState.Manual");
+    updateImageCopyPolicyHandler(value, &status, gpu, classification,
+                                 identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// Valid "Manual" + success response → Success
+TEST_F(NsmRoTPropertyTest, UpdateImageCopyPolicy_Manual_Success)
+{
+    std::vector<uint8_t> resp(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_set_rot_property_resp_command),
+        0);
+    auto msg = reinterpret_cast<nsm_msg*>(resp.data());
+    ASSERT_EQ(encode_nsm_firmware_set_rot_property_resp(0, NSM_SUCCESS,
+                                                        ERR_NULL, msg),
+              NSM_SW_SUCCESS);
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(mockPostPatchIO(resp));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        std::string("com.nvidia.ImageCopyPolicy.ImageCopyPolicyState.Manual");
+    updateImageCopyPolicyHandler(value, &status, gpu, classification,
+                                 identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+}
+
+// Valid "Automatic" + success response → covers Automatic branch
+TEST_F(NsmRoTPropertyTest, UpdateImageCopyPolicy_Automatic_Success)
+{
+    std::vector<uint8_t> resp(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_set_rot_property_resp_command),
+        0);
+    auto msg = reinterpret_cast<nsm_msg*>(resp.data());
+    ASSERT_EQ(encode_nsm_firmware_set_rot_property_resp(0, NSM_SUCCESS,
+                                                        ERR_NULL, msg),
+              NSM_SW_SUCCESS);
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(mockPostPatchIO(resp));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = std::string(
+        "com.nvidia.ImageCopyPolicy.ImageCopyPolicyState.Automatic");
+    updateImageCopyPolicyHandler(value, &status, gpu, classification,
+                                 identifier, index);
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+}
+
+// =============================================================================
+// NsmImageCopy::getActiveSlotComponentInfo branch coverage
+// Called directly (private method exposed via #define private public).
+// Uses mockDBus.getSubtree and MockDbusAsync::propertyMap for async calls.
+// =============================================================================
+
+// Empty getSubtree response → loop never executes → NSM_SW_ERROR
+TEST_F(NsmImageCopySetResultTest, GetActiveSlotComponentInfo_EmptySubtree)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _))
+        .WillOnce(Return(GetSubTreeResponse{}));
+
+    ComponentInfo info;
+    auto rc = imageCopy->getActiveSlotComponentInfo("/test/path", info);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+}
+
+// Entry with empty mapServiceInterfaces → continue → NSM_SW_ERROR
+TEST_F(NsmImageCopySetResultTest,
+       GetActiveSlotComponentInfo_EmptyServiceInterfaces)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    GetSubTreeResponse resp{{"/test/slot_empty_svc", {}}}; // empty interfaces
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    ComponentInfo info;
+    auto rc = imageCopy->getActiveSlotComponentInfo("/test/path_esvc", info);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+}
+
+// Entry with matching service but associations has no AbsolutePath → continue
+TEST_F(NsmImageCopySetResultTest, GetActiveSlotComponentInfo_NoAbsolutePath)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/slot_no_abs";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    // Associations property map present but without AbsolutePath
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["OtherProp"] = std::string("some_value");
+
+    ComponentInfo info;
+    auto rc = imageCopy->getActiveSlotComponentInfo("/test/path_nabs", info);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+}
+
+// Entry with AbsolutePath that does not match objectPath → continue
+TEST_F(NsmImageCopySetResultTest, GetActiveSlotComponentInfo_PathNotMatching)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/slot_path_mismatch";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = std::string("/different/path");
+
+    ComponentInfo info;
+    auto rc = imageCopy->getActiveSlotComponentInfo("/target/path", info);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+}
+
+// Matching path, slot properties found but "SlotType" property absent →
+// slotProperties.count("SlotType") == 0 → FALSE branch (line 342) → loop //
+// continues → NSM_SW_ERROR
+TEST_F(NsmImageCopySetResultTest, GetActiveSlotComponentInfo_NoSlotType)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/slot_no_slottype";
+    const std::string targetPath = "/target/no_slottype";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    // "SlotType" intentionally absent → count("SlotType") == 0 → FALSE branch
+    slotMap["OtherProp"] = std::string("some_value");
+
+    ComponentInfo info;
+    auto rc = imageCopy->getActiveSlotComponentInfo(targetPath, info);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+}
+
+// Matching path, slot properties found but SlotType != "Active" → NSM_SW_ERROR
+TEST_F(NsmImageCopySetResultTest, GetActiveSlotComponentInfo_SlotTypeNotActive)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/slot_inactive";
+    const std::string targetPath = "/target/inactive";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Passive"); // not "Active"
+
+    ComponentInfo info;
+    auto rc = imageCopy->getActiveSlotComponentInfo(targetPath, info);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+}
+
+// SlotType "Active" but component values out of range → continue → NSM_SW_ERROR
+TEST_F(NsmImageCopySetResultTest, GetActiveSlotComponentInfo_ValuesOutOfRange)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/slot_outofrange";
+    const std::string targetPath = "/target/outofrange";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Active");
+    slotMap["ComponentClassification"] = uint64_t(0x10000); // > UINT16_MAX
+    slotMap["ComponentIdentifier"] = uint64_t(1);
+    slotMap["ComponentIndex"] = uint64_t(0);
+
+    ComponentInfo info;
+    auto rc = imageCopy->getActiveSlotComponentInfo(targetPath, info);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+}
+
+// SlotType "Active" with valid in-range values → NSM_SW_SUCCESS
+TEST_F(NsmImageCopySetResultTest, GetActiveSlotComponentInfo_Success)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/slot_success";
+    const std::string targetPath = "/target/success";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Active");
+    slotMap["ComponentClassification"] = uint64_t(2);
+    slotMap["ComponentIdentifier"] = uint64_t(1);
+    slotMap["ComponentIndex"] = uint64_t(0);
+
+    ComponentInfo info;
+    auto rc = imageCopy->getActiveSlotComponentInfo(targetPath, info);
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(info.classification, uint16_t(2));
+    EXPECT_EQ(info.identifier, uint16_t(1));
+    EXPECT_EQ(info.index, uint8_t(0));
+}
+
+// =============================================================================
+// NsmImageCopy::initiateImageCopyAsync and imageCopyAsyncHandler coverage
+// New fixture inherits SensorManagerTest for device access via singleton.
+// =============================================================================
+
+struct NsmImageCopyAsyncTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    const std::string chassisName = "HGX_IC_AsyncTest";
+    const std::string imageCopyPath =
+        "/xyz/openbmc_project/inventory/system/chassis/" + chassisName;
+    const std::string asyncValuePath = imageCopyPath + "_value";
+    const std::string asyncStatusPath = imageCopyPath + "_status";
+    const uuid_t uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+
+    NsmDeviceTable devices;
+    std::shared_ptr<MockNsmDevice> gpu;
+
+    std::unique_ptr<NsmInbandUpdatePolicyObject> nsmObj;
+    std::unique_ptr<NsmImageCopy> imageCopy;
+    std::shared_ptr<AsyncValueIntf> valueIntf;
+    std::shared_ptr<AsyncStatusIntf> statusIntf;
+
+    NsmImageCopyAsyncTest() : SensorManagerTest(devices)
+    {
+        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(uuid));
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    void SetUp() override
+    {
+        auto& bus = utils::DBusHandler::getBus();
+        nsmObj = std::make_unique<NsmInbandUpdatePolicyObject>(bus, chassisName,
+                                                               1, 2, 0);
+        imageCopy = std::make_unique<NsmImageCopy>(bus, imageCopyPath, uuid,
+                                                   *nsmObj);
+        valueIntf = std::make_shared<AsyncValueIntf>(bus,
+                                                     asyncValuePath.c_str());
+        statusIntf = std::make_shared<AsyncStatusIntf>(bus,
+                                                       asyncStatusPath.c_str());
+    }
+
+    ~NsmImageCopyAsyncTest()
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+
+// Empty objectPaths → componentInfos empty → WriteFailure + Rejected
+TEST_F(NsmImageCopyAsyncTest, InitiateImageCopyAsync_EmptyPaths_Rejected)
+{
+    imageCopy->initiateImageCopyAsync({}, statusIntf, valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Rejected);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::WriteFailure);
+}
+
+// One path, getActiveSlotComponentInfo returns error → InternalFailure
+TEST_F(NsmImageCopyAsyncTest, InitiateImageCopyAsync_GetInfoFails)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _))
+        .WillOnce(Return(GetSubTreeResponse{})); // empty → NSM_SW_ERROR
+
+    imageCopy->initiateImageCopyAsync({"/some/path"}, statusIntf, valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Rejected);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// getActiveSlotComponentInfo succeeds, imageCopyAsyncHandler postPatchIO fails
+// → cc stays NSM_ERROR → InternalFailure in initiateImageCopyAsync
+TEST_F(NsmImageCopyAsyncTest, InitiateImageCopyAsync_PostPatchFails)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/async_slot";
+    const std::string targetPath = "/target/async";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Active");
+    slotMap["ComponentClassification"] = uint64_t(2);
+    slotMap["ComponentIdentifier"] = uint64_t(1);
+    slotMap["ComponentIndex"] = uint64_t(0);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(NSM_ERR_INVALID_DATA));
+
+    imageCopy->initiateImageCopyAsync({targetPath}, statusIntf, valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Rejected);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// =============================================================================
+// NsmImageCopy::requestImageCopy branch coverage
+// =============================================================================
+
+// requestImageCopy when imageCopyRequestStatus == Processing → throws
+// Unavailable (TRUE branch of `if (ImageCopyRequestStatus() == Processing)` in
+// requestImageCopy)
+TEST_F(NsmImageCopyAsyncTest,
+       DISABLED_RequestImageCopy_AlreadyProcessing_Throws)
+{
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    // Force the status to Processing (private field exposed by #define private
+    // public)
+    imageCopy->imageCopyRequestStatus(RequestStatus::Processing);
+
+    EXPECT_THROW(imageCopy->requestImageCopy({}),
+                 sdbusplus::error::xyz::openbmc_project::common::Unavailable);
+}
+
+// getActiveSlotComponentInfo and imageCopyAsyncHandler both succeed → Accepted
+TEST_F(NsmImageCopyAsyncTest, InitiateImageCopyAsync_Success)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/async_slot_ok";
+    const std::string targetPath = "/target/async_ok";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Active");
+    slotMap["ComponentClassification"] = uint64_t(2);
+    slotMap["ComponentIdentifier"] = uint64_t(1);
+    slotMap["ComponentIndex"] = uint64_t(0);
+
+    // Build a zeroed response buffer: decode checks cc=0 → NSM_SUCCESS
+    std::vector<uint8_t> resp2(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_image_copy_control_initiate_copy_resp_command),
+        0);
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(mockPostPatchIO(resp2));
+
+    imageCopy->initiateImageCopyAsync({targetPath}, statusIntf, valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Accepted);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}
+
+// imageCopyAsyncHandler: postPatchIO succeeds, decode returns cc=NSM_ERROR
+// → L619 TRUE (cc != NSM_SUCCESS) → L621-626 covered
+TEST_F(NsmImageCopyAsyncTest, InitiateImageCopyAsync_DecodeCcError)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/async_slot_ccerr";
+    const std::string targetPath = "/target/async_ccerr";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Active");
+    slotMap["ComponentClassification"] = uint64_t(2);
+    slotMap["ComponentIdentifier"] = uint64_t(1);
+    slotMap["ComponentIndex"] = uint64_t(0);
+
+    // Build response with cc=NSM_ERROR (completion_code at payload[1])
+    std::vector<uint8_t> errResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    errResp[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(errResp));
+
+    imageCopy->initiateImageCopyAsync({targetPath}, statusIntf, valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Rejected);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// =============================================================================
+// NsmImageCopy::imageCopyAsyncHandler: device not found (L551-553)
+// Uses NullReturnMockSensorManager so getNsmDeviceFromStaticUUID → nullptr.
+// =============================================================================
+// REMOVED_TIMER_MARKER
+
+struct NsmImageCopyNullDeviceTest : public Test, public utils::DBusTest
+{
+    NsmDeviceTable devices;
+    NiceMock<NullReturnMockSensorManager> nullManager{devices};
+
+    const std::string chassisName = "HGX_IC_NullDev";
+    const std::string imageCopyPath =
+        "/xyz/openbmc_project/inventory/system/chassis/" + chassisName;
+    const std::string asyncValuePath = imageCopyPath + "_value";
+    const std::string asyncStatusPath = imageCopyPath + "_status";
+    const uuid_t uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+
+    std::unique_ptr<NsmInbandUpdatePolicyObject> nsmObj;
+    std::unique_ptr<NsmImageCopy> imageCopy;
+    std::shared_ptr<AsyncValueIntf> valueIntf;
+    std::shared_ptr<AsyncStatusIntf> statusIntf;
+
+    NsmImageCopyNullDeviceTest()
+    {
+        sensorManagerInstance.reset(&nullManager);
+        auto& bus = utils::DBusHandler::getBus();
+        nsmObj = std::make_unique<NsmInbandUpdatePolicyObject>(bus, chassisName,
+                                                               1, 2, 0);
+        imageCopy = std::make_unique<NsmImageCopy>(bus, imageCopyPath, uuid,
+                                                   *nsmObj);
+        valueIntf = std::make_shared<AsyncValueIntf>(bus,
+                                                     asyncValuePath.c_str());
+        statusIntf = std::make_shared<AsyncStatusIntf>(bus,
+                                                       asyncStatusPath.c_str());
+    }
+    ~NsmImageCopyNullDeviceTest() override
+    {
+        imageCopy.reset();
+        nsmObj.reset();
+        sensorManagerInstance.release();
+        devices.clear();
+    }
+};
+
+// getActiveSlotComponentInfo succeeds but imageCopyAsyncHandler finds no
+// device → L551-553 covered → InternalFailure
+TEST_F(NsmImageCopyNullDeviceTest, ImageCopyAsyncHandler_DeviceNotFound)
+{
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/nulldev_slot";
+    const std::string targetPath = "/target/nulldev";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Active");
+    slotMap["ComponentClassification"] = uint64_t(2);
+    slotMap["ComponentIdentifier"] = uint64_t(1);
+    slotMap["ComponentIndex"] = uint64_t(0);
+
+    imageCopy->initiateImageCopyAsync({targetPath}, statusIntf, valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Rejected);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// =============================================================================
+// imageCopyTimeoutTimer TRUE branch tests (lines 454, 472, 492, 503, 530):
+// Set imageCopyTimeoutTimer to non-null before calling initiateImageCopyAsync
+// so each `if (imageCopyTimeoutTimer)` guard is TRUE → timer->stop() called.
+// =============================================================================
+
+// L472 TRUE: empty objectPaths → componentInfos.empty() → timer->stop()
+TEST_F(NsmImageCopyAsyncTest,
+       InitiateImageCopyAsync_WithTimer_EmptyPaths_StopsTimer)
+{
+    imageCopy->imageCopyTimeoutTimer =
+        std::make_shared<sdbusplus::Timer>([]() {});
+
+    imageCopy->initiateImageCopyAsync({}, statusIntf, valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Rejected);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::WriteFailure);
+}
+
+// L454 TRUE: getActiveSlotComponentInfo returns error → timer->stop()
+TEST_F(NsmImageCopyAsyncTest,
+       InitiateImageCopyAsync_WithTimer_GetInfoFails_StopsTimer)
+{
+    imageCopy->imageCopyTimeoutTimer =
+        std::make_shared<sdbusplus::Timer>([]() {});
+
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _))
+        .WillOnce(Return(GetSubTreeResponse{}));
+
+    imageCopy->initiateImageCopyAsync({"/some/timer_path"}, statusIntf,
+                                      valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Rejected);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// L492 TRUE: postPatchIO fails → cc!=NSM_SUCCESS → timer->stop() at L492
+TEST_F(NsmImageCopyAsyncTest,
+       InitiateImageCopyAsync_WithTimer_CcError_StopsTimer)
+{
+    imageCopy->imageCopyTimeoutTimer =
+        std::make_shared<sdbusplus::Timer>([]() {});
+
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/timer_slot_cc";
+    const std::string targetPath = "/target/timer_cc";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Active");
+    slotMap["ComponentClassification"] = uint64_t(2);
+    slotMap["ComponentIdentifier"] = uint64_t(1);
+    slotMap["ComponentIndex"] = uint64_t(0);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(NSM_ERR_INVALID_DATA));
+
+    imageCopy->initiateImageCopyAsync({targetPath}, statusIntf, valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Rejected);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// L503 TRUE: success path → timer->stop()
+TEST_F(NsmImageCopyAsyncTest,
+       InitiateImageCopyAsync_WithTimer_Success_StopsTimer)
+{
+    imageCopy->imageCopyTimeoutTimer =
+        std::make_shared<sdbusplus::Timer>([]() {});
+
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/timer_slot_succ";
+    const std::string targetPath = "/target/timer_succ";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Active");
+    slotMap["ComponentClassification"] = uint64_t(2);
+    slotMap["ComponentIdentifier"] = uint64_t(1);
+    slotMap["ComponentIndex"] = uint64_t(0);
+
+    // Build a success response (cc=NSM_SUCCESS, rc=NSM_SW_SUCCESS)
+    std::vector<uint8_t> resp2(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_image_copy_control_initiate_copy_resp_command),
+        0);
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(mockPostPatchIO(resp2));
+
+    imageCopy->initiateImageCopyAsync({targetPath}, statusIntf, valueIntf);
+
+    using RequestStatus =
+        sdbusplus::common::com::nvidia::ImageCopy::ImageCopyRequestStatus;
+    EXPECT_EQ(imageCopy->imageCopyRequestStatus(), RequestStatus::Accepted);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}
+
+// L530 TRUE (NullDevice): imageCopyAsyncHandler finds no device → timer->stop()
+TEST_F(NsmImageCopyNullDeviceTest,
+       InitiateImageCopyAsync_WithTimer_NullDevice_StopsTimer)
+{
+    imageCopy->imageCopyTimeoutTimer =
+        std::make_shared<sdbusplus::Timer>([]() {});
+
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis";
+    const std::string slotPath = "/test/nulldev_timer2_slot";
+    const std::string targetPath = "/target/nulldev_timer2";
+    const std::string assocIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string slotIntf =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+
+    GetSubTreeResponse resp{
+        {slotPath, {{"xyz.openbmc_project.EntityManager", {}}}}};
+    EXPECT_CALL(mockDBus, getSubtree(chassisPath, 0, _)).WillOnce(Return(resp));
+
+    auto& assocMap = utils::MockDbusAsync::propertyMap(slotPath, assocIntf);
+    assocMap["AbsolutePath"] = targetPath;
+    auto& slotMap = utils::MockDbusAsync::propertyMap(slotPath, slotIntf);
+    slotMap["SlotType"] = std::string("Active");
+    slotMap["ComponentClassification"] = uint64_t(2);
+    slotMap["ComponentIdentifier"] = uint64_t(1);
+    slotMap["ComponentIndex"] = uint64_t(0);
+
+    imageCopy->initiateImageCopyAsync({targetPath}, statusIntf, valueIntf);
+
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
 }

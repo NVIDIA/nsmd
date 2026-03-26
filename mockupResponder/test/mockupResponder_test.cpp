@@ -25,6 +25,7 @@
 #include "platform-environmental.h"
 #include "powersmoothing-powerprofile-api-v2.h"
 
+#include "common/event.hpp"
 #include "utils.hpp"
 
 #include <cstdio>
@@ -113,14 +114,14 @@ class MockupResponderTest : public Test
     }
 
   protected:
-    MockupResponderTest() : event(sdeventplus::Event::get_default())
+    MockupResponderTest()
 
     {
         init(30, NSM_DEV_ID_GPU, 2);
     }
 
     uint8_t instanceId = 0;
-    sdeventplus::Event event;
+    common::Event event;
     boost::asio::io_context io;
     std::shared_ptr<sdbusplus::asio::connection> systemBus;
     std::shared_ptr<sdbusplus::asio::object_server> objServer;

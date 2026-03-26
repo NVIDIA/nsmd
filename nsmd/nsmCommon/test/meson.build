@@ -2,7 +2,14 @@
 # nsmCommon subdir is ALWAYS compiled into nsmd_test (core functionality)
 # No additional sources needed - everything is already in nsmd_test
 
-tests = ['nsmCommon_test', 'nsmPcieGroup_test', 'nsmPciePortIntf_test']
+tests = [
+    'nsmCommon_test',
+    'nsmPcieGroup_test',
+    'nsmPciePortIntf_test',
+    'sharedMemCommon_test',
+    'nsmCommonBranch_test',
+    'nsmPcieGroupBranch_test',
+]
 
 foreach t : tests
     test(

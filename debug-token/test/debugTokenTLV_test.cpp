@@ -283,6 +283,93 @@ TEST_F(TlvDecoderItemTest, GetValueWrongSize)
     EXPECT_THROW({ item.getValue<uint32_t>(); }, std::runtime_error);
 }
 
+// Cover getValue<vector<uint16_t>>() throw path (lines 95-99) for uint16_t
+// instantiation
+TEST_F(TlvDecoderItemTest, GetValueVectorUint16_SizeMismatch)
+{
+    // 3 bytes is not a multiple of sizeof(uint16_t)=2 → throw
+    uint16_t itemType = 0x1234;
+    std::vector<uint8_t> itemValue = {0x01, 0x02, 0x03};
+
+    auto itemHeader = createItemHeader(itemType, itemValue.size());
+    std::vector<uint8_t> input;
+    input.insert(input.end(), itemHeader.begin(), itemHeader.end());
+    input.insert(input.end(), itemValue.begin(), itemValue.end());
+
+    tlv_decoder::Item item(std::span{input});
+    EXPECT_THROW({ item.getValue<std::vector<uint16_t>>(); },
+                 std::runtime_error);
+}
+
+// Cover getValue<vector<uint64_t>>() throw path (lines 95-99) for uint64_t
+// instantiation
+TEST_F(TlvDecoderItemTest, GetValueVectorUint64_SizeMismatch)
+{
+    // 3 bytes is not a multiple of sizeof(uint64_t)=8 → throw
+    uint16_t itemType = 0x1234;
+    std::vector<uint8_t> itemValue = {0x01, 0x02, 0x03};
+
+    auto itemHeader = createItemHeader(itemType, itemValue.size());
+    std::vector<uint8_t> input;
+    input.insert(input.end(), itemHeader.begin(), itemHeader.end());
+    input.insert(input.end(), itemValue.begin(), itemValue.end());
+
+    tlv_decoder::Item item(std::span{input});
+    EXPECT_THROW({ item.getValue<std::vector<uint64_t>>(); },
+                 std::runtime_error);
+}
+
+// Cover getValue<uint8_t>() throw path (lines 130-133) for uint8_t
+// instantiation
+TEST_F(TlvDecoderItemTest, GetValueUint8_WrongSize)
+{
+    // 2 bytes != sizeof(uint8_t)=1 → throw
+    uint16_t itemType = 0x1234;
+    std::vector<uint8_t> itemValue = {0x01, 0x02};
+
+    auto itemHeader = createItemHeader(itemType, itemValue.size());
+    std::vector<uint8_t> input;
+    input.insert(input.end(), itemHeader.begin(), itemHeader.end());
+    input.insert(input.end(), itemValue.begin(), itemValue.end());
+
+    tlv_decoder::Item item(std::span{input});
+    EXPECT_THROW({ item.getValue<uint8_t>(); }, std::runtime_error);
+}
+
+// Cover getValue<uint16_t>() throw path (lines 130-133) for uint16_t
+// instantiation
+TEST_F(TlvDecoderItemTest, GetValueUint16_WrongSize)
+{
+    // 1 byte != sizeof(uint16_t)=2 → throw
+    uint16_t itemType = 0x1234;
+    std::vector<uint8_t> itemValue = {0x01};
+
+    auto itemHeader = createItemHeader(itemType, itemValue.size());
+    std::vector<uint8_t> input;
+    input.insert(input.end(), itemHeader.begin(), itemHeader.end());
+    input.insert(input.end(), itemValue.begin(), itemValue.end());
+
+    tlv_decoder::Item item(std::span{input});
+    EXPECT_THROW({ item.getValue<uint16_t>(); }, std::runtime_error);
+}
+
+// Cover getValue<uint64_t>() throw path (lines 130-133) for uint64_t
+// instantiation
+TEST_F(TlvDecoderItemTest, GetValueUint64_WrongSize)
+{
+    // 3 bytes != sizeof(uint64_t)=8 → throw
+    uint16_t itemType = 0x1234;
+    std::vector<uint8_t> itemValue = {0x01, 0x02, 0x03};
+
+    auto itemHeader = createItemHeader(itemType, itemValue.size());
+    std::vector<uint8_t> input;
+    input.insert(input.end(), itemHeader.begin(), itemHeader.end());
+    input.insert(input.end(), itemValue.begin(), itemValue.end());
+
+    tlv_decoder::Item item(std::span{input});
+    EXPECT_THROW({ item.getValue<uint64_t>(); }, std::runtime_error);
+}
+
 TEST_F(TlvDecoderItemTest, GetRawValue)
 {
     uint16_t itemType = 0x1234;

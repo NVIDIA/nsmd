@@ -74,21 +74,22 @@
 //   [44] GetMemoryCapacityUtil
 //   [45] GetCurrentUtilization
 //   [46] GetClockOutputEnableState
-//   [47] QueryAggregatedGPMMetrics
-//   [48] QueryPerInstanceGPMMetrics
-//   [49] QueryPerInstanceGPMMetricsV2
-//   [50] GetViolationDuration
-//   [51] GetListAvailablePciePorts
-//   [52] GetPCIePortConfig
-//   [53] SetPCIePortConfig
-//   [54] QueryMultiportScalarGroupTelemetry
-//   [55] GetEthPortTelemetryCounter
-//   [56] GetPortNetworkAddresses
-//   [57] GetPortEccCounters
-//   [58] GetPowerSmoothingFeatureInfoV2
-//   [59] GetPowerSmoothingCurrentProfileInformationV2
-//   [60] GetPowerSmoothingAdminOverrideProfileInformationV2
-//   [61] GetPowerSmoothingPresetProfileInformationV2
+//   [47] GetSupportedGPMMetrics
+//   [48] QueryAggregatedGPMMetrics
+//   [49] QueryPerInstanceGPMMetrics
+//   [50] QueryPerInstanceGPMMetricsV2
+//   [51] GetViolationDuration
+//   [52] GetListAvailablePciePorts
+//   [53] GetPCIePortConfig
+//   [54] SetPCIePortConfig
+//   [55] QueryMultiportScalarGroupTelemetry
+//   [56] GetEthPortTelemetryCounter
+//   [57] GetPortNetworkAddresses
+//   [58] GetPortEccCounters
+//   [59] GetPowerSmoothingFeatureInfoV2
+//   [60] GetPowerSmoothingCurrentProfileInformationV2
+//   [61] GetPowerSmoothingAdminOverrideProfileInformationV2
+//   [62] GetPowerSmoothingPresetProfileInformationV2
 
 namespace nsmtool::telemetry
 {
@@ -2528,12 +2529,12 @@ TEST(NsmTelemetryCmdParse, GetPortEccCounters_WithEccCounterSample)
 
 // ---- Error paths: all simple commands (payloadLength=0 → decode fails) -----
 
-TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands0to11)
+TEST(NsmTelemetryCmdParse, ErrorPaths_Commands0to11)
 {
     CLI::App app;
     setupTelemetryCommands(app);
 
-    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr), 0);
+    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
 
     // All pass payloadLength=0 to trigger decode_*_resp failure
@@ -2568,7 +2569,7 @@ TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_AggregateCommands12to17)
     CLI::App app;
     setupTelemetryCommands(app);
 
-    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr), 0);
+    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
 
     // payloadLength=0 → msg_len=sizeof(nsm_msg_hdr)=8 < 12 needed
@@ -2589,7 +2590,7 @@ TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands13_18to30)
     CLI::App app;
     setupTelemetryCommands(app);
 
-    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr), 0);
+    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
 
     EXPECT_NO_THROW(
@@ -2619,7 +2620,7 @@ TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands31to53)
     CLI::App app;
     setupTelemetryCommands(app);
 
-    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr), 0);
+    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
 
     EXPECT_NO_THROW(
@@ -2667,14 +2668,14 @@ TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands31to53)
         msg, 0)); // QueryMultiportScalarGroupTelemetry
 }
 
-// ---- Error paths: commands 54-60 aggregate handlers ----------------------
+// ---- Error paths: commands 55-61 aggregate handlers ----------------------
 
-TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands54to60_Aggregate)
+TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands55to61_Aggregate)
 {
     CLI::App app;
     setupTelemetryCommands(app);
 
-    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr), 0);
+    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
 
     EXPECT_NO_THROW(
@@ -2696,7 +2697,7 @@ TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands54to60_Aggregate)
 // ---- Error paths: QueryAvailableAndClearableScalarGroup for each groupId --
 
 TEST(NsmTelemetryCmdParse,
-     DISABLED_QueryAvailableAndClearableScalarGroup_ErrorPath_AllGroupIds)
+     QueryAvailableAndClearableScalarGroup_ErrorPath_AllGroupIds)
 {
     CLI::App app;
     setupTelemetryCommands(app);
@@ -2706,7 +2707,8 @@ TEST(NsmTelemetryCmdParse,
     {
         parseSubcmdArgs(app, "QueryAvailableAndClearableScalarGroup",
                         {"-d", "0", "-g", std::to_string(gid)});
-        std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr), 0);
+        std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN,
+                                 0);
         auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
         EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, 0));
     }
@@ -2998,8 +3000,7 @@ TEST(NsmTelemetryCmdParse, GetVoltage_Aggregate_WithSample)
 
 // ---- QueryScalarGroupTelemetry: error path for each groupId ----------------
 
-TEST(NsmTelemetryCmdParse,
-     DISABLED_QueryScalarGroupTelemetry_AllGroups_ErrorPaths)
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_AllGroups_ErrorPaths)
 {
     for (int g : {0, 1, 2, 3, 4, 5, 6, 8, 9, 10})
     {
@@ -3007,7 +3008,8 @@ TEST(NsmTelemetryCmdParse,
         setupTelemetryCommands(app);
         parseSubcmdArgs(app, "QueryScalarGroupTelemetry",
                         {"-d", "0", "-g", std::to_string(g)});
-        std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr), 0);
+        std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN,
+                                 0);
         auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
         EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, 0));
     }
@@ -3176,7 +3178,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetrics_UnknownMetricId)
     setupTelemetryCommands(app);
     parseSubcmdArgs(app, "QueryPerInstanceGPMMetrics",
                     {"-r", "0", "-g", "0", "-c", "0", "-i", "255", "-b", "1"});
-    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr), 0);
+    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
     EXPECT_NO_THROW(commands[49]->parseResponseMsg(msg, 0));
 }
@@ -3188,7 +3190,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetricsV2_UnknownMetricId)
     setupTelemetryCommands(app);
     parseSubcmdArgs(app, "QueryPerInstanceGPMMetricsV2",
                     {"-r", "0", "-g", "0", "-c", "0", "-i", "255", "-b", "1"});
-    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr), 0);
+    std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
     EXPECT_NO_THROW(commands[50]->parseResponseMsg(msg, 0));
 }
@@ -3705,6 +3707,866 @@ TEST(NsmTelemetryCmdParse, GetPowerLimit_ModuleBranch)
     // powerLimitId = MODULE (1)
     parseSubcmdArgs(app, "GetPowerLimit", {"-i", "1"});
     EXPECT_NO_THROW(commands[35]->createRequestMsg());
+}
+
+// ============================================================================
+// Error-path tests: pass a truncated buffer so decode fails (rc !=
+// NSM_SW_SUCCESS) This covers the else/error branch of all parseResponseMsg
+// implementations.
+// ============================================================================
+
+static std::vector<uint8_t> makeTruncatedResp()
+{
+    // A buffer with header + error response bytes — too small for any
+    // actual response payload, but large enough for decode_reason_code_and_cc.
+    return std::vector<uint8_t>(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN,
+                                0);
+}
+
+TEST(NsmTelemetryCmdParse, GetPortTelemetryCounter_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[0]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortCharacteristics_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[1]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortStatus_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[2]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortsAvailable_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[3]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetPortDisableFuture_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[4]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetFabricManagerState_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[5]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetPortDisableFuture_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[6]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetPowerMode_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[7]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetPowerMode_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[8]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetSwitchIsolationMode_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[9]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetSwitchIsolationMode_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetInventoryInformation_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetTemperatureReading_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[12]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, ReadThermalParameter_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetCurrentPowerDraw_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[14]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetMaxObservedPower_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[15]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetCurrentEnergyCount_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[16]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetVoltage_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetAltitudePressure_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[18]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetDriverInfo_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[19]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetMigMode_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[20]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetMigMode_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[21]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetEccMode_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[22]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetEccMode_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[23]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetEccErrorCounts_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetClockLimit_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[25]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetEDPpScalingFactors_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetEDPpScalingFactors_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[27]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryVectorGroupTelemetry_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[29]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse,
+     QueryAvailableAndClearableScalarGroup_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, PcieFundamentalReset_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[31]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, ClearScalarDataSource_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetClockLimit_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[33]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetPowerLimit_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[34]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetPowerLimit_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[35]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetCurrClockFreq_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[36]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetAccumGpuUtilTime_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[37]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetProcessorThrottleReason_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[38]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetRowRemapState_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[39]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetRowRemappingCounts_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[40]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetRowRemapAvailability_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[41]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetLeakDetectionInfo_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[42]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetLeakDetectionThresholds_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[43]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetMemoryCapacityUtil_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[44]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetCurrentUtilization_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[45]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetClockOutputEnableState_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[46]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryAggregatedGPMMetrics_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[48]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetrics_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[49]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetricsV2_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[50]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetViolationDuration_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[51]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetListAvailablePciePorts_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[52]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetPCIePortConfig_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[53]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, SetPCIePortConfig_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[54]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse,
+     QueryMultiportScalarGroupTelemetry_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[55]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetEthPortTelemetryCounter_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[56]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetPortNetworkAddresses_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[57]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetPortEccCounters_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[58]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetPowerSmoothingFeatureInfoV2_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[59]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetPowerSmoothingCurrentProfile_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[60]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse,
+     GetPowerSmoothingAdminOverrideProfile_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[61]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, GetPowerSmoothingPresetProfile_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[62]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- printPortTeleInfo: all counter bits set to 1 --------------------------
+// Covers the "true" branch of every if (portData->supported_counter.X) check.
+
+TEST(NsmTelemetryCmdParse, GetPortTelemetryCounter_AllCounterBitsSet)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetPortTelemetryCounter", {"-p", "0"});
+
+    struct nsm_port_counter_data portData{};
+    // Set all supported_counter bits to 1 so every if-branch is taken.
+    memset(&portData.supported_counter, 0xFF,
+           sizeof(portData.supported_counter));
+    portData.port_rcv_pkts = 1;
+    portData.port_rcv_data = 2;
+    portData.port_multicast_rcv_pkts = 3;
+    portData.port_unicast_rcv_pkts = 4;
+    portData.port_malformed_pkts = 5;
+    portData.vl15_dropped = 6;
+    portData.port_rcv_errors = 7;
+    portData.port_xmit_pkts = 8;
+    portData.port_xmit_pkts_vl15 = 9;
+    portData.port_xmit_data = 10;
+    portData.port_xmit_data_vl15 = 11;
+    portData.port_unicast_xmit_pkts = 12;
+    portData.port_multicast_xmit_pkts = 13;
+    portData.port_bcast_xmit_pkts = 14;
+    portData.port_xmit_discard = 15;
+    portData.port_neighbor_mtu_discards = 16;
+    portData.port_rcv_ibg2_pkts = 17;
+    portData.port_xmit_ibg2_pkts = 18;
+    portData.symbol_ber = 19;
+    portData.link_error_recovery_counter = 20;
+    portData.link_downed_counter = 21;
+    portData.port_rcv_remote_physical_errors = 22;
+    portData.port_rcv_switch_relay_errors = 23;
+    portData.QP1_dropped = 24;
+    portData.xmit_wait = 25;
+    portData.effective_ber = 26;
+    portData.total_raw_error = 27;
+    portData.effective_error = 28;
+    portData.symbol_error = 29;
+    portData.total_raw_ber = 30;
+    portData.unintentional_link_down_count = 31;
+    portData.intentional_link_down_count = 32;
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                             sizeof(nsm_port_counter_data));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_get_port_telemetry_counter_resp(0, NSM_SUCCESS, ERR_NULL, &portData,
+                                           msg);
+    EXPECT_NO_THROW(commands[0]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- QueryScalarGroupTelemetry Group 1: CommonClock mode --------------------
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group1_CommonClockMode)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "1"});
+
+    struct nsm_query_scalar_group_telemetry_group_1 data{};
+    data.clock_mode = NSM_PCIE_CLOCK_MODE_COMMON;
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_1_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group1_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, msg);
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- QueryScalarGroupTelemetry Group 1: Unknown clock mode (default) --------
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group1_UnknownClockMode)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "1"});
+
+    struct nsm_query_scalar_group_telemetry_group_1 data{};
+    data.clock_mode = 99; // Unknown → default branch
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_1_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group1_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, msg);
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- QueryScalarGroupTelemetry Group 7: success path (various port types) ---
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_Endpoint)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "7"});
+
+    struct nsm_query_scalar_group_telemetry_group_7 data{};
+    data.port_type = NSM_PCIE_PORT_TYPE_ENDPOINT;
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_7_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, msg);
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_RootPort)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "7"});
+
+    struct nsm_query_scalar_group_telemetry_group_7 data{};
+    data.port_type = NSM_PCIE_PORT_TYPE_ROOT_PORT;
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_7_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, msg);
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_UpstreamPort)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "7"});
+
+    struct nsm_query_scalar_group_telemetry_group_7 data{};
+    data.port_type = NSM_PCIE_PORT_TYPE_UPSTREAM;
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_7_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, msg);
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_DownstreamPort)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "7"});
+
+    struct nsm_query_scalar_group_telemetry_group_7 data{};
+    data.port_type = NSM_PCIE_PORT_TYPE_DOWNSTREAM;
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_7_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, msg);
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_UnknownPortType)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "7"});
+
+    struct nsm_query_scalar_group_telemetry_group_7 data{};
+    data.port_type = 99; // Unknown → default branch
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_7_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, msg);
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- QueryVectorGroupTelemetry Group 1: error path --------------------------
+// The existing ParseResponseError test runs with groupId=2 (default case).
+// This test explicitly sets groupId=1 and passes a truncated buffer so the
+// decode-failure branch inside the GROUP_ID_1 case is reached.
+
+TEST(NsmTelemetryCmdParse, QueryVectorGroupTelemetry_Group1_ParseResponseError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(
+        app, "QueryVectorGroupTelemetry",
+        {"-t", "0", "-u", "0", "-i", "0", "-g", "1", "-s", "1", "-l", "0"});
+
+    auto buf = makeTruncatedResp();
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[29]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- SetPCIePortConfig: parseResponseMsg cc error path ----------------------
+// A 9-byte buffer (nsm_msg_hdr + nsm_common_non_success_resp) with
+// completion_code=NSM_ERROR makes decode_reason_code_and_cc succeed but return
+// cc!=NSM_SUCCESS, so the error branch at lines 5267-5272 is taken.
+
+TEST(NsmTelemetryCmdParse, SetPCIePortConfig_ParseResponseCcError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "SetPCIePortConfig",
+                    {"-p", "0", "-t", "0", "-i", "0", "-c", "0", "-d", "0"});
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    // Set completion_code (byte 1 in payload) to NSM_ERROR so the error path
+    // inside parseResponseMsg is exercised.
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[54]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- GetPortTelemetryCounter: printPortTeleInfo null portData
+// ---------------- Call printPortTeleInfo directly with nullptr to cover the
+// null-check branch at lines 122-126 of nsm_telemetry_cmd.cpp.
+
+TEST(NsmTelemetryCmdParse, GetPortTelemetryCounter_NullPortData)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetPortTelemetryCounter", {"-p", "0"});
+
+    auto* cmd = static_cast<GetPortTelemetryCounter*>(commands[0].get());
+    EXPECT_NO_THROW(cmd->printPortTeleInfo(0, nullptr));
+}
+
+// ---- GetPortTelemetryCounter: all counter flags set -------------------------
+// Exercises the TRUE branch of every `if (portData->supported_counter.xxx)`
+// check in printPortTeleInfo (lines 134-334 of nsm_telemetry_cmd.cpp).
+// The existing success test uses a zeroed portData, so all counter checks take
+// the FALSE branch. This test calls printPortTeleInfo directly with all
+// supported_counter bits set to avoid encode/decode stripping the flags.
+
+TEST(NsmTelemetryCmdParse, GetPortTelemetryCounter_AllCounterFlagsSet)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetPortTelemetryCounter", {"-p", "0"});
+
+    struct nsm_port_counter_data portData{};
+    // Set all supported_counter bits so every flag-guarded branch is taken
+    memset(&portData.supported_counter, 0xFF,
+           sizeof(portData.supported_counter));
+    portData.port_rcv_pkts = 1;
+    portData.port_rcv_data = 2;
+    portData.port_multicast_rcv_pkts = 3;
+    portData.port_unicast_rcv_pkts = 4;
+    portData.port_malformed_pkts = 5;
+    portData.vl15_dropped = 6;
+    portData.port_rcv_errors = 7;
+    portData.port_xmit_pkts = 8;
+
+    // Call printPortTeleInfo directly to bypass encode/decode
+    auto* cmd = static_cast<GetPortTelemetryCounter*>(commands[0].get());
+    EXPECT_NO_THROW(cmd->printPortTeleInfo(sizeof(portData), &portData));
+}
+
+// ---- GetPortTelemetryCounter: decode ok but cc = NSM_ERROR ------------------
+// Covers the missing branch at L104 where rc==NSM_SW_SUCCESS but
+// cc!=NSM_SUCCESS (the second `&&` sub-condition fails, directing to the
+// else/error path).
+
+TEST(NsmTelemetryCmdParse, GetPortTelemetryCounter_ParseResponseCcError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetPortTelemetryCounter", {"-p", "0"});
+
+    struct nsm_port_counter_data portData{};
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                             sizeof(nsm_port_counter_data));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    // Encode with NSM_ERROR: decode succeeds (rc=NSM_SW_SUCCESS) but cc !=
+    // NSM_SUCCESS
+    encode_get_port_telemetry_counter_resp(0, NSM_ERROR, ERR_NULL, &portData,
+                                           msg);
+    EXPECT_NO_THROW(commands[0]->parseResponseMsg(msg, buf.size()));
 }
 
 } // namespace nsmtool::telemetry

@@ -528,3 +528,105 @@ TEST_F(NsmGPUSWInventoryTestFixture,
 
     EXPECT_GE(gpu->deviceSensors.size(), 1);
 }
+
+// update(): sensorIO returns NSM_ERROR (transport failure) →
+// if (rc) at line 103 taken → co_return rc at line 106.
+TEST_F(NsmGPUSWInventoryTestFixture, testDriverSensorUpdate_SensorIOError)
+{
+    std::string name = "GPU_Driver_SIOErr";
+    std::vector<utils::Association> associations;
+    auto driverSensor =
+        std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
+            utils::DBusHandler::getBus(), name, associations,
+            "NSM_GPUSWInventory", "NVIDIA");
+    driverSensor->nsmDeviceFound = std::static_pointer_cast<NsmDevice>(gpu);
+
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
+    driverSensor->update(std::static_pointer_cast<NsmDevice>(gpu));
+}
+
+// createGPUDriverSensor: "Manufacturer" key absent in property map →
+// manufacturer="" → sensor still created (covers false branch of
+// if (count("Manufacturer")) at line ~162 in GPUSWInventory.cpp).
+TEST_F(NsmGPUSWInventoryTestFixture,
+       testCreateGPUDriverSensorMissingManufacturer)
+{
+    dbus::PropertyMap properties = {
+        {"Name", std::string("GPU_Driver_NoMfr")}, {"UUID", gpuUuid},
+        // "Manufacturer" intentionally absent → manufacturer=""
+    };
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath + "_nomfr",
+                                                          basicIntfName);
+    propertyMap = properties;
+
+    const size_t before = gpu->deviceSensors.size();
+    createGPUDriverSensor(mockManager, basicIntfName, objPath + "_nomfr");
+    // Sensor is still created with empty manufacturer
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// createGPUDriverSensor: UUID present and valid format but matches no
+// NsmDevice → nsmDevice==nullptr → logs error and co_returns NSM_ERROR //
+// (covers the !nsmDevice error path in GPUSWInventory.cpp
+// factory)
+TEST_F(NsmGPUSWInventoryTestFixture, badTestCreateGPUDriverSensorNoDevice)
+{
+    // UUID is valid format but doesn't match any registered NsmDevice
+    const uuid_t unknownUuid = "STATIC:99:99:NSM_DEVICE_INSTANCE_NUMBER:99";
+    const std::string testPath = objPath + "_nodev";
+
+    dbus::PropertyMap properties = {
+        {"Name", std::string("GPU_Driver_NoDevice")},
+        {"UUID", unknownUuid},
+        {"Manufacturer", std::string("NVIDIA")},
+    };
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
+                                                          basicIntfName);
+    propertyMap = properties;
+
+    const size_t before = gpu->deviceSensors.size();
+    // Should not throw – logs error and returns NSM_ERROR
+    createGPUDriverSensor(mockManager, basicIntfName, testPath);
+    // No sensor added since device was not found
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
+}
+
+// GPUSWInventory.cpp L121 second operand of ||:
+// rc==NSM_SW_SUCCESS but cc==NSM_ERROR.
+// 9-byte buffer: decode_get_driver_info_resp calls decode_reason_code_and_cc
+// which returns NSM_SW_SUCCESS with cc=NSM_ERROR → second operand TRUE.
+TEST_F(NsmGPUSWInventoryTestFixture,
+       testDriverSensorUpdateDecodeSuccessNonZeroCC)
+{
+    std::string name = "GPU_Driver_CC";
+    std::string type = "NSM_GPUSWInventory";
+    std::string manufacturer = "NVIDIA";
+
+    std::vector<utils::Association> associations;
+    auto driverSensor =
+        std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
+            utils::DBusHandler::getBus(), name, associations, type,
+            manufacturer);
+    driverSensor->nsmDeviceFound = std::static_pointer_cast<NsmDevice>(gpu);
+
+    // 9-byte buffer with completion_code=NSM_ERROR at payload[1].
+    // decode_reason_code_and_cc returns NSM_SW_SUCCESS with cc=NSM_ERROR.
+    std::vector<uint8_t> ccErrResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    ccErrResp[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(ccErrResp, Response{}));
+
+    EXPECT_CALL(*gpu, updateNsmDevice())
+        .Times(testing::AtMost(1))
+        .WillRepeatedly(
+            []() -> requester::Coroutine { co_return NSM_SUCCESS; });
+    EXPECT_CALL(*gpu, refreshCapabilitySensor())
+        .Times(testing::AtMost(1))
+        .WillRepeatedly(
+            []() -> requester::Coroutine { co_return NSM_SUCCESS; });
+
+    driverSensor->update(std::static_pointer_cast<NsmDevice>(gpu));
+}

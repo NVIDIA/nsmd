@@ -7,6 +7,12 @@ tests = [
     'nsmFirmwareInventory_test',
     'GPUSWInventory_test',
     'nsmWriteProtectedControl_test',
+    'nsmFirmwareInventoryBranch_test',
+    'GPUSWInventoryBranch_test',
+    'NVLinkManagementNICSWInventoryBranch_test',
+    'nsmFwSwInventoryBranch_test',
+    'GPUSWInventoryBranch2_test',
+    'NVLinkManagementNICSWInventoryBranch2_test',
 ]
 
 foreach t : tests

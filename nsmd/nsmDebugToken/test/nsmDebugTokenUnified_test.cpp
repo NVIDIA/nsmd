@@ -17,9 +17,13 @@
 
 #include "test/mockDBusHandler.hpp"
 #include "test/mockSensorManager.hpp"
+
+#include <fcntl.h>
 using namespace ::testing;
 
 #include "debug-token.h"
+#include "debug-token/tlv.h"
+#include "debug-token/types.h"
 
 #define private public
 #define protected public
@@ -394,8 +398,7 @@ TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
               AsyncOperationStatusType::UnsupportedRequest);
 }
 
-TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
-       DISABLED_eraseTokenAsyncHandlerDeviceErrorCC)
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, eraseTokenAsyncHandlerDeviceErrorCC)
 {
     Response errorResp(
         sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
@@ -499,7 +502,7 @@ TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
 }
 
 TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
-       DISABLED_installTokenAsyncHandlerDeviceRejectsToken)
+       installTokenAsyncHandlerDeviceRejectsToken)
 {
     debugToken->installationChunkSize = 512;
     std::vector<uint8_t> tokenData(100, 0xCC);
@@ -674,8 +677,7 @@ TEST_F(NsmDebugTokenUnifiedWithDeviceTest, queryTokenHandlerPostPatchIOFailure)
     EXPECT_NE(rc, NSM_SUCCESS);
 }
 
-TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
-       DISABLED_queryTokenHandlerDecodeFailure)
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, queryTokenHandlerDecodeFailure)
 {
     Response badResp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp),
                      0);
@@ -816,4 +818,389 @@ TEST_F(NsmDebugTokenUnifiedWithDeviceTest, installTokenDirectPostPatchIOFailure)
 TEST_F(NsmDebugTokenUnifiedWithDeviceTest, deviceTypeStrStored)
 {
     EXPECT_EQ(debugToken->deviceTypeStr, debugTokenDeviceType);
+}
+
+// ============================================================================
+// eraseToken() TokenType tests
+// ============================================================================
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, eraseTokenTokenTypeInvalid)
+{
+    using EraseTypeEnum =
+        sdbusplus::server::com::nvidia::debug_token::Action::EraseType;
+    using TokenTypesEnum =
+        sdbusplus::common::com::nvidia::debug_token::Common::Types;
+    // CRCS is not a valid GPU token type → tokenTypeToUint32 returns 0 → throws
+    EXPECT_THROW(
+        debugToken->eraseToken(EraseTypeEnum::TokenType, TokenTypesEnum::CRCS),
+        Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, eraseTokenTokenTypeValid)
+{
+    using EraseTypeEnum =
+        sdbusplus::server::com::nvidia::debug_token::Action::EraseType;
+    using TokenTypesEnum =
+        sdbusplus::common::com::nvidia::debug_token::Common::Types;
+    // DebugFirmwareUnlock maps to type=1 for GPU device → valid non-zero value
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createEraseTokenResponse(NSM_SUCCESS, 0)))
+        .WillRepeatedly(mockPostPatchIO(NSM_ERROR));
+    auto objPath = debugToken->eraseToken(EraseTypeEnum::TokenType,
+                                          TokenTypesEnum::DebugFirmwareUnlock);
+    EXPECT_FALSE(objPath.str.empty());
+}
+
+// ============================================================================
+// Additional installTokenAsyncHandler() tests
+// ============================================================================
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, installTokenAsyncHandlerMultiChunk)
+{
+    // Two chunks: chunkSize=50, totalSize=100 → two postPatchIO calls needed
+    debugToken->installationChunkSize = 50;
+    std::vector<uint8_t> tokenData(100, 0xCD);
+    auto info = createTokenInstallationInfo(tokenData);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createInstallTokenResponse(NSM_SUCCESS, 0)))
+        .WillOnce(mockPostPatchIO(createInstallTokenResponse(NSM_SUCCESS, 0)))
+        .WillRepeatedly(mockPostPatchIO(NSM_ERROR));
+    auto [rc, statusIntf, valueIntf] = callInstallTokenAsync(info);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::Success);
+}
+
+// ============================================================================
+// Additional installTokenDirect() tests
+// ============================================================================
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       installTokenDirectCreateRequestFailure)
+{
+    debugToken->installationChunkSize = 512;
+    uint16_t errorCode = 0;
+    std::string errorMessage;
+    // fd = -1 causes createInstallTokenRequest to return nullopt
+    auto rc =
+        debugToken->installTokenDirect(-1, 100, errorCode, errorMessage).data();
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+    EXPECT_NE(errorCode, 0);
+    EXPECT_FALSE(errorMessage.empty());
+}
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, installTokenDirectNonSuccessCC)
+{
+    debugToken->installationChunkSize = 512;
+    char tempPath[] = "/tmp/direct_cc_XXXXXX";
+    int fd = mkstemp(tempPath);
+    ASSERT_NE(fd, -1);
+    std::vector<uint8_t> data(100, 0x55);
+    if (write(fd, data.data(), data.size()) < 0)
+    {}
+    lseek(fd, 0, SEEK_SET);
+    unlink(tempPath);
+    uint16_t errorCode = 0;
+    std::string errorMessage;
+    Response errorResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto errMsg = reinterpret_cast<nsm_msg*>(errorResp.data());
+    encode_nsm_install_token_resp(0, NSM_ERROR, 0xABCD, errMsg);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce([errorResp](eid_t, Request&,
+                              std::shared_ptr<const nsm_msg>& responseMsg,
+                              size_t& responseLen) -> requester::Coroutine {
+        responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+        responseMsg = std::shared_ptr<const nsm_msg>(
+            reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+            [](const nsm_msg* ptr) { free((void*)ptr); });
+        memcpy((uint8_t*)responseMsg.get(), errorResp.data(), responseLen);
+        co_return NSM_SW_SUCCESS;
+    });
+    auto rc = debugToken
+                  ->installTokenDirect(fd, data.size(), errorCode, errorMessage)
+                  .data();
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+    EXPECT_NE(errorCode, 0);
+    close(fd);
+}
+
+// ============================================================================
+// Additional queryTokenHandler() tests
+// ============================================================================
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, queryTokenHandlerTLVDecodeException)
+{
+    // Valid NSM response (cc=SUCCESS) but garbage TLV payload (< header size)
+    std::vector<uint8_t> garbageTlv = {0xFF, 0xFE, 0xFD};
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(
+            createQueryTokenResponse(garbageTlv, NSM_SUCCESS, 0)));
+    auto rc = debugToken->queryTokenHandler(mockDevice).data();
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       queryTokenHandlerInstallationStatusMissing)
+{
+    // TLV with ProcessingStatus but no InstallationStatus → exception
+    debug_token::tlv_encoder::Structure enc;
+    enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
+    auto payload = enc.encode();
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(
+            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+    auto rc = debugToken->queryTokenHandler(mockDevice).data();
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       queryTokenHandlerProcessingStatusMissingInstallZero)
+{
+    // TLV with InstallationStatus=0 only; no ProcessingStatus
+    // installStatus=0 → catch sets procStatus=0 and continues → SUCCESS
+    debug_token::tlv_encoder::Structure enc;
+    enc.add(debug_token::types::InstallationStatus, uint8_t(0));
+    auto payload = enc.encode();
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(
+            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+    auto rc = debugToken->queryTokenHandler(mockDevice).data();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       queryTokenHandlerProcessingStatusMissingInstallNonZero)
+{
+    // TLV with InstallationStatus=1 only; no ProcessingStatus
+    // installStatus != 0 → co_return NSM_SW_ERROR
+    debug_token::tlv_encoder::Structure enc;
+    enc.add(debug_token::types::InstallationStatus, uint8_t(1));
+    auto payload = enc.encode();
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(
+            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+    auto rc = debugToken->queryTokenHandler(mockDevice).data();
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, queryTokenHandlerOddTokenTypesSize)
+{
+    // TLV with TokenTypeSubtypeList having 3 uint32 values (odd count)
+    debug_token::tlv_encoder::Structure enc;
+    enc.add(debug_token::types::InstallationStatus, uint8_t(0));
+    enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
+    enc.add(debug_token::types::TokenTypeSubtypeList,
+            std::vector<uint32_t>{1, 2, 3});
+    auto payload = enc.encode();
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(
+            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+    auto rc = debugToken->queryTokenHandler(mockDevice).data();
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       queryTokenHandlerInstalledButNoTokenTypes)
+{
+    // TLV with InstallationStatus=1 and ProcessingStatus=0, no
+    // TokenTypeSubtypeList TokenTypeSubtypeList get throws → tokenTypesSubtypes
+    // stays empty installStatus != 0 && size == 0 → co_return NSM_SW_ERROR //
+
+    debug_token::tlv_encoder::Structure enc;
+    enc.add(debug_token::types::InstallationStatus, uint8_t(1));
+    enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
+    auto payload = enc.encode();
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(
+            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+    auto rc = debugToken->queryTokenHandler(mockDevice).data();
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, queryTokenHandlerValidWithTokenTypes)
+{
+    // Full valid TLV: installed=1, processing=1, one GPU type=1 pair
+    debug_token::tlv_encoder::Structure enc;
+    enc.add(debug_token::types::InstallationStatus, uint8_t(1));
+    enc.add(debug_token::types::ProcessingStatus, uint8_t(1));
+    enc.add(debug_token::types::TokenTypeSubtypeList,
+            std::vector<uint32_t>{1, 0}); // GPU DebugFirmwareUnlock, subtype=0
+    auto payload = enc.encode();
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(
+            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+    auto rc = debugToken->queryTokenHandler(mockDevice).data();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// update() - success path (both already set, queryToken succeeds)
+// ============================================================================
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, updateBothAlreadySetSuccess)
+{
+    // Both tokenDeviceID and installationChunkSize already set
+    // Only queryTokenHandler called → succeeds → co_return NSM_SUCCESS //
+
+    debugToken->tokenDeviceID("0xABCD");
+    debugToken->installationChunkSize = 1024;
+    debug_token::tlv_encoder::Structure enc;
+    enc.add(debug_token::types::InstallationStatus, uint8_t(0));
+    enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
+    enc.add(debug_token::types::TokenTypeSubtypeList, std::vector<uint32_t>{});
+    auto payload = enc.encode();
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(
+            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+    auto rc = debugToken->update(mockDevice).data();
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_EQ(debugToken->tokenDeviceID(), "0xABCD");
+    EXPECT_EQ(debugToken->installationChunkSize, 1024u);
+}
+
+// ============================================================================
+// eraseTokenAsyncHandler() decode failure (lines 109-114)
+// ============================================================================
+
+// postPatchIO returns NSM_SW_SUCCESS but with a response that triggers
+// NSM_SW_ERROR_LENGTH: cc (payload[1]) != NSM_SUCCESS but length is wrong
+// → decode_reason_code_and_cc returns NSM_SW_ERROR_LENGTH
+// → decodeRc != NSM_SW_SUCCESS → lines 109-114 covered → WriteFailure
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       eraseTokenAsyncHandlerDecodeFails_WriteFailure)
+{
+    // payload[1] = NSM_ERROR (cc != SUCCESS) and length !=
+    // sizeof(non_success_resp) → decode returns NSM_SW_ERROR_LENGTH
+    Response badResp(sizeof(nsm_msg_hdr) + 2, 0);
+    badResp[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // cc at payload[1]
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(badResp));
+    auto [rc, statusIntf,
+          valueIntf] = callEraseTokenAsync(NSM_DEBUG_TOKEN_ERASE_ALL_TOKENS);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::WriteFailure);
+}
+
+// ============================================================================
+// createInstallTokenRequest() read() failure (lines 149-152)
+// ============================================================================
+
+// Use a valid fd integer that has been closed → read() returns EBADF < 0
+// → createInstallTokenRequest returns nullopt
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       createInstallTokenRequest_ReadFails_Nullopt)
+{
+    debugToken->installationChunkSize = 256;
+    // Open a file, capture its fd, then close it so read() fails
+    int fd = open("/dev/null", O_RDONLY);
+    ASSERT_GE(fd, 0);
+    close(fd); // fd is now closed; the integer is still >=0
+    auto info =
+        std::make_shared<NsmDebugTokenUnifiedObject::TokenInstallationInfo>(
+            fd, 100);
+    auto result = debugToken->createInstallTokenRequest(info);
+    EXPECT_FALSE(result.has_value());
+}
+
+// ============================================================================
+// installTokenAsyncHandler() decode failure (lines 215-220)
+// ============================================================================
+
+// postPatchIO returns NSM_SW_SUCCESS with a response where cc != SUCCESS but
+// length is wrong → decode_nsm_install_token_resp returns NSM_SW_ERROR_LENGTH
+// → lines 215-220 covered → InternalFailure
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       installTokenAsyncHandlerDecodeFails_InternalFailure)
+{
+    debugToken->installationChunkSize = 512;
+    std::vector<uint8_t> tokenData(64, 0xEE);
+    auto info = createTokenInstallationInfo(tokenData);
+    // payload[1] = NSM_ERROR, length != sizeof(non_success_resp) → length error
+    Response badResp(sizeof(nsm_msg_hdr) + 2, 0);
+    badResp[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // cc at payload[1]
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(badResp));
+    auto [rc, statusIntf, valueIntf] = callInstallTokenAsync(info);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+}
+
+// ============================================================================
+// installToken() D-Bus method: dup(fd) failure (lines 302-304)
+// ============================================================================
+
+// Passing an invalid file descriptor (-1) causes dup(-1) to fail →
+// throws Common::Error::InternalFailure
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       installToken_InvalidFd_ThrowsInternalFailure)
+{
+    sdbusplus::message::unix_fd badFd(-1);
+    EXPECT_THROW(debugToken->installToken(badFd),
+                 Common::Error::InternalFailure);
+}
+
+// ============================================================================
+// installTokenDirect() decode failure (lines 397-407)
+// ============================================================================
+
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, installTokenDirectDecodeFailure)
+{
+    debugToken->installationChunkSize = 512;
+    char tempPath[] = "/tmp/direct_dec_XXXXXX";
+    int fd = mkstemp(tempPath);
+    ASSERT_NE(fd, -1);
+    std::vector<uint8_t> data(100, 0x44);
+    if (write(fd, data.data(), data.size()) < 0)
+    {}
+    lseek(fd, 0, SEEK_SET);
+    unlink(tempPath);
+    uint16_t errorCode = 0;
+    std::string errorMessage;
+    // payload[1] = cc = NSM_ERROR, length 8 != 10 →
+    // decode_reason_code_and_cc returns NSM_SW_ERROR_LENGTH → lines 397-407
+    Response badResp(sizeof(nsm_msg_hdr) + 2, 0);
+    badResp[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(badResp));
+    auto rc = debugToken
+                  ->installTokenDirect(fd, data.size(), errorCode, errorMessage)
+                  .data();
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+    EXPECT_NE(errorCode, 0);
+    close(fd);
+}
+
+// ============================================================================
+// installToken() D-Bus method: lseek failure (lines 313-318)
+// ============================================================================
+
+// Passing a pipe fd causes lseek(SEEK_SET) to fail with ESPIPE →
+// throws Common::Error::InternalFailure (after successful dup)
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       installToken_PipeFd_LseekFailsThrowsInternalFailure)
+{
+    int pipefd[2];
+    ASSERT_EQ(pipe(pipefd), 0);
+    // pipefd[0] is the read end; lseek on a pipe returns -1 (ESPIPE)
+    sdbusplus::message::unix_fd readEnd(pipefd[0]);
+    EXPECT_THROW(debugToken->installToken(readEnd),
+                 Common::Error::InternalFailure);
+    close(pipefd[0]);
+    close(pipefd[1]);
+}
+
+// ============================================================================
+// deviceIdHandler – second operand of || at L702:
+//   rc==NSM_SW_SUCCESS but cc==NSM_ERROR
+// 9-byte buffer: decode_reason_code_and_cc returns NSM_SW_SUCCESS with
+// cc=NSM_ERROR → decode_nsm_query_device_ids_resp returns NSM_SW_SUCCESS,
+// cc=NSM_ERROR → second operand of (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+// is TRUE.
+// ============================================================================
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
+       deviceIdHandlerDecodeSuccessNonZeroCC_ReturnsError)
+{
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code = NSM_ERROR
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(buf));
+    auto rc = debugToken->deviceIdHandler(mockDevice).data();
+    EXPECT_NE(rc, NSM_SUCCESS);
 }

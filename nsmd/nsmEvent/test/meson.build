@@ -8,10 +8,13 @@ tests = [
     'nsmGPIOStateChangeEvent_test',
     'nsmEvent_dump_test',
     'nsmLongRunningEvent_test',
+    'nsmLongRunningEventHandler_test',
     'nsmFabricManagerStateEvent_test',
     'nsmThresholdEvent_test',
     'nsmResetRequiredEvent_test',
     'nsmRediscoveryEvent_test',
+    'nsmEventInfoBranch_test',
+    'nsmEventBranch_test',
 ]
 
 foreach t : tests

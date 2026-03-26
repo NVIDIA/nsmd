@@ -150,3 +150,58 @@ TEST(NsmWriteProtectedControl, ConstructorWithDifferentIndex)
 
     EXPECT_EQ(wpControl.dataIndex, GPU_SPI_FLASH_1);
 }
+
+// handleResponse: decode failure (buffer too small) → rc != NSM_SW_SUCCESS
+// → `if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)` FALSE via rc!=0
+TEST(NsmWriteProtectedControl, HandleResponseDecodeFailure)
+{
+    std::filesystem::path path = "/xyz/openbmc_project/software/test3";
+    std::string name = "WriteProtected3";
+    std::string type = "NSM_WriteProtected";
+
+    auto settingsIntf = std::make_shared<SettingsIntf>(bus, path.c_str());
+    NsmInterfaceProvider<SettingsIntf> provider(name, type, path, settingsIntf);
+
+    NsmWriteProtectedControl wpControl(provider, GPU_1_4_SPI_FLASH);
+
+    // Buffer with NSM_ERROR CC → decode_reason_code_and_cc safely reads CC
+    std::vector<uint8_t> shortBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    shortBuf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code
+    auto msg = reinterpret_cast<const nsm_msg*>(shortBuf.data());
+
+    uint8_t rc = wpControl.handleResponse(msg, shortBuf.size());
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// handleResponse: success with writeProtected = false (data.gpu1_4 = 0)
+// Covers the TRUE branch of the `if` and the NsmSetWriteProtected::getValue
+// returning false
+TEST(NsmWriteProtectedControl, HandleResponseSuccessNotProtected)
+{
+    std::filesystem::path path = "/xyz/openbmc_project/software/test4";
+    std::string name = "WriteProtected4";
+    std::string type = "NSM_WriteProtected";
+
+    auto settingsIntf = std::make_shared<SettingsIntf>(bus, path.c_str());
+    NsmInterfaceProvider<SettingsIntf> provider(name, type, path, settingsIntf);
+
+    NsmWriteProtectedControl wpControl(provider, GPU_1_4_SPI_FLASH);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_fpga_diagnostics_settings_wp_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    nsm_fpga_diagnostics_settings_wp data = {};
+    data.gpu1_4 = 0; // Not write protected
+
+    uint8_t rc = encode_get_fpga_diagnostics_settings_wp_resp(
+        0, NSM_SUCCESS, ERR_NULL, &data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = wpControl.handleResponse(response, responseMsg.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+
+    EXPECT_EQ(settingsIntf->writeProtected(), false);
+}

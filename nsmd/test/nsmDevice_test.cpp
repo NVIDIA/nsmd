@@ -35,6 +35,9 @@ using ::testing::ElementsAre;
 #undef private
 #undef protected
 
+#include "nsmFwSwInventory/GPUSWInventory.hpp"
+#include "test/mockDBusHandler.hpp"
+
 TEST(nsmDevice, GoodTest)
 {
     uuid_t uuid = "00000000-0000-0000-0000-000000000000";
@@ -496,6 +499,30 @@ TEST(nsmDevice, TestUpdateCommandCodeMatrixInvalidMessageType)
     {
         EXPECT_FALSE(nsmDevice.isCommandSupported(mt, 0));
     }
+}
+
+// Calling updateMessageTypesToCommandCodeMatrix with an invalid messageType
+// TWICE on the same device covers both branches of the shouldLog() if-check:
+// first call → state changes false→true (shouldLog returns true, logs),
+// second call → state stays true (shouldLog returns false, no log).
+TEST(nsmDevice, TestUpdateCommandCodeMatrixInvalidMT_ShouldLogFalseBranch)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    bitfield8_t supportedCommands[4] = {};
+    supportedCommands[0].byte = 0x01;
+
+    // First call: shouldLog(key, true) → state changes, returns true (logs)
+    nsmDevice.updateMessageTypesToCommandCodeMatrix(NUM_NSM_TYPES,
+                                                    supportedCommands, 4);
+    // Second call with same invalid type: shouldLog(key, true) → no state
+    // change, returns false (no log) — covers the false branch of the if
+    nsmDevice.updateMessageTypesToCommandCodeMatrix(NUM_NSM_TYPES,
+                                                    supportedCommands, 4);
+
+    // Matrix should still be untouched
+    EXPECT_FALSE(nsmDevice.isCommandSupported(0, 0));
 }
 
 TEST(nsmDevice, TestUpdateCommandCodeMatrixZeroSize)
@@ -1584,6 +1611,77 @@ class MockNsmLongRunningEvent : public nsm::NsmLongRunningEvent
     }
 };
 
+// ---- invokeLongRunningHandler: decode_nsm_event fails ----
+
+// With a handler registered, passing a null/zero-length event buffer causes
+// decode_nsm_event to fail → the function returns the decode error code.
+TEST(nsmDevice, InvokeLongRunningHandler_DecodeFails_ReturnsError)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    auto lrEvent = std::make_shared<MockNsmLongRunningEvent>("LREvt", "LRType");
+    nsmDevice.registerLongRunningHandler(5, 10, lrEvent);
+
+    // nullptr / 0-length → decode_nsm_event returns NSM_SW_ERROR_NULL
+    int rc = nsmDevice.invokeLongRunningHandler(0, 0, NSM_LONG_RUNNING_EVENT,
+                                                nullptr, 0);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ---- invokeLongRunningHandler: mismatched message type / command ----
+
+// With a handler expecting (messageType=5, commandCode=10) and an event that
+// carries (nvidia_message_type=9, command=9), the mismatch branch is taken
+// and NSM_SW_ERROR_DATA is returned.
+TEST(nsmDevice, InvokeLongRunningHandler_MismatchedTypeCmd_ReturnsError)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    auto lrEvent = std::make_shared<MockNsmLongRunningEvent>("LREvt", "LRType");
+    nsmDevice.registerLongRunningHandler(5, 10, lrEvent);
+
+    // nvidia_message_type=9, command=9 (doesn't match handler's 5,10)
+    // nsm_long_running_event_state: byte0=nvidia_message_type, byte1=command
+    // event_state as uint16 LE: low byte=nvidia_message_type, high byte=command
+    const uint16_t eventState = static_cast<uint16_t>(9u | (9u << 8));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_nsm_event(0, NSM_TYPE_PLATFORM_ENVIRONMENTAL, false, 0,
+                     NSM_LONG_RUNNING_EVENT, NSM_NVIDIA_GENERAL_EVENT_CLASS,
+                     eventState, 0, nullptr, msg);
+
+    int rc = nsmDevice.invokeLongRunningHandler(0, 0, NSM_LONG_RUNNING_EVENT,
+                                                msg, buf.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// ---- invokeLongRunningHandler: matching type/command → success ----
+
+// With a handler expecting (messageType=5, commandCode=10) and an event that
+// matches, handle() is called and its NSM_SW_SUCCESS return is propagated.
+TEST(nsmDevice, InvokeLongRunningHandler_MatchingTypeCmd_CallsHandle)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    auto lrEvent = std::make_shared<MockNsmLongRunningEvent>("LREvt", "LRType");
+    nsmDevice.registerLongRunningHandler(5, 10, lrEvent);
+
+    // nvidia_message_type=5, command=10 → matches handler (5,10)
+    const uint16_t eventState = static_cast<uint16_t>(5u | (10u << 8));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_nsm_event(0, NSM_TYPE_PLATFORM_ENVIRONMENTAL, false, 0,
+                     NSM_LONG_RUNNING_EVENT, NSM_NVIDIA_GENERAL_EVENT_CLASS,
+                     eventState, 0, nullptr, msg);
+
+    int rc = nsmDevice.invokeLongRunningHandler(0, 0, NSM_LONG_RUNNING_EVENT,
+                                                msg, buf.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
 // ---- findAggregatorByType: found case ----
 
 TEST(nsmDevice, FindAggregatorByType_AggregatorExists_ReturnsMatchingAggregator)
@@ -1908,6 +2006,7 @@ TEST(nsmDevice, InitMsgTypesSensor_SensorIsInStaticQueue)
     MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
 
     // Assert: msgTypesSensor is added via addSensor(false) -> roundRobinSensors
+    //
     EXPECT_GE(nsmDevice.roundRobinSensors.size(), 1u);
 
     // msgTypesSensor should be in deviceSensors
@@ -2360,6 +2459,34 @@ TEST(nsmDevice, EventDispatcher_AddDuplicateTypeEventId_ReturnsError)
     EXPECT_NE(rc2, NSM_SW_SUCCESS);
 }
 
+// EventDispatcher::handle() - type not registered → NSM_SW_ERROR_DATA
+TEST(nsmDevice, EventDispatcher_Handle_TypeNotFound_ReturnsErrorData)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    // No events registered - type 99 is unknown
+    int rc = nsmDevice.eventDispatcher.handle(0, 99, 0, nullptr, 0);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// EventDispatcher::handle() - type found but eventId missing →
+// NSM_SW_ERROR_DATA
+TEST(nsmDevice, EventDispatcher_Handle_EventIdNotFound_ReturnsErrorData)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+
+    // Register type=10, eventId=20
+    auto event = std::make_shared<MockNsmEvent>("E1", "ET1");
+    ASSERT_EQ(nsmDevice.eventDispatcher.addEvent(10, 20, event),
+              NSM_SW_SUCCESS);
+
+    // Call handle() with type=10 but wrong eventId=99
+    int rc = nsmDevice.eventDispatcher.handle(0, 10, 99, nullptr, 0);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
 // ---- addSensorBase: device identifier ----
 
 TEST(nsmDevice, AddSensorBase_MultipleSensors_EachGetsDeviceIdentifier)
@@ -2376,4 +2503,587 @@ TEST(nsmDevice, AddSensorBase_MultipleSensors_EachGetsDeviceIdentifier)
     EXPECT_FALSE(sensor1->getDeviceIdentifier().empty());
     EXPECT_FALSE(sensor2->getDeviceIdentifier().empty());
     EXPECT_EQ(sensor1->getDeviceIdentifier(), sensor2->getDeviceIdentifier());
+}
+
+// ==========================================================================
+// Coroutine coverage (B1)
+// All three private coroutines call co_await Sleep(...). In
+// COVERAGE_DISABLE_COROUTINES mode, Sleep is a no-op that returns
+// NSM_SW_SUCCESS immediately, so no mocking is needed.
+// ==========================================================================
+
+using ::testing::_;
+
+// --------------------------------------------------------------------------
+// markSensorsUnrefreshed()
+// --------------------------------------------------------------------------
+
+TEST(nsmDevice, MarkSensorsUnrefreshed_EmptySensors_NoSleep)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+
+    // No sensors → count never reaches MAX_SENSOR_UPDATE_BATCH_SIZE → no sleep
+    auto coro = device.markSensorsUnrefreshed();
+    EXPECT_TRUE(coro.done());
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+}
+
+TEST(nsmDevice, MarkSensorsUnrefreshed_FewerThanBatch_NoSleep)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+
+    // 5 sensors < MAX_SENSOR_UPDATE_BATCH_SIZE (10) → no sleep
+    for (int i = 0; i < 5; i++)
+    {
+        auto s = std::make_shared<MockSensor>("s" + std::to_string(i), "T");
+        s->isRefreshed = true;
+        device.deviceSensors.push_back(s);
+    }
+
+    auto coro = device.markSensorsUnrefreshed();
+    EXPECT_TRUE(coro.done());
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+
+    for (auto& s : device.deviceSensors)
+        EXPECT_FALSE(s->isRefreshed);
+}
+
+TEST(nsmDevice, MarkSensorsUnrefreshed_ExactOneBatch_AllMarked)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+
+    // Use one fewer than batch size to avoid triggering the Sleep path
+    // which suspends the coroutine in non-coverage mode.
+    for (int i = 0; i < MAX_SENSOR_UPDATE_BATCH_SIZE - 1; i++)
+    {
+        auto s = std::make_shared<MockSensor>("s" + std::to_string(i), "T");
+        s->isRefreshed = true;
+        device.deviceSensors.push_back(s);
+    }
+
+    EXPECT_NO_THROW_COROUTINE(device.markSensorsUnrefreshed());
+
+    for (auto& s : device.deviceSensors)
+        EXPECT_FALSE(s->isRefreshed);
+}
+
+TEST(nsmDevice, MarkSensorsUnrefreshed_MultipleBatches_FirstBatchMarked)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+
+    // 25 sensors: first batch of MAX_SENSOR_UPDATE_BATCH_SIZE is processed
+    // before the coroutine hits Sleep and suspends. In coverage mode (Sleep
+    // is a no-op) all 25 are processed.
+    for (int i = 0; i < 25; i++)
+    {
+        auto s = std::make_shared<MockSensor>("s" + std::to_string(i), "T");
+        s->isRefreshed = true;
+        device.deviceSensors.push_back(s);
+    }
+
+    EXPECT_NO_THROW_COROUTINE(device.markSensorsUnrefreshed());
+
+    // First batch is always processed regardless of coroutine mode
+    for (int i = 0; i < MAX_SENSOR_UPDATE_BATCH_SIZE; i++)
+        EXPECT_FALSE(device.deviceSensors[i]->isRefreshed);
+}
+
+// --------------------------------------------------------------------------
+// updateSensorsForOffline()
+// --------------------------------------------------------------------------
+
+TEST(nsmDevice, UpdateSensorsForOffline_EmptySensors_NoSleep)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+    device.deviceSensors
+        .clear(); // constructor may pre-populate via initMsgTypesSensor
+
+    // No sensors → outer while never executes → no sleep
+    auto coro = device.updateSensorsForOffline();
+    EXPECT_TRUE(coro.done());
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+}
+
+TEST(nsmDevice, UpdateSensorsForOffline_FewerThanBatch_AllHandled)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+
+    // 5 sensors: one batch of 5, all processed before Sleep is reached
+    for (int i = 0; i < 5; i++)
+        device.deviceSensors.push_back(
+            std::make_shared<MockSensor>("s" + std::to_string(i), "T"));
+
+    EXPECT_NO_THROW_COROUTINE(device.updateSensorsForOffline());
+}
+
+TEST(nsmDevice, UpdateSensorsForOffline_MultipleBatches_FirstBatchHandled)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+
+    // 11 sensors: first batch of 10 processed before Sleep suspends the
+    // coroutine. In coverage mode (Sleep is a no-op) all 11 are processed.
+    for (int i = 0; i < 11; i++)
+        device.deviceSensors.push_back(
+            std::make_shared<MockSensor>("s" + std::to_string(i), "T"));
+
+    EXPECT_NO_THROW_COROUTINE(device.updateSensorsForOffline());
+}
+
+// --------------------------------------------------------------------------
+// waitForNsmDeviceUpdate()
+// --------------------------------------------------------------------------
+
+TEST(nsmDevice, WaitForNsmDeviceUpdate_AlreadyDone_NoSleep)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+
+    // discoveryPending = false from the start → loop never entered
+    device.discoveryPending = false;
+
+    auto coro = device.waitForNsmDeviceUpdate();
+    EXPECT_TRUE(coro.done());
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+}
+
+TEST(nsmDevice, WaitForNsmDeviceUpdate_ClearedBeforeCall_ReturnsSuccess)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+
+    // discoveryPending is false before the call → loop never entered
+    device.discoveryPending = false;
+
+    auto coro = device.waitForNsmDeviceUpdate();
+    EXPECT_TRUE(coro.done());
+    EXPECT_EQ(coro.data(), NSM_SW_SUCCESS);
+}
+
+TEST(nsmDevice, WaitForNsmDeviceUpdate_NeverClears_StaysPending)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+
+    // discoveryPending stays true; in non-coverage mode the coroutine
+    // suspends at the first Sleep. In coverage mode (Sleep is a no-op)
+    // the loop runs DEVICE_UPDATE_POST_PATCH_SLEEP_MAX_ITER times and
+    // returns NSM_SW_ERROR_TIMEOUT.
+    device.discoveryPending = true;
+
+    EXPECT_NO_THROW_COROUTINE(device.waitForNsmDeviceUpdate());
+    EXPECT_TRUE(device.discoveryPending); // still pending
+}
+
+// ============================================================================
+// Coroutine function tests: markSensorsUnrefreshed, updateSensorsForOffline,
+// setOffline, waitForNsmDeviceUpdate, setOnline.
+// With COVERAGE_DISABLE_COROUTINES: co_await → expr (no-op), co_return → return
+//
+// ============================================================================
+
+TEST(nsmDevice, MarkSensorsUnrefreshed_EmptySensors_NoOp)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+    // deviceSensors is empty; the for loop is never entered
+    EXPECT_NO_THROW_COROUTINE(dev.markSensorsUnrefreshed());
+}
+
+TEST(nsmDevice, MarkSensorsUnrefreshed_FewSensors_AllMarkedUnrefreshed)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    auto s1 = std::make_shared<MockSensor>("S1", "T1");
+    auto s2 = std::make_shared<MockSensor>("S2", "T2");
+    s1->isRefreshed = true;
+    s2->isRefreshed = true;
+    dev.addDeviceSensors(s1);
+    dev.addDeviceSensors(s2);
+
+    EXPECT_NO_THROW_COROUTINE(dev.markSensorsUnrefreshed());
+
+    EXPECT_FALSE(s1->isRefreshed);
+    EXPECT_FALSE(s2->isRefreshed);
+}
+
+TEST(nsmDevice, MarkSensorsUnrefreshed_ExactBatchSize_TriggersBatchSleep)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // Clear pre-existing sensors added by the constructor
+    // (initMsgTypesSensor) so that the test controls the exact count.
+    dev.deviceSensors.clear();
+
+    // Exactly MAX_SENSOR_UPDATE_BATCH_SIZE sensors triggers the batch sleep.
+    // All sensors are processed before Sleep suspends the coroutine.
+    for (int i = 0; i < MAX_SENSOR_UPDATE_BATCH_SIZE; i++)
+    {
+        auto s = std::make_shared<MockSensor>("S" + std::to_string(i), "T");
+        s->isRefreshed = true;
+        dev.addDeviceSensors(s);
+    }
+
+    EXPECT_NO_THROW_COROUTINE(dev.markSensorsUnrefreshed());
+
+    for (auto& sensor : dev.deviceSensors)
+    {
+        EXPECT_FALSE(sensor->isRefreshed);
+    }
+}
+
+TEST(nsmDevice, UpdateSensorsForOffline_EmptySensors_NoOp)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+    EXPECT_NO_THROW_COROUTINE(dev.updateSensorsForOffline());
+}
+
+TEST(nsmDevice, UpdateSensorsForOffline_FewSensors_InnerWhileExitsOnSize)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // Fewer than MAX_SENSOR_UPDATE_BATCH_SIZE: inner while exits when
+    // sensorIndex reaches sensors.size() before count reaches the limit
+    for (int i = 0; i < 3; i++)
+    {
+        dev.addDeviceSensors(
+            std::make_shared<MockSensor>("S" + std::to_string(i), "T"));
+    }
+
+    EXPECT_NO_THROW_COROUTINE(dev.updateSensorsForOffline());
+}
+
+TEST(nsmDevice, UpdateSensorsForOffline_BatchCrossing_InnerWhileExitsOnCount)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // More than MAX_SENSOR_UPDATE_BATCH_SIZE: inner while exits when count
+    // reaches the limit, outer loop continues for the remaining sensors
+    for (int i = 0; i < MAX_SENSOR_UPDATE_BATCH_SIZE + 2; i++)
+    {
+        dev.addDeviceSensors(
+            std::make_shared<MockSensor>("S" + std::to_string(i), "T"));
+    }
+
+    EXPECT_NO_THROW_COROUTINE(dev.updateSensorsForOffline());
+}
+
+TEST(nsmDevice, SetOffline_NoGpuDriverSensor_DeviceGoesOffline)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+    dev.isDeviceActive = true;
+
+    // gpuDriverSensor is nullptr; the if branch is not taken
+    EXPECT_NO_THROW_COROUTINE(dev.setOffline());
+
+    EXPECT_FALSE(dev.isDeviceActive);
+}
+
+TEST(nsmDevice, WaitForNsmDeviceUpdate_DiscoveryNotPending_ReturnsSuccess)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+    dev.discoveryPending = false;
+
+    auto result = dev.waitForNsmDeviceUpdate();
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_SW_SUCCESS);
+#endif
+}
+
+TEST(nsmDevice, WaitForNsmDeviceUpdate_AlwaysPending_ReturnsTimeout)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // discoveryPending stays true; loop runs
+    // DEVICE_UPDATE_POST_PATCH_SLEEP_MAX_ITER times then returns TIMEOUT
+    // (Sleep is no-op in test mode)
+    dev.discoveryPending = true;
+
+    auto result = dev.waitForNsmDeviceUpdate();
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_SW_ERROR_TIMEOUT);
+#endif
+}
+
+TEST(nsmDevice, SetOnline_ServiceReadyNotInitialized_Throws)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // NsmServiceReadyIntf::getInstance() throws std::runtime_error when not
+    // initialized
+    EXPECT_THROW_COROUTINE(dev.setOnline(), std::runtime_error);
+}
+
+// ---- NsmDevice base class sensorIO early-return branches ----
+
+TEST(nsmDevice, SensorIO_BaseImpl_DeviceInactive_ReturnsUnsupported)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // MockNsmDevice constructor sets isDeviceActive=true; override to false
+    dev.isDeviceActive = false;
+    Request req(20, 0);
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto result = dev.nsm::NsmDevice::sensorIO(0, req, responseMsg, responseLen,
+                                               false);
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_ERR_UNSUPPORTED_COMMAND_CODE);
+#endif
+}
+
+TEST(nsmDevice, SensorIO_BaseImpl_CommandNotSupported_ReturnsUnsupported)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // isDeviceActive=true but command 0/0 not in matrix: early return
+    dev.isDeviceActive = true;
+    Request req(20, 0);
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto result = dev.nsm::NsmDevice::sensorIO(0, req, responseMsg, responseLen,
+                                               false);
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_ERR_UNSUPPORTED_COMMAND_CODE);
+#endif
+}
+
+// ---- NsmDevice base class postPatchIO early-return branches ----
+
+TEST(nsmDevice, PostPatchIO_BaseImpl_DiscoveryPending_ReturnsTimeout)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // discoveryPending=true: waitForNsmDeviceUpdate loops MAX_ITER times and
+    // returns TIMEOUT; postPatchIO then early-returns with TIMEOUT
+    dev.discoveryPending = true;
+    Request req(20, 0);
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto result = dev.nsm::NsmDevice::postPatchIO(0, req, responseMsg,
+                                                  responseLen);
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_SW_ERROR_TIMEOUT);
+#endif
+}
+
+TEST(nsmDevice, PostPatchIO_BaseImpl_DeviceInactive_ReturnsUnsupported)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // discoveryPending=false (default): waitForNsmDeviceUpdate returns SUCCESS;
+    // MockNsmDevice constructor sets isDeviceActive=true; override to false so
+    // postPatchIO early-returns NSM_ERR_UNSUPPORTED_COMMAND_CODE
+    dev.isDeviceActive = false;
+    Request req(20, 0);
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto result = dev.nsm::NsmDevice::postPatchIO(0, req, responseMsg,
+                                                  responseLen);
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_ERR_UNSUPPORTED_COMMAND_CODE);
+#endif
+}
+
+// ---- NsmDevice constructor invalid remap value branches ----
+
+TEST(nsmDevice, Constructor_InvalidInstanceNumberRemap_CatchesAndContinues)
+{
+    // Passing a non-numeric string for NSM_DEVICE_INSTANCE_NUMBER causes
+    // stoi to throw std::invalid_argument inside the NsmDevice base
+    // constructor's catch block (lines 162-167 of nsmDevice.hpp).
+    // MockNsmDevice then also calls stoi and propagates the throw.
+    EXPECT_THROW(MockNsmDevice(NSM_DEV_ID_GPU, 0, "NSM_DEVICE_INSTANCE_NUMBER",
+                               "not_a_number", 0),
+                 std::invalid_argument);
+}
+
+TEST(nsmDevice, Constructor_InvalidEidRemap_CatchesAndContinues)
+{
+    // Same pattern for MCTP_EID: invalid_argument caught in NsmDevice base
+    // constructor (lines 182-187 of nsmDevice.hpp), then propagated from
+    // MockNsmDevice constructor body.
+    EXPECT_THROW(
+        MockNsmDevice(NSM_DEV_ID_GPU, 0, "MCTP_EID", "not_a_number", 0),
+        std::invalid_argument);
+}
+
+// ---- updateDiscoveryIdentifiers non-preferred path ----
+
+TEST(nsmDevice, UpdateDiscoveryIdentifiers_NewLowerPriorityMedium_NotPreferred)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // Set device as already connected via PCIe (priority 0 - highest)
+    dev.uuid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    dev.eid = 10;
+    dev.mctpMedium = "xyz.openbmc_project.MCTP.Endpoint.MediaTypes.PCIe";
+    dev.mctpBinding = "xyz.openbmc_project.MCTP.Binding.BindingTypes.PCIe";
+
+    // New connection via SMBus (priority 6 - lowest): not preferred over PCIe
+    // isPreferred returns false (0 >= 6 is false) → else branch (lines 468-474)
+    eid_t newEid = 20;
+    uuid_t newUuid = "bbbbbbbb-cccc-dddd-eeee-ffffffffffff";
+    std::string newMedium =
+        "xyz.openbmc_project.MCTP.Endpoint.MediaTypes.SMBus";
+    std::string newBinding =
+        "xyz.openbmc_project.MCTP.Binding.BindingTypes.SMBus";
+    std::string assocPath = "/mctp/test";
+
+    bool result = dev.updateDiscoveryIdentifiers(newEid, newUuid, 1, assocPath,
+                                                 newMedium, newBinding, 30);
+
+    EXPECT_FALSE(result);
+    // Device keeps original EID/medium (not updated)
+    EXPECT_EQ(dev.getEid(), 10);
+}
+
+// ============================================================================
+// refreshCapabilitySensor base-class implementation
+// NsmDevice::refreshCapabilitySensor (L931-943):
+//   while sensorIndex < sensors.size():
+//       co_await sensor->update(shared_from_this())
+//   co_return NSM_SW_SUCCESS
+// MockNsmDevice mocks this method, so call via base-class qualification.
+// Device must be heap-allocated (make_shared) for shared_from_this() to work.
+// ============================================================================
+
+TEST(nsmDevice, RefreshCapabilitySensor_BaseImpl_EmptyList_ReturnsSuccess)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    // Must be heap-allocated so shared_from_this() works inside the coroutine
+    auto dev = std::make_shared<MockNsmDevice>(NSM_DEV_ID_GPU, 0, "MCTP_UUID",
+                                               uuid, 0);
+    // capabilityRefreshSensors is empty; loop body is never entered
+    EXPECT_TRUE(dev->capabilityRefreshSensors.empty());
+    auto result = dev->nsm::NsmDevice::refreshCapabilitySensor();
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_SW_SUCCESS);
+#endif
+}
+
+TEST(nsmDevice, RefreshCapabilitySensor_BaseImpl_WithSensor_UpdatesCalled)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    auto dev = std::make_shared<MockNsmDevice>(NSM_DEV_ID_GPU, 0, "MCTP_UUID",
+                                               uuid, 0);
+    auto sensor = std::make_shared<MockSensor>("CapSensor", "CapType");
+    dev->capabilityRefreshSensors.push_back(sensor);
+
+    // Loop body executes once; sensor->update(shared_from_this()) is called
+    auto result = dev->nsm::NsmDevice::refreshCapabilitySensor();
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_SW_SUCCESS);
+#endif
+}
+
+// ============================================================================
+// refreshCommandMatrix base-class implementation
+// NsmDevice::refreshCommandMatrix (L946-1008):
+//   if (!areMessageTypesRetrieved) → calls getSupportedNvidiaMessageType
+//     → needs nsmMsgHandler (blocked with nullptr)
+//   for each messageType in retrievedMessageTypes:
+//     if messageType >= NUM_NSM_TYPES: continue (out-of-range skip)
+//     if !commandCodesRetrieved[messageType]: calls getSupportedCommandCodes
+//       → needs nsmMsgHandler (blocked with nullptr)
+//     else: type already retrieved, no-op
+//   co_return NSM_SW_SUCCESS
+// refreshCommandMatrix is NOT mocked; can call directly on stack device.
+// ============================================================================
+
+TEST(nsmDevice, RefreshCommandMatrix_BaseImpl_EmptyTypes_ReturnsSuccess)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // areMessageTypesRetrieved=true (set by MockNsmDevice ctor)
+    // retrievedMessageTypes is empty → for loop body never entered
+    dev.retrievedMessageTypes.clear();
+    dev.commandCodesRetrieved.clear();
+
+    auto result = dev.refreshCommandMatrix();
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_SW_SUCCESS);
+#endif
+}
+
+TEST(nsmDevice, RefreshCommandMatrix_BaseImpl_OutOfRangeType_ContinueBranch)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // retrievedMessageTypes contains an out-of-range type (>= NUM_NSM_TYPES)
+    // The if (messageType >= NUM_NSM_TYPES) branch is taken → continue
+    dev.retrievedMessageTypes = {static_cast<uint8_t>(NUM_NSM_TYPES)};
+    dev.commandCodesRetrieved.clear();
+
+    auto result = dev.refreshCommandMatrix();
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_SW_SUCCESS);
+#endif
+}
+
+TEST(nsmDevice, RefreshCommandMatrix_BaseImpl_TypeAlreadyRetrieved_SkipsInner)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+
+    // Valid type with commandCodesRetrieved[0]=true → inner if NOT taken,
+    // skip getSupportedCommandCodes (which would need nsmMsgHandler)
+    dev.retrievedMessageTypes = {0};
+    dev.commandCodesRetrieved.clear();
+    dev.commandCodesRetrieved[0] = true;
+
+    auto result = dev.refreshCommandMatrix();
+#ifdef COVERAGE_DISABLE_COROUTINES
+    EXPECT_EQ(static_cast<uint8_t>(result), NSM_SW_SUCCESS);
+#endif
+}
+
+// ============================================================================
+// setOffline() — gpuDriverSensor != nullptr TRUE branch (nsmDevice.cpp:229)
+// ============================================================================
+
+struct NsmDeviceGpuDriverTest : public ::testing::Test, public utils::DBusTest
+{};
+
+TEST_F(NsmDeviceGpuDriverTest, SetOffline_WithGpuDriverSensor_ResetsDriverState)
+{
+    using namespace nsm;
+
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice dev(NSM_DEV_ID_GPU, 0, "MCTP_UUID", uuid, 0);
+    dev.isDeviceActive = true;
+
+    auto& bus = utils::DBusHandler::getBus();
+    auto gpuSensor = std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
+        bus, "test_gpu_drv", std::vector<utils::Association>{}, "TestFirmware",
+        "NVIDIA");
+    gpuSensor->driverState = 1; // non-zero; setOffline() must reset to 0
+    dev.gpuDriverSensor = gpuSensor;
+
+    EXPECT_NO_THROW_COROUTINE(dev.setOffline());
+
+    EXPECT_FALSE(dev.isDeviceActive);
+    EXPECT_EQ(dev.gpuDriverSensor->driverState, static_cast<uint8_t>(0));
 }

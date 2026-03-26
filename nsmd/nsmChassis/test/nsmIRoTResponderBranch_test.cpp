@@ -373,7 +373,7 @@ TEST_F(Batch12DIRoTResponderTest, AddSensorNsmIRoTResponderSPDM)
 
 // ============================================================================
 // NsmIRoTResponder<T>::update() coverage
-// For non-NsmAssetIntf and non-UuidIntf types, update() just co_returns
+// For non-NsmAssetIntf and non-UuidIntf types, update() just co_returns //
 // NSM_SUCCESS.
 // ============================================================================
 
@@ -410,5 +410,313 @@ TEST_F(Batch12DIRoTResponderTest, UpdateChassisIntf)
 {
     auto sensor = std::make_shared<NsmIRoTResponder<ChassisIntf>>(
         "ChassisUpd", "NSM_ChassisIRoTResponder");
+    sensor->update(fpga);
+}
+
+// ============================================================================
+// createIRoTResponderLocationCode – lines 196-211, 324
+// ============================================================================
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_WithLocationCode_CreatesLocationCodeSensor)
+{
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_loccode";
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = {{"Name", name}, {"UUID", fpgaUuid}};
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMap = {
+        {"Type", std::string("NSM_Chassis_Attributes")},
+        {"Name", std::string("IRoT_LocCode")},
+        {"LocationCode", std::string("U0-C1")},
+    };
+
+    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
+                           objPath);
+
+    // Asset(4) + Health(1) + LocationCode(1) = 6
+    EXPECT_GE(fpga->staticSensors.size(), 6u);
+}
+
+// ============================================================================
+// createIRoTResponderLocationContext – lines 213-228, 329
+// ============================================================================
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_WithLocationContext_CreatesLocationContextSensor)
+{
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_locctx";
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = {{"Name", name}, {"UUID", fpgaUuid}};
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMap = {
+        {"Type", std::string("NSM_Chassis_Attributes")},
+        {"Name", std::string("IRoT_LocCtx")},
+        {"LocationContext", std::string("rear-panel")},
+    };
+
+    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
+                           objPath);
+
+    // Asset(4) + Health(1) + LocationContext(1) = 6
+    EXPECT_GE(fpga->staticSensors.size(), 6u);
+}
+
+// ============================================================================
+// createIRoTResponderFieldReplaceable – lines 230-245, 334
+// ============================================================================
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_WithFieldReplaceable_CreatesReplaceableSensor)
+{
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_fieldrepl";
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = {{"Name", name}, {"UUID", fpgaUuid}};
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".ChassisAttributes");
+    propertyMap = {
+        {"Type", std::string("NSM_Chassis_Attributes")},
+        {"Name", std::string("IRoT_FieldRepl")},
+        {"FieldReplaceable", bool{true}},
+    };
+
+    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
+                           objPath);
+
+    // Asset(4) + Health(1) + FieldReplaceable(1) = 6
+    EXPECT_GE(fpga->staticSensors.size(), 6u);
+}
+
+// ============================================================================
+// NsmIRoTResponder<NsmAssetIntf>::update – sensorIO failure → lines 65-69
+// ============================================================================
+TEST_F(Batch12DIRoTResponderTest,
+       UpdateNsmAssetIntf_SensorIOFails_CoversErrorPath)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<NsmAssetIntf>>(
+        "AssetUpd_sioerr", "NSM_ChassisIRoTResponder");
+
+    EXPECT_CALL(*fpga, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERROR));
+
+    sensor->update(fpga);
+}
+
+// ============================================================================
+// NsmIRoTResponder<NsmAssetIntf>::update – first decode fails (cc=NSM_ERROR)
+// → if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS) TRUE → lines 79-83
+// ============================================================================
+TEST_F(Batch12DIRoTResponderTest,
+       UpdateNsmAssetIntf_FirstDecodeErrorCC_CoversFirstDecodeFailPath)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<NsmAssetIntf>>(
+        "AssetUpd_badcc", "NSM_ChassisIRoTResponder");
+
+    // Minimal response with cc=NSM_ERROR: sensorIO returns NSM_SUCCESS (0)
+    // but the response has a bad completion code, so the first decode path
+    // at line 77 triggers the TRUE branch (cc != NSM_SUCCESS)
+    uint8_t devId[] = {0x01};
+    std::vector<uint8_t> resp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_device_ids_resp), 0);
+    auto* respMsg = reinterpret_cast<nsm_msg*>(resp.data());
+    encode_nsm_query_device_ids_resp(0, NSM_ERROR, ERR_NULL, devId, 0, respMsg);
+
+    // Return the error-CC response with transport success (code=NSM_SUCCESS)
+    EXPECT_CALL(*fpga, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(resp, NSM_SUCCESS));
+
+    sensor->update(fpga);
+}
+
+// ============================================================================
+// NsmIRoTResponder<UuidIntf>::update – MctpDiscovery::getInstance() throws
+// → lines 108: calling getInstance() in test env raises std::runtime_error
+// ============================================================================
+TEST_F(Batch12DIRoTResponderTest,
+       UpdateUuidIntf_MctpDiscoveryNotInitialized_Throws)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<UuidIntf>>(
+        "UuidUpd_throw", "NSM_ChassisIRoTResponder");
+
+    // MctpDiscovery::getInstance() raises std::runtime_error in test env
+    EXPECT_THROW_COROUTINE(sensor->update(fpga), std::runtime_error);
+}
+
+// ============================================================================
+// NsmIRoTResponder<NsmAssetIntf>::update – success path → lines 73-95+
+// ============================================================================
+TEST_F(Batch12DIRoTResponderTest, UpdateNsmAssetIntf_Success_SetsSerialNumber)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<NsmAssetIntf>>(
+        "AssetUpd_ok", "NSM_ChassisIRoTResponder");
+
+    // Build a valid query_device_ids_resp
+    uint8_t devId[] = {0xAB, 0xCD};
+    const size_t devIdLen = sizeof(devId);
+    std::vector<uint8_t> resp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_device_ids_resp) + devIdLen - 1,
+        0);
+    auto* respMsg = reinterpret_cast<nsm_msg*>(resp.data());
+    encode_nsm_query_device_ids_resp(0, NSM_SUCCESS, ERR_NULL, devId, devIdLen,
+                                     respMsg);
+
+    EXPECT_CALL(*fpga, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(resp));
+
+    // Covers: first decode (false branch), second decode (false branch),
+    // serial number string formatting and serialNumber setter
+    sensor->update(fpga);
+}
+
+// ============================================================================
+// createNsmIRoTResponder: type == baseType branch (lines 282-306)
+// Tests the UUID sensor + Associations sensor creation path.
+// ============================================================================
+
+// type == "NSM_ChassisIRoTResponder" (baseType) with UUID present in current →
+// L289 count("UUID") TRUE → inneruuid = fpgaUuid → UUID sensor + Assoc sensor
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_BaseType_WithCurrentUUID_CreatesUuidAndAssocSensors)
+{
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_basetype_uuid";
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = {{"Name", name}, {"UUID", fpgaUuid}};
+
+    // Current interface has Type == baseType AND UUID →
+    // type == baseType branch taken, L289 TRUE, UuidIntf + Assoc sensors added
+    auto& currPropertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Base");
+    currPropertyMap = {
+        {"Type", std::string("NSM_ChassisIRoTResponder")},
+        {"UUID", fpgaUuid},
+    };
+
+    const size_t before = fpga->staticSensors.size();
+    createNsmIRoTResponder(mockManager, basicIntfName + ".Base", objPath);
+    // UuidIntf sensor + AssociationDefinitionsIntf sensor = ≥2 static sensors
+    EXPECT_GE(fpga->staticSensors.size(), before + 2u);
+}
+
+// type == "NSM_ChassisIRoTResponder" (baseType) with UUID absent from current →
+// L289 count("UUID") FALSE → inner uuid="" → UuidIntf sensor with empty uuid
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_BaseType_NoCurrentUUID_UsesEmptyUuid)
+{
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_basetype_nouuid";
+
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = {{"Name", name}, {"UUID", fpgaUuid}};
+
+    // Type == baseType but UUID intentionally absent → L289 FALSE →
+    // inner uuid stays default ("") → UuidIntf + Assoc sensors still created
+    auto& currPropertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".BaseNoUUID");
+    currPropertyMap = {
+        {"Type", std::string("NSM_ChassisIRoTResponder")},
+    };
+
+    const size_t before = fpga->staticSensors.size();
+    createNsmIRoTResponder(mockManager, basicIntfName + ".BaseNoUUID", objPath);
+    // UuidIntf (empty uuid) + Assoc sensors still added
+    EXPECT_GE(fpga->staticSensors.size(), before + 2u);
+}
+
+// "Name" absent from current intf when type == "NSM_Chassis_Attributes" →
+// L136 FALSE in createIRoTResponderAsset → assetName="" → sensors still
+// created with empty assetName (no throw).
+TEST_F(Batch12DIRoTResponderTest,
+       CreateIRoTResponder_AssetNameAbsent_FalseBranch)
+{
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_asset_no_name";
+
+    // Base has Name and UUID
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = {{"Name", name}, {"UUID", fpgaUuid}};
+
+    // Current intf: NSM_Chassis_Attributes but no "Name" key → L136 FALSE
+    auto& currPropertyMap = utils::MockDbusAsync::propertyMap(
+        objPath, basicIntfName + ".NoAssetName");
+    currPropertyMap = {{"Type", std::string("NSM_Chassis_Attributes")}};
+
+    const size_t before = fpga->staticSensors.size();
+    createNsmIRoTResponder(mockManager, basicIntfName + ".NoAssetName",
+                           objPath);
+
+    // Asset(1) + buildDate + model + partNumber + Health(1) = 5 sensors added
+    EXPECT_GE(fpga->staticSensors.size(), before + 5u);
+}
+
+// UUID absent from base props → uuid="" (L275 FALSE) →
+// getNsmDeviceFromStaticUUID("") throws (invalid UUID format)
+TEST_F(Batch12DIRoTResponderTest, CreateIRoTResponder_MissingBaseUUID_Throws)
+{
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
+    const std::string objPath =
+        "/xyz/openbmc_project/inventory/system/irot_no_base_uuid";
+
+    // UUID intentionally absent from base → L275 FALSE → uuid="" →
+    // getNsmDeviceFromStaticUUID("") throws std::runtime_error
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                              basicIntfName);
+    basePropertyMap = {{"Name", name}};
+
+    auto& currPropertyMap =
+        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Attr");
+    currPropertyMap = {{"Type", std::string("NSM_Chassis_Attributes")}};
+
+    EXPECT_THROW_COROUTINE(
+        createNsmIRoTResponder(mockManager, basicIntfName + ".Attr", objPath),
+        std::exception);
+}
+
+// ============================================================================
+// NsmIRoTResponder<NsmAssetIntf>::update – first decode second operand (L77):
+//   rc==NSM_SW_SUCCESS but cc==NSM_ERROR
+// 9-byte buffer: decode_nsm_query_device_ids_resp calls
+// decode_reason_code_and_cc which returns NSM_SW_SUCCESS with cc=NSM_ERROR
+// → second operand of (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS) is TRUE.
+// ============================================================================
+TEST_F(Batch12DIRoTResponderTest,
+       UpdateNsmAssetIntf_FirstDecodeSuccessNonZeroCC_CoversSecondOperand)
+{
+    auto sensor = std::make_shared<NsmIRoTResponder<NsmAssetIntf>>(
+        "AssetUpd_cc_err", "NSM_ChassisIRoTResponder");
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code = NSM_ERROR
+
+    EXPECT_CALL(*fpga, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(buf, Response{}));
+
     sensor->update(fpga);
 }

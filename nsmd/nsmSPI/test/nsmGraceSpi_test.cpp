@@ -843,4 +843,87 @@ TEST_F(NsmGraceSpiTest, testRequestSpiStatusRegister)
     spiObject.requestSpiStatusRegister(grace);
 }
 
+// =============================================================================
+// FALSE-branch coverage: count() checks in createNsmGraceSpi
+// (covers count("Type"), count("Name"), count("InventoryObjPath") FALSE paths)
+// =============================================================================
+
+// count("Type") FALSE: Type absent → type="" → if(type=="NSM_SPI") FALSE →
+// no sensor added to device; nsmDevice found but sensor creation skipped
+TEST_F(NsmGraceSpiTest, Factory_MissingType_NoSensorCreated)
+{
+    const std::string uniquePath = objPath + "_missing_type";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
+    pm["Name"] = name;
+    pm["UUID"] = graceUuid;
+    pm["InventoryObjPath"] = inventoryPath;
+    // "Type" intentionally omitted → type="" → if(type=="NSM_SPI") is FALSE
+
+    const size_t before = grace->deviceSensors.size();
+    createNsmGraceSpi(mockManager, basicIntfName, uniquePath);
+    // No sensor added since type doesn't match "NSM_SPI"
+    EXPECT_EQ(grace->deviceSensors.size(), before);
+}
+
+// count("Name") FALSE: Name absent → name="" →
+// inventoryObjPath + "" = inventoryPath (valid D-Bus path) → sensor IS created
+TEST_F(NsmGraceSpiTest, Factory_MissingName_SensorCreated)
+{
+    const std::string uniquePath = objPath + "_missing_name";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
+    pm["Type"] = std::string("NSM_SPI");
+    pm["UUID"] = graceUuid;
+    pm["InventoryObjPath"] = inventoryPath;
+    // "Name" intentionally omitted → name="" → path = inventoryPath + "" →
+    // valid
+
+    const size_t before = grace->deviceSensors.size();
+    createNsmGraceSpi(mockManager, basicIntfName, uniquePath);
+    EXPECT_GT(grace->deviceSensors.size(), before);
+}
+
+// count("InventoryObjPath") FALSE: InventoryObjPath absent →
+// inventoryObjPath="" → D-Bus path = "" + name = "GraceSPI" (no leading "/") →
+// SpiIntf constructor throws SdBusError (InvalidArgs)
+TEST_F(NsmGraceSpiTest, Factory_MissingInventoryObjPath_Throws)
+{
+    const std::string uniquePath = objPath + "_missing_inv";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
+    pm["Name"] = name;
+    pm["Type"] = std::string("NSM_SPI");
+    pm["UUID"] = graceUuid;
+    // "InventoryObjPath" intentionally omitted → inventoryObjPath="" →
+    // path = "" + "GraceSPI" = "GraceSPI" → no leading "/" → SdBusError
+
+    EXPECT_THROW_COROUTINE(
+        createNsmGraceSpi(mockManager, basicIntfName, uniquePath),
+        std::exception);
+}
+
+// eraseSpi: cmdInProgress TRUE → startSpiOperation() returns NSM_SW_ERROR
+// → throws Common::Error::Unavailable
+TEST_F(NsmGraceSpiTest, EraseSpi_WhenCmdInProgress_ThrowsUnavailable)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    NsmGraceSpiObject spiObject(bus, name, inventoryPath, "NSM_SPI", graceUuid);
+
+    // Force cmdInProgress to true so startSpiOperation() returns NSM_SW_ERROR
+    spiObject.cmdInProgress = true;
+
+    EXPECT_THROW(spiObject.eraseSpi(), std::exception);
+}
+
+// readSpi: cmdInProgress TRUE → startSpiOperation() returns NSM_SW_ERROR
+// → throws Common::Error::Unavailable
+TEST_F(NsmGraceSpiTest, ReadSpi_WhenCmdInProgress_ThrowsUnavailable)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    NsmGraceSpiObject spiObject(bus, name, inventoryPath, "NSM_SPI", graceUuid);
+
+    // Force cmdInProgress to true so startSpiOperation() returns NSM_SW_ERROR
+    spiObject.cmdInProgress = true;
+
+    EXPECT_THROW(spiObject.readSpi(), std::exception);
+}
+
 #endif // ENABLE_GRACE_SPI_OPERATIONS

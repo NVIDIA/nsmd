@@ -188,8 +188,7 @@ TEST(NsmDiagCmdParse, DisableTokens_ParseResponseSuccess)
 
 // ---- QueryTokenStatus -------------------------------------------------------
 
-TEST(NsmDiagCmdParse,
-     DISABLED_QueryTokenStatus_ParseResponseSuccess_AllStatuses)
+TEST(NsmDiagCmdParse, QueryTokenStatus_ParseResponseSuccess_AllStatuses)
 {
     const nsm_debug_token_status statuses[] = {
         NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ENDED,
@@ -452,6 +451,21 @@ TEST(NsmDiagCmdParse, EraseDebugInfo_InProgress)
     EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, buf.size()));
 }
 
+// [10] EraseDebugInfo – default case (lines 1196-1198 in nsm_diag_cmd.cpp)
+// result_status = 3 is not covered by ERASE_TRACE_* constants → hits default:
+TEST(NsmDiagCmdParse, EraseDebugInfo_UnknownStatus)
+{
+    CLI::App app;
+    setupDiagCommands(app);
+    parseSubcmdArgs(app, "EraseDebugInfo", {"--infoType", "0"});
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_erase_debug_info_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_erase_debug_info_resp(0, NSM_SUCCESS, ERR_NULL, 3, msg);
+    EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, buf.size()));
+}
+
 // ---- QueryResetStatistics ---------------------------------------------------
 
 TEST(NsmDiagCmdParse, QueryResetStatistics_ParseResponseNoSamples)
@@ -649,7 +663,7 @@ TEST(NsmDiagCmdParse, EraseToken_ParseResponseSuccess)
 
 // ---- QueryToken -------------------------------------------------------------
 
-TEST(NsmDiagCmdParse, DISABLED_QueryToken_ParseResponseNoPayload)
+TEST(NsmDiagCmdParse, QueryToken_ParseResponseNoPayload)
 {
     CLI::App app;
     setupDiagCommands(app);
@@ -684,160 +698,160 @@ TEST(NsmDiagCmdParse, QueryToken_ParseResponseWithPayload)
 
 // ---- Error path tests -------------------------------------------------------
 
-TEST(NsmDiagCmdParse, DISABLED_QueryTokenParameters_ParseResponseError)
+TEST(NsmDiagCmdParse, QueryTokenParameters_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
     parseSubcmdArgs(app, "QueryTokenParameters", {"--opcode", "0"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[0]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_ProvideToken_ParseResponseError)
+TEST(NsmDiagCmdParse, ProvideToken_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[1]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_DisableTokens_ParseResponseError)
+TEST(NsmDiagCmdParse, DisableTokens_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[2]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_QueryTokenStatus_ParseResponseError)
+TEST(NsmDiagCmdParse, QueryTokenStatus_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
     parseSubcmdArgs(app, "QueryTokenStatus", {"--type", "0"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[3]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_QueryDeviceIds_ParseResponseError)
+TEST(NsmDiagCmdParse, QueryDeviceIds_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[4]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_EraseTrace_ParseResponseError)
+TEST(NsmDiagCmdParse, EraseTrace_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[8]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_GetDeviceDiagnostics_ParseResponseError)
+TEST(NsmDiagCmdParse, GetDeviceDiagnostics_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
     parseSubcmdArgs(app, "GetDeviceDiagnostics", {"--segmentId", "0"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[12]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_EraseToken_ParseResponseError)
+TEST(NsmDiagCmdParse, EraseToken_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
     parseSubcmdArgs(app, "EraseToken", {"--type", "0"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[16]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_QueryToken_ParseResponseError)
+TEST(NsmDiagCmdParse, QueryToken_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
 }
 
 // Error paths for commands not yet covered above
 
-TEST(NsmDiagCmdParse, DISABLED_EnableDisableWriteProtected_ParseResponseError)
+TEST(NsmDiagCmdParse, EnableDisableWriteProtected_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
     parseSubcmdArgs(app, "EnableDisableWriteProtected",
                     {"--dataId", "128", "--value", "1"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[5]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_ResetNetworkDevice_ParseResponseError)
+TEST(NsmDiagCmdParse, ResetNetworkDevice_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
     parseSubcmdArgs(app, "ResetNetworkDevice", {"--mode", "0"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[6]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_GetNetworkDeviceDebugInfo_ParseResponseError)
+TEST(NsmDiagCmdParse, GetNetworkDeviceDebugInfo_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
     parseSubcmdArgs(app, "GetNetworkDeviceDebugInfo",
                     {"--debugInfoType", "0", "--recordHandle", "0"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[7]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_GetNetworkDeviceLogInfo_ParseResponseError)
+TEST(NsmDiagCmdParse, GetNetworkDeviceLogInfo_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
     parseSubcmdArgs(app, "GetNetworkDeviceLogInfo", {"--recordHandle", "0"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[9]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_EraseDebugInfo_ParseResponseError)
+TEST(NsmDiagCmdParse, EraseDebugInfo_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
     parseSubcmdArgs(app, "EraseDebugInfo", {"--infoType", "0"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_QueryResetStatistics_ParseResponseError)
+TEST(NsmDiagCmdParse, QueryResetStatistics_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
@@ -850,7 +864,7 @@ TEST(NsmDiagCmdParse, DISABLED_QueryResetStatistics_ParseResponseError)
     EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_GetDeviceDebugParameters_ParseResponseError)
+TEST(NsmDiagCmdParse, GetDeviceDebugParameters_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
@@ -858,12 +872,12 @@ TEST(NsmDiagCmdParse, DISABLED_GetDeviceDebugParameters_ParseResponseError)
                     {"--configType", "0", "--portNumber", "0",
                      "--parameterIndex", "0", "--parameterSubId", "0"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_SetDeviceDebugParameters_ParseResponseError)
+TEST(NsmDiagCmdParse, SetDeviceDebugParameters_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
@@ -872,17 +886,17 @@ TEST(NsmDiagCmdParse, DISABLED_SetDeviceDebugParameters_ParseResponseError)
                      "--parameterIndex", "0", "--parameterSubId", "0", "--data",
                      "1"});
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[14]->parseResponseMsg(msg, buf.size()));
 }
 
-TEST(NsmDiagCmdParse, DISABLED_InstallToken_ParseResponseError)
+TEST(NsmDiagCmdParse, InstallToken_ParseResponseError)
 {
     CLI::App app;
     setupDiagCommands(app);
 
-    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr));
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(commands[15]->parseResponseMsg(msg, buf.size()));
 }
@@ -1065,6 +1079,141 @@ TEST(NsmDiagCmdParse, QueryToken_ParseResponseSuccess_EmptyPayload)
     uint8_t emptyPayload[1] = {0};
     encode_nsm_query_token_resp(0, NSM_SUCCESS, ERR_NULL, emptyPayload, 0, msg);
     EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- QueryToken: ProcessingStatus TLV type ----------------------------------
+// Covers the ProcessingStatus branch at lines 1689-1693 of nsm_diag_cmd.cpp.
+
+TEST(NsmDiagCmdParse, QueryToken_ProcessingStatus)
+{
+    CLI::App app;
+    setupDiagCommands(app);
+
+    debug_token::tlv_encoder::Structure encoder;
+    encoder.setVersion(1, 0);
+    encoder.add(
+        static_cast<uint16_t>(debug_token::types::Common::ProcessingStatus),
+        static_cast<uint8_t>(1));
+    auto tlv = encoder.encode();
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                             tlv.size());
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_nsm_query_token_resp(0, NSM_SUCCESS, ERR_NULL, tlv.data(),
+                                tlv.size(), msg);
+    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- QueryToken: TokenTypeSubtypeList with even count -----------------------
+// Covers the else branch of lines 1706-1718 (valid pair processing).
+
+TEST(NsmDiagCmdParse, QueryToken_TokenTypeSubtypeList_Even)
+{
+    CLI::App app;
+    setupDiagCommands(app);
+
+    debug_token::tlv_encoder::Structure encoder;
+    encoder.setVersion(1, 0);
+    std::vector<uint32_t> pairs = {1, 2, 3, 4}; // 4 elements = 2 pairs (even)
+    encoder.add(
+        static_cast<uint16_t>(debug_token::types::Common::TokenTypeSubtypeList),
+        pairs);
+    auto tlv = encoder.encode();
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                             tlv.size());
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_nsm_query_token_resp(0, NSM_SUCCESS, ERR_NULL, tlv.data(),
+                                tlv.size(), msg);
+    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- QueryToken: TokenTypeSubtypeList with odd count
+// ------------------------- Covers the error path at lines 1698-1705 (odd
+// number of elements → cerr).
+
+TEST(NsmDiagCmdParse, QueryToken_TokenTypeSubtypeList_Odd)
+{
+    CLI::App app;
+    setupDiagCommands(app);
+
+    debug_token::tlv_encoder::Structure encoder;
+    encoder.setVersion(1, 0);
+    std::vector<uint32_t> vals = {1, 2, 3}; // 3 elements = odd → error path
+    encoder.add(
+        static_cast<uint16_t>(debug_token::types::Common::TokenTypeSubtypeList),
+        vals);
+    auto tlv = encoder.encode();
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                             tlv.size());
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_nsm_query_token_resp(0, NSM_SUCCESS, ERR_NULL, tlv.data(),
+                                tlv.size(), msg);
+    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- QueryToken: unknown TLV type -------------------------------------------
+// Covers the else branch at lines 1720-1725 (unknown type → raw hex output).
+
+TEST(NsmDiagCmdParse, QueryToken_UnknownType)
+{
+    CLI::App app;
+    setupDiagCommands(app);
+
+    debug_token::tlv_encoder::Structure encoder;
+    encoder.setVersion(1, 0);
+    std::vector<uint8_t> rawData = {0xDE, 0xAD, 0xBE, 0xEF};
+    encoder.add(static_cast<uint16_t>(0x9999), rawData); // unknown type
+    auto tlv = encoder.encode();
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                             tlv.size());
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_nsm_query_token_resp(0, NSM_SUCCESS, ERR_NULL, tlv.data(),
+                                tlv.size(), msg);
+    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- InstallToken: parseResponseMsg error path (cc=NSM_ERROR) ---------------
+
+TEST(NsmDiagCmdParse, InstallToken_ParseResponseError_CcError)
+{
+    const std::string tmpPath = "/tmp/diag_token_cc_err_50.bin";
+    createDiagTokenFile(tmpPath, 50);
+
+    CLI::App app;
+    setupDiagCommands(app);
+    parseSubcmdArgs(app, "InstallToken",
+                    {"--bufferSize", "32", "--file", tmpPath});
+
+    auto [rc, reqMsg] = commands[15]->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    // 9-byte buffer with cc=NSM_ERROR triggers error block (line 1515-1522)
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[15]->parseResponseMsg(msg, buf.size()));
+
+    ::unlink(tmpPath.c_str());
+}
+
+// ---- EraseToken: parseResponseMsg error path (cc=NSM_ERROR) -----------------
+
+TEST(NsmDiagCmdParse, EraseToken_ParseResponseError_CcError)
+{
+    CLI::App app;
+    setupDiagCommands(app);
+    parseSubcmdArgs(app, "EraseToken", {"--type", "1"});
+
+    // 9-byte buffer with cc=NSM_ERROR triggers error block (line 1591-1598)
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    EXPECT_NO_THROW(commands[16]->parseResponseMsg(msg, buf.size()));
 }
 
 } // namespace nsmtool::diag

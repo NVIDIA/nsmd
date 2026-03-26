@@ -193,6 +193,34 @@ TEST(NsmPCIeDeviceQueryScalarTelemetry, BadHandleResp)
     EXPECT_NE(rc, NSM_SUCCESS);
 }
 
+// Error-CC path: decode succeeds but cc = NSM_ERROR (non-zero)
+// → return cc ? cc : rc; takes the true branch (return cc).
+TEST(NsmPCIeDeviceQueryScalarTelemetry, HandleResp_ErrorCC_CoversBranch)
+{
+    std::vector<utils::Association> associations;
+    std::string deviceType =
+        "xyz.openbmc_project.Inventory.Item.PCIeDevice.DeviceTypes.Retimer";
+    uint8_t deviceIndex = 5;
+
+    NsmPCIeDeviceQueryScalarTelemetry sensor(bus, sensorName, associations,
+                                             sensorType, deviceType,
+                                             deviceIndex, inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_1_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    struct nsm_query_scalar_group_telemetry_group_1 link_info = {};
+    uint8_t rc = encode_query_scalar_group_telemetry_v1_group1_resp(
+        0, NSM_ERROR, ERR_NULL, &link_info, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
 TEST(NsmPCIeDeviceGetClockOutput, Constructor)
 {
     uint64_t deviceInstance = 0;
@@ -270,6 +298,28 @@ TEST(NsmPCIeDeviceGetClockOutput, BadHandleResp)
     EXPECT_NE(rc, NSM_SUCCESS);
 }
 
+// Error-CC path: decode succeeds but cc = NSM_ERROR (non-zero)
+// → return cc ? cc : rc; takes the true branch (return cc).
+TEST(NsmPCIeDeviceGetClockOutput, HandleResp_ErrorCC_CoversBranch)
+{
+    uint64_t deviceInstance = 4;
+
+    NsmPCIeDeviceGetClockOutput sensor(bus, sensorName, sensorType,
+                                       deviceInstance, inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_clock_output_enabled_state_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t rc = encode_get_clock_output_enable_state_resp(
+        0, NSM_ERROR, ERR_NULL, 0, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
 TEST(NsmPCIeDeviceGetClockOutput, TestGetRetimerClockState)
 {
     uint64_t deviceInstance = 0;
@@ -292,6 +342,36 @@ TEST(NsmPCIeDeviceGetClockOutput, TestGetRetimerClockState)
     sensor.deviceInstanceNumber = 1;
     clkBuf = {};
     clkBuf.clk_buf_retimer2 = 1;
+    EXPECT_TRUE(sensor.getRetimerClockState(*clockBuffer));
+
+    // Test device 2 (retimer3)
+    sensor.deviceInstanceNumber = 2;
+    clkBuf = {};
+    clkBuf.clk_buf_retimer3 = 1;
+    EXPECT_TRUE(sensor.getRetimerClockState(*clockBuffer));
+
+    // Test device 3 (retimer4)
+    sensor.deviceInstanceNumber = 3;
+    clkBuf = {};
+    clkBuf.clk_buf_retimer4 = 1;
+    EXPECT_TRUE(sensor.getRetimerClockState(*clockBuffer));
+
+    // Test device 4 (retimer5)
+    sensor.deviceInstanceNumber = 4;
+    clkBuf = {};
+    clkBuf.clk_buf_retimer5 = 1;
+    EXPECT_TRUE(sensor.getRetimerClockState(*clockBuffer));
+
+    // Test device 5 (retimer6)
+    sensor.deviceInstanceNumber = 5;
+    clkBuf = {};
+    clkBuf.clk_buf_retimer6 = 1;
+    EXPECT_TRUE(sensor.getRetimerClockState(*clockBuffer));
+
+    // Test device 6 (retimer7)
+    sensor.deviceInstanceNumber = 6;
+    clkBuf = {};
+    clkBuf.clk_buf_retimer7 = 1;
     EXPECT_TRUE(sensor.getRetimerClockState(*clockBuffer));
 
     // Test device 7 (retimer8)
@@ -429,4 +509,181 @@ TEST_F(NsmPCIeRetimerPDTest, TearDown)
 {
     devices.clear();
     ::testing::Mock::VerifyAndClearExpectations(&mockManager);
+}
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in createPCIeRetimerChassisPCIeDevice
+// =============================================================================
+
+static const std::string kPDIntf =
+    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_PCIeDevices";
+static const std::string kPDDeviceType =
+    "xyz.openbmc_project.Inventory.Item.PCIeDevice.DeviceTypes.Retimer";
+
+// Priority absent → count("Priority") FALSE → priority=false → sensors created
+TEST_F(NsmPCIeRetimerPDTest, Factory_MissingPriority_SensorsCreated)
+{
+    const std::string uniquePath = "/xyz/test/pcie/pd_no_priority";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kPDIntf);
+    pm["Name"] = std::string("PDNoPriority");
+    pm["UUID"] = retimerUuid;
+    pm["InventoryObjPath"] = std::string("/xyz/test/chassis/HGX_NP");
+    pm["DeviceType"] = kPDDeviceType;
+    pm["DeviceInstance"] = uint64_t(0);
+    // "Priority" intentionally omitted → priority=false (default bool)
+
+    const size_t before = retimer->deviceSensors.size();
+    createPCIeRetimerChassisPCIeDevice(mockManager, kPDIntf, uniquePath);
+    EXPECT_GT(retimer->deviceSensors.size(), before);
+}
+
+// DeviceType absent → count("DeviceType") FALSE → deviceType="" →
+// PCIeDeviceIntf::convertDeviceTypesFromString("") throws InvalidEnumString
+// → propagates out of NsmPCIeDeviceQueryScalarTelemetry ctor → factory throws
+TEST_F(NsmPCIeRetimerPDTest, Factory_MissingDeviceType_Throws)
+{
+    const std::string uniquePath = "/xyz/test/pcie/pd_no_devtype";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kPDIntf);
+    pm["Name"] = std::string("PDNoDevType");
+    pm["UUID"] = retimerUuid;
+    pm["InventoryObjPath"] = std::string("/xyz/test/chassis/HGX_NDT");
+    // "DeviceType" intentionally omitted → deviceType="" →
+    // convertDeviceTypesFromString("") throws InvalidEnumString
+    pm["Priority"] = bool(false);
+    pm["DeviceInstance"] = uint64_t(0);
+
+    EXPECT_THROW_COROUTINE(
+        createPCIeRetimerChassisPCIeDevice(mockManager, kPDIntf, uniquePath),
+        std::exception);
+}
+
+// DeviceInstance absent → count("DeviceInstance") FALSE → deviceInstance=0
+// → deviceIndex = 0 + PCIE_RETIMER_DEVICE_INDEX_START → sensors created
+TEST_F(NsmPCIeRetimerPDTest, Factory_MissingDeviceInstance_SensorsCreated)
+{
+    const std::string uniquePath = "/xyz/test/pcie/pd_no_devinst";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kPDIntf);
+    pm["Name"] = std::string("PDNoDI");
+    pm["UUID"] = retimerUuid;
+    pm["InventoryObjPath"] = std::string("/xyz/test/chassis/HGX_NDI");
+    pm["DeviceType"] = kPDDeviceType;
+    pm["Priority"] = bool(false);
+    // "DeviceInstance" intentionally omitted → deviceInstance=0 (default
+    // uint64_t)
+
+    const size_t before = retimer->deviceSensors.size();
+    createPCIeRetimerChassisPCIeDevice(mockManager, kPDIntf, uniquePath);
+    EXPECT_GT(retimer->deviceSensors.size(), before);
+}
+
+// UUID absent → count("UUID") FALSE → uuid="" → getNsmDeviceFromStaticUUID("")
+// calls parseStaticUuid("") → throws std::runtime_error
+TEST_F(NsmPCIeRetimerPDTest, Factory_MissingUUID_Throws)
+{
+    const std::string uniquePath = "/xyz/test/pcie/pd_no_uuid";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kPDIntf);
+    pm["Name"] = std::string("PDNoUUID");
+    // "UUID" intentionally omitted → uuid="" → parseStaticUuid throws
+    pm["InventoryObjPath"] = std::string("/xyz/test/chassis/HGX_NU");
+    pm["DeviceType"] = kPDDeviceType;
+    pm["Priority"] = bool(false);
+    pm["DeviceInstance"] = uint64_t(0);
+
+    EXPECT_THROW_COROUTINE(
+        createPCIeRetimerChassisPCIeDevice(mockManager, kPDIntf, uniquePath),
+        std::exception);
+}
+
+// genRequestMsg: instanceId > NSM_INSTANCE_MAX → encode fails → returns nullopt
+// Covers lines 91-94 in nsmPCIeRetimerPD.cpp (error debug log + return nullopt)
+TEST(NsmPCIeDeviceQueryScalarTelemetry, BadGenReq_InvalidInstanceId)
+{
+    std::vector<utils::Association> associations;
+    std::string deviceType =
+        "xyz.openbmc_project.Inventory.Item.PCIeDevice.DeviceTypes.Retimer";
+    uint8_t deviceIndex = 1;
+
+    NsmPCIeDeviceQueryScalarTelemetry sensor(bus, sensorName, associations,
+                                             sensorType, deviceType,
+                                             deviceIndex, inventoryObjPath);
+
+    // instance_id = 32 > NSM_INSTANCE_MAX(31) → encode fails → nullopt
+    const uint8_t eid{5};
+    const uint8_t badInstanceId{32};
+    auto request = sensor.genRequestMsg(eid, badInstanceId);
+    EXPECT_FALSE(request.has_value());
+}
+
+// genRequestMsg for GetClockOutput: instanceId > NSM_INSTANCE_MAX → nullopt
+// Covers lines 192-195 in nsmPCIeRetimerPD.cpp (error debug log + return
+// nullopt)
+TEST(NsmPCIeDeviceGetClockOutput, BadGenReq_InvalidInstanceId)
+{
+    uint64_t deviceInstance = 1;
+
+    NsmPCIeDeviceGetClockOutput sensor(bus, sensorName, sensorType,
+                                       deviceInstance, inventoryObjPath);
+
+    const uint8_t eid{5};
+    const uint8_t badInstanceId{32};
+    auto request = sensor.genRequestMsg(eid, badInstanceId);
+    EXPECT_FALSE(request.has_value());
+}
+
+// Name absent → count("Name") FALSE → name="" → objPath = inventoryObjPath + ""
+// = inventoryObjPath → valid absolute path → sensors created with empty name
+TEST_F(NsmPCIeRetimerPDTest, Factory_MissingName_SensorsCreated)
+{
+    const std::string uniquePath = "/xyz/test/pcie/pd_no_name";
+    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, kPDIntf);
+    // "Name" intentionally omitted → name=""
+    pm["UUID"] = retimerUuid;
+    pm["InventoryObjPath"] = std::string("/xyz/test/chassis/HGX_NN");
+    pm["DeviceType"] = kPDDeviceType;
+    pm["Priority"] = bool(false);
+    pm["DeviceInstance"] = uint64_t(0);
+
+    const size_t before = retimer->deviceSensors.size();
+    createPCIeRetimerChassisPCIeDevice(mockManager, kPDIntf, uniquePath);
+    EXPECT_GT(retimer->deviceSensors.size(), before);
+}
+
+// ─── Branch coverage: rc==NSM_SW_SUCCESS && cc!=NSM_SUCCESS ─────────────────
+
+// NsmPCIeDeviceQueryScalarTelemetry::handleResponseMsg: non-success CC →
+// `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` false branch via 9-byte buffer
+TEST(NsmPCIeDeviceQueryScalarTelemetry,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    std::vector<utils::Association> associations;
+    std::string deviceType =
+        "xyz.openbmc_project.Inventory.Item.PCIeDevice.DeviceTypes.Retimer";
+    NsmPCIeDeviceQueryScalarTelemetry sensor(bus, sensorName, associations,
+                                             sensorType, deviceType, uint8_t(0),
+                                             inventoryObjPath);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// NsmPCIeDeviceGetClockOutput::handleResponseMsg: non-success CC →
+// `if (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` false branch via 9-byte buffer
+TEST(NsmPCIeDeviceGetClockOutput,
+     HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
+{
+    NsmPCIeDeviceGetClockOutput sensor(bus, sensorName, sensorType, uint64_t(0),
+                                       inventoryObjPath);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
 }

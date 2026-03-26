@@ -228,3 +228,143 @@ TEST_F(NsmPCIeSlotTest, badTestCompletionErrorResponse)
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
 }
+
+// =============================================================================
+// Branch coverage: factory property presence/absence branches
+// =============================================================================
+
+// ChassisName absent → FALSE branch → chassisName="" → sensor still created
+TEST_F(NsmChassisPCIeSlotTest, Factory_MissingChassisName_SensorCreated)
+{
+    auto& map = utils::MockDbusAsync::serviceMap();
+    map = serviceMap;
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    // Intentionally omit "ChassisName" → FALSE branch for count("ChassisName")
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
+    propertyMap["DeviceIndex"] = basic["DeviceIndex"];
+    propertyMap["SlotType"] = basic["SlotType"];
+    propertyMap["Priority"] = basic["Priority"];
+
+    const size_t before = baseboard->staticSensors.size();
+    nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
+    // AssociationDefinitionsIntf static sensor added regardless of chassisName
+    EXPECT_GT(baseboard->staticSensors.size(), before);
+}
+
+// Name absent → FALSE branch → name="" → D-Bus path invalid → throws
+TEST_F(NsmChassisPCIeSlotTest, Factory_MissingName_Throws)
+{
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    // Intentionally omit "Name" → FALSE branch for count("Name") → name=""
+    // NsmChassisPCIeSlot constructor registers path ending with "/" → invalid
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["UUID"] = basic["UUID"];
+    propertyMap["DeviceIndex"] = basic["DeviceIndex"];
+    propertyMap["SlotType"] = basic["SlotType"];
+    propertyMap["Priority"] = basic["Priority"];
+
+    EXPECT_THROW_COROUTINE(
+        nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath),
+        std::exception);
+}
+
+// UUID absent → FALSE branch → uuid="" → getNsmDeviceFromStaticUUID throws
+TEST_F(NsmChassisPCIeSlotTest, Factory_MissingUUID_Throws)
+{
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    // Intentionally omit "UUID" → FALSE branch for count("UUID") → uuid=""
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["DeviceIndex"] = basic["DeviceIndex"];
+    propertyMap["SlotType"] = basic["SlotType"];
+    propertyMap["Priority"] = basic["Priority"];
+
+    EXPECT_THROW_COROUTINE(
+        nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath),
+        std::runtime_error);
+}
+
+// DeviceIndex absent → FALSE branch → deviceIndex=0 → sensor still created
+TEST_F(NsmChassisPCIeSlotTest, Factory_MissingDeviceIndex_SensorCreated)
+{
+    auto& map = utils::MockDbusAsync::serviceMap();
+    map = serviceMap;
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    // Intentionally omit "DeviceIndex" → FALSE branch for count("DeviceIndex")
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
+    propertyMap["SlotType"] = basic["SlotType"];
+    propertyMap["Priority"] = basic["Priority"];
+
+    const size_t before = baseboard->staticSensors.size();
+    nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
+    EXPECT_GT(baseboard->staticSensors.size(), before);
+}
+
+// SlotType absent → FALSE branch → slotType="" → convertSlotTypesFromString
+// throws
+TEST_F(NsmChassisPCIeSlotTest, Factory_MissingSlotType_Throws)
+{
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    // Intentionally omit "SlotType" → FALSE branch for count("SlotType")
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
+    propertyMap["DeviceIndex"] = basic["DeviceIndex"];
+    propertyMap["Priority"] = basic["Priority"];
+
+    EXPECT_THROW_COROUTINE(
+        nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath),
+        std::exception);
+}
+
+// Priority absent → FALSE branch → priority=false (default) → roundRobinSensors
+TEST_F(NsmChassisPCIeSlotTest, Factory_MissingPriority_RoundRobinSensor)
+{
+    auto& map = utils::MockDbusAsync::serviceMap();
+    map = serviceMap;
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    // Intentionally omit "Priority" → FALSE branch for count("Priority")
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
+    propertyMap["DeviceIndex"] = basic["DeviceIndex"];
+    propertyMap["SlotType"] = basic["SlotType"];
+
+    const size_t roundRobinBefore = baseboard->roundRobinSensors.size();
+    nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
+    // priority defaults to false → sensor goes to roundRobinSensors
+    EXPECT_GT(baseboard->roundRobinSensors.size(), roundRobinBefore);
+    EXPECT_EQ(0u, baseboard->prioritySensors.size());
+}
+
+// Priority=true → TRUE branch → addSensor(sensor, true) → prioritySensors //
+
+TEST_F(NsmChassisPCIeSlotTest, Factory_PriorityTrue_AddsToPrioritySensors)
+{
+    auto& map = utils::MockDbusAsync::serviceMap();
+    map = serviceMap;
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
+    propertyMap["DeviceIndex"] = basic["DeviceIndex"];
+    propertyMap["SlotType"] = basic["SlotType"];
+    propertyMap["Priority"] = true; // TRUE → addSensor(sensor, true)
+
+    const size_t priorityBefore = baseboard->prioritySensors.size();
+    const size_t roundRobinBefore = baseboard->roundRobinSensors.size();
+    nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
+    // priority=true → sensor added to prioritySensors, not roundRobinSensors
+    EXPECT_GT(baseboard->prioritySensors.size(), priorityBefore);
+    EXPECT_EQ(roundRobinBefore, baseboard->roundRobinSensors.size());
+}

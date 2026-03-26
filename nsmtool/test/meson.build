@@ -10,7 +10,7 @@ nsmtool_test_sources = [
     '../../libnsm/requester/mctp.c',
 ]
 
-tests = ['cmd_helper_test']
+tests = ['cmd_helper_test', 'nsmtool_branch_test']
 
 foreach t : tests
     test(
@@ -37,9 +37,19 @@ parse_test_common_sources = [
 
 foreach t : [
     'nsm_config_cmd_parse_test',
+    'nsm_config_cmd_branch_test',
     'nsm_diag_cmd_parse_test',
+    'nsm_discovery_cmd_parse_test',
+    'nsm_discovery_cmd_branch_test',
     'nsm_telemetry_cmd_parse_test',
+    'nsm_telemetry_cmd_branch_test',
+    'nsm_telemetry_cmd_branch2_test',
     'nsm_firmware_cmd_parse_test',
+    'nsm_firmware_cmd_branch_test',
+    'nsm_firmware_cmd_branch2_test',
+    'nsm_telemetry_cmd_branch3_test',
+    'nsm_diag_cmd_branch2_test',
+    'nsm_config_cmd_branch2_test',
 ]
     test(
         t,

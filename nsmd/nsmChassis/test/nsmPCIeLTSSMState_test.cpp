@@ -101,6 +101,15 @@ TEST(NsmPCIeLTSSMState, GenRequestMsg_ReturnsValidRequest)
                   sizeof(nsm_query_scalar_group_telemetry_v1_req));
 }
 
+TEST(NsmPCIeLTSSMState, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    std::shared_ptr<LTSSMStateIntf> intf;
+    auto provider = makeProvider("/test/ltssm/badreq", intf);
+    NsmPCIeLTSSMState sensor(provider, 2);
+    auto request = sensor.genRequestMsg(5, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
 // =============================================================================
 // handleResponseMsg – success with various LTSSM states
 // =============================================================================
@@ -178,4 +187,42 @@ TEST(NsmPCIeLTSSMState, HandleResponseMsg_StateRecovery_SetsRecovery)
 
     EXPECT_EQ(rc, NSM_SUCCESS);
     EXPECT_EQ(intf->ltssmState(), LTSSMStateIntf::State::Recovery);
+}
+
+// Test decode failure path (rc != NSM_SW_SUCCESS): pass a buffer that is
+// too small to decode → else branch is hit via rc != NSM_SW_SUCCESS
+TEST(NsmPCIeLTSSMState, HandleResponseMsg_DecodeFail_SetsNA)
+{
+    std::shared_ptr<LTSSMStateIntf> intf;
+    auto provider = makeProvider("/test/ltssm/decode_fail", intf);
+    NsmPCIeLTSSMState sensor(provider, 0);
+
+    // Build a valid response but pass size = 1 so decode returns error
+    auto buf = buildGroup6Response(NSM_SUCCESS, 0x5);
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = sensor.handleResponseMsg(msg, 1);
+
+    EXPECT_NE(rc, NSM_SUCCESS);
+    EXPECT_EQ(intf->ltssmState(), LTSSMStateIntf::State::NA);
+}
+
+// handleResponseMsg: rc==NSM_SW_SUCCESS but cc!=NSM_SUCCESS → else branch.
+// 9-byte buffer: decode_reason_code_and_cc returns NSM_SW_SUCCESS with
+// cc=NSM_ERROR, so the "rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS" is FALSE.
+TEST(NsmPCIeLTSSMState, HandleResponseMsg_DecodeSuccessNonZeroCC_SetsNA)
+{
+    std::shared_ptr<LTSSMStateIntf> intf;
+    auto provider = makeProvider("/test/ltssm/cc_err", intf);
+    NsmPCIeLTSSMState sensor(provider, 0);
+
+    std::vector<uint8_t> ccErrBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    ccErrBuf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR; // completion_code
+    auto ccErrMsg = reinterpret_cast<const nsm_msg*>(ccErrBuf.data());
+
+    auto rc2 = sensor.handleResponseMsg(ccErrMsg, ccErrBuf.size());
+
+    EXPECT_NE(rc2, NSM_SUCCESS);
+    EXPECT_EQ(intf->ltssmState(), LTSSMStateIntf::State::NA);
 }

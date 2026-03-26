@@ -1,25 +1,57 @@
-# mockupResponder tests now use nsmd_test
-# Only mockupResponder-specific sources need to be compiled here
-
-mockup_test_sources = [
+dep_src_files = [
     '../debugToken.cpp',
     '../mockupResponder.cpp',
     '../firmwareUtils.cpp',
+    '../../common/event.cpp',
+    '../../common/utils.cpp',
+    '../../common/test/mockDBusHandler.cpp',
+    '../../libnsm/base.c',
+    '../../libnsm/debug-token.c',
+    '../../libnsm/network-ports.c',
+    '../../libnsm/device-capability-discovery.c',
+    '../../libnsm/device-configuration.c',
+    '../../libnsm/diagnostics.c',
+    '../../libnsm/platform-environmental.c',
+    '../../libnsm/powersmoothing-powerprofile-api-v2.c',
+    '../../libnsm/pci-links.c',
+    '../../libnsm/requester/mctp.c',
+    '../../libnsm/firmware-utils.c',
 ]
 
-tests = ['mockupResponder_test']
+dep_src_headers = ['.', '..', '../../', '../../common', '../../libnsm']
+
+test_src = declare_dependency(
+    sources: dep_src_files,
+    include_directories: dep_src_headers,
+)
+
+tests = [
+    'mockupResponder_test',
+    'mockupResponderBranch_test',
+    'mockupResponderBranch2_test',
+    'mockupResponderBranch3_test',
+    'mockupResponderBranch4_test',
+]
 
 foreach t : tests
     test(
         t,
         executable(
             t.underscorify(),
-            [t + '.cpp', mockup_test_sources],
+            t + '.cpp',
             implicit_include_directories: false,
-            include_directories: ['.', '..'],
             link_args: dynamic_linker,
             build_rpath: '',
-            dependencies: tests_deps,
+            dependencies: [
+                test_src,
+                CLI11_dep,
+                nlohmann_json,
+                sdbusplus,
+                sdeventplus,
+                phosphor_logging,
+                gtest,
+                gmock,
+            ],
         ),
         workdir: meson.current_source_dir(),
     )

@@ -3,8 +3,14 @@ tests = [
     'nsmDebugToken_test',
     'nsmDebugTokenObjectFactory_test',
     'nsmDebugTokenNIC_test',
+    'nsmDebugTokenNICBranch_test',
     'nsmDebugTokenUnified_test',
+    'nsmDebugTokenUnifiedBranch_test',
     'nsmDebugTokenAggregation_test',
+    'nsmDebugTokenAggregationBranch_test',
+    'nsmDebugTokenNICBranch2_test',
+    'nsmDebugTokenAggregationBranch2_test',
+    'nsmDebugTokenNICBranch3_test',
 ]
 
 foreach t : tests

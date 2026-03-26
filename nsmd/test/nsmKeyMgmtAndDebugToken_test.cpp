@@ -477,6 +477,26 @@ TEST_F(NsmReconfigPermissionsFixture,
     EXPECT_NE(NSM_SUCCESS, result);
 }
 
+TEST_F(NsmReconfigPermissionsFixture, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    // Arrange
+    NsmReconfigPermissions sensor(testSensorName, testSensorType, hostPath,
+                                  doePath,
+                                  ReconfigSettingsIntf::FeatureType::CCMode,
+                                  hostConfigIntf, doeConfigIntf);
+
+    // 7-byte buffer: safely reads cc at payload[1] but too short for the
+    // full response struct, triggering NSM_SW_ERROR_LENGTH
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    // Act
+    auto result = sensor.handleResponseMsg(msg, responseMsg.size());
+
+    // Assert
+    EXPECT_NE(NSM_SUCCESS, result);
+}
+
 TEST_F(NsmReconfigPermissionsFixture, Constructor_ValidFeature_SetsIndexAndType)
 {
     // Arrange & Act
@@ -697,6 +717,30 @@ TEST_F(NsmKeyMgmtFixture, HandleResponseMsg_ZeroBitmapLen_ReturnSuccess)
     // Assert
     EXPECT_EQ(NSM_SUCCESS, result);
     EXPECT_EQ(0, keyMgmt.bitmapLength);
+}
+
+TEST_F(NsmKeyMgmtFixture, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    // Arrange
+    NsmKeyMgmt keyMgmt(testBus, chassisName, testSensorType, testUuid,
+                       progressIntf, compClass, compId, compClassIdx);
+
+    // Allocate exactly the struct header bytes (no bitmap payload).
+    // Set permission_bitmap_length = 1 so the length check inside
+    // decode_nsm_code_auth_key_perm_query_resp fails with
+    // NSM_SW_ERROR_LENGTH (expected 4 bytes of bitmap, got 0).
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_query_resp), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    auto* resp =
+        reinterpret_cast<nsm_code_auth_key_perm_query_resp*>(msg->payload);
+    resp->permission_bitmap_length = 1;
+
+    // Act
+    auto result = keyMgmt.handleResponseMsg(msg, responseMsg.size());
+
+    // Assert
+    EXPECT_NE(NSM_SUCCESS, result);
 }
 
 TEST_F(NsmKeyMgmtFixture, StartOperation_FirstCall_ReturnsSuccess)

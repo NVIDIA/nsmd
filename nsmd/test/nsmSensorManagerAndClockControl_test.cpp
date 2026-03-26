@@ -342,7 +342,8 @@ TEST_F(NsmGpuClockControlTest, UpdateMetricOnSharedMemory_NoShmem_DoesNotThrow)
     // Arrange - set some speed limits first
     cpuConfigIntf->requestedSpeedLimits(std::make_tuple(100u, 200u));
 
-    // Act & Assert - should not throw even without shared memory
+    // Act & Assert - should not throw even without shared memory //
+
     EXPECT_NO_THROW(clockControl->updateMetricOnSharedMemory());
 }
 

@@ -133,9 +133,9 @@ TEST(queryNvlinkLED, DISABLED_testBadDecodeResponse)
 
 	rc = decode_get_nvlink_agg_led_status_resp(request, 0, &cc,
 						   &reason_code, nullptr);
-	// With msg_len=0, length validation in decode_reason_code_and_cc
-	// happens before this function can check ledStatus for NULL
-	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	// decode_reason_code_and_cc returns NSM_SW_SUCCESS (cc=0=NSM_SUCCESS),
+	// then led_state==NULL check returns NSM_SW_ERROR_NULL
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_nvlink_agg_led_status_resp(request, 0, &cc,
 						   &reason_code, &ledStatus);
@@ -3980,4 +3980,177 @@ TEST(getSwitchIsolationMode, EncodeResponseErrorCompletionCode)
 	EXPECT_EQ(resp->command, NSM_GET_SWITCH_ISOLATION_MODE);
 	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
 	EXPECT_EQ(le16toh(resp->reason_code), 0xBADB);
+}
+
+// Branch coverage for encode_set_port_disable_future_req
+// Tests the "if (mask == NULL || msg == NULL)" TRUE branches (line 876 in
+// network-ports.c)
+TEST(EncodeSetPortDisableFutureReqBranch, NullMask)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 64, 0);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(buf.data());
+
+	auto rc = encode_set_port_disable_future_req(0, nullptr, msg);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(EncodeSetPortDisableFutureReqBranch, NullMsg)
+{
+	bitfield8_t mask[8] = {};
+
+	auto rc = encode_set_port_disable_future_req(0, mask, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// ---------------------------------------------------------------------------
+// Pack-fail branches (instance_id > NSM_INSTANCE_MAX = 31)
+// ---------------------------------------------------------------------------
+
+// encode_get_nvlink_agg_led_status_req — L298
+TEST(NetworkPortsPackFailBranch, EncodeGetNvlinkAggLedStatusReq_PackFail)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_get_nvlink_agg_led_status_req(32, msg);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_query_port_status_req — L523
+TEST(NetworkPortsPackFailBranch, EncodeQueryPortStatusReq_PackFail)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_query_port_status_req(32, 0, msg);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_set_port_disable_future_req — L886
+TEST(NetworkPortsPackFailBranch, EncodeSetPortDisableFutureReq_PackFail)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	bitfield8_t mask[PORT_MASK_DATA_SIZE] = {};
+	auto rc = encode_set_port_disable_future_req(32, mask, msg);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_get_port_disable_future_req — L988
+TEST(NetworkPortsPackFailBranch, EncodeGetPortDisableFutureReq_PackFail)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_get_port_disable_future_req(32, msg);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_set_power_mode_req — L1228
+TEST(NetworkPortsPackFailBranch, EncodeSetPowerModeReq_PackFail)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	struct nsm_power_mode_data data = {};
+	auto rc = encode_set_power_mode_req(32, msg, data);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// encode_get_network_addresses_req — L1849
+TEST(NetworkPortsPackFailBranch, EncodeGetNetworkAddressesReq_PackFail)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_get_network_addresses_req(32, 0, msg);
+	EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ---------------------------------------------------------------------------
+// Null checks for secondary conditions
+// ---------------------------------------------------------------------------
+
+// encode_set_port_disable_future_resp L930: msg == NULL
+TEST(NetworkPortsNullBranch, EncodeSetPortDisableFutureResp_NullMsg)
+{
+	auto rc =
+	    encode_set_port_disable_future_resp(0, NSM_SUCCESS, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_get_port_disable_future_resp L1064: mask == NULL
+TEST(NetworkPortsNullBranch, DecodeGetPortDisableFutureResp_NullMask)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 64, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	auto rc = decode_get_port_disable_future_resp(msg, buf.size(), &cc,
+						      &reason_code, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_get_switch_isolation_mode_resp L1396: isolation_mode == NULL
+TEST(NetworkPortsNullBranch, DecodeGetSwitchIsolationModeResp_NullMode)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 16, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	auto rc = decode_get_switch_isolation_mode_resp(msg, buf.size(), &cc,
+							&reason_code, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_nsm_get_fabric_manager_state_event L1639: msg == NULL
+TEST(NetworkPortsNullBranch, DecodeGetFabricManagerStateEvent_NullMsg)
+{
+	uint8_t event_class = 0;
+	uint16_t event_state = 0;
+	nsm_get_fabric_manager_state_event_payload payload = {};
+	auto rc = decode_nsm_get_fabric_manager_state_event(
+	    nullptr, 0, &event_class, &event_state, &payload);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(NetworkPortsNullBranch, DecodeGetFabricManagerStateEvent_NullEventClass)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint16_t event_state = 0;
+	nsm_get_fabric_manager_state_event_payload payload = {};
+	auto rc = decode_nsm_get_fabric_manager_state_event(
+	    msg, buf.size(), nullptr, &event_state, &payload);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// decode_aggregate_network_address_data L1891: data == NULL
+TEST(NetworkPortsNullBranch, DecodeAggregateNetworkAddressData_NullData)
+{
+	network_address_sample_data address = {};
+	auto rc =
+	    decode_aggregate_network_address_data(0, nullptr, 0, &address);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// encode_aggregate_network_address_data L1932: address == NULL
+TEST(NetworkPortsNullBranch, EncodeAggregateNetworkAddressData_NullAddress)
+{
+	uint8_t data[16] = {};
+	size_t data_len = 0;
+	auto rc =
+	    encode_aggregate_network_address_data(0, nullptr, data, &data_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// encode_aggregate_port_ecc_counter_data L2050: data == NULL
+TEST(NetworkPortsNullBranch, EncodeAggregatePortEccCounterData_NullData)
+{
+	size_t data_len = 0;
+	auto rc =
+	    encode_aggregate_port_ecc_counter_data(0, 0, nullptr, &data_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(NetworkPortsNullBranch, EncodeAggregatePortEccCounterData_NullDataLen)
+{
+	uint8_t data[16] = {};
+	auto rc = encode_aggregate_port_ecc_counter_data(0, 0, data, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }

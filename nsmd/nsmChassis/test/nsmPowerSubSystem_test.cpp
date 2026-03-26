@@ -192,3 +192,50 @@ TEST_F(NsmPowerPowerSupplyTest, testcreatePowerSubSystemSuccess)
     // Verify that power supply sensors were created
     EXPECT_GE(fpga->deviceSensors.size(), 0);
 }
+
+// =============================================================================
+// Branch coverage: FALSE branches for property count() checks
+// =============================================================================
+
+// PowerSupplyType absent → FALSE branch for count("PowerSupplyType") →
+// powerSupplyType="" → NsmPowerPowerSupply convertPowerSupplyTypes("") throws
+// InvalidEnumString → propagates out (no try/catch in factory)
+TEST_F(NsmPowerPowerSupplyTest, testcreatePowerSubSystemMissingPowerSupplyType)
+{
+    const std::string testPath =
+        "/xyz/openbmc_project/inventory/item/powersupply/PSU_notype";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
+                                                          interfaceName);
+    dbus::PropertyMap props = {
+        {"Name", std::string("PSU_notype")}, {"Type", type}, {"UUID", fpgaUuid},
+        // "PowerSupplyType" intentionally omitted → FALSE branch → empty string
+    };
+    propertyMap = props;
+
+    EXPECT_THROW_COROUTINE(
+        createPowerSubSystem(mockManager, interfaceName, testPath),
+        std::exception);
+}
+
+// UUID absent → FALSE branch for count("UUID") → uuid="" →
+// parseStaticUuid("") throws std::runtime_error → propagates out of coroutine
+TEST_F(NsmPowerPowerSupplyTest, testcreatePowerSubSystemMissingUUID)
+{
+    const std::string testPath =
+        "/xyz/openbmc_project/inventory/item/powersupply/PSU_nouuid";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
+                                                          interfaceName);
+    dbus::PropertyMap props = {
+        {"Name", std::string("PSU_nouuid")},
+        {"Type", type},
+        {"PowerSupplyType",
+         "com.nvidia.PowerSupply.PowerSupplyInfo.PowerSupplyTypes.AC"},
+        // "UUID" intentionally omitted → FALSE branch → uuid="" →
+        // parseStaticUuid throws
+    };
+    propertyMap = props;
+
+    EXPECT_THROW_COROUTINE(
+        createPowerSubSystem(mockManager, interfaceName, testPath),
+        std::runtime_error);
+}

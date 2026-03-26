@@ -14,6 +14,24 @@ tests = [
     'nsmEthPortTelemetryAggregator_test',
     'nsmPCIeErrors_test',
     'nsmPortAddSensor_test',
+    'nsmPCIePort_test',
+    'nsmPortDisableFuture_test',
+    'nsmPortBranch_test',
+    'nsmRetimerPortBranch_test',
+    'nsmGpuPciePortBranch_test',
+    'nsmGpuPciePortFactoryBranch_test',
+    # 'nsmFpgaPortBranch_test',  # SIGSEGV - no fixture infrastructure
+    'nsmPortFactoryBranch_test',
+    'nsmPortBranch2_test',
+    'nsmFpgaPortBranch2_test',
+    'nsmPortBranch4_test',
+    'nsmRetimerPortBranch2_test',
+    'nsmPortConfigBranch_test',
+    'nsmFpgaPortBranch3_test',
+    'nsmRetimerPortBranch3_test',
+    'nsmPortBranch5_test',
+    'nsmGpuPciePortBranch2_test',
+    'nsmFpgaPortBranch4_test',
 ]
 
 foreach t : tests

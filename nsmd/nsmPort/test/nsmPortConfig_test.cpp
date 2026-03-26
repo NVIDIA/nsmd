@@ -195,6 +195,35 @@ TEST(NsmPCIePortConfigurationInfo,
     EXPECT_EQ(static_cast<uint8_t>(preset1[3]), 8u);
 }
 
+// TRUE branch: if (getPreset0.size() < 4) / if (getPreset1.size() < 4)
+// Force the resize path by shrinking the preset vectors before calling
+// updatePresetProperty.
+TEST(NsmPCIePortConfigurationInfo,
+     UpdatePresetProperty_SmallPresetVectors_ResizesAndSets)
+{
+    // Arrange
+    PCIePortConfigInfoHelper h;
+    nsm::NsmPCIePortConfigurationInfo sensor(
+        h.name, h.type, h.pciePortConfigInfoIntf, h.portNumber, h.portType,
+        h.portIndex, h.inventoryObjPath);
+
+    // Shrink preset vectors to size 1 to trigger the resize branch
+    using PI = nsm::PCIePortConfigurationInfoIntf::PCIePresetIndex;
+    h.pciePortConfigInfoIntf->preset0({PI::DeviceDefault});
+    h.pciePortConfigInfoIntf->preset1({PI::DeviceDefault});
+
+    // Act — update tag 2 (in-bounds after resize)
+    sensor.updatePresetProperty(2, 5, 9);
+
+    // Assert — vectors were resized to 4 and tag 2 was set correctly
+    auto preset0 = h.pciePortConfigInfoIntf->preset0();
+    auto preset1 = h.pciePortConfigInfoIntf->preset1();
+    EXPECT_EQ(preset0.size(), 4u);
+    EXPECT_EQ(preset1.size(), 4u);
+    EXPECT_EQ(static_cast<uint8_t>(preset0[2]), 5u);
+    EXPECT_EQ(static_cast<uint8_t>(preset1[2]), 9u);
+}
+
 TEST(NsmPCIePortConfigurationInfo, UpdatePresetProperty_InvalidTag_DoesNotCrash)
 {
     // Arrange
@@ -349,7 +378,7 @@ TEST(NsmPCIePortConfigurationInfo,
 }
 
 TEST(NsmPCIePortConfigurationInfo,
-     DISABLED_HandleResponseMsg_TxAmplitudeSample_UpdatesProperty)
+     HandleResponseMsg_TxAmplitudeSample_UpdatesProperty)
 {
     // Arrange
     PCIePortConfigInfoHelper h;
@@ -358,9 +387,10 @@ TEST(NsmPCIePortConfigurationInfo,
         h.portIndex, h.inventoryObjPath);
 
     // Encode TxAmplitude data for tag 4
+    // encode_PCIe_TxAmplitude_data masks input to 0x07 (3-bit field, max=7)
     uint8_t txReading[64] = {};
     size_t txLen = 0;
-    encode_PCIe_TxAmplitude_data(77, txReading, &txLen);
+    encode_PCIe_TxAmplitude_data(7, txReading, &txLen);
     std::vector<uint8_t> txData(txReading, txReading + txLen);
 
     auto response = buildPortConfigAggregateResponse(1, {{4, txData}});
@@ -371,11 +401,11 @@ TEST(NsmPCIePortConfigurationInfo,
 
     // Assert
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_EQ(h.pciePortConfigInfoIntf->txAmplitude(), 77u);
+    EXPECT_EQ(h.pciePortConfigInfoIntf->txAmplitude(), 7u);
 }
 
 TEST(NsmPCIePortConfigurationInfo,
-     DISABLED_HandleResponseMsg_MixedPresetAndTxAmplitude_UpdatesAll)
+     HandleResponseMsg_MixedPresetAndTxAmplitude_UpdatesAll)
 {
     // Arrange
     PCIePortConfigInfoHelper h;
@@ -389,10 +419,10 @@ TEST(NsmPCIePortConfigurationInfo,
     encode_preset_PCIe_data(11, presetReading, &presetLen);
     std::vector<uint8_t> presetData(presetReading, presetReading + presetLen);
 
-    // TxAmplitude tag 4
+    // TxAmplitude tag 4 — value must fit in 3 bits (0x07 mask); use 5
     uint8_t txReading[64] = {};
     size_t txLen = 0;
-    encode_PCIe_TxAmplitude_data(200, txReading, &txLen);
+    encode_PCIe_TxAmplitude_data(5, txReading, &txLen);
     std::vector<uint8_t> txData(txReading, txReading + txLen);
 
     auto response =
@@ -404,7 +434,7 @@ TEST(NsmPCIePortConfigurationInfo,
 
     // Assert
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_EQ(h.pciePortConfigInfoIntf->txAmplitude(), 200u);
+    EXPECT_EQ(h.pciePortConfigInfoIntf->txAmplitude(), 5u);
 }
 
 TEST(NsmPCIePortConfigurationInfo,
@@ -506,7 +536,7 @@ TEST(NsmPCIePortConfigurationInfo,
 }
 
 TEST(NsmPCIePortConfigurationInfo,
-     DISABLED_HandleResponseMsg_InvalidPresetData_ReturnsLengthError)
+     HandleResponseMsg_InvalidPresetData_ReturnsLengthError)
 {
     // Arrange
     PCIePortConfigInfoHelper h;
@@ -514,9 +544,10 @@ TEST(NsmPCIePortConfigurationInfo,
         h.name, h.type, h.pciePortConfigInfoIntf, h.portNumber, h.portType,
         h.portIndex, h.inventoryObjPath);
 
-    // Build response with tag 0 (preset) but empty data (will fail decode)
+    // Use 2 bytes (valid power-of-2 for encode_aggregate_resp_sample, but
+    // decode_preset_PCIe_data expects exactly 1 byte -> NSM_SW_ERROR_LENGTH)
     auto response =
-        buildPortConfigAggregateResponse(1, {{0, std::vector<uint8_t>()}});
+        buildPortConfigAggregateResponse(1, {{0, std::vector<uint8_t>(2, 0)}});
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     // Act
@@ -527,7 +558,7 @@ TEST(NsmPCIePortConfigurationInfo,
 }
 
 TEST(NsmPCIePortConfigurationInfo,
-     DISABLED_HandleResponseMsg_InvalidTxAmplitudeData_ReturnsLengthError)
+     HandleResponseMsg_InvalidTxAmplitudeData_ReturnsLengthError)
 {
     // Arrange
     PCIePortConfigInfoHelper h;
@@ -535,9 +566,11 @@ TEST(NsmPCIePortConfigurationInfo,
         h.name, h.type, h.pciePortConfigInfoIntf, h.portNumber, h.portType,
         h.portIndex, h.inventoryObjPath);
 
-    // Build response with tag 4 (TxAmplitude) but empty data
+    // Use 2 bytes (valid power-of-2 for encode_aggregate_resp_sample, but
+    // decode_PCIe_TxAmplitude_data expects exactly 1 byte ->
+    // NSM_SW_ERROR_LENGTH)
     auto response =
-        buildPortConfigAggregateResponse(1, {{4, std::vector<uint8_t>()}});
+        buildPortConfigAggregateResponse(1, {{4, std::vector<uint8_t>(2, 0)}});
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     // Act
@@ -708,8 +741,43 @@ TEST_F(NsmPCIePortConfigSetTestFixture,
     EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
 }
 
+// NsmPortConfigurationInfo::setPortConfiguration L286 FALSE via
+// cc!=NSM_SUCCESS: decode_set_port_config_aggregate_resp (=
+// decode_reason_code_and_cc) returns NSM_SW_SUCCESS with cc=NSM_ERROR → `if
+// (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)` FALSE branch via cc check
 TEST_F(NsmPCIePortConfigSetTestFixture,
-       DISABLED_SetPortConfiguration_InvalidValueType_ThrowsInvalidArgument)
+       SetPortConfiguration_DecodeSuccessNonZeroCC_L286ElseBranch)
+{
+    using namespace nsm;
+
+    auto& bus [[maybe_unused]] = utils::DBusHandler::getBus();
+    std::string inventoryObjPath =
+        "/xyz/openbmc_project/inventory/system/gpu/pcie_cc_branch";
+    auto pcieIntf = std::make_shared<PCIePortConfigurationInfoIntf>(
+        bus, inventoryObjPath.c_str());
+
+    NsmPCIePortConfigurationInfo sensor("portCfgCCBranch", "NSM_PCIe", pcieIntf,
+                                        1, 0, 0, inventoryObjPath);
+
+    // Exactly-sized non-success buffer: decode_reason_code_and_cc returns
+    // NSM_SW_SUCCESS with cc=NSM_ERROR → L286 FALSE via cc!=NSM_SUCCESS
+    std::vector<uint8_t> resp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    resp[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+    EXPECT_CALL(*gpu, postPatchIO).WillOnce(mockPostPatchIO(resp));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    std::vector<std::tuple<std::string, uint32_t>> configData = {
+        {"PresetGen3", 5}};
+    AsyncSetOperationValueType value = configData;
+
+    auto coroutine = sensor.setPortConfiguration(value, &status, gpu);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+TEST_F(NsmPCIePortConfigSetTestFixture,
+       SetPortConfiguration_InvalidValueType_ThrowsInvalidArgument)
 {
     using namespace nsm;
 
@@ -723,12 +791,13 @@ TEST_F(NsmPCIePortConfigSetTestFixture,
     NsmPCIePortConfigurationInfo sensor("portCfgInvalid", "NSM_PCIe", pcieIntf,
                                         1, 0, 0, inventoryObjPath);
 
-    // Act & Assert - wrong variant type should throw InvalidArgument
+    // Act & Assert - wrong variant type should throw InvalidArgument //
+
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
     // Pass a uint32_t instead of vector<tuple<string,uint32_t>>
     AsyncSetOperationValueType value = static_cast<uint32_t>(42);
 
-    EXPECT_THROW(
+    EXPECT_THROW_COROUTINE(
         sensor.setPortConfiguration(value, &status, gpu),
         sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
 }
@@ -1102,7 +1171,7 @@ TEST_F(NsmPortDisableFutureTestFixture, SetPortDisableFuture_ValidPorts_Success)
 }
 
 TEST_F(NsmPortDisableFutureTestFixture,
-       DISABLED_SetPortDisableFuture_InvalidValueType_ThrowsInvalidArgument)
+       SetPortDisableFuture_InvalidValueType_ThrowsInvalidArgument)
 {
     using namespace nsm;
 
@@ -1118,7 +1187,7 @@ TEST_F(NsmPortDisableFutureTestFixture,
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
     AsyncSetOperationValueType value = static_cast<uint32_t>(42);
 
-    EXPECT_THROW(
+    EXPECT_THROW_COROUTINE(
         sensor.setPortDisableFuture(value, &status, gpu),
         sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
 }
@@ -1292,4 +1361,23 @@ TEST_F(NsmPCIePortConfigSetTestFixture, AddSensorNsmPCIePortConfigurationInfo)
     size_t before = gpu->deviceSensors.size();
     gpu->addSensor(sensor, PollingType::RoundRobin);
     EXPECT_GT(gpu->deviceSensors.size(), before);
+}
+
+// =============================================================================
+// NsmPCIePortConfigurationInfo::genRequestMsg encode failure branch
+// instanceId > NSM_INSTANCE_MAX → encode_get_pcie_port_config_req fails →
+// returns nullopt (covers lines 99,101-103 of nsmPortConfigurationInfo.cpp)
+// =============================================================================
+
+TEST(NsmPCIePortConfigurationInfo,
+     GenRequestMsg_InvalidInstanceId_ReturnsNullopt)
+{
+    PCIePortConfigInfoHelper h;
+    nsm::NsmPCIePortConfigurationInfo sensor(
+        h.name, h.type, h.pciePortConfigInfoIntf, h.portNumber, h.portType,
+        h.portIndex, h.inventoryObjPath);
+
+    auto request = sensor.genRequestMsg(10, NSM_INSTANCE_MAX + 1);
+
+    EXPECT_FALSE(request.has_value());
 }

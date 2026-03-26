@@ -265,3 +265,205 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateCpuSensors)
             fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, cpuWriteProtectedSensor);
 }
+
+// ===================================================================
+// Branch Coverage Tests
+// ===================================================================
+
+// base interface not registered → coGetCachedBaseProperties returns error
+// → co_return rc immediately (lines 45-48)
+TEST_F(NsmFirmwareInventoryTest, BasePropertiesFail_ReturnsEarly)
+{
+    const std::string uniquePath = "/xyz/test/fw/base_fail_unique";
+    // Do NOT register basicIntfName for uniquePath — findPropertyMap returns
+    // nullptr → coGetCachedBaseProperties returns NSM_SW_ERROR → early return.
+    auto& other = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                    basicIntfName + ".Other");
+    other["Type"] = std::string("NSM_Asset");
+
+    const size_t before = fpga->deviceSensors.size();
+    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, uniquePath);
+    // No sensors added; function exited via co_return rc
+    EXPECT_EQ(before, fpga->deviceSensors.size());
+}
+
+// NSM_WriteProtect: DataIndex has no matching case → default: throw
+// std::out_of_range (lines 132-133)
+TEST_F(NsmFirmwareInventoryTest, WriteProtect_InvalidDataIndex_Throws)
+{
+    const std::string uniquePath = "/xyz/test/fw/inv_idx_unique";
+    auto& propMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    propMap["Name"] = std::string("TestSensor");
+    propMap["UUID"] = fpgaUuid;
+    propMap["Type"] = std::string("NSM_WriteProtect");
+    propMap["DataIndex"] = uint64_t(0xFFFF); // out-of-range enum value
+
+    utils::MockDbusAsync::serviceMap() = emtpyServiceMap;
+    EXPECT_THROW_COROUTINE(nsmFirmwareInventoryCreateSensors(
+                               mockManager, basicIntfName, uniquePath),
+                           std::out_of_range);
+}
+
+// NSM_Asset: "Manufacturer" key absent → manufacturer defaults to empty string
+// (line 157 false-branch)
+TEST_F(NsmFirmwareInventoryTest, Asset_MissingManufacturer_EmptyManufacturer)
+{
+    const std::string uniquePath = "/xyz/test/fw/no_mfg_unique";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["Name"] = std::string("TestFW");
+    baseMap["UUID"] = fpgaUuid;
+
+    auto& assetMap =
+        utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName + ".Asset");
+    assetMap["Type"] = std::string("NSM_Asset");
+    // No "Manufacturer" key
+
+    const size_t before = fpga->staticSensors.size();
+    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName + ".Asset",
+                                      uniquePath);
+    EXPECT_EQ(before + 1, fpga->staticSensors.size());
+    auto asset = dynamic_pointer_cast<NsmFirmwareInventory<NsmAssetIntf>>(
+        fpga->staticSensors.back());
+    ASSERT_NE(nullptr, asset);
+    EXPECT_EQ(std::string(""), asset->invoke(pdiMethod(manufacturer)));
+}
+
+// NSM_FirmwareVersion: "InstanceNumber" key absent → instanceNumber defaults
+// to 0 (line 170 false-branch)
+TEST_F(NsmFirmwareInventoryTest,
+       FirmwareVersion_MissingInstanceNumber_DefaultsZero)
+{
+    const std::string uniquePath = "/xyz/test/fw/no_instnum_unique";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["Name"] = std::string("TestVersionFW");
+    baseMap["UUID"] = fpgaUuid;
+
+    auto& fwMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".FirmwareVersion");
+    fwMap["Type"] = std::string("NSM_FirmwareVersion");
+    // No "InstanceNumber" key → instanceNumber = 0
+
+    const size_t before = fpga->staticSensors.size();
+    nsmFirmwareInventoryCreateSensors(
+        mockManager, basicIntfName + ".FirmwareVersion", uniquePath);
+    EXPECT_EQ(before + 1, fpga->staticSensors.size());
+    auto version = dynamic_pointer_cast<NsmInventoryProperty<VersionIntf>>(
+        fpga->staticSensors.back());
+    ASSERT_NE(nullptr, version);
+    // instanceNumber=0 → property = PCIERETIMER_0_EEPROM_VERSION + 0
+    EXPECT_EQ(nsm_inventory_property_identifiers(PCIERETIMER_0_EEPROM_VERSION),
+              version->property);
+}
+
+// Unknown type: falls through all if/else-if chains without creating sensors
+// → co_return NSM_SUCCESS (lines 184-186)
+TEST_F(NsmFirmwareInventoryTest, UnknownType_FallsThrough_NoSensorsCreated)
+{
+    const std::string uniquePath = "/xyz/test/fw/unknown_type_unique";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["Name"] = std::string("TestSensor");
+    baseMap["UUID"] = fpgaUuid;
+
+    auto& currMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".Unknown");
+    currMap["Type"] = std::string("NSM_UnknownType");
+
+    const size_t beforeDevice = fpga->deviceSensors.size();
+    const size_t beforeStatic = fpga->staticSensors.size();
+    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName + ".Unknown",
+                                      uniquePath);
+    EXPECT_EQ(beforeDevice, fpga->deviceSensors.size());
+    EXPECT_EQ(beforeStatic, fpga->staticSensors.size());
+}
+
+// =============================================================================
+// FALSE-branch coverage: count() checks in nsmFirmwareInventoryCreateSensors
+// =============================================================================
+
+// Type absent → count("Type") FALSE → type="" → no if/else-if branch matches
+// → co_return NSM_SUCCESS (same fall-through as unknown type but via FALSE //
+// branch)
+TEST_F(NsmFirmwareInventoryTest, Factory_MissingType_NoSensorCreated)
+{
+    const std::string uniquePath = "/xyz/test/fw/missing_type_false";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["Name"] = std::string("TestSensor");
+    baseMap["UUID"] = fpgaUuid;
+
+    auto& currMap = utils::MockDbusAsync::propertyMap(
+        uniquePath, basicIntfName + ".NoType");
+    (void)currMap; // intentionally empty → count("Type") = 0 → type=""
+
+    const size_t beforeDevice = fpga->deviceSensors.size();
+    const size_t beforeStatic = fpga->staticSensors.size();
+    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName + ".NoType",
+                                      uniquePath);
+    EXPECT_EQ(beforeDevice, fpga->deviceSensors.size());
+    EXPECT_EQ(beforeStatic, fpga->staticSensors.size());
+}
+
+// UUID absent from base → count("UUID") FALSE → uuid="" →
+// parseStaticUuid("") throws inside getNsmDeviceFromStaticUUID
+TEST_F(NsmFirmwareInventoryTest, Factory_MissingUUID_Throws)
+{
+    const std::string uniquePath = "/xyz/test/fw/missing_uuid_false";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    baseMap["Name"] = std::string("TestSensor");
+    // "UUID" intentionally omitted → uuid="" → parseStaticUuid throws
+
+    auto& currMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName + ".Asset");
+    currMap["Type"] = std::string("NSM_Asset");
+
+    EXPECT_THROW_COROUTINE(
+        nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName + ".Asset",
+                                          uniquePath),
+        std::exception);
+}
+
+// Name absent from base → count("Name") FALSE → name="" → NSM_Asset branch:
+// NsmFirmwareInventory<NsmAssetIntf>("") tries to register D-Bus object at
+// firmwareInventoryBasePath/"" → invalid D-Bus path → sd_bus throws
+TEST_F(NsmFirmwareInventoryTest, Factory_MissingName_Throws)
+{
+    const std::string uniquePath = "/xyz/test/fw/missing_name_false";
+    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    // "Name" intentionally omitted → name="" → FALSE branch at line 53
+    baseMap["UUID"] = fpgaUuid;
+
+    auto& currMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName + ".Asset");
+    currMap["Type"] = std::string("NSM_Asset");
+
+    // name="" → path = firmwareInventoryBasePath/"" → invalid → sd_bus throws
+    EXPECT_THROW_COROUTINE(
+        nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName + ".Asset",
+                                          uniquePath),
+        std::exception);
+}
+
+// type=="NSM_WriteProtect", DataIndex absent → count("DataIndex") FALSE →
+// dataIndex=0 → not in enum range (RETIMER_EEPROM=128) → default: throw
+TEST_F(NsmFirmwareInventoryTest, WriteProtect_MissingDataIndex_ThrowsOutOfRange)
+{
+    const std::string uniquePath = "/xyz/test/fw/missing_dataidx_false";
+    auto& propMap = utils::MockDbusAsync::propertyMap(uniquePath,
+                                                      basicIntfName);
+    propMap["Name"] = std::string("TestSensor");
+    propMap["UUID"] = fpgaUuid;
+    propMap["Type"] = std::string("NSM_WriteProtect");
+    // "DataIndex" intentionally omitted → dataIndex = 0 (default) →
+    // switch hits default → throw std::out_of_range
+
+    utils::MockDbusAsync::serviceMap() = emtpyServiceMap;
+    EXPECT_THROW_COROUTINE(nsmFirmwareInventoryCreateSensors(
+                               mockManager, basicIntfName, uniquePath),
+                           std::out_of_range);
+}

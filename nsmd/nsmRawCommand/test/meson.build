@@ -2,7 +2,7 @@
 # nsmRawCommand subdir is ALWAYS compiled into nsmd_test (core functionality)
 # No additional sources needed - everything is already in nsmd_test
 
-tests = ['nsmRawCommandHandler_test']
+tests = ['nsmRawCommandHandler_test', 'nsmRawCommandHandlerBranch_test']
 foreach t : tests
     test(
         t,

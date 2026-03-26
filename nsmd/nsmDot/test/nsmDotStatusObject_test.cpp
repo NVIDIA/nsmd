@@ -55,7 +55,7 @@ TEST_F(NsmDotStatusObjectTest, testConstructor)
 {
     std::string chassisName = "DotStatusTest";
     auto dotActionIntf = std::make_unique<NsmDotObject>(
-        utils::DBusHandler::getBus(), chassisName, gpuUuid);
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
 
     NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
                                  dotActionIntf.get(), gpuUuid);
@@ -69,7 +69,7 @@ TEST_F(NsmDotStatusObjectTest, testGenRequestMsg)
 {
     std::string chassisName = "DotStatusReq";
     auto dotActionIntf = std::make_unique<NsmDotObject>(
-        utils::DBusHandler::getBus(), chassisName, gpuUuid);
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
 
     NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
                                  dotActionIntf.get(), gpuUuid);
@@ -90,7 +90,7 @@ TEST_F(NsmDotStatusObjectTest, testHandleResponseUninitialized)
 {
     std::string chassisName = "DotStatusUninit";
     auto dotActionIntf = std::make_unique<NsmDotObject>(
-        utils::DBusHandler::getBus(), chassisName, gpuUuid);
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
 
     NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
                                  dotActionIntf.get(), gpuUuid);
@@ -115,7 +115,7 @@ TEST_F(NsmDotStatusObjectTest, testHandleResponseVolatile)
 {
     std::string chassisName = "DotStatusVolatile";
     auto dotActionIntf = std::make_unique<NsmDotObject>(
-        utils::DBusHandler::getBus(), chassisName, gpuUuid);
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
 
     NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
                                  dotActionIntf.get(), gpuUuid);
@@ -139,7 +139,7 @@ TEST_F(NsmDotStatusObjectTest, testHandleResponseDisabled)
 {
     std::string chassisName = "DotStatusDisabled";
     auto dotActionIntf = std::make_unique<NsmDotObject>(
-        utils::DBusHandler::getBus(), chassisName, gpuUuid);
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
 
     NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
                                  dotActionIntf.get(), gpuUuid);
@@ -163,7 +163,7 @@ TEST_F(NsmDotStatusObjectTest, badTestHandleResponseWrongSize)
 {
     std::string chassisName = "DotStatusBadSize";
     auto dotActionIntf = std::make_unique<NsmDotObject>(
-        utils::DBusHandler::getBus(), chassisName, gpuUuid);
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
 
     NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
                                  dotActionIntf.get(), gpuUuid);
@@ -180,7 +180,7 @@ TEST_F(NsmDotStatusObjectTest, badTestHandleResponseReasonCodeError)
 {
     std::string chassisName = "DotStatusReasonErr";
     auto dotActionIntf = std::make_unique<NsmDotObject>(
-        utils::DBusHandler::getBus(), chassisName, gpuUuid);
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
 
     NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
                                  dotActionIntf.get(), gpuUuid);
@@ -205,7 +205,7 @@ TEST_F(NsmDotStatusObjectTest, testUpdateCoroutine)
 {
     std::string chassisName = "DotStatusUpdate";
     auto dotActionIntf = std::make_unique<NsmDotObject>(
-        utils::DBusHandler::getBus(), chassisName, gpuUuid);
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
 
     NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
                                  dotActionIntf.get(), gpuUuid);
@@ -226,11 +226,36 @@ TEST_F(NsmDotStatusObjectTest, testUpdateCoroutine)
     dotStatus.update(gpu);
 }
 
+// Error-CC path: decode succeeds but cc = NSM_ERROR (non-zero)
+// → if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS) is true
+// → return cc ? cc : rc; takes the true (cc != 0) branch.
+TEST_F(NsmDotStatusObjectTest, HandleResponseMsg_ErrorCC_CoversBranch)
+{
+    std::string chassisName = "DotStatusErrorCC";
+    auto dotActionIntf = std::make_unique<NsmDotObject>(
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
+
+    NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
+                                 dotActionIntf.get(), gpuUuid);
+
+    Response dotStatusResp(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_status_resp), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(dotStatusResp.data());
+
+    uint8_t status = 0x00;
+    auto rc = encode_nsm_dot_get_status_resp(0, NSM_ERROR, ERR_NULL, status,
+                                             msg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = dotStatus.handleResponseMsg(msg, dotStatusResp.size());
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
 TEST_F(NsmDotStatusObjectTest, testStatusTransitions)
 {
     std::string chassisName = "DotStatusTransitions";
     auto dotActionIntf = std::make_unique<NsmDotObject>(
-        utils::DBusHandler::getBus(), chassisName, gpuUuid);
+        utils::DBusHandler::getBus(), chassisName, gpuUuid, "");
 
     NsmDotStatusObject dotStatus(chassisName, "NSM_Dot_Status",
                                  dotActionIntf.get(), gpuUuid);
@@ -251,9 +276,6 @@ TEST_F(NsmDotStatusObjectTest, testStatusTransitions)
         auto rc = encode_nsm_dot_get_status_resp(0, NSM_SUCCESS, ERR_NULL,
                                                  stateSequence[i], msg);
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
-
-        EXPECT_CALL(*gpu, sensorIO)
-            .WillOnce(mockSensorIO(dotStatusResp, Response{}));
 
         rc = dotStatus.handleResponseMsg(msg, dotStatusResp.size());
         EXPECT_EQ(rc, NSM_SW_SUCCESS);

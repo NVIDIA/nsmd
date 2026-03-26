@@ -226,6 +226,18 @@ TEST_F(NsmInbandUpdatePolicyTest,
     EXPECT_NE(rc, NSM_SW_SUCCESS);
 }
 
+TEST_F(NsmInbandUpdatePolicyTest, HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    // 7-byte buffer: safely reads cc=0 at payload[1] but too short for
+    // nsm_firmware_erot_state_info_hdr_resp; decode returns NSM_SW_ERROR_LENGTH
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    auto rc = policyObject->handleResponseMsg(responseMsg, response.size());
+
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
 // ---------------------------------------------------------------------------
 // NsmImageCopyObject Tests (constructor only since requestImageCopy is async)
 // ---------------------------------------------------------------------------
@@ -1093,6 +1105,13 @@ struct NsmWorkloadPowerProfilePageTest :
 
     void TearDown() override
     {
+        // Break shared_ptr cycles before resetting:
+        // pageCollection->supportedPages → page → page->pageCollection
+        // profileCollection->supportedPowerProfiles → profile objects
+        if (pageCollection)
+            pageCollection->supportedPages.clear();
+        if (profileCollection)
+            profileCollection->supportedPowerProfiles.clear();
         page.reset();
         profileMapper.reset();
         pageCollection.reset();
@@ -1258,7 +1277,7 @@ TEST_F(NsmWorkloadPowerProfilePageTest,
 }
 
 TEST_F(NsmWorkloadPowerProfilePageTest,
-       DISABLED_HandleResponseMsg_ExistingNextPage_DoesNotDuplicate)
+       HandleResponseMsg_ExistingNextPage_DoesNotDuplicate)
 {
     // Arrange - add page 1 manually first
     auto existingPage = std::make_shared<NsmWorkloadPowerProfilePage>(
@@ -1301,7 +1320,7 @@ TEST_F(NsmWorkloadPowerProfilePageTest,
 }
 
 TEST_F(NsmWorkloadPowerProfilePageTest,
-       DISABLED_HandleResponseMsg_UpdateExistingProfile_UpdatesFields)
+       HandleResponseMsg_UpdateExistingProfile_UpdatesFields)
 {
     // Arrange - pre-add a profile, then handle a response with the same id
     auto& bus = utils::DBusHandler::getBus();
