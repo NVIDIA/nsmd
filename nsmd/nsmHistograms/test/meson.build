@@ -2,7 +2,7 @@
 # nsmHistograms is CONDITIONAL - only runs if enabled, in which case it's in nsmd_test
 # All sources already compiled into nsmd_test, no need to recompile
 
-tests = ['nsmHistogramInfo_test']
+tests = ['nsmHistogramInfo_test', 'nsmHistogramInfoBranch_test']
 
 foreach t : tests
     test(

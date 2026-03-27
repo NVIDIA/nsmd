@@ -3,6 +3,8 @@ tests = [
     'nsmEventConfig_test',
     'nsmEventConfigBranch_test',
     'nsmEventConfigDeepBranch_test',
+    'nsmEventConfigBranch2_test',
+    'nsmEventSettingBranch_test',
 ]
 
 foreach t : tests

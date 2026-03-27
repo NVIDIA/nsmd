@@ -15,6 +15,8 @@ tests = [
     'nsmGpmOemBranch6_test',
     'nsmGPMBranch_test',
     'nsmGpmOemBranch7_test',
+    'nsmGpmOemBranch8_test',
+    'nsmGpmOemBranch9_test',
 ]
 
 foreach t : tests

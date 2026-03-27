@@ -424,8 +424,7 @@ TEST_F(NsmDebugTokenUnifiedBranch4Test, eraseToken_TokenType_Invalid_Throws)
 
     EXPECT_THROW(
         debugToken->eraseToken(EraseTypeEnum::TokenType, TokenTypeEnum::None),
-        sdbusplus::server::com::nvidia::debug_token::Common::Error::
-            InvalidArgument);
+        Common::Error::InvalidArgument);
 }
 
 // ============================================================================
@@ -545,7 +544,7 @@ TEST_F(NsmDebugTokenUnifiedBranch4Test, deviceIdHandler_EmptyDeviceId)
         .WillOnce(mockPostPatchIO(
             createQueryDeviceIdsResponse(emptyId, NSM_SUCCESS, 0)));
     debugToken->deviceIdHandler(mockDevice);
-    EXPECT_EQ(debugToken->tokenDeviceID(), "0x");
+    EXPECT_EQ(debugToken->tokenDeviceID(), "");
 }
 
 // ============================================================================

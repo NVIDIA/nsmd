@@ -9,6 +9,7 @@ tests = [
     'nsmDot_test',
     'nsmDotBlob_test',
     'nsmDotBlobUtils_test',
+    'nsmDotBlobUtilsBranch_test',
     'nsmDotStatusObject_test',
 ]
 

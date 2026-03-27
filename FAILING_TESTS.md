@@ -1,12 +1,13 @@
 # Failing/Disabled Unit Tests
 
-Currently 28 tests are disabled. 7 are blocked by production code issues
+Currently 33 tests are disabled. 10 are blocked by production code issues
 (missing validation, source bugs, untestable singletons). 3 are blocked by
 test infrastructure limitations (mock constraints, encode/decode mismatches).
 1 is blocked by a design issue (coroutine destructor safety). 11 are blocked
 by long-running event response struct mismatches or async handler decode
 assumptions (added 2026-03-18). 6 are blocked by a production code buffer
-overflow in `getDeviceModeSettingsV2Handler` (added 2026-03-20).
+overflow in `getDeviceModeSettingsV2Handler` (added 2026-03-20). 4 added
+2026-03-30 (MctpDiscovery singleton, mock D-Bus path validation).
 
 ---
 
@@ -302,6 +303,41 @@ overflow would be fixed and all tests would pass.
 **Status**: DISABLED_ — production code bug in `mockupResponder/mockupResponder.cpp`
 at the buffer size calculation. Requires changing `- 2` to `- 1` in
 `getDeviceModeSettingsV2Handler`.
+
+---
+
+---
+
+### 29–31. NsmDeviceBranch2 — 3 DISABLED DumpNsmDeviceInfo tests
+
+**File**: `nsmd/test/nsmDeviceBranch2_test.cpp`
+
+| Test | What fails |
+|------|-----------|
+| `DISABLED_DumpNsmDeviceInfo_DoesNotCrash` | `dumpNsmDeviceInfo()` throws `std::runtime_error("MctpDiscovery instance is not initialized yet")` |
+| `DISABLED_DumpNsmDeviceInfo_WithEventSubscriptionStatus` | Same |
+| `DISABLED_DumpNsmDeviceInfo_LastEventRequestAndResponsePresent` | Same |
+
+**Why they should pass**: `dumpNsmDeviceInfo()` should launch a detached coroutine without
+accessing the `MctpDiscovery` singleton synchronously.
+
+**Status**: DISABLED_ — `MctpDiscovery` is a non-injectable singleton; accessing it in a
+unit-test context throws before the coroutine body executes.
+
+---
+
+### 32. NsmPowerSubSystemBranchTest.DISABLED_Factory_NameAbsent_FalseBranch_EmptyNameUsed
+
+**File**: `nsmd/nsmChassis/test/nsmPowerSubSystemBranch_test.cpp`
+
+**What fails**: With `Name` absent, an empty name is used to construct the D-Bus object path.
+`sd_bus_add_object_vtable` rejects the empty/invalid path with `InvalidArgs`.
+
+**Why it should pass**: The production code path should handle an empty name without crashing
+(or should validate earlier). The test assumed the mock D-Bus layer would not validate paths.
+
+**Status**: DISABLED_ — mock sdbusplus validates D-Bus object paths; an empty name produces
+an invalid path. Requires non-empty name or earlier validation in production code.
 
 ---
 

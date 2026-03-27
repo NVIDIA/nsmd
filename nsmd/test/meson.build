@@ -40,6 +40,10 @@ tests = [
     'nsmDeviceDI_test',
     'nsmDeviceDI2_test',
     'nsmDeviceDI3_test',
+    'nsmDeviceBranch_test',
+    'sensorManagerBranch2_test',
+    'nsmDeviceBranch2_test',
+    'nsmDeviceBranch3_test',
 ]
 
 # mctpDiscoveryBranch_test: helper TU isolates mctp_endpoint_discovery.hpp

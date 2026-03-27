@@ -17,6 +17,7 @@ tests = [
     'nsmNVSwitchAndNVMgmtNICChassisAssembly_test',
     'nsmNVSwitchChassis_test',
     'nsmPCIeRetimer_test',
+    'nsmPCIeRetimerSwitchDI_test',
     'nsmPowerControl_test',
     'nsmPowerSubSystem_test',
     'nsmProcessorModulePowerControl_test',
@@ -58,6 +59,7 @@ tests = [
     'nsmChassisPCIeDeviceBranch2_test',
     'nsmRoTPropertyBranch_test',
     'nsmNVSwitchChassisBranch2_test',
+    'nsmNVSwitchChassisBranch3_test',
     'nsmChassisAssemblyBranch2_test',
     'nsmNVSwitchChassisAssemblyBranch2_test',
     # 'nsmErotBranch2_test',  # SIGABRT in fixture teardown
@@ -80,6 +82,11 @@ tests = [
     'nsmGpuClockControlBranch3_test',
     'nsmRoTPropertyBranch4_test',
     'nsmApSkuIdBranch_test',
+    'nsmPowerSubSystemBranch_test',
+    'nsmWriteProtectedJumperBranch_test',
+    'nsmPCIeLTSSMStateBranch_test',
+    'nsmPCIeFunctionBranch_test',
+    'nsmLeakDetectionBranch7_test',
 ]
 
 foreach t : tests

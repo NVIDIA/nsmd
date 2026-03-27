@@ -12,6 +12,7 @@ tests = [
     'nsmSetEgmMode_test',
     'nsmSetEgmModeBranch_test',
     'nsmSetMigMode_test',
+    'nsmSetMigModeBranch_test',
     'nsmSetCpuOperatingConfig_test',
     'nsmSetAsyncBranch_test',
 ]

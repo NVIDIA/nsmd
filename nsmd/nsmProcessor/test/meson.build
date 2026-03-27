@@ -14,6 +14,7 @@ tests = [
     'nsmPowerLimit_test',
     'nsmPowerLimitBranch_test',
     'nsmProcessorBranch2_test',
+    'nsmProcessorBranch3_test',
     'nsmPowerSmoothingBranch2_test',
     'nsmWorkloadPowerProfileBranch2_test',
     'nsmReconfigPermissionsBranch_test',

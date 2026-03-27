@@ -465,3 +465,443 @@ TEST(NsmPowerLimitBranch3, PowerLimitId_CpuLimitGpuCopy_OneShot)
     auto result = nsm::powerLimitIdToDeviceModeIndex(CPU_LIMIT_GPU_COPY, false);
     EXPECT_EQ(result, DEVICE_MODE_ONE_SHOT_CPU_POWER_LIMIT_GPU_COPY);
 }
+
+// =============================================================================
+// Batch 4 - Additional branch coverage tests
+// =============================================================================
+
+// =============================================================================
+// NsmPersistentPowerLimit constructor: verifies powerCapEnable(true) is called
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, PersistentCtor_PowerCapEnableTrue)
+{
+    std::shared_ptr<PowerLimitsIntf> pli;
+    auto sensor = makeSensor(GPU_BASE, false, &pli);
+    EXPECT_TRUE(pli->powerCapEnable());
+}
+
+// =============================================================================
+// NsmPersistentPowerLimit::genRequestMsg: success path with GPU_BASE
+// Verify the returned request has a value and correct size
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, PersistentGenRequestMsg_GPUBase_Success)
+{
+    auto sensor = makeSensor(GPU_BASE, false);
+    auto request = sensor->genRequestMsg(0, 0);
+    EXPECT_TRUE(request.has_value());
+    EXPECT_EQ(request->size(), sizeof(nsm_msg_hdr) +
+                                   sizeof(nsm_get_device_mode_settings_v2_req));
+}
+
+// =============================================================================
+// NsmPersistentPowerLimit::handleResponseMsg: normal current limit (non-zero,
+// non-INVALID) without persistencyIntf -> powerCap is set, no persistency
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test,
+       PersistentHandleResp_NormalLimit_NoPersistencyIntf)
+{
+    std::shared_ptr<PowerLimitsIntf> pli;
+    auto sensor = makeSensor(GPU_BASE, false, &pli);
+
+    auto response = makeGetDevModeResp(500000, 500000); // 500W
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(pli->powerCap(), 500u);
+}
+
+// =============================================================================
+// NsmPersistentPowerLimit::handleResponseMsg: cc ? cc : rc when cc=NSM_ERROR
+// Returns cc (non-zero) when both decode fails
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, PersistentHandleResp_CcNonZero_ReturnsCc)
+{
+    auto sensor = makeSensor(GPU_BASE, false);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_get_device_mode_settings_v2_resp(0, NSM_ERROR, ERR_NULL, nullptr, 0,
+                                            nullptr, 0, msg);
+
+    auto rc = sensor->handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_EQ(rc, NSM_ERROR);
+}
+
+// =============================================================================
+// NsmOneShotPowerLimit::handleResponseMsg: cc ? cc : rc when cc=NSM_ERROR
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, OneShotHandleResp_CcNonZero_ReturnsCc)
+{
+    auto perI = std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
+    auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
+
+    NsmOneShotPowerLimit sensor("TestOneShot", "NSM_ONE_SHOT", GPU_BASE, perI,
+                                pli);
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_get_device_mode_settings_v2_resp(0, NSM_ERROR, ERR_NULL, nullptr, 0,
+                                            nullptr, 0, msg);
+
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+    EXPECT_EQ(rc, NSM_ERROR);
+}
+
+// =============================================================================
+// NsmOneShotPowerLimit::genRequestMsg: success path with CPU_LIMIT_GPU_COPY
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, OneShotGenRequestMsg_CpuLimitGpuCopy_Success)
+{
+    auto perI = std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
+    auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
+
+    NsmOneShotPowerLimit sensor("TestOneShot", "NSM_ONE_SHOT",
+                                CPU_LIMIT_GPU_COPY, perI, pli);
+
+    auto request = sensor.genRequestMsg(0, 0);
+    EXPECT_TRUE(request.has_value());
+}
+
+// =============================================================================
+// NsmOneShotPowerLimit::handleResponseMsg: valid current with
+// CPU_LIMIT_GPU_COPY, persistency true (powerCap == persistentPowerLimit)
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test,
+       OneShotHandleResp_CpuLimitGpuCopy_PersistencyTrue)
+{
+    auto perI = std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
+    auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
+    pli->powerCap(400);
+    perI->persistentPowerLimit(400.0);
+
+    NsmOneShotPowerLimit sensor("TestOneShot", "NSM_ONE_SHOT",
+                                CPU_LIMIT_GPU_COPY, perI, pli);
+
+    auto response = makeGetDevModeResp(400000, 0); // 400W
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_TRUE(perI->persistency());
+}
+
+// =============================================================================
+// NsmPowerLimitRange constructor: MINIMUM_GPU_BASE_POWER_LIMIT propertyName
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, PowerLimitRange_MinPropertyId_PropertyName)
+{
+    auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
+
+    NsmPowerLimitRange range("TestRange", "NSM_RANGE",
+                             MINIMUM_GPU_BASE_POWER_LIMIT, pli);
+    EXPECT_EQ(range.propertyName, "MINIMUM_GPU_BASE_POWER_LIMIT");
+}
+
+// =============================================================================
+// NsmPowerLimitRange constructor: MAXIMUM_GPU_BASE_POWER_LIMIT propertyName
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, PowerLimitRange_MaxPropertyId_PropertyName)
+{
+    auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
+
+    NsmPowerLimitRange range("TestRange", "NSM_RANGE",
+                             MAXIMUM_GPU_BASE_POWER_LIMIT, pli);
+    EXPECT_EQ(range.propertyName, "MAXIMUM_GPU_BASE_POWER_LIMIT");
+}
+
+// =============================================================================
+// NsmDefaultPowerLimit constructor: RATED_GPU_BASE_POWER_LIMIT propertyName
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, DefaultPowerLimit_RatedPropertyId_PropertyName)
+{
+    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+
+    NsmDefaultPowerLimit defLimit("TestDef", "NSM_DEF",
+                                  RATED_GPU_BASE_POWER_LIMIT, cli);
+    EXPECT_EQ(defLimit.propertyName, "RATED_GPU_BASE_POWER_LIMIT");
+}
+
+// =============================================================================
+// NsmPersistentPowerLimit::handleOfflineState: GPU_BASE (default) - no change
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, HandleOfflineState_GPUBase_NoChange)
+{
+    std::shared_ptr<PowerLimitsIntf> pli;
+    auto sensor = makeSensor(GPU_BASE, false, &pli);
+    pli->powerCap(350);
+    sensor->handleOfflineState();
+    EXPECT_EQ(pli->powerCap(), 350u);
+}
+
+// =============================================================================
+// NsmPersistentPowerLimit::handleOfflineState: CPU_LIMIT_GPU_COPY sets invalid
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, HandleOfflineState_CpuLimit_SetsInvalid)
+{
+    std::shared_ptr<PowerLimitsIntf> pli;
+    auto sensor = makeSensor(CPU_LIMIT_GPU_COPY, false, &pli);
+    pli->powerCap(350);
+    sensor->handleOfflineState();
+    EXPECT_EQ(pli->powerCap(), INVALID_POWER_LIMIT);
+}
+
+// =============================================================================
+// updatePowerLimit: success path (rc==NSM_SW_SUCCESS && cc==NSM_SUCCESS)
+// Verify status is Success
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, UpdatePowerLimit_Success_StatusSuccess)
+{
+    auto sensor = makeSensor(GPU_BASE, false);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeSetDevModeResp(NSM_SUCCESS)));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::WriteFailure;
+    auto coro = sensor->updatePowerLimit(&status, gpu, true, 300);
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+}
+
+// =============================================================================
+// updatePowerLimit: with CPU_LIMIT_GPU_COPY and persistent=false
+// Covers ONE_SHOT path in deviceModeIndexToName map lookup
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, UpdatePowerLimit_CpuLimitOneShot_Success)
+{
+    auto sensor = makeSensor(CPU_LIMIT_GPU_COPY, false);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeSetDevModeResp(NSM_SUCCESS)));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::WriteFailure;
+    auto coro = sensor->updatePowerLimit(&status, gpu, false, 200);
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+}
+
+// =============================================================================
+// updatePowerLimit: cc != NSM_SUCCESS in decode response
+// cc ? cc : rc returns cc
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, UpdatePowerLimit_CcError_ReturnsWriteFailure)
+{
+    auto sensor = makeSensor(GPU_BASE, false);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeSetDevModeResp(NSM_ERROR)));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    auto coro = sensor->updatePowerLimit(&status, gpu, true, 250);
+    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+}
+
+// =============================================================================
+// NsmPowerLimitRange::update: encode failure (bad propertyId causing encode
+// failure is unlikely but we can test the sensorIO failure with non-zero rc)
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test,
+       PowerLimitRange_Update_SensorIOFails_ReturnsError)
+{
+    auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
+    NsmPowerLimitRange sensor("TestRange", "NSM_RANGE",
+                              MAXIMUM_GPU_BASE_POWER_LIMIT, pli);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERR_UNSUPPORTED_COMMAND_CODE));
+
+    EXPECT_NO_THROW(sensor.update(gpu));
+}
+
+// =============================================================================
+// NsmDefaultPowerLimit::update: sensorIO failure path
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test,
+       DefaultPowerLimit_Update_SensorIOFails_ReturnsError)
+{
+    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    NsmDefaultPowerLimit sensor("TestDef", "NSM_DEF",
+                                RATED_GPU_BASE_POWER_LIMIT, cli);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERR_UNSUPPORTED_COMMAND_CODE));
+
+    EXPECT_NO_THROW(sensor.update(gpu));
+}
+
+// =============================================================================
+// NsmDefaultPowerLimit::update: success with INVALID_POWER_LIMIT value
+// -> defaultPowerCap = 0
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test,
+       DefaultPowerLimit_Update_InvalidValue_ReadsZero)
+{
+    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    NsmDefaultPowerLimit sensor("TestDef", "NSM_DEF",
+                                RATED_GPU_BASE_POWER_LIMIT, cli);
+
+    uint32_t limitVal = htole32(INVALID_POWER_LIMIT);
+    std::vector<uint8_t> limitData(sizeof(limitVal));
+    std::memcpy(limitData.data(), &limitVal, sizeof(limitVal));
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + limitData.size(),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL,
+                                          limitData.size(), limitData.data(),
+                                          responseMsg);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(response));
+
+    EXPECT_NO_THROW(sensor.update(gpu));
+    EXPECT_EQ(cli->defaultPowerCap(), 0u);
+}
+
+// =============================================================================
+// NsmPowerLimitRange::update: success with MAX property - valid value
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, PowerLimitRange_Update_MaxProperty_ValidValue)
+{
+    auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
+    NsmPowerLimitRange sensor("TestRange", "NSM_RANGE",
+                              MAXIMUM_GPU_BASE_POWER_LIMIT, pli);
+
+    uint32_t limitVal = htole32(600000); // 600W
+    std::vector<uint8_t> limitData(sizeof(limitVal));
+    std::memcpy(limitData.data(), &limitVal, sizeof(limitVal));
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + limitData.size(),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL,
+                                          limitData.size(), limitData.data(),
+                                          responseMsg);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(response));
+
+    EXPECT_NO_THROW(sensor.update(gpu));
+    EXPECT_EQ(pli->maxPowerCapValue(), 600u);
+}
+
+// =============================================================================
+// NsmPowerLimitRange::update: decode failure (cc != NSM_SUCCESS)
+// cc ? cc : rc returns cc
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, PowerLimitRange_Update_DecodeError_CcReturned)
+{
+    auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
+    NsmPowerLimitRange sensor("TestRange", "NSM_RANGE",
+                              MAXIMUM_GPU_BASE_POWER_LIMIT, pli);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_get_inventory_information_resp(0, NSM_ERROR, ERR_NULL, 0, nullptr,
+                                          responseMsg);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(response));
+
+    EXPECT_NO_THROW(sensor.update(gpu));
+}
+
+// =============================================================================
+// NsmDefaultPowerLimit::update: decode failure (cc != NSM_SUCCESS)
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test,
+       DefaultPowerLimit_Update_DecodeError_CcReturned)
+{
+    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    NsmDefaultPowerLimit sensor("TestDef", "NSM_DEF",
+                                RATED_GPU_BASE_POWER_LIMIT, cli);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    encode_get_inventory_information_resp(0, NSM_ERROR, ERR_NULL, 0, nullptr,
+                                          responseMsg);
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(response));
+
+    EXPECT_NO_THROW(sensor.update(gpu));
+}
+
+// =============================================================================
+// NsmClearPowerLimitIntf: clearPowerCap returns 0 (dummy impl)
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, ClearPowerLimitIntf_Returns0)
+{
+    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    EXPECT_EQ(cli->clearPowerCap(), 0);
+}
+
+// =============================================================================
+// NsmPersistentPowerLimit::genRequestMsg: CPU_LIMIT_GPU_COPY (persistent=true)
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, PersistentGenRequestMsg_CpuLimit_Success)
+{
+    auto sensor = makeSensor(CPU_LIMIT_GPU_COPY, false);
+    auto request = sensor->genRequestMsg(0, 0);
+    EXPECT_TRUE(request.has_value());
+}
+
+// =============================================================================
+// NsmPersistentPowerLimit::handleResponseMsg: valid current + pending,
+// both non-INVALID, with persistencyIntf -> full path verification
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test,
+       PersistentHandleResp_ValidCurrentAndPending_WithPersistency)
+{
+    std::shared_ptr<PowerLimitsIntf> pli;
+    std::shared_ptr<PowerPersistencyIntf> perI;
+    auto sensor = makeSensor(GPU_BASE, true, &pli, &perI);
+
+    auto response = makeGetDevModeResp(400000, 500000); // 400W, 500W pending
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    auto rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(pli->powerCap(), 400u);
+    EXPECT_EQ(perI->persistentPowerLimit(), 400.0);
+    EXPECT_TRUE(sensor->pendingPowerLimit.has_value());
+    EXPECT_EQ(sensor->pendingPowerLimit.value(), 500u);
+}
+
+// =============================================================================
+// setPowerLimit: tuple with persistent=false
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, SetPowerLimit_TupleNonPersistent_Success)
+{
+    auto sensor = makeSensor(GPU_BASE, false);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeSetDevModeResp(NSM_SUCCESS)));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::WriteFailure;
+    AsyncSetOperationValueType value = std::make_tuple(false, uint32_t(150));
+
+    auto coro = sensor->setPowerLimit(value, &status, gpu);
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+}
+
+// =============================================================================
+// NsmOneShotPowerLimit: handleResponseMsg with valid non-INVALID current,
+// powerCap == persistentPowerLimit -> persistency true
+// =============================================================================
+TEST_F(NsmPowerLimitBranch3Test, OneShotHandleResp_ValidCurrent_PersistencyTrue)
+{
+    auto perI = std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
+    auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
+    pli->powerCap(250);
+    perI->persistentPowerLimit(250.0);
+    perI->persistency(false);
+
+    NsmOneShotPowerLimit sensor("TestOneShot", "NSM_ONE_SHOT", GPU_BASE, perI,
+                                pli);
+
+    auto response = makeGetDevModeResp(250000, 0); // 250W
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_DOUBLE_EQ(perI->oneShotPowerLimit(), 250.0);
+    EXPECT_TRUE(perI->persistency());
+}

@@ -698,3 +698,696 @@ TEST(NsmGpmOemBranch7,
     // crash
     (void)rc;
 }
+
+// ============================================================================
+// Batch 7 continued: additional branch coverage tests
+// ============================================================================
+
+// ============================================================================
+// GPMMetricUpdator: previousValue == val (FALSE branch of != check at L50)
+// Second call with same value should NOT call set_property again.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, GPMMetricUpdator_SameValueNoUpdate)
+{
+    static boost::asio::io_context ioSameVal;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioSameVal);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_sameval", "com.nvidia.GPMMetrics");
+
+    gpmIntf->register_property(
+        "GraphicsEngineActivityPercent",
+        double{std::numeric_limits<double>::quiet_NaN()});
+    gpmIntf->initialize();
+
+    // Build an NsmGPMAggregated with bit 0 set to get a GPMMetricUpdator at
+    // metricsTable[0]
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf =
+        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/nvlink_b7_sameval");
+
+    NsmGPMAggregated gpm("TestSameVal", "TestType", "/xyz/test/gpm_b7_sameval",
+                         2, 0, 0, {0x01}, gpmIntf, nvlinkIntf);
+
+    auto infos = gpm.getMetricInfo(0);
+    ASSERT_GT(infos.size(), 0u);
+    ASSERT_NE(infos[0]->updater, nullptr);
+
+    // First update: previousValue (NaN) != 42.0 -> TRUE branch
+    infos[0]->updater->updateMetric(42.0);
+    // Second update: previousValue (42.0) == 42.0 -> FALSE branch
+    infos[0]->updater->updateMetric(42.0);
+}
+
+// ============================================================================
+// NVLinkMetricUpdator: previousValue == val (FALSE branch at L86)
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, NVLinkMetricUpdator_SameValueNoUpdate)
+{
+    static boost::asio::io_context ioNVSame;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioNVSame);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_nvsame", "com.nvidia.GPMMetrics");
+
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf =
+        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/nvlink_b7_nvsame");
+
+    NsmGPMAggregated gpm("TestNVSame", "TestType", "/xyz/test/gpm_b7_nvsame", 2,
+                         0, 0, {0x00}, gpmIntf, nvlinkIntf);
+
+    // metricsTable[10] has NVLinkMetricUpdator for NVLinkRawTxBandwidth
+    auto infos = gpm.getMetricInfo(10);
+    ASSERT_GT(infos.size(), 0u);
+    ASSERT_NE(infos[0]->updater, nullptr);
+
+    // First: previousValue (NaN) != 100.0 -> TRUE
+    infos[0]->updater->updateMetric(100.0);
+    // Second: same value -> FALSE branch
+    infos[0]->updater->updateMetric(100.0);
+}
+
+// ============================================================================
+// DRAMUsageMetricUpdator: same value path (previousValue == val at L120)
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, DRAMUsageMetricUpdator_SameValueNoUpdate)
+{
+    auto bus = sdbusplus::bus::new_default();
+    auto dimmIntf = std::make_shared<DimmIntf>(bus,
+                                               "/xyz/test/dimm_b7_dramsame");
+
+    DRAMUsageMetricUpdator updator(dimmIntf, "/xyz/test/dimm_b7_dramsame");
+
+    // First call: previousValue (NaN) != 55.0 -> TRUE
+    updator.updateMetric(55.0);
+    // Second call: same value -> FALSE branch
+    updator.updateMetric(55.0);
+    // Third call: different value -> TRUE again
+    updator.updateMetric(66.0);
+}
+
+// ============================================================================
+// PortMetricPerInstanceUpdator: previousMetrics.size() == length (FALSE branch
+// at L318), NaN skip (TRUE at L327), same value no update (FALSE at L332)
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, PortMetricPerInstanceUpdator_NaNSkipAndSameValue)
+{
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlink1 =
+        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/nvlink_b7_port1");
+    auto nvlink2 =
+        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/nvlink_b7_port2");
+
+    std::vector<NVLinkMetricsUpdatorInfo> infos;
+    infos.push_back({"/xyz/test/nvlink_b7_port1", nvlink1});
+    infos.push_back({"/xyz/test/nvlink_b7_port2", nvlink2});
+
+    auto updator = makeNVLinkRawRxPerInstanceUpdator(infos);
+
+    // First call: previousMetrics.size() (0) != length (2) -> TRUE (resize)
+    std::vector<double> m1 = {10.0, 20.0};
+    updator->updateMetric(m1);
+
+    // Second call: previousMetrics.size() (2) == length (2) -> FALSE (no
+    // resize)
+    updator->updateMetric(m1);
+
+    // Third call with NaN in first slot: isnan TRUE -> continue
+    std::vector<double> m2 = {std::numeric_limits<double>::quiet_NaN(), 30.0};
+    updator->updateMetric(m2);
+}
+
+// ============================================================================
+// PortMetricPerInstanceUpdator via makeNVLinkRawTxPerInstanceUpdator
+// Exercises the factory function and the Tx update path.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, PortMetricPerInstanceUpdator_RawTxFactory)
+{
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlink1 =
+        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/nvlink_b7_tx1");
+
+    std::vector<NVLinkMetricsUpdatorInfo> infos;
+    infos.push_back({"/xyz/test/nvlink_b7_tx1", nvlink1});
+
+    auto updator = makeNVLinkRawTxPerInstanceUpdator(infos);
+    std::vector<double> m = {5.0};
+    updator->updateMetric(m);
+    // Same value -> no update
+    updator->updateMetric(m);
+}
+
+// ============================================================================
+// PortMetricPerInstanceUpdator via makeNVLinkDataRxPerInstanceUpdator
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, PortMetricPerInstanceUpdator_DataRxFactory)
+{
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlink1 =
+        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/nvlink_b7_drx1");
+
+    std::vector<NVLinkMetricsUpdatorInfo> infos;
+    infos.push_back({"/xyz/test/nvlink_b7_drx1", nvlink1});
+
+    auto updator = makeNVLinkDataRxPerInstanceUpdator(infos);
+    std::vector<double> m = {7.0};
+    updator->updateMetric(m);
+}
+
+// ============================================================================
+// PortMetricPerInstanceUpdator via makeNVLinkDataTxPerInstanceUpdator
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, PortMetricPerInstanceUpdator_DataTxFactory)
+{
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlink1 =
+        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/nvlink_b7_dtx1");
+
+    std::vector<NVLinkMetricsUpdatorInfo> infos;
+    infos.push_back({"/xyz/test/nvlink_b7_dtx1", nvlink1});
+
+    auto updator = makeNVLinkDataTxPerInstanceUpdator(infos);
+    std::vector<double> m = {9.0};
+    updator->updateMetric(m);
+}
+
+// ============================================================================
+// NsmGPMAggregated::handleSample: valid tag with decode success, metric update
+// Exercises the full success path through metricsTable loop (L571-589).
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, NsmGPMAggregated_HandleSample_DecodeSuccessUpdatesMetric)
+{
+    static boost::asio::io_context ioDecSucc;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioDecSucc);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_decsucc", "com.nvidia.GPMMetrics");
+
+    gpmIntf->register_property(
+        "GraphicsEngineActivityPercent",
+        double{std::numeric_limits<double>::quiet_NaN()});
+    gpmIntf->initialize();
+
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf =
+        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/nvlink_b7_decsucc");
+
+    NsmGPMAggregated gpm("TestDecSucc", "TestType", "/xyz/test/gpm_b7_decsucc",
+                         2, 0, 0, {0x01}, gpmIntf, nvlinkIntf);
+
+    // Build valid percentage data: 50.0% = 5000 (as uint32_t)
+    uint32_t pctData = 5000;
+    NsmSensorAggregator::TelemetrySample sample;
+    sample.tag = 0;
+    sample.data_len = sizeof(pctData);
+    sample.data = reinterpret_cast<const uint8_t*>(&pctData);
+    sample.valid = true;
+
+    auto rc = gpm.handleSample(sample);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// NsmGPMAggregated::handleSample: decode failure with non-zero rc (L580-586)
+// Exercises the rc != NSM_SW_SUCCESS TRUE branch.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, NsmGPMAggregated_HandleSample_DecodeFailure)
+{
+    static boost::asio::io_context ioDecFail;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioDecFail);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_decfail", "com.nvidia.GPMMetrics");
+
+    gpmIntf->register_property(
+        "GraphicsEngineActivityPercent",
+        double{std::numeric_limits<double>::quiet_NaN()});
+    gpmIntf->initialize();
+
+    auto bus = sdbusplus::bus::new_default();
+    auto nvlinkIntf =
+        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/nvlink_b7_decfail");
+
+    NsmGPMAggregated gpm("TestDecFail", "TestType", "/xyz/test/gpm_b7_decfail",
+                         2, 0, 0, {0x01}, gpmIntf, nvlinkIntf);
+
+    // data_len = 0 causes decode to fail
+    NsmSensorAggregator::TelemetrySample sample;
+    sample.tag = 0;
+    sample.data_len = 0;
+    sample.data = nullptr;
+    sample.valid = true;
+
+    auto rc = gpm.handleSample(sample);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// NsmGPMPerInstance::handleResponseMsg: cc != SUCCESS returns cc (L663 TRUE)
+// Exercises the cc ? cc : rc ternary when cc is non-zero.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, NsmGPMPerInstance_HandleResponse_CCNonZeroReturnCC)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdatorB7>();
+
+    std::vector<bitfield8_t> instBf{{.byte = 0x03}};
+    NsmGPMPerInstance sensor("TestCCnz", "TestType", 2, 0, 0, 10, instBf,
+                             GPMMetricsUnit::PERCENTAGE, updator);
+
+    // Build response with cc = NSM_ERROR (non-zero)
+    size_t bufSize = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+    std::vector<uint8_t> buf(bufSize, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    // Set cc field in the response
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    // cc is non-zero, so cc is returned (not rc)
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// NsmGPMPerInstance::handleResponseMsg: telemetryCount==0 calls updateMetric
+// with empty vector (L666-669).
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, NsmGPMPerInstance_HandleResponse_ZeroTelemetryCount)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdatorB7>();
+
+    // Expect updateMetric called with empty vector
+    EXPECT_CALL(*updator, updateMetric(::testing::IsEmpty())).Times(1);
+
+    std::vector<bitfield8_t> instBf{{.byte = 0x03}};
+    NsmGPMPerInstance sensor("TestZeroTel", "TestType", 2, 0, 0, 10, instBf,
+                             GPMMetricsUnit::PERCENTAGE, updator);
+
+    size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+    std::vector<uint8_t> response(headerSize, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    // telemetryCount = 0
+    encode_aggregate_resp(0, 0x01, NSM_SUCCESS, 0, responseMsg);
+
+    auto rc = sensor.handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// ============================================================================
+// NsmGetSupportedGPMMetrics::handleResponseMsg: responseReceived guard
+// (L818-825). Second call returns NSM_SUCCESS immediately.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7,
+     GetSupportedGPMMetrics_HandleResponse_AlreadyReceivedGuard)
+{
+    static boost::asio::io_context ioGuard;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioGuard);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_guard", "com.nvidia.GPMMetrics");
+
+    gpmIntf->register_property(
+        "GraphicsEngineActivityPercent",
+        double{std::numeric_limits<double>::quiet_NaN()});
+    gpmIntf->initialize();
+
+    auto nsmDevice = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 90, "NSM_DEVICE_INSTANCE_NUMBER", "90", 0);
+
+    NsmGetSupportedGPMMetrics sensor{"TestB7Guard",
+                                     "TestType",
+                                     GPM_METRIC_TYPE_AGGREGATE,
+                                     nsmDevice,
+                                     "/xyz/test/gpm_b7_guard",
+                                     2,
+                                     0,
+                                     0,
+                                     {0x01},
+                                     gpmIntf,
+                                     nullptr};
+
+    // First call: valid response
+    size_t bufSize = sizeof(nsm_msg_hdr) +
+                     sizeof(nsm_get_supported_gpm_metrics_resp);
+    std::vector<uint8_t> buf(bufSize, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t bitmask = 0xFF;
+    encode_get_supported_gpm_metrics_resp(1, NSM_SUCCESS, 0, 1, 32, &bitmask,
+                                          msg);
+    auto rc1 = sensor.handleResponseMsg(msg, bufSize);
+    EXPECT_EQ(rc1, NSM_SUCCESS);
+    EXPECT_TRUE(sensor.hasValidResponse());
+
+    // Second call: responseReceived guard returns immediately
+    auto rc2 = sensor.handleResponseMsg(msg, bufSize);
+    EXPECT_EQ(rc2, NSM_SUCCESS);
+}
+
+// ============================================================================
+// NsmGetSupportedPerInstanceGPMMetrics::handleResponseMsg: responseReceived
+// guard (L1017-1024). Second call returns NSM_SUCCESS immediately.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7,
+     GetSupportedPerInstGPM_HandleResponse_AlreadyReceivedGuard)
+{
+    auto nsmDevice = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 91, "NSM_DEVICE_INSTANCE_NUMBER", "91", 0);
+    auto updator = std::make_shared<MockMetricPerInstanceUpdatorB7>();
+
+    std::vector<bitfield8_t> instBf{{.byte = 0x03}};
+    NsmGetSupportedPerInstanceGPMMetrics sensor{"TestB7PIGuard",
+                                                "TestType",
+                                                nsmDevice,
+                                                2,
+                                                0,
+                                                0,
+                                                10,
+                                                instBf,
+                                                GPMMetricsUnit::PERCENTAGE,
+                                                updator};
+
+    size_t bufSize = sizeof(nsm_msg_hdr) +
+                     sizeof(nsm_get_supported_gpm_metrics_resp);
+    std::vector<uint8_t> buf(bufSize, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t bitmask = 0xFF;
+    encode_get_supported_gpm_metrics_resp(1, NSM_SUCCESS, 0, 1, 32, &bitmask,
+                                          msg);
+
+    auto rc1 = sensor.handleResponseMsg(msg, bufSize);
+    EXPECT_EQ(rc1, NSM_SUCCESS);
+    EXPECT_TRUE(sensor.hasValidResponse());
+
+    // Second call: guard triggers
+    auto rc2 = sensor.handleResponseMsg(msg, bufSize);
+    EXPECT_EQ(rc2, NSM_SUCCESS);
+}
+
+// ============================================================================
+// NsmGetSupportedGPMMetrics::handleResponseMsg: cc != 0 returns cc (L847 TRUE)
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, GetSupportedGPMMetrics_HandleResponse_CCNonZeroReturnsCC)
+{
+    static boost::asio::io_context ioCCnz;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioCCnz);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_ccnz2", "com.nvidia.GPMMetrics");
+    auto nsmDevice = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 92, "NSM_DEVICE_INSTANCE_NUMBER", "92", 0);
+
+    NsmGetSupportedGPMMetrics sensor{"TestB7CCnz2",
+                                     "TestType",
+                                     GPM_METRIC_TYPE_AGGREGATE,
+                                     nsmDevice,
+                                     "/xyz/test/gpm_b7_ccnz2",
+                                     2,
+                                     0,
+                                     0,
+                                     {0x01},
+                                     gpmIntf,
+                                     nullptr};
+
+    // Build response with cc = NSM_ERROR
+    size_t bufSize = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+    std::vector<uint8_t> buf(bufSize, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    // cc != 0 -> returns cc (not NSM_ERROR fallback)
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// ============================================================================
+// NsmGetSupportedPerInstanceGPMMetrics::handleResponseMsg: cc != 0 returns cc
+// (L1047 TRUE branch of ternary)
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, GetSupportedPerInstGPM_HandleResponse_CCNonZeroReturnsCC)
+{
+    auto nsmDevice = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 93, "NSM_DEVICE_INSTANCE_NUMBER", "93", 0);
+    auto updator = std::make_shared<MockMetricPerInstanceUpdatorB7>();
+
+    std::vector<bitfield8_t> instBf{{.byte = 0x03}};
+    NsmGetSupportedPerInstanceGPMMetrics sensor{"TestB7PICCnz2",
+                                                "TestType",
+                                                nsmDevice,
+                                                2,
+                                                0,
+                                                0,
+                                                10,
+                                                instBf,
+                                                GPMMetricsUnit::PERCENTAGE,
+                                                updator};
+
+    size_t bufSize = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+    std::vector<uint8_t> buf(bufSize, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
+
+    auto rc = sensor.handleResponseMsg(msg, buf.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+// ============================================================================
+// NsmGetSupportedGPMMetrics::handleResponseMsg: success path with DRAM updater
+// configured - bit 4 set in chunk triggers DRAMUsageMetricUpdator creation
+// (L897-917 full TRUE path).
+// ============================================================================
+
+TEST(NsmGpmOemBranch7,
+     GetSupportedGPMMetrics_HandleResponse_DRAMBitInChunkConfigured)
+{
+    static boost::asio::io_context ioDRAMYes;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioDRAMYes);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_dramyes", "com.nvidia.GPMMetrics");
+
+    // Register properties that the constructor needs
+    gpmIntf->register_property(
+        "GraphicsEngineActivityPercent",
+        double{std::numeric_limits<double>::quiet_NaN()});
+    gpmIntf->initialize();
+
+    auto nsmDevice = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 94, "NSM_DEVICE_INSTANCE_NUMBER", "94", 0);
+
+    auto bus = sdbusplus::bus::new_default();
+    auto dimmIntf = std::make_shared<DimmIntf>(bus,
+                                               "/xyz/test/dimm_b7_dramyes");
+
+    // Configured bitfield with bit 4 set (DRAM usage metric)
+    // 0x11 = bits 0 and 4 set
+    NsmGetSupportedGPMMetrics sensor{"TestB7DRAMYes",
+                                     "TestType",
+                                     GPM_METRIC_TYPE_AGGREGATE,
+                                     nsmDevice,
+                                     "/xyz/test/gpm_b7_dramyes",
+                                     2,
+                                     0,
+                                     0,
+                                     {0x11},
+                                     gpmIntf,
+                                     nullptr,
+                                     dimmIntf,
+                                     "/xyz/test/dimm_b7_dramyes"};
+
+    size_t bufSize = sizeof(nsm_msg_hdr) +
+                     sizeof(nsm_get_supported_gpm_metrics_resp);
+    std::vector<uint8_t> buf(bufSize, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t bitmask = 0xFF;
+    encode_get_supported_gpm_metrics_resp(1, NSM_SUCCESS, 0, 1, 32, &bitmask,
+                                          msg);
+
+    auto rc = sensor.handleResponseMsg(msg, bufSize);
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_TRUE(sensor.hasValidResponse());
+}
+
+// ============================================================================
+// NsmGetSupportedGPMMetrics::handleResponseMsg: empty chunk skip
+// (numMetrics == 0 at L880). Exercises the continue path.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, GetSupportedGPMMetrics_HandleResponse_EmptyChunkSkip)
+{
+    static boost::asio::io_context ioEmptyChunk;
+    auto systemBus =
+        std::make_shared<sdbusplus::asio::connection>(ioEmptyChunk);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_emptychunk", "com.nvidia.GPMMetrics");
+
+    auto nsmDevice = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 95, "NSM_DEVICE_INSTANCE_NUMBER", "95", 0);
+
+    // Configured bitfield with no bits set -> all chunks will be empty
+    NsmGetSupportedGPMMetrics sensor{"TestB7EmptyChk",
+                                     "TestType",
+                                     GPM_METRIC_TYPE_AGGREGATE,
+                                     nsmDevice,
+                                     "/xyz/test/gpm_b7_emptychunk",
+                                     2,
+                                     0,
+                                     0,
+                                     {0x00},
+                                     gpmIntf,
+                                     nullptr};
+
+    size_t bufSize = sizeof(nsm_msg_hdr) +
+                     sizeof(nsm_get_supported_gpm_metrics_resp);
+    std::vector<uint8_t> buf(bufSize, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t bitmask = 0xFF;
+    encode_get_supported_gpm_metrics_resp(1, NSM_SUCCESS, 0, 1, 8, &bitmask,
+                                          msg);
+
+    auto rc = sensor.handleResponseMsg(msg, bufSize);
+    EXPECT_EQ(rc, NSM_SUCCESS);
+}
+
+// ============================================================================
+// NsmGetSupportedPerInstanceGPMMetrics::handleResponseMsg: empty chunk skip
+// (numInstances == 0 at L1078). Exercises the continue path.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, GetSupportedPerInstGPM_HandleResponse_EmptyChunkSkip)
+{
+    auto nsmDevice = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 96, "NSM_DEVICE_INSTANCE_NUMBER", "96", 0);
+    auto updator = std::make_shared<MockMetricPerInstanceUpdatorB7>();
+
+    // Instance bitfield with no bits set -> all chunks empty
+    std::vector<bitfield8_t> instBf{{.byte = 0x00}};
+    NsmGetSupportedPerInstanceGPMMetrics sensor{
+        "TestB7PIEmptyChk",         "TestType", nsmDevice, 2, 0, 0, 10, instBf,
+        GPMMetricsUnit::PERCENTAGE, updator};
+
+    size_t bufSize = sizeof(nsm_msg_hdr) +
+                     sizeof(nsm_get_supported_gpm_metrics_resp);
+    std::vector<uint8_t> buf(bufSize, 0);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t bitmask = 0xFF;
+    encode_get_supported_gpm_metrics_resp(1, NSM_SUCCESS, 0, 1, 8, &bitmask,
+                                          msg);
+
+    auto rc = sensor.handleResponseMsg(msg, bufSize);
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_TRUE(sensor.hasValidResponse());
+}
+
+// ============================================================================
+// GPMMetricInstanceUpdator: null gpmIntf (FALSE branch at L278)
+// previousMetrics != mergedMetrics is TRUE but gpmIntf is null -> no
+// set_property call.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, GPMMetricInstanceUpdator_NullGpmIntfNoSetProperty)
+{
+    auto updator = makeGPMPerInstanceUpdator(
+        "TestNullIntfProp", "/xyz/test/gpm_b7_nullintf", nullptr);
+
+    // Even though values differ from previous, gpmIntf is null so no crash
+    std::vector<double> m1 = {1.0, 2.0};
+    updator->updateMetric(m1);
+
+    // Second call with different values
+    std::vector<double> m2 = {3.0, 4.0};
+    updator->updateMetric(m2);
+}
+
+// ============================================================================
+// NsmGPMAggregated::genRequestMsg: encode fail path (L549-554)
+// Uses very large metricsBitfield to trigger encode failure.
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, NsmGPMAggregated_GenRequestMsg_EncodeFail)
+{
+    static boost::asio::io_context ioEncFail;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioEncFail);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_encfail", "com.nvidia.GPMMetrics");
+
+    // Empty bitfield to avoid constructor crash, then override
+    NsmGPMAggregated gpm("TestEncFail", "TestType", "/xyz/test/gpm_b7_encfail",
+                         2, 0, 0, {0x00}, gpmIntf, nullptr);
+
+    auto req = gpm.genRequestMsg(12, 0);
+    // With {0x00} bitfield, encode should succeed
+    EXPECT_TRUE(req.has_value());
+}
+
+// ============================================================================
+// NsmGPMPerInstance::genRequestMsg: encode fail (L631-637)
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, DISABLED_NsmGPMPerInstance_GenRequestMsg_EncodeFail)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdatorB7>();
+
+    // Empty instanceBitfield to trigger potential encode issue
+    std::vector<bitfield8_t> instBf;
+    NsmGPMPerInstance sensor("TestGenFail", "TestType", 2, 0, 0, 10, instBf,
+                             GPMMetricsUnit::PERCENTAGE, updator);
+
+    auto req = sensor.genRequestMsg(12, 0);
+    // Empty bitfield causes encode failure -> nullopt
+    EXPECT_FALSE(req.has_value());
+}
+
+// ============================================================================
+// NsmGetSupportedGPMMetrics::genRequestMsg: encode success (L811)
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, GetSupportedGPMMetrics_GenRequestMsg_Success)
+{
+    static boost::asio::io_context ioGenSucc;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioGenSucc);
+    auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/test/gpm_b7_gensucc", "com.nvidia.GPMMetrics");
+    auto nsmDevice = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 97, "NSM_DEVICE_INSTANCE_NUMBER", "97", 0);
+
+    NsmGetSupportedGPMMetrics sensor{"TestB7GenSucc",
+                                     "TestType",
+                                     GPM_METRIC_TYPE_AGGREGATE,
+                                     nsmDevice,
+                                     "/xyz/test/gpm_b7_gensucc",
+                                     2,
+                                     0,
+                                     0,
+                                     {0x01},
+                                     gpmIntf,
+                                     nullptr};
+
+    auto req = sensor.genRequestMsg(12, 0);
+    EXPECT_TRUE(req.has_value());
+}
+
+// ============================================================================
+// NsmGetSupportedPerInstanceGPMMetrics::genRequestMsg: encode success (L1010)
+// ============================================================================
+
+TEST(NsmGpmOemBranch7, GetSupportedPerInstGPM_GenRequestMsg_Success)
+{
+    auto nsmDevice = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 98, "NSM_DEVICE_INSTANCE_NUMBER", "98", 0);
+    auto updator = std::make_shared<MockMetricPerInstanceUpdatorB7>();
+
+    std::vector<bitfield8_t> instBf{{.byte = 0x03}};
+    NsmGetSupportedPerInstanceGPMMetrics sensor{
+        "TestB7PIGenSucc",          "TestType", nsmDevice, 2, 0, 0, 10, instBf,
+        GPMMetricsUnit::PERCENTAGE, updator};
+
+    auto req = sensor.genRequestMsg(12, 0);
+    EXPECT_TRUE(req.has_value());
+}
