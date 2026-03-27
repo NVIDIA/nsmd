@@ -2461,8 +2461,7 @@ int decode_get_supported_device_modes_req(const struct nsm_msg *msg,
 
 int encode_get_supported_device_modes_resp(uint8_t instance_id, uint8_t cc,
 					   uint16_t reason_code,
-					   uint16_t handle,
-					   uint16_t mode_count,
+					   uint16_t handle, uint16_t mode_count,
 					   const uint32_t *supported_mode_list,
 					   struct nsm_msg *msg)
 {
@@ -2481,8 +2480,8 @@ int encode_get_supported_device_modes_resp(uint8_t instance_id, uint8_t cc,
 	}
 
 	if (cc != NSM_SUCCESS) {
-		return encode_reason_code(cc, reason_code,
-					  NSM_GET_SUPPORTED_DEVICE_MODES_V2, msg);
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_SUPPORTED_DEVICE_MODES_V2, msg);
 	}
 
 	if (supported_mode_list == NULL && mode_count > 0) {
@@ -2528,8 +2527,8 @@ int decode_get_supported_device_modes_resp(const struct nsm_msg *msg,
 	struct nsm_get_supported_device_modes_resp *response =
 	    (struct nsm_get_supported_device_modes_resp *)msg->payload;
 
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(response->hdr) + sizeof(response->handle) +
+	if (msg_len < sizeof(struct nsm_msg_hdr) + sizeof(response->hdr) +
+			  sizeof(response->handle) +
 			  sizeof(response->mode_count)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
