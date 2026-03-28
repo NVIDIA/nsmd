@@ -412,4 +412,43 @@ class NsmPCIeLaneManager : public NsmSensor
     uint8_t convertSpeedGbpsToLinkSpeedCode(double speedGbps);
 };
 
+/**
+ * @brief Discovery sensor that queries ListPCIePorts (0x07) from the device
+ *        and dynamically creates upstream/downstream port D-Bus objects with
+ *        all associated telemetry sensors.
+ *
+ */
+class NsmPCIePortDiscovery : public NsmSensor
+{
+  public:
+    NsmPCIePortDiscovery(const std::string& name, const std::string& type,
+                         const std::string& inventoryObjPath,
+                         const std::string& upstreamPortName,
+                         const std::string& downstreamPortName,
+                         bool portSensorPriority,
+                         const std::vector<utils::Association>& associations,
+                         std::shared_ptr<NsmDevice> device);
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::string inventoryObjPath;
+    std::string upstreamPortName;
+    std::string downstreamPortName;
+    bool portSensorPriority;
+    std::vector<utils::Association> associations;
+    std::shared_ptr<NsmDevice> device;
+    bool portsCreated{false};
+
+    void createMultiPCIePort(sdbusplus::bus::bus& bus,
+                             const std::string& portName,
+                             const std::string& portObjPath,
+                             uint8_t portTypeVal, uint64_t portIndex,
+                             uint8_t upstreamPortNumber,
+                             bool includeInboundCounters);
+};
+
 } // namespace nsm
