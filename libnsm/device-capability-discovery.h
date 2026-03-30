@@ -191,14 +191,14 @@ struct nsm_get_device_capabilities_v2_resp {
 /** @struct nsm_gpio_event
  *
  *  Structure representing individual GPIO event
- *  Bit 15: Reserved
- *  Bit 14: GPIO Value
- *  Bit 0-13: GPIO index
+ *  Bit 15: GPIO Value
+ *  Bit 10-14: Reserved
+ *  Bit 0-9: GPIO index
  */
 struct nsm_gpio_event {
-	uint16_t gpio_index : 14; /* GPIO index (bits 0-13) */
-	uint16_t gpio_value : 1;  /* GPIO value (bit 14) */
-	uint16_t reserved : 1;	  /* Reserved (bit 15) */
+	uint16_t gpio_index : 10; /* GPIO index (bits 0-9) */
+	uint16_t reserved : 5;	  /* Reserved (bit 10-14) */
+	uint16_t gpio_value : 1;  /* GPIO value (bit 15) */
 } __attribute__((packed));
 
 /** @struct nsm_gpio_state_change_event_payload
