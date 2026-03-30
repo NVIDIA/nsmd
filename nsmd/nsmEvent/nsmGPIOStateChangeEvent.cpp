@@ -41,7 +41,7 @@ int NsmGPIOStateChangeEvent::handle(eid_t eid, NsmType /*type*/,
                                     NsmEventId /*eventId*/,
                                     const nsm_msg* event, size_t eventLen)
 {
-    lg2::info("Received gpio state change event from EID {EID}.", "EID", eid);
+    lg2::debug("Received gpio state change event from EID {EID}.", "EID", eid);
 
     uint8_t eventClass{};
     uint16_t eventState{};
