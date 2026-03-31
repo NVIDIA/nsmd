@@ -17,6 +17,7 @@
 
 #include "nsmRoTProperty.hpp"
 
+#include "nsmErot.hpp"
 #include "nsmFirmwareUtilsCommon.hpp"
 #include "sensorManager.hpp"
 
@@ -709,6 +710,19 @@ requester::Coroutine NsmImageCopy::initiateImageCopyAsync(
 
         setImageCopyResult(valueIntf, NSM_SUCCESS, 0,
                            ImageCopyRequestStatus::Accepted);
+
+        // Refresh slot properties on D-Bus now (firmware state and other slot
+        // info), instead of waiting for the next poll. co_await update()
+        // waits for each refresh to finish; there is no sleep or delay first.
+        auto device =
+            SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+        if (device && device->isOnline())
+        {
+            for (const auto& fwStateSensor : device->getBuildTypeSensors())
+            {
+                co_await fwStateSensor->update(device);
+            }
+        }
         // Stop the timeout timer since operation completed successfully
         if (imageCopyTimeoutTimer)
         {

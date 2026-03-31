@@ -61,6 +61,7 @@ class NsmDevice;
 class NsmLongRunningEvent;
 class ProgressCounters;
 class DiscoveryEvents;
+class NsmBuildTypeObject;
 using NsmDeviceTable = std::vector<std::shared_ptr<NsmDevice>>;
 using SensorQueue = CircularQueue<std::shared_ptr<NsmObject>>;
 
@@ -360,6 +361,7 @@ class NsmDevice :
         {
             // sensors was not added to deviceSensors
             addSensorBase(sensor, pollingType);
+            registerBuildTypeSensor(sensor);
         }
     }
 
@@ -377,6 +379,21 @@ class NsmDevice :
     void addSensor(std::shared_ptr<SensorType>& sensor, PollingType pollingType)
     {
         addSensorBase(sensor, pollingType);
+        registerBuildTypeSensor(sensor);
+    }
+
+    std::vector<std::shared_ptr<NsmBuildTypeObject>> getBuildTypeSensors() const
+    {
+        std::vector<std::shared_ptr<NsmBuildTypeObject>> sensors;
+        sensors.reserve(buildTypeSensors.size());
+        for (const auto& weakSensor : buildTypeSensors)
+        {
+            if (auto sensor = weakSensor.lock())
+            {
+                sensors.emplace_back(std::move(sensor));
+            }
+        }
+        return sensors;
     }
 
     virtual requester::Coroutine updateNsmDevice();
@@ -582,6 +599,17 @@ class NsmDevice :
     void dumpNsmDeviceInfo();
 
   private:
+    template <typename SensorType>
+    void registerBuildTypeSensor(const std::shared_ptr<SensorType>& sensor)
+    {
+        using SensorTypeNoCvRef =
+            std::remove_cv_t<std::remove_reference_t<SensorType>>;
+        if constexpr (std::is_same_v<SensorTypeNoCvRef, NsmBuildTypeObject>)
+        {
+            buildTypeSensors.emplace_back(sensor);
+        }
+    }
+
     std::vector<std::vector<bitfield8_t>> commands;
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
     uint8_t eventMode;
@@ -632,6 +660,7 @@ class NsmDevice :
     std::unordered_map<uint8_t, bool> commandCodesRetrieved;
     std::vector<std::shared_ptr<NsmObject>> setSensors;
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
+    std::vector<std::weak_ptr<NsmBuildTypeObject>> buildTypeSensors;
 
     void initMsgTypesSensor();
     requester::Coroutine markSensorsUnrefreshed();
