@@ -84,27 +84,38 @@ std::shared_ptr<NsmAggregateFabricManagerState>
 
 void NsmAggregateFabricManagerState::updateAggregateFabricManagerState()
 {
-    size_t idx;
     FMState fmState = FMState::Unknown;
     FMReportStatus reportStatus = FMReportStatus::Unknown;
     OpState state = OpState::StandbyOffline;
     uint16_t lastRestartTime = 0;
     uint16_t lastRestartDuration = 0;
+    bool hasTimeout = false;
+    bool hasNotReceived = false;
 
-    for (idx = 0; idx < associatedFabricManagerIntfs.size(); idx++)
+    for (size_t idx = 0; idx < associatedFabricManagerIntfs.size(); idx++)
     {
-        if (associatedFabricManagerIntfs[idx]->reportStatus() !=
-            FMReportStatus::Received)
+        auto switchStatus = associatedFabricManagerIntfs[idx]->reportStatus();
+
+        // Track non-Received statuses to derive aggregate when no Received
+        // switch exists. Timeout takes priority over NotReceived (Pending).
+        if (switchStatus == FMReportStatus::Timeout)
+        {
+            hasTimeout = true;
+        }
+        else if (switchStatus == FMReportStatus::NotReceived)
+        {
+            hasNotReceived = true;
+        }
+
+        if (switchStatus != FMReportStatus::Received)
         {
             continue;
         }
+
         if (reportStatus == FMReportStatus::Received)
         {
-            if (fmState == associatedFabricManagerIntfs[idx]->fmState())
-            {
-                continue;
-            }
-            else
+            // A second Received switch: FMState must match, else Unknown.
+            if (fmState != associatedFabricManagerIntfs[idx]->fmState())
             {
                 fmState = FMState::Unknown;
                 break;
@@ -112,7 +123,8 @@ void NsmAggregateFabricManagerState::updateAggregateFabricManagerState()
         }
         else
         {
-            reportStatus = associatedFabricManagerIntfs[idx]->reportStatus();
+            // First Received switch: capture its values.
+            reportStatus = FMReportStatus::Received;
             fmState = associatedFabricManagerIntfs[idx]->fmState();
             lastRestartTime =
                 associatedFabricManagerIntfs[idx]->lastRestartTime();
@@ -120,6 +132,21 @@ void NsmAggregateFabricManagerState::updateAggregateFabricManagerState()
                 associatedFabricManagerIntfs[idx]->lastRestartDuration();
             state = associatedOperationalStatusIntfs[idx]->state();
         }
+    }
+
+    // If no switch reported Received, derive aggregate from remaining statuses:
+    // Timeout takes priority over NotReceived (Pending).
+    if (reportStatus != FMReportStatus::Received)
+    {
+        if (hasTimeout)
+        {
+            reportStatus = FMReportStatus::Timeout;
+        }
+        else if (hasNotReceived)
+        {
+            reportStatus = FMReportStatus::NotReceived;
+        }
+        fmState = FMState::Unknown;
     }
 
     fabricManagerIntf->reportStatus(reportStatus);
