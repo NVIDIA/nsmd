@@ -178,6 +178,92 @@ TEST(NsmPersistentPowerLimit, BadHandleResp)
     EXPECT_NE(rc, NSM_SW_SUCCESS);
 }
 
+TEST(NsmPersistentPowerLimit, HandleOfflineState_GPU_COPY_SWITCH)
+{
+    auto powerLimitsIntf =
+        std::make_shared<PowerLimitsIntf>(bus, inventoryObjPath.c_str());
+    auto associationDefIntf = std::make_shared<AssociationDefinitionsIntf>(
+        bus, inventoryObjPath.c_str());
+
+    NsmPersistentPowerLimit sensor(sensorName, sensorType, powerLimitsIntf,
+                                   nullptr, associationDefIntf, nullptr,
+                                   GPU_COPY_SWITCH, nullptr);
+
+    uint32_t initialPowerCap = 300;
+    powerLimitsIntf->powerCap(initialPowerCap);
+
+    sensor.handleOfflineState();
+
+    EXPECT_EQ(powerLimitsIntf->powerCap(), initialPowerCap);
+}
+
+TEST(NsmPersistentPowerLimit, GoodHandleResp_GPU_COPY_SWITCH)
+{
+    auto powerLimitsIntf =
+        std::make_shared<PowerLimitsIntf>(bus, inventoryObjPath.c_str());
+    auto associationDefIntf = std::make_shared<AssociationDefinitionsIntf>(
+        bus, inventoryObjPath.c_str());
+
+    NsmPersistentPowerLimit sensor(sensorName, sensorType, powerLimitsIntf,
+                                   nullptr, associationDefIntf, nullptr,
+                                   GPU_COPY_SWITCH, nullptr);
+
+    uint32_t powerLimitValue = htole32(300000);
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            sizeof(powerLimitValue) * 2,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, reason_code,
+        reinterpret_cast<const uint8_t*>(&powerLimitValue),
+        sizeof(powerLimitValue),
+        reinterpret_cast<const uint8_t*>(&powerLimitValue),
+        sizeof(powerLimitValue), responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(responseMsg, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(powerLimitsIntf->powerCap(), 300);
+}
+
+TEST(NsmPersistentPowerLimit, BadHandleResp_GPU_COPY_SWITCH)
+{
+    auto powerLimitsIntf =
+        std::make_shared<PowerLimitsIntf>(bus, inventoryObjPath.c_str());
+    auto associationDefIntf = std::make_shared<AssociationDefinitionsIntf>(
+        bus, inventoryObjPath.c_str());
+
+    NsmPersistentPowerLimit sensor(sensorName, sensorType, powerLimitsIntf,
+                                   nullptr, associationDefIntf, nullptr,
+                                   GPU_COPY_SWITCH, nullptr);
+
+    uint32_t powerLimitValue = htole32(300000);
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            sizeof(powerLimitValue) * 2,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, reason_code,
+        reinterpret_cast<const uint8_t*>(&powerLimitValue),
+        sizeof(powerLimitValue),
+        reinterpret_cast<const uint8_t*>(&powerLimitValue),
+        sizeof(powerLimitValue), responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+    rc = sensor.handleResponseMsg(responseMsg, 0);
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
 // NsmOneShotPowerLimit Tests
 TEST(NsmOneShotPowerLimit, GoodGenReq)
 {
