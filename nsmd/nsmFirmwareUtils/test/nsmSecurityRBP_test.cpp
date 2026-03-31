@@ -1445,10 +1445,13 @@ TEST_F(NsmFabricManagerStateTest, UpdateAggregate_NoReceivedReports_SetsUnknown)
     fmState.getAggregateFabricManagerState()
         ->updateAggregateFabricManagerState();
 
-    // Assert - aggregate should show Unknown since no received
+    // Assert - aggregate should show NotReceived (Pending) since no switch has
+    // reported yet (design doc: all Pending -> aggregate ReportStatus =
+    // Pending)
     auto agg = fmState.getAggregateFabricManagerState();
     EXPECT_EQ(agg->fabricManagerIntf->fmState(), FMState::Unknown);
-    EXPECT_EQ(agg->fabricManagerIntf->reportStatus(), FMReportStatus::Unknown);
+    EXPECT_EQ(agg->fabricManagerIntf->reportStatus(),
+              FMReportStatus::NotReceived);
 }
 
 TEST_F(NsmFabricManagerStateTest,

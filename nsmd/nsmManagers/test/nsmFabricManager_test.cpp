@@ -504,6 +504,200 @@ TEST_F(NsmFabricManagerTest, HandleResponseMsg_Success_DefaultReportStatus)
     EXPECT_EQ(operaStatusIntf->state(), nsm::OpState::StandbyOffline);
 }
 
+// Fixture for aggregate aggregation tests. Creates two switch-level interfaces
+// and registers them with the aggregate singleton.
+class NsmAggregateFabricManagerTest : public NsmFabricManagerTest
+{
+  protected:
+    const std::string aggregatePath =
+        "/xyz/openbmc_project/inventory/system/fabric_manager_aggregate";
+    const std::string description = "Aggregate Fabric Manager";
+
+    std::shared_ptr<nsm::FabricManagerIntf> sw1FM;
+    std::shared_ptr<nsm::OperaStatusIntf> sw1OS;
+    std::shared_ptr<nsm::FabricManagerIntf> sw2FM;
+    std::shared_ptr<nsm::OperaStatusIntf> sw2OS;
+    std::shared_ptr<nsm::NsmAggregateFabricManagerState> aggregate;
+
+    void SetUp() override
+    {
+        NsmFabricManagerTest::SetUp();
+
+        sw1FM = std::make_shared<nsm::FabricManagerIntf>(
+            bus,
+            "/xyz/openbmc_project/inventory/system/fabric_manager/Switch0");
+        sw1OS = std::make_shared<nsm::OperaStatusIntf>(
+            bus,
+            "/xyz/openbmc_project/inventory/system/fabric_manager/Switch0");
+        sw2FM = std::make_shared<nsm::FabricManagerIntf>(
+            bus,
+            "/xyz/openbmc_project/inventory/system/fabric_manager/Switch1");
+        sw2OS = std::make_shared<nsm::OperaStatusIntf>(
+            bus,
+            "/xyz/openbmc_project/inventory/system/fabric_manager/Switch1");
+
+        aggregate = nsm::NsmAggregateFabricManagerState::getInstance(
+            aggregatePath, sw1FM, sw1OS, description);
+        nsm::NsmAggregateFabricManagerState::getInstance(aggregatePath, sw2FM,
+                                                         sw2OS, description);
+    }
+};
+
+// Design doc table row 1: Pending + Pending -> Pending, Unknown
+TEST_F(NsmAggregateFabricManagerTest, Aggregate_Pending_Pending)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::NotReceived);
+    sw1FM->fmState(nsm::FMState::Unknown);
+    sw2FM->reportStatus(nsm::FMReportStatus::NotReceived);
+    sw2FM->fmState(nsm::FMState::Unknown);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::NotReceived);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(), nsm::FMState::Unknown);
+}
+
+// Design doc table row 2: Pending + Received -> Received, switch2 value
+TEST_F(NsmAggregateFabricManagerTest, Aggregate_Pending_Received)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::NotReceived);
+    sw1FM->fmState(nsm::FMState::Unknown);
+    sw2FM->reportStatus(nsm::FMReportStatus::Received);
+    sw2FM->fmState(nsm::FMState::Standby);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::Received);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(), nsm::FMState::Standby);
+}
+
+// Design doc table row 3: Pending + Timeout -> Timeout, Unknown
+TEST_F(NsmAggregateFabricManagerTest, Aggregate_Pending_Timeout)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::NotReceived);
+    sw1FM->fmState(nsm::FMState::Unknown);
+    sw2FM->reportStatus(nsm::FMReportStatus::Timeout);
+    sw2FM->fmState(nsm::FMState::Unknown);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::Timeout);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(), nsm::FMState::Unknown);
+}
+
+// Design doc table row 4: Received + Pending -> Received, switch1 value
+TEST_F(NsmAggregateFabricManagerTest, Aggregate_Received_Pending)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::Received);
+    sw1FM->fmState(nsm::FMState::Configured);
+    sw2FM->reportStatus(nsm::FMReportStatus::NotReceived);
+    sw2FM->fmState(nsm::FMState::Unknown);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::Received);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(),
+              nsm::FMState::Configured);
+}
+
+// Design doc table row 5: Received + Received (same) -> Received, that value
+TEST_F(NsmAggregateFabricManagerTest, Aggregate_Received_Received_SameState)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::Received);
+    sw1FM->fmState(nsm::FMState::Configured);
+    sw2FM->reportStatus(nsm::FMReportStatus::Received);
+    sw2FM->fmState(nsm::FMState::Configured);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::Received);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(),
+              nsm::FMState::Configured);
+}
+
+// Design doc table row 5 (mismatch): Received + Received (different) ->
+// Received, Unknown
+TEST_F(NsmAggregateFabricManagerTest,
+       Aggregate_Received_Received_DifferentState)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::Received);
+    sw1FM->fmState(nsm::FMState::Configured);
+    sw2FM->reportStatus(nsm::FMReportStatus::Received);
+    sw2FM->fmState(nsm::FMState::Standby);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::Received);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(), nsm::FMState::Unknown);
+}
+
+// Design doc table row 6: Received + Timeout -> Received, switch1 value
+TEST_F(NsmAggregateFabricManagerTest, Aggregate_Received_Timeout)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::Received);
+    sw1FM->fmState(nsm::FMState::Configured);
+    sw2FM->reportStatus(nsm::FMReportStatus::Timeout);
+    sw2FM->fmState(nsm::FMState::Unknown);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::Received);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(),
+              nsm::FMState::Configured);
+}
+
+// Design doc table row 7: Timeout + Pending -> Timeout, Unknown
+TEST_F(NsmAggregateFabricManagerTest, Aggregate_Timeout_Pending)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::Timeout);
+    sw1FM->fmState(nsm::FMState::Unknown);
+    sw2FM->reportStatus(nsm::FMReportStatus::NotReceived);
+    sw2FM->fmState(nsm::FMState::Unknown);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::Timeout);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(), nsm::FMState::Unknown);
+}
+
+// Design doc table row 8: Timeout + Received -> Received, switch2 value
+TEST_F(NsmAggregateFabricManagerTest, Aggregate_Timeout_Received)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::Timeout);
+    sw1FM->fmState(nsm::FMState::Unknown);
+    sw2FM->reportStatus(nsm::FMReportStatus::Received);
+    sw2FM->fmState(nsm::FMState::Standby);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::Received);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(), nsm::FMState::Standby);
+}
+
+// Design doc table row 9: Timeout + Timeout -> Timeout, Unknown
+TEST_F(NsmAggregateFabricManagerTest, Aggregate_Timeout_Timeout)
+{
+    sw1FM->reportStatus(nsm::FMReportStatus::Timeout);
+    sw1FM->fmState(nsm::FMState::Unknown);
+    sw2FM->reportStatus(nsm::FMReportStatus::Timeout);
+    sw2FM->fmState(nsm::FMState::Unknown);
+
+    aggregate->updateAggregateFabricManagerState();
+
+    EXPECT_EQ(aggregate->fabricManagerIntf->reportStatus(),
+              nsm::FMReportStatus::Timeout);
+    EXPECT_EQ(aggregate->fabricManagerIntf->fmState(), nsm::FMState::Unknown);
+}
+
 TEST_F(NsmFabricManagerTest, AggregateFabricManager_SingletonBehavior)
 {
     std::string inventoryObjPathFM =

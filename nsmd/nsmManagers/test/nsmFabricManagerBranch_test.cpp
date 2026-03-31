@@ -289,9 +289,10 @@ TEST_F(NsmFabricManagerBranchTest, Aggregate_AllNotReceived_DefaultState)
     ASSERT_NE(agg, nullptr);
     agg->updateAggregateFabricManagerState();
 
-    // Aggregate should remain in Unknown state
+    // Both switches pending → aggregate is Pending (NotReceived), FMState
+    // Unknown
     EXPECT_EQ(agg->fabricManagerIntf->reportStatus(),
-              nsm::FMReportStatus::Unknown);
+              nsm::FMReportStatus::NotReceived);
     EXPECT_EQ(agg->fabricManagerIntf->fmState(), nsm::FMState::Unknown);
 }
 
