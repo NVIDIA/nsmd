@@ -73,6 +73,12 @@ class AsyncOperationManager
 
     AsyncSetOperationDispatcher* getDispatcher(const std::string& objPath);
 
+    /** @brief Remove a dispatcher for the given D-Bus object path.
+     *
+     * @param objPath[in] D-Bus object path of the dispatcher
+     */
+    void removeDispatcher(const std::string& objPath);
+
     std::pair<std::string, std::shared_ptr<AsyncStatusIntf>>
         getNewStatusInterface();
 

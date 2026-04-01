@@ -3672,20 +3672,21 @@ TEST_F(NsmPCIeRetimerPortsFactoryFixture,
     EXPECT_GT(retimer->deviceSensors.size(), beforeRetimer);
 }
 
-// Invalid portType string → else branch → lg2::error + co_return NSM_ERROR //
-// No sensors created
+// PortType is no longer read from EM config (dynamic discovery via
+// ListPCIePorts determines port types at runtime). Factory always succeeds
+// if UUID is valid — a NsmPCIePortDiscovery sensor is created regardless
+// of any PortType property in the config.
 TEST_F(NsmPCIeRetimerPortsFactoryFixture,
-       MultiFactory_InvalidPortType_ReturnsError)
+       MultiFactory_NoPortType_StillCreatesDiscoverySensor)
 {
-    const std::string testPath = "/xyz/test/multiport/invalid_type";
+    const std::string testPath = "/xyz/test/multiport/no_port_type";
     auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
     pm = multiPortProps;
-    pm["Name"] = std::string("InvalidTypePort");
-    pm["PortType"] = std::string("xyz.openbmc_project.Invalid.PortType.Foo");
+    pm["Name"] = std::string("NoPortTypePort");
 
     const size_t before = retimer->deviceSensors.size();
     createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
-    EXPECT_EQ(retimer->deviceSensors.size(), before);
+    EXPECT_GT(retimer->deviceSensors.size(), before);
 }
 
 // UUID="" → parseStaticUuid("") throws in mock (invalid format)

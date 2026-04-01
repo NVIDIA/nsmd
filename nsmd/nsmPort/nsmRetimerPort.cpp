@@ -10,6 +10,7 @@
 #endif
 
 #include "nsmPort/nsmPortConfigurationInfo.hpp"
+#include "nsmSetAsync/asyncOperationManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -1258,8 +1259,16 @@ bool NsmPCIeLaneManager::hasLaneSensor(uint8_t laneIdx) const
     return laneSensors.find(laneIdx) != laneSensors.end();
 }
 
-void NsmPCIeLaneManager::clearAllLaneSensors()
+void NsmPCIeLaneManager::clearAllLaneSensors(
+    std::shared_ptr<NsmDevice> nsmDevice)
 {
+    if (nsmDevice)
+    {
+        for (auto& [_, laneSensor] : laneSensors)
+        {
+            nsmDevice->removeSensor(laneSensor);
+        }
+    }
     laneSensors.clear();
     lanesInitialized = false;
     currentLaneCount = 0;
@@ -1492,7 +1501,7 @@ requester::Coroutine createNsmPCIeRetimerPorts(SensorManager& manager,
     co_return NSM_SUCCESS;
 }
 
-inline void createNsmPCIePortConfigurationInfo(
+inline std::shared_ptr<NsmObject> createNsmPCIePortConfigurationInfo(
     sdbusplus::bus::bus& bus, const std::string& portName,
     const std::string& type, const std::string& objPath, const bool priority,
     const uint64_t upstreamPortNumber, const uint8_t portTypeVal,
@@ -1529,6 +1538,8 @@ inline void createNsmPCIePortConfigurationInfo(
             "xyz.openbmc_project.PCIe.PCIePortConfigurationInfo", "Preset1",
             AsyncSetOperationInfo{setPortConfigurationHandler,
                                   pciePortConfigurationInfo, nsmDevice});
+
+    return pciePortConfigurationInfo;
 }
 
 NsmPCIePortDiscovery::NsmPCIePortDiscovery(
@@ -1541,10 +1552,7 @@ NsmPCIePortDiscovery::NsmPCIePortDiscovery(
     upstreamPortName(upstreamPortName), downstreamPortName(downstreamPortName),
     portSensorPriority(portSensorPriority), associations(associations),
     device(std::move(device))
-{
-    lg2::info("NsmPCIePortDiscovery: created for {NAME} {TYPE}", "NAME",
-              name.c_str(), "TYPE", type.c_str());
-}
+{}
 
 std::optional<std::vector<uint8_t>>
     NsmPCIePortDiscovery::genRequestMsg([[maybe_unused]] eid_t eid,
@@ -1563,11 +1571,14 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-void NsmPCIePortDiscovery::createMultiPCIePort(
+PortSensorGroup NsmPCIePortDiscovery::createMultiPCIePort(
     sdbusplus::bus::bus& bus, const std::string& portName,
     const std::string& portObjPath, uint8_t portTypeVal, uint64_t portIndex,
     uint8_t upstreamPortNumber, bool includeInboundCounters)
 {
+    PortSensorGroup portGroup;
+    portGroup.portObjPath = portObjPath;
+
     auto type = getType();
     std::string portProtocol =
         "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe";
@@ -1576,13 +1587,12 @@ void NsmPCIePortDiscovery::createMultiPCIePort(
             ? "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort"
             : "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.DownstreamPort";
 
-    // Port D-Bus object
     std::string mutablePortName = portName;
     auto pciePortIntfSensor = std::make_shared<NsmPort>(
         bus, mutablePortName, type, associations, portObjPath);
     device->addStaticSensor(pciePortIntfSensor);
+    portGroup.sensors.push_back(pciePortIntfSensor);
 
-    // Telemetry interfaces
     auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus, portObjPath.c_str());
     auto portInfoIntf = std::make_shared<PortInfoIntf>(bus,
                                                        portObjPath.c_str());
@@ -1597,55 +1607,66 @@ void NsmPCIePortDiscovery::createMultiPCIePort(
         PortInfoIntf::convertPortProtocolFromString(portProtocol));
     portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portTypeStr));
 
-    // ECC sensor groups (same as existing static flow)
-    auto group1 = std::make_shared<NsmPCIeECCGroup1>(
+    auto multipcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
         portName, type, portObjPath, portInfoIntf, portWidthIntf,
         pcieClockModeIntf, portTypeVal, portIndex, upstreamPortNumber);
-    auto group2 = std::make_shared<NsmPCIeECCGroup2>(
+    auto multipcieSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
         portName, type, portObjPath, pcieECCIntf, portTypeVal, portIndex,
         upstreamPortNumber);
-    auto group3 = std::make_shared<NsmPCIeECCGroup3>(
+    auto multipcieSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
         portName, type, portObjPath, pcieECCIntf, portTypeVal, portIndex,
         upstreamPortNumber);
-    auto group4 = std::make_shared<NsmPCIeECCGroup4>(
+    auto multipcieSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
         portName, type, portObjPath, pcieECCIntf, portTypeVal, portIndex,
         upstreamPortNumber);
-    auto group5 = std::make_shared<NsmPCIeECCGroup5>(
+    auto multipcieSensorGroup5 = std::make_shared<NsmPCIeECCGroup5>(
         portName, type, portObjPath, portMetricsOem2Intf, portTypeVal,
         portIndex, upstreamPortNumber);
-    auto group7 = std::make_shared<NsmPCIeECCGroup7>(
+    auto multipcieSensorGroup7 = std::make_shared<NsmPCIeECCGroup7>(
         portName, type, portObjPath, portInfoIntf, portTypeVal, portIndex,
         upstreamPortNumber);
-    auto group10 = std::make_shared<NsmPCIeECCGroup10>(
+    auto multipcieSensorGroup10 = std::make_shared<NsmPCIeECCGroup10>(
         portName, type, portObjPath, portTypeVal, portIndex, upstreamPortNumber,
         includeInboundCounters);
 
-    device->addSensor(group1, portSensorPriority);
-    device->addSensor(group2, portSensorPriority);
-    device->addSensor(group3, portSensorPriority);
-    device->addSensor(group4, portSensorPriority);
-    device->addSensor(group5, portSensorPriority);
-    device->addSensor(group7, portSensorPriority);
-    device->addSensor(group10, portSensorPriority);
+    device->addSensor(multipcieSensorGroup1, portSensorPriority);
+    device->addSensor(multipcieSensorGroup2, portSensorPriority);
+    device->addSensor(multipcieSensorGroup3, portSensorPriority);
+    device->addSensor(multipcieSensorGroup4, portSensorPriority);
+    device->addSensor(multipcieSensorGroup5, portSensorPriority);
+    device->addSensor(multipcieSensorGroup7, portSensorPriority);
+    device->addSensor(multipcieSensorGroup10, portSensorPriority);
 
-    // Per-lane counters manager
+    portGroup.sensors.push_back(multipcieSensorGroup1);
+    portGroup.sensors.push_back(multipcieSensorGroup2);
+    portGroup.sensors.push_back(multipcieSensorGroup3);
+    portGroup.sensors.push_back(multipcieSensorGroup4);
+    portGroup.sensors.push_back(multipcieSensorGroup5);
+    portGroup.sensors.push_back(multipcieSensorGroup7);
+    portGroup.sensors.push_back(multipcieSensorGroup10);
+
     auto laneManager = std::make_shared<NsmPCIeLaneManager>(
         portName, type, portObjPath, portInfoIntf, portWidthIntf, portTypeVal,
         portIndex, upstreamPortNumber);
     device->addSensor(laneManager, portSensorPriority);
+    portGroup.sensors.push_back(laneManager);
 
     // Port configuration info (upstream only)
     if (portTypeVal == NSM_PORT_TYPE_UPSTREAM)
     {
-        createNsmPCIePortConfigurationInfo(
+        auto pciePortConfigurationInfo = createNsmPCIePortConfigurationInfo(
             bus, portName, type, portObjPath, portSensorPriority,
             upstreamPortNumber, portTypeVal, portIndex, device);
+        portGroup.hasAsyncDispatcher = true;
+        portGroup.sensors.push_back(pciePortConfigurationInfo);
     }
 
-    lg2::info(
+    lg2::debug(
         "NsmPCIePortDiscovery: created port {PORT} type={PTYPE} index={IDX} upPort={UP}",
         "PORT", portName, "PTYPE", portTypeVal, "IDX", portIndex, "UP",
         upstreamPortNumber);
+
+    return portGroup;
 }
 
 uint8_t
@@ -1671,55 +1692,210 @@ uint8_t
         return cc ? cc : rc;
     }
 
-    if (portsCreated)
+    if (portInfo->ports_count > UINT8_MAX)
+    {
+        uint16_t portsCount = portInfo->ports_count;
+        LG2_ERROR_FLT(
+            "NsmPCIePortDiscovery: ports_count {COUNT} exceeds uint8_t max for {NAME}",
+            "COUNT", portsCount, "NAME", getName().c_str());
+        return NSM_SW_ERROR_DATA;
+    }
+
+    uint16_t newUpstreamPortsCount = portInfo->ports_count;
+    uint16_t oldUpstreamPortsCount =
+        static_cast<uint16_t>(upstreamPortGroups.size());
+
+    if (portsCreated && !hasTopologyChanged(portInfo, newUpstreamPortsCount))
     {
         return NSM_SUCCESS;
     }
 
-    if (portInfo->ports_count == 0)
+    if (portsCreated)
     {
-        lg2::warning(
-            "NsmPCIePortDiscovery: device reported 0 upstream ports for {NAME}",
-            "NAME", getName().c_str());
-        return NSM_SUCCESS;
+        lg2::info("NsmPCIePortDiscovery: topology changed for {NAME} "
+                  "(upstream: {OLD}->{NEW})",
+                  "NAME", getName(), "OLD", oldUpstreamPortsCount, "NEW",
+                  newUpstreamPortsCount);
     }
 
     auto& bus = utils::DBusHandler::getBus();
-
     bool includeInboundCounters =
         (device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9);
+
+    // 1. Remove excess upstream ports (and their downstream children)
+    removeExcessUpstreamPorts(newUpstreamPortsCount);
+
+    // 2. For each surviving upstream port, reconcile its downstream count
     uint16_t downstreamPortIndex = 0;
-
-    for (uint16_t i = 0; i < portInfo->ports_count; i++)
+    for (uint16_t i = 0;
+         i < std::min(newUpstreamPortsCount, oldUpstreamPortsCount); i++)
     {
-        // Create upstream port
-        std::string upPortName = upstreamPortName + "_" + std::to_string(i);
-        std::string upPortObjPath = inventoryObjPath + upPortName;
-        createMultiPCIePort(bus, upPortName, upPortObjPath,
-                            NSM_PORT_TYPE_UPSTREAM, 0, static_cast<uint8_t>(i),
-                            includeInboundCounters);
+        downstreamPortIndex += reconcileDownstreamPorts(
+            bus, i, portInfo->ports[i].downstream_ports_count,
+            downstreamPortIndex, includeInboundCounters);
+    }
 
-        // Create downstream ports for this upstream
-        for (uint8_t j = 0; j < portInfo->ports[i].downstream_ports_count; j++)
-        {
-            std::string dnPortName = downstreamPortName + "_" +
-                                     std::to_string(downstreamPortIndex);
-            std::string dnPortObjPath = inventoryObjPath + dnPortName;
-            createMultiPCIePort(
-                bus, dnPortName, dnPortObjPath, NSM_PORT_TYPE_DOWNSTREAM, j,
-                static_cast<uint8_t>(i), includeInboundCounters);
-            downstreamPortIndex++;
-        }
+    // 3. Create brand-new upstream ports (with their downstream children)
+    for (uint16_t i = oldUpstreamPortsCount; i < newUpstreamPortsCount; i++)
+    {
+        downstreamPortIndex += createUpstreamPortGroup(
+            bus, i, portInfo->ports[i].downstream_ports_count,
+            downstreamPortIndex, includeInboundCounters);
     }
 
     portsCreated = true;
-    uint16_t upstreamCount = portInfo->ports_count;
     lg2::info(
-        "NsmPCIePortDiscovery: completed for {NAME} — {UP} upstream + {DOWN} downstream ports created",
-        "NAME", getName().c_str(), "UP", upstreamCount, "DOWN",
+        "NsmPCIePortDiscovery: completed for {NAME} — {UP} upstream + {DOWN} downstream ports",
+        "NAME", getName().c_str(), "UP", newUpstreamPortsCount, "DOWN",
         downstreamPortIndex);
 
     return NSM_SUCCESS;
+}
+
+void NsmPCIePortDiscovery::onDeviceOnline()
+{
+    if (portsCreated)
+    {
+        // Re-enqueue into static sensors queue. handleResponseMsg()
+        // compare old vs new topology and do differential update
+        for (auto& sensor : device->deviceSensors)
+        {
+            if (sensor.get() == this)
+            {
+                device->staticSensors.push(sensor);
+                break;
+            }
+        }
+        lg2::info("NsmPCIePortDiscovery: re-enqueued for differential "
+                  "topology check on {NAME}",
+                  "NAME", getName());
+    }
+}
+
+void NsmPCIePortDiscovery::removePortSensorGroup(PortSensorGroup& group)
+{
+    for (auto& sensor : group.sensors)
+    {
+        auto laneManager =
+            std::dynamic_pointer_cast<NsmPCIeLaneManager>(sensor);
+        if (laneManager)
+        {
+            laneManager->clearAllLaneSensors(device);
+        }
+        device->removeSensor(sensor);
+    }
+
+    if (group.hasAsyncDispatcher)
+    {
+        AsyncOperationManager::getInstance()->removeDispatcher(
+            group.portObjPath);
+    }
+
+    group.sensors.clear();
+}
+
+bool NsmPCIePortDiscovery::hasTopologyChanged(
+    const nsm_list_available_pcie_ports_info* portInfo,
+    uint16_t newUpstreamPortsCount) const
+{
+    if (newUpstreamPortsCount != upstreamPortGroups.size())
+    {
+        return true;
+    }
+    for (uint16_t i = 0; i < newUpstreamPortsCount; i++)
+    {
+        if (portInfo->ports[i].downstream_ports_count !=
+            upstreamPortGroups[i].downstreamPorts.size())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void NsmPCIePortDiscovery::removeExcessUpstreamPorts(
+    uint16_t targetUpstreamCount)
+{
+    while (upstreamPortGroups.size() > static_cast<size_t>(targetUpstreamCount))
+    {
+        auto& upstreamPortGroup = upstreamPortGroups.back();
+        for (auto& downstreamPortGroup : upstreamPortGroup.downstreamPorts)
+        {
+            removePortSensorGroup(downstreamPortGroup);
+        }
+        removePortSensorGroup(upstreamPortGroup.upstream);
+        upstreamPortGroups.pop_back();
+    }
+}
+
+uint16_t NsmPCIePortDiscovery::reconcileDownstreamPorts(
+    sdbusplus::bus::bus& bus, uint16_t upstreamIndex,
+    uint8_t newDownstreamPortsCount, uint16_t downstreamPortIndex,
+    bool includeInboundCounters)
+{
+    auto& upstreamPortGroup = upstreamPortGroups[upstreamIndex];
+    uint16_t totalDownstream = 0;
+
+    // Remove excess downstream ports from the back
+    while (upstreamPortGroup.downstreamPorts.size() >
+           static_cast<size_t>(newDownstreamPortsCount))
+    {
+        removePortSensorGroup(upstreamPortGroup.downstreamPorts.back());
+        upstreamPortGroup.downstreamPorts.pop_back();
+    }
+
+    uint8_t existingCount =
+        static_cast<uint8_t>(upstreamPortGroup.downstreamPorts.size());
+    totalDownstream += existingCount;
+
+    // Add new downstream ports at the back
+    for (uint8_t j = existingCount; j < newDownstreamPortsCount; j++)
+    {
+        uint16_t flatIndex = downstreamPortIndex + totalDownstream;
+        std::string dnPortName = downstreamPortName + "_" +
+                                 std::to_string(flatIndex);
+        std::string dnPortObjPath = inventoryObjPath + dnPortName;
+        auto dnGroup = createMultiPCIePort(
+            bus, dnPortName, dnPortObjPath, NSM_PORT_TYPE_DOWNSTREAM, j,
+            static_cast<uint8_t>(upstreamIndex), includeInboundCounters);
+        upstreamPortGroup.downstreamPorts.push_back(std::move(dnGroup));
+        totalDownstream++;
+    }
+
+    return totalDownstream;
+}
+
+uint16_t NsmPCIePortDiscovery::createUpstreamPortGroup(
+    sdbusplus::bus::bus& bus, uint16_t upstreamIndex,
+    uint8_t downstreamPortsCount, uint16_t downstreamPortIndex,
+    bool includeInboundCounters)
+{
+    std::string upPortName = upstreamPortName + "_" +
+                             std::to_string(upstreamIndex);
+    std::string upPortObjPath = inventoryObjPath + upPortName;
+    auto upSensorGroup = createMultiPCIePort(
+        bus, upPortName, upPortObjPath, NSM_PORT_TYPE_UPSTREAM, 0,
+        static_cast<uint8_t>(upstreamIndex), includeInboundCounters);
+
+    UpstreamPortGroup newUpstreamPortGroup;
+    newUpstreamPortGroup.upstream = std::move(upSensorGroup);
+
+    uint16_t totalDownstream = 0;
+    for (uint8_t j = 0; j < downstreamPortsCount; j++)
+    {
+        uint16_t flatIndex = downstreamPortIndex + totalDownstream;
+        std::string dnPortName = downstreamPortName + "_" +
+                                 std::to_string(flatIndex);
+        std::string dnPortObjPath = inventoryObjPath + dnPortName;
+        auto dnGroup = createMultiPCIePort(
+            bus, dnPortName, dnPortObjPath, NSM_PORT_TYPE_DOWNSTREAM, j,
+            static_cast<uint8_t>(upstreamIndex), includeInboundCounters);
+        newUpstreamPortGroup.downstreamPorts.push_back(std::move(dnGroup));
+        totalDownstream++;
+    }
+
+    upstreamPortGroups.push_back(std::move(newUpstreamPortGroup));
+    return totalDownstream;
 }
 
 requester::Coroutine

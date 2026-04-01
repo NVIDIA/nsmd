@@ -297,23 +297,16 @@ NsmDeviceModeSettingsV2Base::NsmDeviceModeSettingsV2Base(
     patchabilityBitmap(patchabilityBitmap)
 {}
 
-uint8_t NsmDeviceModeSettingsV2Base::getSubDeviceModeIndex(
-    enum device_mode_index subDeviceMode)
+bool NsmDeviceModeSettingsV2Base::isModeBitSet(uint8_t bitmap,
+                                               uint8_t subModeOffset)
 {
-    return static_cast<uint8_t>(subDeviceMode % 10);
-}
-
-bool NsmDeviceModeSettingsV2Base::isModeBitSet(
-    uint8_t bitmap, enum device_mode_index subDeviceMode)
-{
-    auto bit = getSubDeviceModeIndex(subDeviceMode);
-    return (bitmap & (1U << bit)) != 0;
+    return (bitmap & (1U << subModeOffset)) != 0;
 }
 
 bool NsmDeviceModeSettingsV2Base::isSubDeviceModePatchable(
-    enum device_mode_index subDeviceMode) const
+    uint8_t subModeOffset) const
 {
-    return isModeBitSet(patchabilityBitmap, subDeviceMode);
+    return isModeBitSet(patchabilityBitmap, subModeOffset);
 }
 
 NsmDeviceModeSettingsV2GetBase::NsmDeviceModeSettingsV2GetBase(
@@ -333,7 +326,7 @@ std::optional<std::vector<uint8_t>>
         instanceId, static_cast<uint32_t>(deviceModeIndex), requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        LG2_ERROR_FLT(
             "encode_get_device_mode_settings_v2_req failed. eid={EID} index={INDEX} rc={RC}",
             "EID", eid, "INDEX", deviceModeIndex, "RC", rc);
         return std::nullopt;
@@ -366,7 +359,7 @@ uint8_t NsmDeviceModeSettingsV2GetBase::handleResponseMsg(
         if (reportedCurrentLen > maxModeBytes ||
             reportedPendingLen > maxModeBytes)
         {
-            lg2::error(
+            LG2_ERROR_FLT(
                 "device mode payload exceeds buffer. index={INDEX} current={CURRENT} pending={PENDING}",
                 "INDEX", deviceModeIndex, "CURRENT", reportedCurrentLen,
                 "PENDING", reportedPendingLen);
@@ -379,7 +372,7 @@ uint8_t NsmDeviceModeSettingsV2GetBase::handleResponseMsg(
         pendingData, &pendingLength);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error(
+        LG2_ERROR_FLT(
             "decode_get_device_mode_settings_v2_resp failed. index={INDEX} reasonCode={REASONCODE}, cc={CC}, rc={RC}",
             "INDEX", deviceModeIndex, "REASONCODE", reasonCode, "CC", cc, "RC",
             rc);
@@ -452,22 +445,19 @@ uint8_t NsmDPUOperationModeDeviceModeSettingsV2Get::handleDeviceModeGetPayload(
     const uint8_t* currentData, uint16_t currentLength,
     const uint8_t* pendingData, uint16_t pendingLength)
 {
-    constexpr uint8_t dpuOperationOffset =
-        DEVICE_MODE_DPU_OPERATION_MODE_DPU_OPERATION % 10;
-
     if (deviceModeIntf)
     {
-        if (currentLength > dpuOperationOffset &&
-            currentData[dpuOperationOffset] != deviceModeSettingsNoChange)
+        if (currentLength > SUB_MODE_DPU_OPERATION &&
+            currentData[SUB_MODE_DPU_OPERATION] != deviceModeSettingsNoChange)
         {
             deviceModeIntf->currentMode(
-                rawByteToDpuOperationMode(currentData[dpuOperationOffset]));
+                rawByteToDpuOperationMode(currentData[SUB_MODE_DPU_OPERATION]));
         }
-        if (pendingLength > dpuOperationOffset &&
-            pendingData[dpuOperationOffset] != deviceModeSettingsNoChange)
+        if (pendingLength > SUB_MODE_DPU_OPERATION &&
+            pendingData[SUB_MODE_DPU_OPERATION] != deviceModeSettingsNoChange)
         {
             deviceModeIntf->pendingMode(
-                rawByteToDpuOperationMode(pendingData[dpuOperationOffset]));
+                rawByteToDpuOperationMode(pendingData[SUB_MODE_DPU_OPERATION]));
         }
     }
 
@@ -560,7 +550,11 @@ requester::Coroutine NsmDPUOperationModeDeviceModeSettingsV2Set::setPendingMode(
     {
         *status = AsyncOperationStatusType::WriteFailure;
         asyncPatchInProgress = false;
-        co_return cc ? cc : rc;
+        if (cc != NSM_SUCCESS)
+        {
+            co_return cc;
+        }
+        co_return rc;
     }
 
     if (deviceModeIntf)
@@ -581,36 +575,16 @@ NsmPCIeDeviceModeDeviceModeSettingsV2Get::
     pcieDeviceModeIntf(std::move(pcieDeviceModeIntf))
 {}
 
-static SocketMode rawByteToSocketMode(uint8_t val)
-{
-    // NSM: 0 = Single Socket, 1 = Dual Socket
-    return val == 0 ? SocketMode::SingleSocket : SocketMode::DualSocket;
-}
-
 static EWTrafficMode rawByteToEWTrafficMode(uint8_t val)
 {
     // NSM: 0 = Disabled, 1 = Enabled
     return val == 0 ? EWTrafficMode::Disabled : EWTrafficMode::Enabled;
 }
 
-static BifurcationMode rawByteToBifurcationMode(uint8_t val)
-{
-    // NSM: 0 = No bifurcation (x16), 1 = Bifurcation 2x8
-    return val == 0 ? BifurcationMode::NoBifurcation
-                    : BifurcationMode::Bifurcation2x8;
-}
-
 uint8_t NsmPCIeDeviceModeDeviceModeSettingsV2Get::handleDeviceModeGetPayload(
     const uint8_t* currentData, uint16_t currentLength,
     const uint8_t* pendingData, uint16_t pendingLength)
 {
-    constexpr uint8_t multiSocketOffset =
-        DEVICE_MODE_MULTI_SOCKET_MODE_PCIE_DEVICE % 10;
-    constexpr uint8_t controlledEWOffset =
-        DEVICE_MODE_CONTROLLED_EW_TRAFFIC_MODE_PCIE_DEVICE % 10;
-    constexpr uint8_t bifurcationOffset =
-        DEVICE_MODE_PCIE_BIFURCATION_MODE_PCIE_DEVICE % 10;
-
     auto isValid = [](const uint8_t* data, uint16_t len, uint8_t offset) {
         return len >= offset + 1 &&
                data[offset] !=
@@ -619,35 +593,39 @@ uint8_t NsmPCIeDeviceModeDeviceModeSettingsV2Get::handleDeviceModeGetPayload(
 
     if (pcieDeviceModeIntf)
     {
-        if (isValid(currentData, currentLength, multiSocketOffset))
+        if (isValid(currentData, currentLength, SUB_MODE_PCIE_MULTI_SOCKET))
         {
             pcieDeviceModeIntf->PCIeMultiSocketServer::currentMode(
-                rawByteToSocketMode(currentData[multiSocketOffset]));
+                currentData[SUB_MODE_PCIE_MULTI_SOCKET]);
         }
-        if (isValid(pendingData, pendingLength, multiSocketOffset))
+        if (isValid(pendingData, pendingLength, SUB_MODE_PCIE_MULTI_SOCKET))
         {
             pcieDeviceModeIntf->PCIeMultiSocketServer::pendingMode(
-                rawByteToSocketMode(pendingData[multiSocketOffset]));
+                pendingData[SUB_MODE_PCIE_MULTI_SOCKET]);
         }
-        if (isValid(currentData, currentLength, controlledEWOffset))
+        if (isValid(currentData, currentLength,
+                    SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC))
         {
             pcieDeviceModeIntf->PCIeControlledEWTrafficServer::currentMode(
-                rawByteToEWTrafficMode(currentData[controlledEWOffset]));
+                rawByteToEWTrafficMode(
+                    currentData[SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC]));
         }
-        if (isValid(pendingData, pendingLength, controlledEWOffset))
+        if (isValid(pendingData, pendingLength,
+                    SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC))
         {
             pcieDeviceModeIntf->PCIeControlledEWTrafficServer::pendingMode(
-                rawByteToEWTrafficMode(pendingData[controlledEWOffset]));
+                rawByteToEWTrafficMode(
+                    pendingData[SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC]));
         }
-        if (isValid(currentData, currentLength, bifurcationOffset))
+        if (isValid(currentData, currentLength, SUB_MODE_PCIE_BIFURCATION))
         {
             pcieDeviceModeIntf->PCIeBifurcationServer::currentMode(
-                rawByteToBifurcationMode(currentData[bifurcationOffset]));
+                currentData[SUB_MODE_PCIE_BIFURCATION]);
         }
-        if (isValid(pendingData, pendingLength, bifurcationOffset))
+        if (isValid(pendingData, pendingLength, SUB_MODE_PCIE_BIFURCATION))
         {
             pcieDeviceModeIntf->PCIeBifurcationServer::pendingMode(
-                rawByteToBifurcationMode(pendingData[bifurcationOffset]));
+                pendingData[SUB_MODE_PCIE_BIFURCATION]);
         }
     }
 
@@ -754,7 +732,11 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
     {
         *status = AsyncOperationStatusType::WriteFailure;
         asyncPatchInProgress = false;
-        co_return cc ? cc : rc;
+        if (cc != NSM_SUCCESS)
+        {
+            co_return cc;
+        }
+        co_return rc;
     }
 
     if (pcieDeviceModeIntf)
@@ -762,7 +744,7 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
         if (multiSocketsMode != deviceModeSettingsNoChange)
         {
             pcieDeviceModeIntf->PCIeMultiSocketServer::pendingMode(
-                rawByteToSocketMode(multiSocketsMode));
+                multiSocketsMode);
         }
         if (controlledEWMode != deviceModeSettingsNoChange)
         {
@@ -772,7 +754,7 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
         if (bifurcationRawMode != deviceModeSettingsNoChange)
         {
             pcieDeviceModeIntf->PCIeBifurcationServer::pendingMode(
-                rawByteToBifurcationMode(bifurcationRawMode));
+                bifurcationRawMode);
         }
     }
 
@@ -807,22 +789,21 @@ static std::shared_ptr<PCIeDeviceModeIntf> createPCIeDeviceModeInterface(
 {
     auto path = getDeviceModeObjectPath(inventoryObjPath, "PCIeDeviceMode");
     auto intf = std::make_shared<PCIeDeviceModeIntf>(bus, path.c_str());
-    intf->PCIeMultiSocketServer::currentMode(SocketMode::SingleSocket);
-    intf->PCIeMultiSocketServer::pendingMode(SocketMode::SingleSocket);
+    intf->PCIeMultiSocketServer::currentMode(PCIE_DEVICE_MODE_SINGLE_SOCKET);
+    intf->PCIeMultiSocketServer::pendingMode(PCIE_DEVICE_MODE_SINGLE_SOCKET);
     intf->PCIeMultiSocketServer::isModeConfigurable(
-        NsmDeviceModeSettingsV2Base::isModeBitSet(
-            pcieModeBitmap, DEVICE_MODE_MULTI_SOCKET_MODE_PCIE_DEVICE));
+        NsmDeviceModeSettingsV2Base::isModeBitSet(pcieModeBitmap,
+                                                  SUB_MODE_PCIE_MULTI_SOCKET));
     intf->PCIeControlledEWTrafficServer::currentMode(EWTrafficMode::Disabled);
     intf->PCIeControlledEWTrafficServer::pendingMode(EWTrafficMode::Disabled);
     intf->PCIeControlledEWTrafficServer::isModeConfigurable(
         NsmDeviceModeSettingsV2Base::isModeBitSet(
-            pcieModeBitmap,
-            DEVICE_MODE_CONTROLLED_EW_TRAFFIC_MODE_PCIE_DEVICE));
-    intf->PCIeBifurcationServer::currentMode(BifurcationMode::NoBifurcation);
-    intf->PCIeBifurcationServer::pendingMode(BifurcationMode::NoBifurcation);
+            pcieModeBitmap, SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC));
+    intf->PCIeBifurcationServer::currentMode(PCIE_DEVICE_MODE_NO_BIFURCATION);
+    intf->PCIeBifurcationServer::pendingMode(PCIE_DEVICE_MODE_NO_BIFURCATION);
     intf->PCIeBifurcationServer::isModeConfigurable(
-        NsmDeviceModeSettingsV2Base::isModeBitSet(
-            pcieModeBitmap, DEVICE_MODE_PCIE_BIFURCATION_MODE_PCIE_DEVICE));
+        NsmDeviceModeSettingsV2Base::isModeBitSet(pcieModeBitmap,
+                                                  SUB_MODE_PCIE_BIFURCATION));
     intf->associations(
         {{"network_adapter", "device_mode_settings", networkAdapterPath}});
     return intf;
@@ -848,10 +829,10 @@ static void createDpuModeSensors(sdbusplus::bus::bus& bus,
                                  uint8_t dpuModeBitmap,
                                  const std::string& networkAdapterPath)
 {
-    constexpr auto dpuSubMode = DEVICE_MODE_DPU_OPERATION_MODE_DPU_OPERATION;
     auto dpuDeviceModeIntf = createDPUOperationModeInterface(
         bus, inventoryObjPath, networkAdapterPath,
-        NsmDeviceModeSettingsV2Base::isModeBitSet(dpuModeBitmap, dpuSubMode));
+        NsmDeviceModeSettingsV2Base::isModeBitSet(dpuModeBitmap,
+                                                  SUB_MODE_DPU_OPERATION));
 
     auto dpuGetSensor =
         std::make_shared<NsmDPUOperationModeDeviceModeSettingsV2Get>(
@@ -871,8 +852,8 @@ static void createDpuModeSensors(sdbusplus::bus::bus& bus,
                   std::placeholders::_3);
     registerPendingModeHandler(
         getDeviceModeObjectPath(inventoryObjPath, "DPUOperationMode"),
-        "com.nvidia.DeviceMode.DPUOperationMode", setDpuOperationModeHandler,
-        dpuSetSensor, nsmDevice);
+        std::string(DPUOperationModeServer::interface),
+        setDpuOperationModeHandler, dpuSetSensor, nsmDevice);
 }
 
 static void createPcieModeSensors(sdbusplus::bus::bus& bus,
@@ -999,24 +980,23 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
     createDeviceProtectionOptions(nsmDevice, type, inventoryObjPath, name);
 #endif
 
-    if (allCurrentIfaceProperties.count("DeviceModesSupported") &&
-        allCurrentIfaceProperties.count("DeviceModesPatchability"))
+    if (allCurrentIfaceProperties.count("DeviceModesSupported"))
     {
-        // DeviceModesSupported: uint64 bitmap — bit N = device mode N supported
-        auto supportedModesBitmap = std::get<uint64_t>(
+        // DeviceModesSupported: DEVICE_MODE_NOT_SUPPORTED (-1) = mode not
+        // supported;  >= 0 = patchability bitmap.
+        auto deviceModesSupported = std::get<std::vector<int64_t>>(
             allCurrentIfaceProperties.at("DeviceModesSupported"));
-        // DeviceModesPatchability: array of uint8 bitmaps per device mode
-        auto patchabilityArray = std::get<std::vector<uint64_t>>(
-            allCurrentIfaceProperties.at("DeviceModesPatchability"));
 
         auto isModeSupported = [&](size_t modeIndex) -> bool {
-            return (supportedModesBitmap & (1ULL << modeIndex)) != 0;
+            return modeIndex < deviceModesSupported.size() &&
+                   deviceModesSupported[modeIndex] != DEVICE_MODE_NOT_SUPPORTED;
         };
 
         auto getPatchabilityBitmap = [&](size_t modeIndex) -> uint8_t {
-            if (modeIndex < patchabilityArray.size())
+            if (modeIndex < deviceModesSupported.size() &&
+                deviceModesSupported[modeIndex] != DEVICE_MODE_NOT_SUPPORTED)
             {
-                return static_cast<uint8_t>(patchabilityArray[modeIndex]);
+                return static_cast<uint8_t>(deviceModesSupported[modeIndex]);
             }
             return 0;
         };

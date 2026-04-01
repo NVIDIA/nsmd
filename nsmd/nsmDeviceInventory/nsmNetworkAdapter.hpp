@@ -52,13 +52,11 @@ using PCIeDeviceModeIntf = sdbusplus::server::object_t<
     Association::server::Definitions>;
 using PCIeMultiSocketServer =
     sdbusplus::com::nvidia::DeviceMode::server::PCIeMultiSocket;
-using SocketMode = PCIeMultiSocketServer::SocketMode;
 using PCIeControlledEWTrafficServer =
     sdbusplus::com::nvidia::DeviceMode::server::PCIeControlledEWTraffic;
 using EWTrafficMode = PCIeControlledEWTrafficServer::EWTrafficMode;
 using PCIeBifurcationServer =
     sdbusplus::com::nvidia::DeviceMode::server::PCIeBifurcation;
-using BifurcationMode = PCIeBifurcationServer::BifurcationMode;
 
 class NsmDeviceProtectionOptions : public NsmSensor
 {
@@ -125,12 +123,10 @@ class NsmDeviceModeSettingsV2Base : public NsmSensor
                                 enum device_mode_index deviceModeIndex,
                                 uint8_t patchabilityBitmap);
 
-    static bool isModeBitSet(uint8_t bitmap,
-                             enum device_mode_index subDeviceMode);
+    static bool isModeBitSet(uint8_t bitmap, uint8_t subModeOffset);
 
   protected:
-    static uint8_t getSubDeviceModeIndex(enum device_mode_index subDeviceMode);
-    bool isSubDeviceModePatchable(enum device_mode_index subDeviceMode) const;
+    bool isSubDeviceModePatchable(uint8_t subModeOffset) const;
 
     enum device_mode_index deviceModeIndex;
     uint8_t patchabilityBitmap;
@@ -207,8 +203,7 @@ class NsmDPUOperationModeDeviceModeSettingsV2Set :
   public:
     static constexpr enum device_mode_index modeIndex =
         DEVICE_MODE_DPU_OPERATION_MODE;
-    static constexpr enum device_mode_index dpuOperationSubMode =
-        DEVICE_MODE_DPU_OPERATION_MODE_DPU_OPERATION;
+    static constexpr uint8_t dpuOperationSubMode = SUB_MODE_DPU_OPERATION;
 
     NsmDPUOperationModeDeviceModeSettingsV2Set(
         const std::string& name, const std::string& type,
@@ -251,12 +246,10 @@ class NsmPCIeDeviceModeDeviceModeSettingsV2Set :
   public:
     static constexpr enum device_mode_index modeIndex =
         DEVICE_MODE_PCIE_DEVICE_MODE;
-    static constexpr enum device_mode_index multiSocketSubMode =
-        DEVICE_MODE_MULTI_SOCKET_MODE_PCIE_DEVICE;
-    static constexpr enum device_mode_index controlledEWSubMode =
-        DEVICE_MODE_CONTROLLED_EW_TRAFFIC_MODE_PCIE_DEVICE;
-    static constexpr enum device_mode_index bifurcationSubMode =
-        DEVICE_MODE_PCIE_BIFURCATION_MODE_PCIE_DEVICE;
+    static constexpr uint8_t multiSocketSubMode = SUB_MODE_PCIE_MULTI_SOCKET;
+    static constexpr uint8_t controlledEWSubMode =
+        SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC;
+    static constexpr uint8_t bifurcationSubMode = SUB_MODE_PCIE_BIFURCATION;
 
     NsmPCIeDeviceModeDeviceModeSettingsV2Set(
         const std::string& name, const std::string& type,

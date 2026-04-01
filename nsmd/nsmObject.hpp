@@ -87,6 +87,9 @@ class NsmObject : virtual public StateChangeLogger
 
     virtual void updateMetricOnSharedMemory() {}
 
+    /** @brief Hook invoked when device transitions from offline to online. */
+    virtual void onDeviceOnline() {}
+
     bool isRefreshed = false;
 
   protected:

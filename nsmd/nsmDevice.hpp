@@ -548,6 +548,14 @@ class NsmDevice :
         deviceSensors.push_back(sensor);
     }
 
+    /**
+     * @brief Removes a sensor from all polling queues, deviceSensors,
+     *        and standByToDcRefreshSensors using pointer identity.
+     *
+     * @param sensor[in] Pointer to dynamic sensor
+     */
+    void removeSensor(const std::shared_ptr<NsmObject>& sensor);
+
     /** @brief Getter for the longRunningSemaphore */
     common::CoroutineSemaphore& getSemaphore()
     {

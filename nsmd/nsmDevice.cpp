@@ -204,6 +204,17 @@ void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
     sensors[pollingType].push(sensor);
 }
 
+void NsmDevice::removeSensor(const std::shared_ptr<NsmObject>& sensor)
+{
+    for (auto& [_, queue] : sensors)
+    {
+        std::erase(queue, sensor);
+    }
+    std::erase(deviceSensors, sensor);
+    std::erase(standByToDcRefreshSensors, sensor);
+    std::erase(capabilityRefreshSensors, sensor);
+}
+
 /* Mark all the sensors as unrefreshed. Sleep for 10 seconds to avoid
  * overwhelming the system*/
 requester::Coroutine NsmDevice::markSensorsUnrefreshed()
@@ -227,8 +238,9 @@ requester::Coroutine NsmDevice::markSensorsUnrefreshed()
 // 1. set isDeviceReady to false
 // 2. set NsmServiceReadyIntf to starting
 // 3. mark all the sensors as unrefreshed
-// 4. set isDeviceActive to true
-// 5. Refresh all the capability sensors
+// 4. notify sensors of device reconnect/online transition
+// 5. set isDeviceActive to true
+// 6. Refresh all the capability sensors
 
 requester::Coroutine NsmDevice::setOnline()
 {
@@ -240,6 +252,15 @@ requester::Coroutine NsmDevice::setOnline()
     {
         co_return NSM_SW_SUCCESS;
     }
+
+    // Iterate a snapshot because onDeviceOnline() handlers may
+    // modify deviceSensors list during discovery.
+    auto deviceSensorsBeforeOnline = deviceSensors;
+    for (auto& sensor : deviceSensorsBeforeOnline)
+    {
+        sensor->onDeviceOnline();
+    }
+
     isDeviceActive = true;
     lg2::info(
         "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets online",

@@ -43,6 +43,11 @@ AsyncSetOperationDispatcher*
                 .first->second;
 }
 
+void AsyncOperationManager::removeDispatcher(const std::string& objPath)
+{
+    dispatchers.erase(objPath);
+}
+
 std::pair<bool, size_t> AsyncOperationManager::getCurrentObjectCount()
 {
     const std::string objPath = asyncOperationResultObjPath + "/" +

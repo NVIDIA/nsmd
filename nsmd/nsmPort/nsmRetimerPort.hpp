@@ -391,6 +391,7 @@ class NsmPCIeLaneManager : public NsmSensor
     {
         return laneSensors.size();
     }
+    void clearAllLaneSensors(std::shared_ptr<NsmDevice> nsmDevice = nullptr);
 
   private:
     std::string portObjPath;
@@ -408,8 +409,32 @@ class NsmPCIeLaneManager : public NsmSensor
 
     void createLaneSensor(std::shared_ptr<NsmDevice> nsmDevice, uint8_t laneIdx,
                           uint8_t speedCode);
-    void clearAllLaneSensors();
     uint8_t convertSpeedGbpsToLinkSpeedCode(double speedGbps);
+};
+
+/**
+ * @brief Tracks all sensors created for a single PCIe port, enabling
+ *        batch removal from NsmDevice queues and D-Bus during port
+ *        re-discovery.
+ */
+struct PortSensorGroup
+{
+    std::string portObjPath;
+    std::vector<std::shared_ptr<NsmObject>> sensors;
+    bool hasAsyncDispatcher{false};
+};
+
+/**
+ * @brief Groups one upstream port with all its downstream children.
+ *        Indexed by upstream port number in a vector, enabling O(1)
+ *        differential removal:
+ *        - Upstream reduced:  pop from back of upstreamPortGroups
+ *        - Downstream reduced: pop from back of downstreamPorts
+ */
+struct UpstreamPortGroup
+{
+    PortSensorGroup upstream;
+    std::vector<PortSensorGroup> downstreamPorts;
 };
 
 /**
@@ -417,6 +442,13 @@ class NsmPCIeLaneManager : public NsmSensor
  *        and dynamically creates upstream/downstream port D-Bus objects with
  *        all associated telemetry sensors.
  *
+ *        On device offline→online transition, re-enqueues itself for a
+ *        differential topology check. handleResponseMsg() compares old vs
+ *        new port counts and only removes/creates the delta:
+ *        - Upstream reduced:   remove from back of upstreamPortGroups
+ *        - Downstream reduced: remove from back of downstreamPorts per upstream
+ *        - Ports added:        append new groups
+ *        - No change:          no-op (skip teardown entirely)
  */
 class NsmPCIePortDiscovery : public NsmSensor
 {
@@ -434,6 +466,9 @@ class NsmPCIePortDiscovery : public NsmSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
+    /** @brief Hook invoked when device state transitions to online. */
+    void onDeviceOnline() override;
+
   private:
     std::string inventoryObjPath;
     std::string upstreamPortName;
@@ -442,13 +477,42 @@ class NsmPCIePortDiscovery : public NsmSensor
     std::vector<utils::Association> associations;
     std::shared_ptr<NsmDevice> device;
     bool portsCreated{false};
+    std::vector<UpstreamPortGroup> upstreamPortGroups;
 
-    void createMultiPCIePort(sdbusplus::bus::bus& bus,
-                             const std::string& portName,
-                             const std::string& portObjPath,
-                             uint8_t portTypeVal, uint64_t portIndex,
-                             uint8_t upstreamPortNumber,
-                             bool includeInboundCounters);
+    PortSensorGroup createMultiPCIePort(sdbusplus::bus::bus& bus,
+                                        const std::string& portName,
+                                        const std::string& portObjPath,
+                                        uint8_t portTypeVal, uint64_t portIndex,
+                                        uint8_t upstreamPortNumber,
+                                        bool includeInboundCounters);
+
+    /** @brief Remove all sensors in a single port group from device queues. */
+    void removePortSensorGroup(PortSensorGroup& group);
+
+    /** @brief Compare old vs new port counts at upstream & downstream level. */
+    bool hasTopologyChanged(const nsm_list_available_pcie_ports_info* portInfo,
+                            uint16_t newUpstreamPortsCount) const;
+
+    /** @brief remove excess upstream port groups (and their associated
+     downstream ports) from back. */
+    void removeExcessUpstreamPorts(uint16_t targetUpstreamCount);
+
+    /** @brief Adjust downstream port count for a surviving upstream port.
+     *  @return total downstream ports */
+    uint16_t reconcileDownstreamPorts(sdbusplus::bus::bus& bus,
+                                      uint16_t upstreamIndex,
+                                      uint8_t newDownstreamPortsCount,
+                                      uint16_t downstreamPortIndex,
+                                      bool includeInboundCounters);
+
+    /** @brief Create a new upstream port group with all associated downstream
+     * ports.
+     *  @return number of downstream ports created. */
+    uint16_t createUpstreamPortGroup(sdbusplus::bus::bus& bus,
+                                     uint16_t upstreamIndex,
+                                     uint8_t downstreamPortsCount,
+                                     uint16_t downstreamPortIndex,
+                                     bool includeInboundCounters);
 };
 
 } // namespace nsm
