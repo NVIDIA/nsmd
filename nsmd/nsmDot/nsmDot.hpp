@@ -92,15 +92,17 @@ class NsmDotObject : public NsmObject, public DotActionIntf
                  const uuid_t& uuid, const std::string& blobPathName);
 
     /**
-     * @brief Update DOT object state during device rediscovery
+     * @brief Refresh DOT blob via GetInfo (round-robin polling).
      *
-     * Called during device rediscovery to refresh the DOT blob from the device.
-     * If the blob checksum has changed, it will be updated in EMMC storage.
-     *
-     * @param nsmDevice Pointer to the NSM device
-     * @return Coroutine result code
+     * Sends GetInfo until the first successful response; later calls are no-ops
+     * until handleOfflineState() clears the success flag.
      */
     requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
+
+    /**
+     * @brief Reset GetInfo success flag on offline so update() will poll again.
+     */
+    void handleOfflineState() override;
 
     /**
      * @brief Install DOT CAK (Code Authentication Key)
@@ -529,6 +531,9 @@ class NsmDotObject : public NsmObject, public DotActionIntf
 
     /** Blob file path name (from EM config PathName) */
     std::string blobPathName_;
+
+    /** True after first successful GetInfo; cleared in handleOfflineState() */
+    bool getInfoSucceeded_{false};
 
   public:
     /** Pointer to DOT status sensor for manual triggering */

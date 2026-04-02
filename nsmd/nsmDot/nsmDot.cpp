@@ -159,6 +159,10 @@ NsmDotObject::NsmDotObject(sdbusplus::bus::bus& bus, const std::string& name,
 
 requester::Coroutine NsmDotObject::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
+    if (getInfoSucceeded_)
+    {
+        co_return NSM_SW_SUCCESS;
+    }
     if (!nsmDevice)
     {
         lg2::error("Dot: update called with null device");
@@ -166,8 +170,11 @@ requester::Coroutine NsmDotObject::update(std::shared_ptr<NsmDevice> nsmDevice)
     }
 
     auto eid = nsmDevice->getEid();
-    lg2::debug("Dot: update called during rediscovery: eid={EID}, uuid={UUID}",
-               "EID", eid, "UUID", uuid);
+    if (shouldLog("Dot: update called:" + blobPathName_, true))
+    {
+        lg2::debug("Dot: update called: eid={EID}, uuid={UUID}", "EID", eid,
+                   "UUID", uuid);
+    }
 
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_info_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
@@ -216,7 +223,13 @@ requester::Coroutine NsmDotObject::update(std::shared_ptr<NsmDevice> nsmDevice)
         updateDotBlobIfChanged(blobPathName_, dotBlob);
     }
 
+    getInfoSucceeded_ = true;
     co_return cc ? cc : decodeRc;
+}
+
+void NsmDotObject::handleOfflineState()
+{
+    getInfoSucceeded_ = false;
 }
 
 void NsmDotObject::handleSendError(int sendRc, int eid,
@@ -2007,8 +2020,7 @@ requester::Coroutine createNsmDot(SensorManager& manager,
     auto dotStatusSensor = std::make_shared<NsmDotStatusObject>(
         chassisName, "NSM_Dot_Status", object.get(), uuid);
     object->dotStatusSensor_ = dotStatusSensor.get();
-    device->addStaticSensor(object);
-    device->addCapabilityRefreshSensor(object);
+    device->addSensor(object, PollingType::RoundRobin);
     device->addSensor(dotStatusSensor, PollingType::RoundRobin);
 
     lg2::debug(
