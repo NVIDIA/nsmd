@@ -87,6 +87,7 @@ tests = [
     'nsmPCIeLTSSMStateBranch_test',
     'nsmPCIeFunctionBranch_test',
     'nsmLeakDetectionBranch7_test',
+    'nsmImageCopyState_test',
 ]
 
 foreach t : tests

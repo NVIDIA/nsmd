@@ -255,6 +255,13 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 allCurrentIfaceProperties.at("ImageCopyEnabled"));
         }
 
+        bool imageCopyStateEnabled = false;
+        if (allCurrentIfaceProperties.count("ImageCopyStateEnabled"))
+        {
+            imageCopyStateEnabled = std::get<bool>(
+                allCurrentIfaceProperties.at("ImageCopyStateEnabled"));
+        }
+
         bool inbandUpdatePolicyEnabled = false;
         if (allCurrentIfaceProperties.count("InbandUpdatePolicyEnabled"))
         {
@@ -325,6 +332,7 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
             nullptr;
         std::shared_ptr<NsmFailoverPolicyObject> failoverPolicy = nullptr;
         std::shared_ptr<NsmImageCopyObject> imageCopyObject = nullptr;
+        std::shared_ptr<NsmImageCopyStateObject> imageCopyStateSensor = nullptr;
 
         std::vector<SlotInfo> allSlots;
         uint8_t parseRc = co_await parseSlots(path, slotCount, rotSlotInterface,
@@ -560,6 +568,15 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 imageCopyObject =
                     std::make_shared<NsmImageCopyObject>(bus, name, uuid);
                 device->addSensor(imageCopyObject, PollingType::RoundRobin);
+            }
+
+            if (imageCopyStateSensor == nullptr and imageCopyStateEnabled)
+            {
+                imageCopyStateSensor =
+                    std::make_shared<NsmImageCopyStateObject>(bus, name);
+                device->addSensor(imageCopyStateSensor,
+                                  PollingType::RoundRobin);
+                device->imageCopyStateSensor = imageCopyStateSensor;
             }
         }
 

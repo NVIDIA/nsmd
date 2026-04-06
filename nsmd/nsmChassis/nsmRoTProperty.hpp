@@ -26,6 +26,7 @@
 #include <com/nvidia/FailoverPolicy/server.hpp>
 #include <com/nvidia/ImageCopy/server.hpp>
 #include <com/nvidia/ImageCopyPolicy/server.hpp>
+#include <com/nvidia/ImageCopyState/server.hpp>
 #include <com/nvidia/InbandUpdatePolicy/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/timer.hpp>
@@ -46,6 +47,8 @@ using FailoverPolicyIntf =
 using ImageCopyIntf = object_t<sdbusplus::server::com::nvidia::ImageCopy>;
 using ImageCopyPolicyIntf =
     object_t<sdbusplus::server::com::nvidia::ImageCopyPolicy>;
+using ImageCopyStateIntf =
+    object_t<sdbusplus::server::com::nvidia::ImageCopyState>;
 
 class NsmInbandUpdatePolicy :
     public InbandUpdatePolicyIntf,
@@ -382,5 +385,58 @@ requester::Coroutine updateImageCopyPolicyHandler(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device, uint16_t classification,
     uint16_t identifier, uint8_t index);
+
+/**
+ * @brief D-Bus interface class for RoT Image Copy State
+ *
+ * Exposes com.nvidia.ImageCopyState (Status + Progress) for the chassis RoT.
+ */
+class NsmImageCopyState : public ImageCopyStateIntf, public StateChangeLogger
+{
+  public:
+    // 0x65 (101): Progress sentinel meaning "reporting not supported".
+    static constexpr uint8_t progressNotSupported = 0x65;
+
+    NsmImageCopyState(sdbusplus::bus::bus& bus, const std::string& objPath,
+                      NsmSensor& nsmSensor);
+
+    ~NsmImageCopyState() override = default;
+
+    void updateProperties(
+        const struct ::nsm_firmware_image_copy_control_query_progress_resp&
+            queryResp);
+
+  private:
+    NsmSensor& nsmSensor;
+};
+
+/**
+ * @brief NSM sensor that polls NSM_IMAGE_COPY_QUERY_PROGRESS and updates
+ * the com.nvidia.ImageCopyState Status/Progress properties.
+ */
+class NsmImageCopyStateObject : public NsmSensor
+{
+  private:
+    std::string getPath(const std::string& chassisName)
+    {
+        return std::string(chassisInventoryBasePath) + "/" + chassisName;
+    }
+
+  public:
+    NsmImageCopyStateObject(sdbusplus::bus::bus& bus,
+                            const std::string& chassisName);
+
+    NsmImageCopyStateObject() = delete;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::string objectPath;
+    std::unique_ptr<NsmImageCopyState> imageCopyState;
+};
 
 } // namespace nsm
