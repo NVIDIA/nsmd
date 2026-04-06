@@ -728,6 +728,12 @@ requester::Coroutine NsmImageCopy::initiateImageCopyAsync(
             {
                 co_await fwStateSensor->update(device);
             }
+
+            auto imageCopyStateSensor = device->imageCopyStateSensor.lock();
+            if (imageCopyStateSensor)
+            {
+                co_await imageCopyStateSensor->update(device);
+            }
         }
         // Stop the timeout timer since operation completed successfully
         if (imageCopyTimeoutTimer)
@@ -1085,6 +1091,131 @@ requester::Coroutine updateImageCopyPolicyHandler(
     ImageCopyPolicyHandler handler;
     co_return co_await handler.updateImageCopyPolicy(
         value, status, device, classification, identifier, index);
+}
+
+NsmImageCopyState::NsmImageCopyState(sdbusplus::bus::bus& bus,
+                                     const std::string& objPath,
+                                     NsmSensor& nsmSensor) :
+    ImageCopyStateIntf(bus, objPath.c_str()), nsmSensor(nsmSensor)
+{
+    using Status = sdbusplus::common::com::nvidia::ImageCopyState::Status;
+    status(Status::ImageCopyNotTriggered);
+    progress(progressNotSupported);
+}
+
+void NsmImageCopyState::updateProperties(
+    const struct ::nsm_firmware_image_copy_control_query_progress_resp&
+        queryResp)
+{
+    using Status = sdbusplus::common::com::nvidia::ImageCopyState::Status;
+
+    bool invalidValue = false;
+    switch (queryResp.image_copy_status)
+    {
+        case NSM_IMAGE_COPY_NOT_TRIGGERED:
+            status(Status::ImageCopyNotTriggered);
+            break;
+        case NSM_IMAGE_COPY_IN_PROGRESS:
+            status(Status::InProgress);
+            break;
+        case NSM_IMAGE_COPY_COMPLETE:
+            status(Status::Complete);
+            break;
+        case NSM_IMAGE_COPY_UNDEFINED_FAILURE:
+            status(Status::UndefinedFailure);
+            break;
+        case NSM_IMAGE_COPY_NO_VALID_IMAGE:
+            status(Status::NoValidImage);
+            break;
+        case NSM_IMAGE_COPY_DESTINATION_WRITE_PROTECTED:
+            status(Status::DestinationWriteProtected);
+            break;
+        case NSM_IMAGE_COPY_FAIL_FLASH_ACCESS:
+            status(Status::FailFlashAccess);
+            break;
+        case NSM_IMAGE_COPY_FAILED_VERIFY:
+            status(Status::FailedVerify);
+            break;
+        default:
+            // Unknown NSM status -> map to UndefinedFailure and log.
+            status(Status::UndefinedFailure);
+            invalidValue = true;
+            break;
+    }
+
+    // Per spec, the only valid wire values for image_copy_progress are 0..100
+    // and 101 (= reporting not supported). Clamp out-of-spec values back to
+    // the "not supported" sentinel.
+    uint8_t reportedProgress = queryResp.image_copy_progress;
+    if (reportedProgress > progressNotSupported)
+    {
+        reportedProgress = progressNotSupported;
+        invalidValue = true;
+    }
+    progress(reportedProgress);
+
+    if (invalidValue)
+    {
+        LG2_ERROR_FLT(
+            "Invalid image copy response: status={STATUS}, progress={PROGRESS}",
+            "STATUS", queryResp.image_copy_status, "PROGRESS",
+            queryResp.image_copy_progress);
+    }
+}
+
+NsmImageCopyStateObject::NsmImageCopyStateObject(
+    sdbusplus::bus::bus& bus, const std::string& chassisName) :
+    NsmSensor(chassisName, "NSM_ChassisRoT"), objectPath(getPath(chassisName))
+{
+    lg2::info("NsmImageCopyState: create sensor: {PATH}", "PATH",
+              objectPath.c_str());
+    imageCopyState = std::make_unique<NsmImageCopyState>(bus, objectPath,
+                                                         *this);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmImageCopyStateObject::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+                    sizeof(nsm_firmware_image_copy_control_req));
+
+    struct ::nsm_firmware_image_copy_control_req nsm_req = {};
+    nsm_req.request_type = NSM_IMAGE_COPY_QUERY_PROGRESS;
+    nsm_req.component_count = 0;
+
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_nsm_firmware_image_copy_control_req(instanceId, &nsm_req,
+                                                         nullptr, requestMsg);
+    if (rc)
+    {
+        LG2_ERROR_FLT(
+            "encode_nsm_firmware_image_copy_control_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmImageCopyStateObject::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    struct nsm_firmware_image_copy_control_query_progress_resp queryResp = {};
+
+    auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+        responseMsg, responseLen, &cc, &reason_code, &queryResp);
+
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        LG2_ERROR_FLT(
+            "decode_nsm_firmware_image_copy_control_query_progress_resp failed: rc={RC}, cc={CC}, reasonCode={REASONCODE}",
+            "RC", rc, "CC", cc, "REASONCODE", reason_code);
+        return cc ? cc : rc;
+    }
+
+    imageCopyState->updateProperties(queryResp);
+    return cc ? cc : rc;
 }
 
 } // namespace nsm

@@ -730,6 +730,7 @@ class NsmDevice :
         nullptr; // for GPU driver
     std::shared_ptr<NsmObject> msgTypesSensor =
         nullptr; // Sensor for retrieving message types
+    std::weak_ptr<NsmObject> imageCopyStateSensor = {};
     EventDispatcher eventDispatcher;
     std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
 
