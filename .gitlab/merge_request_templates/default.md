@@ -35,4 +35,8 @@ Sensor Addition Checklist:
 - [ ] This MR adds round robin sensor
 - [ ] This MR adds static sensor
 
+Workaround Details:
+- [ ] this MR doesnt add workaround
+- [ ] If this MR adds a workaround, then commit message follows the format `[Workaround]<commitmsg>`
+
 Thanks for your MR, you're awesome! :thumbsup:
