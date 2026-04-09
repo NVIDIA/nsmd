@@ -455,6 +455,25 @@ TEST_F(NsmDotTest, DotCAKInstallHybridModeWithoutLmsKey)
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
 }
 
+TEST_F(NsmDotTest, DotCAKInstallRejectedWhenISTInProgress)
+{
+    auto& istProps = utils::MockDbusAsync::propertyMap(
+        "/com/nvidia/vera/ist", "com.nvidia.vera.ist.State");
+    istProps["IstInProgress"] = bool(true);
+
+    EXPECT_CALL(*mockDevice, postPatchIO).Times(0);
+
+    auto [rc, statusIntf, valueIntf] = callDotCAKInstallAsync();
+
+    EXPECT_EQ(rc, NSM_SW_ERROR);
+    EXPECT_EQ(statusIntf->status(),
+              AsyncOperationStatusType::ConflictingOperation);
+    auto value = valueIntf->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple), static_cast<uint16_t>(NSM_SW_ERROR));
+    EXPECT_EQ(std::get<1>(tuple), "CPU IST is in progress");
+}
+
 TEST_F(NsmDotTest, DotCAKInstallAsyncHandlerSuccess)
 {
     EXPECT_CALL(*mockDevice, postPatchIO)

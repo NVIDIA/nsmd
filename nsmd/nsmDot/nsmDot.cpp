@@ -416,6 +416,30 @@ requester::Coroutine NsmDotObject::dotCAKInstallAsyncHandler(
 {
     statusIntf->status(AsyncOperationStatusType::InProgress);
 
+    constexpr auto istService = "com.nvidia.vera.ist";
+    constexpr auto istPath = "/com/nvidia/vera/ist";
+    constexpr auto istStateIface = "com.nvidia.vera.ist.State";
+
+    bool istInProgress = false;
+    try
+    {
+        istInProgress = co_await utils::coGetDbusProperty<bool>(
+            istPath, "IstInProgress", istStateIface, istService);
+    }
+    catch (const std::exception& e)
+    {
+        lg2::debug("Dot: IST status check skipped: {ERR}", "ERR", e.what());
+    }
+
+    if (istInProgress)
+    {
+        lg2::error("Dot: dotCAKInstall rejected: CPU IST is in progress");
+        statusIntf->status(AsyncOperationStatusType::ConflictingOperation);
+        valueIntf->value(std::make_tuple(static_cast<uint16_t>(NSM_SW_ERROR),
+                                         "CPU IST is in progress"));
+        co_return NSM_SW_ERROR;
+    }
+
     auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
     if (!device)
     {
