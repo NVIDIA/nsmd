@@ -66,7 +66,7 @@ class NsmObject : virtual public StateChangeLogger
         lastUpdatedTimeStampInUsec = currentTimestampInUsec;
     }
 
-    inline bool needsUpdate(const uint64_t& currentTimestampInUsec) const
+    virtual bool needsUpdate(const uint64_t& currentTimestampInUsec) const
     {
         const uint64_t deltaInUsec = currentTimestampInUsec -
                                      lastUpdatedTimeStampInUsec;
