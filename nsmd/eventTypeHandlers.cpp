@@ -51,6 +51,7 @@ EventType3Handler::EventType3Handler()
 {
     enableDelegation(NSM_XID_EVENT);
     enableDelegation(NSM_RESET_REQUIRED_EVENT);
+    enableDelegation(NSM_CPER_EVENT);
 }
 
 EventType5Handler::EventType5Handler()

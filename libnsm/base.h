@@ -101,6 +101,7 @@ enum nsm_device_capability_discovery_commands {
 	NSM_GET_GPIO_STATE = 0x0F,
 	NSM_SET_GPIO_STATE = 0x10,
 	NSM_GET_DEVICE_CAPABILITIES_V2 = 0x11,
+	NSM_GET_EVENT_LOG_RECORD_V2 = 0x12,
 };
 
 /** @brief NSM Debug Token Commands
@@ -175,6 +176,7 @@ enum nsm_sw_codes {
 enum nsm_evnet_class {
 	NSM_GENERAL_EVENT_CLASS = 0x00,
 	NSM_ASSERTION_DEASSERTION_EVENT_CLASS = 0x01,
+	NSM_POLLED_EVENT_CLASS = 0x02,
 	NSM_NVIDIA_GENERAL_EVENT_CLASS = 0x80,
 };
 

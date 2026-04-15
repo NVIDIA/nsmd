@@ -32,6 +32,12 @@ dbus::ObjectValueTree& MockDbusAsync::dbus()
     return map;
 }
 
+std::shared_ptr<sdbusplus::asio::connection>& DBusHandler::getAsioConnection()
+{
+    static std::shared_ptr<sdbusplus::asio::connection> conn;
+    return conn;
+}
+
 MapperServiceMap& MockDbusAsync::serviceMap()
 {
     static MapperServiceMap map{};

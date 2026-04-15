@@ -622,6 +622,32 @@ requester::Coroutine
  */
 static const uint64_t allowedBufferInUsec = ALLOWED_BUFFER_IN_MS * 1000;
 
+requester::Coroutine SensorManagerImpl::pollDumpCollectionSensors(
+    std::shared_ptr<NsmDevice> nsmDevice, const uint64_t& t0)
+{
+    LimitedSensorQueue sensors(nsmDevice->dumpCollectionSensors);
+    if (!sensors.hasSensorsToUpdate())
+    {
+        co_return NSM_SW_SUCCESS;
+    }
+    uint64_t t1 = 0;
+    sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+
+    while ((t1 - t0) < (pollingTimeInUsec - allowedBufferInUsec) &&
+           nsmDevice->isOnline())
+    {
+        [[maybe_unused]] auto rc =
+            co_await sensors.current()->update(nsmDevice);
+        if (!sensors.current()->needsUpdate(t1))
+        {
+            std::erase(nsmDevice->dumpCollectionSensors, sensors.current());
+            break;
+        }
+        sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
 requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
     std::shared_ptr<NsmDevice> nsmDevice, const uint64_t& t0)
 {
@@ -753,6 +779,7 @@ requester::Coroutine
             nsm_shmem_utils::SharedMemoryManager::
                 updateAggregateTelemetryOnTAL();
 #endif
+            co_await pollDumpCollectionSensors(nsmDevice, t0);
             co_await pollNonPrioritySensors(nsmDevice, t0);
         }
 

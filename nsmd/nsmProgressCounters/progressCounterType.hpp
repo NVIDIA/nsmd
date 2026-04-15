@@ -45,6 +45,18 @@ enum class ProgressCounterType
     Priority,
 
     /**
+     * @brief Dump / CPER record collection polling counter
+     *
+     * Incremented when: a dump / CPER record collection sensor is polled
+     * during the priority polling phase (shares the 150ms budget with
+     * priority sensors). Mirrors PollingType::DumpCollection so that
+     * ProgressCounters::increment(PollingType) can map by static_cast.
+     *
+     * Location: sensorManager.cpp dump-collection polling path
+     */
+    DumpCollection,
+
+    /**
      * @brief GPU Performance Monitoring sensor counter
      *
      * Incremented when: A GPU Performance Monitoring (GPM) sensor is

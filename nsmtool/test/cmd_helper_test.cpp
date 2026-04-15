@@ -67,7 +67,7 @@ TEST(NsmDiscoveryCmd, RegisterCommandCreatesAllCommands)
     CLI::App app;
     nsmtool::discovery::commands.clear();
     nsmtool::discovery::registerCommand(app);
-    EXPECT_EQ(nsmtool::discovery::commands.size(), 8);
+    EXPECT_EQ(nsmtool::discovery::commands.size(), 9);
 }
 
 TEST(NsmDiscoveryCmd, AllCommandsCreateRequestMsg)

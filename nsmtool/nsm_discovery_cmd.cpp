@@ -809,6 +809,131 @@ class GetGpioState : public CommandInterface
     uint16_t length;
 };
 
+class GetEventLogRecordV2 : public CommandInterface
+{
+  public:
+    ~GetEventLogRecordV2() = default;
+    GetEventLogRecordV2() = delete;
+    GetEventLogRecordV2(const GetEventLogRecordV2&) = delete;
+    GetEventLogRecordV2(GetEventLogRecordV2&&) = default;
+    GetEventLogRecordV2& operator=(const GetEventLogRecordV2&) = delete;
+    GetEventLogRecordV2& operator=(GetEventLogRecordV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetEventLogRecordV2(const char* type, const char* name,
+                                 CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto optionGroup = app->add_option_group(
+            "Required", "Get Event Log Record V2 parameters");
+        optionGroup
+            ->add_option("-M, --mode", mode,
+                         "Mode: 0 = Get Data, 1 = Acknowledgement Only")
+            ->required();
+        optionGroup
+            ->add_option("-e, --event_handle", eventHandle,
+                         "Event handle identifier (0x0 for first entry)")
+            ->required();
+        optionGroup
+            ->add_option(
+                "-t, --transfer_handle", transferHandle,
+                "Transfer handle (0 for first segment or acknowledgement)")
+            ->required();
+        optionGroup->require_option(3);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_event_log_record_v2_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_get_event_log_record_v2_req(
+            instanceId, mode, eventHandle, transferHandle, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+
+        ordered_json result;
+
+        if (transferHandle == 0 && mode == NSM_EVENT_LOG_V2_MODE_GET_DATA)
+        {
+            struct nsm_event_log_record_v2_first_fields fields{};
+
+            auto rc = decode_nsm_get_event_log_record_v2_resp_first_handle(
+                responsePtr, payloadLength, &cc, &fields);
+
+            if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+            {
+                std::cerr << "Response message error: "
+                          << "rc=" << rc << ", cc=" << (int)cc << "\n";
+                return;
+            }
+
+            result["Completion Code"] = cc;
+            result["Next Transfer Handle"] = fields.next_transfer_handle;
+            result["Event Handle"] = fields.event_handle;
+            result["NVIDIA Message Type"] = fields.nvidia_message_type;
+            result["Event Version"] = fields.event_version;
+            result["Event ID"] = fields.event_id;
+            result["Event Class"] = fields.event_class;
+            result["Event State"] = fields.event_state;
+            result["Event Data Length"] = fields.event_data_len;
+
+            if (fields.event_data_len > 0 && fields.event_data != nullptr)
+            {
+                result["Event Data"] = std::vector<uint8_t>(
+                    fields.event_data,
+                    fields.event_data + fields.event_data_len);
+            }
+            else
+            {
+                result["Event Data"] = std::vector<uint8_t>{};
+            }
+        }
+        else
+        {
+            struct nsm_event_log_record_v2_next_fields fields{};
+
+            auto rc = decode_nsm_get_event_log_record_v2_resp_next_handle(
+                responsePtr, payloadLength, &cc, &fields);
+
+            if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+            {
+                std::cerr << "Response message error: "
+                          << "rc=" << rc << ", cc=" << (int)cc << "\n";
+                return;
+            }
+
+            result["Completion Code"] = cc;
+            result["Next Transfer Handle"] = fields.next_transfer_handle;
+            result["Event Handle"] = fields.event_handle;
+            result["Event Data Length"] = fields.event_data_len;
+
+            if (fields.event_data_len > 0 && fields.event_data != nullptr)
+            {
+                result["Event Data"] = std::vector<uint8_t>(
+                    fields.event_data,
+                    fields.event_data + fields.event_data_len);
+            }
+            else
+            {
+                result["Event Data"] = std::vector<uint8_t>{};
+            }
+        }
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t mode = 0;
+    uint16_t eventHandle = 0;
+    uint16_t transferHandle = 0;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto discovery = app.add_subcommand(
@@ -856,6 +981,11 @@ void registerCommand(CLI::App& app)
         "GetGpioState", "get GPIO states for specified offset and length");
     commands.push_back(std::make_unique<GetGpioState>(
         "discovery", "GetGpioState", getGpioState));
+
+    auto getEventLogRecordV2 = discovery->add_subcommand(
+        "GetEventLogRecordV2", "get event log record v2");
+    commands.push_back(std::make_unique<GetEventLogRecordV2>(
+        "discovery", "GetEventLogRecordV2", getEventLogRecordV2));
 }
 
 } // namespace discovery

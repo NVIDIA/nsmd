@@ -146,6 +146,9 @@ class SensorManagerImpl : public SensorManager
         pollPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice,
                             const uint64_t& t0);
     virtual requester::Coroutine
+        pollDumpCollectionSensors(std::shared_ptr<NsmDevice> nsmDevice,
+                                  const uint64_t& t0);
+    virtual requester::Coroutine
         pollNonPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice,
                                const uint64_t& t0);
 

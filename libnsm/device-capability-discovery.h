@@ -30,6 +30,8 @@ extern "C" {
 #define NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE 9
 #define NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT_REQ_DATA_SIZE 9
 #define NSM_GET_EVENT_LOG_RECORD_RESP_MIN_DATA_SIZE 14
+#define NSM_GET_EVENT_LOG_RECORD_V2_RESP_FIRST_HANDLE_MIN_DATA_SIZE 10
+#define NSM_GET_EVENT_LOG_RECORD_V2_RESP_NEXT_HANDLE_MIN_DATA_SIZE 4
 #define NSM_GET_DEVICE_CAPABILITIES_V2_DATA_SIZE 9
 
 #define EVENT_SOURCES_LENGTH 8
@@ -129,6 +131,81 @@ struct nsm_get_event_log_record_req {
 	uint8_t selector_type;
 	uint32_t selector;
 } __attribute__((packed));
+
+/** @brief NSM Get Event Log Record V2 mode
+ */
+enum nsm_get_event_log_record_v2_mode {
+	NSM_EVENT_LOG_V2_MODE_GET_DATA = 0,
+	NSM_EVENT_LOG_V2_MODE_ACKNOWLEDGEMENT = 1,
+};
+
+/** @struct nsm_get_event_log_record_v2_req
+ *
+ *  Structure representing NSM get event log record v2 request
+ */
+struct nsm_get_event_log_record_v2_req {
+	struct nsm_common_req hdr;
+	uint8_t mode;
+	uint16_t event_handle;
+	uint16_t transfer_handle;
+} __attribute__((packed));
+
+/** @struct nsm_get_event_log_record_v2_resp_first_handle
+ *
+ *  Structure representing NSM get event log record v2 response
+ *  for the first segment (request transfer_handle = 0)
+ */
+struct nsm_get_event_log_record_v2_resp_first_handle {
+	struct nsm_common_resp hdr;
+	uint16_t next_transfer_handle;
+	uint16_t event_handle;
+	uint8_t nvidia_message_type;
+	uint8_t event_version;
+	uint8_t event_id;
+	uint8_t event_class;
+	uint16_t event_state;
+	uint8_t event_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_get_event_log_record_v2_resp_next_handle
+ *
+ *  Structure representing NSM get event log record v2 response
+ *  for continuation segments (request transfer_handle != 0)
+ */
+struct nsm_get_event_log_record_v2_resp_next_handle {
+	struct nsm_common_resp hdr;
+	uint16_t next_transfer_handle;
+	uint16_t event_handle;
+	uint8_t event_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_event_log_record_v2_first_fields
+ *
+ *  Host-endian fields of Get Event Log Record V2 first-segment response.
+ */
+struct nsm_event_log_record_v2_first_fields {
+	uint16_t next_transfer_handle;
+	uint16_t event_handle;
+	uint8_t nvidia_message_type;
+	uint8_t event_version;
+	uint8_t event_id;
+	uint8_t event_class;
+	uint16_t event_state;
+	uint8_t *event_data;
+	uint16_t event_data_len;
+};
+
+/** @struct nsm_event_log_record_v2_next_fields
+ *
+ *  Host-endian fields of Get Event Log Record V2 continuation-segment
+ *  response.
+ */
+struct nsm_event_log_record_v2_next_fields {
+	uint16_t next_transfer_handle;
+	uint16_t event_handle;
+	uint8_t *event_data;
+	uint16_t event_data_len;
+};
 
 /** @struct nsm_get_event_log_record_resp
  *
@@ -424,6 +501,94 @@ int decode_nsm_set_event_subscription_resp(const struct nsm_msg *msg,
 int encode_nsm_get_event_log_record_req(uint8_t instance_id,
 					uint8_t selector_type,
 					uint32_t selector, struct nsm_msg *msg);
+
+/** @brief Create a Get Event Log Record V2 request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] mode - 0: Get Data, 1: Acknowledgement Only
+ *  @param[in] event_handle - identifier for the event record
+ *  @param[in] transfer_handle - must be 0 for first segment or acknowledgement
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_get_event_log_record_v2_req(uint8_t instance_id, uint8_t mode,
+					   uint16_t event_handle,
+					   uint16_t transfer_handle,
+					   struct nsm_msg *msg);
+
+/** @brief Decode a Get Event Log Record V2 request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] mode - pointer to mode (0: Get Data, 1: Acknowledgement Only)
+ *  @param[out] event_handle - pointer to event handle
+ *  @param[out] transfer_handle - pointer to transfer handle
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_get_event_log_record_v2_req(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *mode,
+					   uint16_t *event_handle,
+					   uint16_t *transfer_handle);
+
+/** @brief Encode Get Event Log Record V2 response (first segment)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - reason code when cc != success
+ *  @param[in] in - host-endian fields to serialize; must be non-NULL
+ *                  when cc == NSM_SUCCESS. in->event_data may be NULL
+ *                  iff in->event_data_len == 0.
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_get_event_log_record_v2_resp_first_handle(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_event_log_record_v2_first_fields *in, struct nsm_msg *msg);
+
+/** @brief Decode Get Event Log Record V2 response (first segment)
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to completion code
+ *  @param[out] out - host-endian fields filled from the payload on
+ *                    success. out->event_data aliases into msg and is
+ *                    valid only for the lifetime of msg. out->event_data
+ *                    is NULL when out->event_data_len == 0.
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_get_event_log_record_v2_resp_first_handle(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    struct nsm_event_log_record_v2_first_fields *out);
+
+/** @brief Encode Get Event Log Record V2 response (continuation segment)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - reason code when cc != success
+ *  @param[in] in - host-endian fields to serialize; must be non-NULL
+ *                  when cc == NSM_SUCCESS. in->event_data may be NULL
+ *                  iff in->event_data_len == 0.
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_get_event_log_record_v2_resp_next_handle(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_event_log_record_v2_next_fields *in, struct nsm_msg *msg);
+
+/** @brief Decode Get Event Log Record V2 response (continuation segment)
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to completion code
+ *  @param[out] out - host-endian fields filled from the payload on
+ *                    success. out->event_data aliases into msg and is
+ *                    valid only for the lifetime of msg. out->event_data
+ *                    is NULL when out->event_data_len == 0.
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_get_event_log_record_v2_resp_next_handle(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    struct nsm_event_log_record_v2_next_fields *out);
 
 /** @brief Decode a Get Event Log Record response message
  *

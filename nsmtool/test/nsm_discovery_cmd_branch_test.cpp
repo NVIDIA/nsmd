@@ -823,8 +823,8 @@ TEST(NsmDiscoveryBranch, RegisterCommand_AllCommandsCreated)
     CLI::App app;
     setupDiscoveryCommands(app);
 
-    // Verify all 8 commands are registered
-    EXPECT_EQ(commands.size(), 8u);
+    // Verify all 9 commands are registered
+    EXPECT_EQ(commands.size(), 9u);
 }
 
 } // namespace nsmtool::discovery

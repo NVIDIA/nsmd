@@ -111,6 +111,7 @@ ProgressCounters::ProgressCounters(eid_t eid) :
         "Polling Progress Counters for device EID=" + std::to_string(eid),
         {
             "Priority",
+            "DumpCollection",
             "GPM",
             "LongRunning",
             "Static",

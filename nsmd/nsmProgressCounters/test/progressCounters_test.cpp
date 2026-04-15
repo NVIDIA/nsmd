@@ -287,6 +287,7 @@ TEST_F(ProgressCountersTest, AllCounterTypes)
 
     // Test each counter type (except EnumCount which is just for sizing)
     progressCounters.increment(ProgressCounterType::Priority, rc);
+    progressCounters.increment(ProgressCounterType::DumpCollection, rc);
     progressCounters.increment(ProgressCounterType::GpuPerformanceMonitoring,
                                rc);
     progressCounters.increment(ProgressCounterType::LongRunning, rc);
@@ -302,6 +303,9 @@ TEST_F(ProgressCountersTest, AllCounterTypes)
         progressCounters
             .counters[static_cast<uint32_t>(ProgressCounterType::Priority)],
         1);
+    EXPECT_EQ(progressCounters.counters[static_cast<uint32_t>(
+                  ProgressCounterType::DumpCollection)],
+              1);
     EXPECT_EQ(progressCounters.counters[static_cast<uint32_t>(
                   ProgressCounterType::GpuPerformanceMonitoring)],
               1);
@@ -333,7 +337,7 @@ TEST_F(ProgressCountersTest, AllCounterTypes)
         progressCounters
             .counters[static_cast<uint32_t>(ProgressCounterType::Timeout)],
         1);
-    EXPECT_EQ(progressCounters.totalCount, 10);
+    EXPECT_EQ(progressCounters.totalCount, 11);
 }
 
 // Test all PollingType enum values
@@ -343,6 +347,7 @@ TEST_F(ProgressCountersTest, AllPollingTypes)
 
     // Test each polling type
     progressCounters.increment(PollingType::Priority, rc);
+    progressCounters.increment(PollingType::DumpCollection, rc);
     progressCounters.increment(PollingType::GpuPerformanceMonitoring, rc);
     progressCounters.increment(PollingType::LongRunning, rc);
     progressCounters.increment(PollingType::Static, rc);
@@ -353,6 +358,9 @@ TEST_F(ProgressCountersTest, AllPollingTypes)
         progressCounters
             .counters[static_cast<uint32_t>(ProgressCounterType::Priority)],
         1);
+    EXPECT_EQ(progressCounters.counters[static_cast<uint32_t>(
+                  ProgressCounterType::DumpCollection)],
+              1);
     EXPECT_EQ(progressCounters.counters[static_cast<uint32_t>(
                   ProgressCounterType::GpuPerformanceMonitoring)],
               1);
@@ -367,7 +375,7 @@ TEST_F(ProgressCountersTest, AllPollingTypes)
         progressCounters
             .counters[static_cast<uint32_t>(ProgressCounterType::RoundRobin)],
         1);
-    EXPECT_EQ(progressCounters.totalCount, 5);
+    EXPECT_EQ(progressCounters.totalCount, 6);
 }
 
 // Test multiple dump iterations

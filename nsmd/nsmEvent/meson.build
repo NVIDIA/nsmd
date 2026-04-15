@@ -1,6 +1,7 @@
 sources += [
     'nsmEvent/nsmLongRunningEventHandler.cpp',
     'nsmEvent/nsmLongRunningEvent.cpp',
+    'nsmEvent/nsmEventLogRecordV2.cpp',
 ]
 
 include_all_events = get_option('nsm-event-all')
@@ -13,6 +14,7 @@ valid_events = [
     'reset-required',
     'fabric-manager-state',
     'gpio-state',
+    'cper',
 ]
 foreach name : include_event_list
     if not valid_events.contains(name)
@@ -37,6 +39,9 @@ if include_all_events or include_event_list.contains('fabric-manager-state')
 endif
 if include_all_events or include_event_list.contains('gpio-state')
     sources += ['nsmEvent/nsmGPIOStateChangeEvent.cpp']
+endif
+if include_all_events or include_event_list.contains('cper')
+    sources += ['nsmEvent/nsmCPEREvent.cpp']
 endif
 
 nsmd_headers += ['.', '..', 'nsmEvent']

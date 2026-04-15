@@ -433,6 +433,8 @@ std::optional<Response>
                     return getDeviceCapabilitiesV2Handler(request, requestLen);
                 case NSM_GET_GPIO_STATE:
                     return getGpioStateHandler(request, requestLen);
+                case NSM_GET_EVENT_LOG_RECORD_V2:
+                    return getEventLogRecordV2Handler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -978,7 +980,8 @@ std::optional<std::vector<uint8_t>>
                  {0,
                   {0, 1, 2, 3, 4, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
                    NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
-                   NSM_GET_DEVICE_CAPABILITIES_V2}},
+                   NSM_GET_DEVICE_CAPABILITIES_V2,
+                   NSM_GET_EVENT_LOG_RECORD_V2}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
                  {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,
@@ -7476,6 +7479,110 @@ std::optional<std::vector<uint8_t>>
     }
 
     return response;
+}
+
+std::optional<std::vector<uint8_t>> MockupResponder::encodeEventLogRecordV2Resp(
+    uint8_t instanceId, uint16_t eventHandle, uint16_t transferHandle,
+    uint16_t nextTransferHandle, const std::vector<uint8_t>& eventData)
+{
+    uint16_t reasonCode = ERR_NULL;
+    int rc;
+
+    if (transferHandle == 0 && nextTransferHandle != 0xFFFF)
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) +
+                sizeof(nsm_get_event_log_record_v2_resp_first_handle) - 1 +
+                eventData.size(),
+            0);
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+        struct nsm_event_log_record_v2_first_fields fields{};
+        fields.next_transfer_handle = nextTransferHandle;
+        fields.event_handle = eventHandle;
+        fields.nvidia_message_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+        fields.event_version = 1;
+        fields.event_id = 1;
+        fields.event_class = 0;
+        fields.event_state = 0;
+        fields.event_data = const_cast<uint8_t*>(eventData.data());
+        fields.event_data_len = static_cast<uint16_t>(eventData.size());
+
+        rc = encode_nsm_get_event_log_record_v2_resp_first_handle(
+            instanceId, NSM_SUCCESS, reasonCode, &fields, responseMsg);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "encode_nsm_get_event_log_record_v2_resp_first_handle failed: rc={RC}",
+                "RC", rc);
+            return std::nullopt;
+        }
+        return response;
+    }
+    else
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) +
+                sizeof(nsm_get_event_log_record_v2_resp_next_handle) - 1 +
+                eventData.size(),
+            0);
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+        struct nsm_event_log_record_v2_next_fields fields{};
+        fields.next_transfer_handle = nextTransferHandle;
+        fields.event_handle = eventHandle;
+        fields.event_data = const_cast<uint8_t*>(eventData.data());
+        fields.event_data_len = static_cast<uint16_t>(eventData.size());
+
+        rc = encode_nsm_get_event_log_record_v2_resp_next_handle(
+            instanceId, NSM_SUCCESS, reasonCode, &fields, responseMsg);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "encode_nsm_get_event_log_record_v2_resp_next_handle failed: rc={RC}",
+                "RC", rc);
+            return std::nullopt;
+        }
+        return response;
+    }
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getEventLogRecordV2Handler(const nsm_msg* requestMsg,
+                                                size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getEventLogRecordV2Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t mode;
+    uint16_t eventHandle;
+    uint16_t transferHandle;
+
+    auto rc = decode_nsm_get_event_log_record_v2_req(
+        requestMsg, requestLen, &mode, &eventHandle, &transferHandle);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_get_event_log_record_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    if (mode == NSM_EVENT_LOG_V2_MODE_ACKNOWLEDGEMENT)
+    {
+        return encodeEventLogRecordV2Resp(requestMsg->hdr.instance_id, 0xFFFF,
+                                          0, 0, {});
+    }
+
+    std::vector<uint8_t> mockEventData = {0x01, 0x02, 0x03, 0x04};
+    uint16_t nextTransferHandle = (transferHandle < 5) ? (transferHandle + 1)
+                                                       : 0;
+
+    return encodeEventLogRecordV2Resp(requestMsg->hdr.instance_id, eventHandle,
+                                      transferHandle, nextTransferHandle,
+                                      mockEventData);
 }
 
 std::optional<Response>

@@ -276,4 +276,71 @@ struct coLogEvent
 #endif // COVERAGE_DISABLE_COROUTINES
 };
 
+/* @struct coDbusMethodCall
+ *
+ * A generic awaitable object for async D-Bus method calls with any data type
+ * e.g.
+ * bool success = co_await utils::coDbusMethodCall(
+ *     service, objPath, interface, method, data);
+ */
+template <typename DataType>
+struct coDbusMethodCall
+{
+    const std::string service;
+    const std::string objectPath;
+    const std::string interface;
+    const std::string method;
+    const DataType data;
+    bool success = false;
+
+    bool await_ready() noexcept
+    {
+        return false;
+    }
+
+    bool await_suspend(std::coroutine_handle<> handle) noexcept
+    {
+        auto& asioConnection = utils::DBusHandler::getAsioConnection();
+
+        asioConnection->async_method_call(
+            [resumeHandle = handle,
+             &success = success](boost::system::error_code ec) {
+            success = !ec;
+            if (ec)
+            {
+                lg2::error("coDbusMethodCall failed: {ERROR}", "ERROR",
+                           ec.message());
+            }
+            resumeHandle();
+        },
+            service.c_str(), objectPath.c_str(), interface.c_str(),
+            method.c_str(), data);
+        return true;
+    }
+
+    bool await_resume() const noexcept
+    {
+        return success;
+    }
+
+    coDbusMethodCall(const std::string& svc, const std::string& objPath,
+                     const std::string& intf, const std::string& mtd,
+                     const DataType& payload) :
+        service(svc), objectPath(objPath), interface(intf), method(mtd),
+        data(payload)
+    {}
+
+#ifdef COVERAGE_DISABLE_COROUTINES
+
+    coDbusMethodCall(bool value) :
+        service(""), objectPath(""), interface(""), method(""), data{},
+        success(value)
+    {}
+    operator bool() const noexcept
+    {
+        return success;
+    }
+#endif // COVERAGE_DISABLE_COROUTINES
+};
+
 } // namespace utils

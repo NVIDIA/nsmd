@@ -1262,7 +1262,7 @@ TEST(JoinTest, NegativeIntegers_FormatCorrectly)
 
 TEST(ProgressCounterTypeTest, EnumCount_IsLast)
 {
-    EXPECT_EQ(10u, static_cast<uint32_t>(ProgressCounterType::EnumCount));
+    EXPECT_EQ(11u, static_cast<uint32_t>(ProgressCounterType::EnumCount));
     EXPECT_EQ(static_cast<uint32_t>(ProgressCounterType::EnumCount),
               PollingCountersSize);
 }
@@ -1277,17 +1277,18 @@ TEST(DiscoveryEventTypeTest, EnumCount_IsLast)
 TEST(ProgressCounterTypeTest, AllEnumValues_InRange)
 {
     EXPECT_EQ(0u, static_cast<uint32_t>(ProgressCounterType::Priority));
-    EXPECT_EQ(1u, static_cast<uint32_t>(
+    EXPECT_EQ(1u, static_cast<uint32_t>(ProgressCounterType::DumpCollection));
+    EXPECT_EQ(2u, static_cast<uint32_t>(
                       ProgressCounterType::GpuPerformanceMonitoring));
-    EXPECT_EQ(2u, static_cast<uint32_t>(ProgressCounterType::LongRunning));
-    EXPECT_EQ(3u, static_cast<uint32_t>(ProgressCounterType::Static));
-    EXPECT_EQ(4u, static_cast<uint32_t>(ProgressCounterType::RoundRobin));
-    EXPECT_EQ(5u,
+    EXPECT_EQ(3u, static_cast<uint32_t>(ProgressCounterType::LongRunning));
+    EXPECT_EQ(4u, static_cast<uint32_t>(ProgressCounterType::Static));
+    EXPECT_EQ(5u, static_cast<uint32_t>(ProgressCounterType::RoundRobin));
+    EXPECT_EQ(6u,
               static_cast<uint32_t>(ProgressCounterType::PriorityTimeExceeded));
-    EXPECT_EQ(6u, static_cast<uint32_t>(ProgressCounterType::PostPatch));
-    EXPECT_EQ(7u, static_cast<uint32_t>(ProgressCounterType::Event));
-    EXPECT_EQ(8u, static_cast<uint32_t>(ProgressCounterType::Error));
-    EXPECT_EQ(9u, static_cast<uint32_t>(ProgressCounterType::Timeout));
+    EXPECT_EQ(7u, static_cast<uint32_t>(ProgressCounterType::PostPatch));
+    EXPECT_EQ(8u, static_cast<uint32_t>(ProgressCounterType::Event));
+    EXPECT_EQ(9u, static_cast<uint32_t>(ProgressCounterType::Error));
+    EXPECT_EQ(10u, static_cast<uint32_t>(ProgressCounterType::Timeout));
 }
 
 TEST(DiscoveryEventTypeTest, AllEnumValues_InRange)

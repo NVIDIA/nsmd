@@ -228,6 +228,12 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getGpioStateHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getEventLogRecordV2Handler(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+    std::optional<std::vector<uint8_t>> encodeEventLogRecordV2Resp(
+        uint8_t instanceId, uint16_t eventHandle, uint16_t transferHandle,
+        uint16_t nextTransferHandle, const std::vector<uint8_t>& eventData);
 
     // type3 handlers
     std::optional<std::vector<uint8_t>>

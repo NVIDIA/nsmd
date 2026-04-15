@@ -24,6 +24,7 @@
 
 #include "nsmCommon/nsmPcieGroup.hpp"
 #include "nsmCommon/nsmPciePortIntf.hpp"
+#include "nsmEvent/nsmCPEREvent.hpp"
 #ifdef ENABLE_SYSTEM_GUID
 #include "network-ports.h"
 
@@ -3731,6 +3732,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             createGPUPowerLimit(nsmDevice, bus, name,
                                 "NSM_GPU_COPY_SWITCH_POWER_LIMIT",
                                 inventoryObjPath);
+        }
+        if (allCurrentIfaceProperties.count("CPEREventSupported") &&
+            std::get<bool>(allCurrentIfaceProperties.at("CPEREventSupported")))
+        {
+            createNsmCPEREvent(nsmDevice, name, "NSM_Event_CPER");
         }
     }
     else if (type == "NSM_PCIe")

@@ -147,7 +147,8 @@ enum nsm_spi_status { NSM_SPI_READY, NSM_SPI_BUSY, NSM_SPI_ERROR };
  */
 enum nsm_platform_environmental_events {
 	NSM_RESET_REQUIRED_EVENT = 0x00,
-	NSM_XID_EVENT = 0x01
+	NSM_XID_EVENT = 0x01,
+	NSM_CPER_EVENT = 0x02
 };
 
 enum nsm_mnnvlink_peer_type {

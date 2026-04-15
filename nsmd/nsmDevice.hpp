@@ -75,6 +75,8 @@ struct ActiveLongRunningHandlerInfo
 enum class PollingType
 {
     Priority,                 // Priority polling [150ms] for priority sensors
+    DumpCollection,           // Dump / CPER record collection polling [150ms]
+                              // (uses leftover budget after priority sensors)
     GpuPerformanceMonitoring, // Gpu Performance Monitoring [1000ms]
     LongRunning,              // Long running polling for long running sensors
     Static,                   // One time polling for static sensors
@@ -243,6 +245,11 @@ class NsmDevice :
     {
         deviceEvents.push_back(event);
         eventDispatcher.addEvent(type, eventId, event);
+    }
+
+    void addDumpCollectionSensor(std::shared_ptr<NsmObject> sensor)
+    {
+        dumpCollectionSensors.push(sensor);
     }
 
     /**
@@ -726,12 +733,14 @@ class NsmDevice :
     PollingType nonPriorityPollingType = PollingType::GpuPerformanceMonitoring;
     std::unordered_map<PollingType, SensorQueue> sensors = {
         {PollingType::Priority, SensorQueue()},
+        {PollingType::DumpCollection, SensorQueue()},
         {PollingType::GpuPerformanceMonitoring, SensorQueue()},
         {PollingType::LongRunning, SensorQueue()},
         {PollingType::Static, SensorQueue()},
         {PollingType::RoundRobin, SensorQueue()},
     };
     SensorQueue& prioritySensors = sensors[PollingType::Priority];
+    SensorQueue& dumpCollectionSensors = sensors[PollingType::DumpCollection];
     SensorQueue& gpmSensors = sensors[PollingType::GpuPerformanceMonitoring];
     SensorQueue& longRunningSensors = sensors[PollingType::LongRunning];
     SensorQueue& staticSensors = sensors[PollingType::Static];
