@@ -335,11 +335,13 @@ requester::Coroutine NsmDebugTokenAggregationObject::installTokensToDevices(
         }
     }
 
+    size_t unmatchedTokens =
+        tokens.size() > results.size() ? tokens.size() - results.size() : 0;
     lg2::info(
         "DebugToken: Installation complete - success={SUCCESS}, "
-        "failure={FAILURE}, mapped_devices={TOTAL}, unmatched_tokens={UNMATCHED}",
+        "failure={FAILURE}, tokens_processed={TOTAL}, unmatched_tokens={UNMATCHED}",
         "SUCCESS", successCount, "FAILURE", failureCount, "TOTAL",
-        results.size(), "UNMATCHED", tokens.size() - results.size());
+        results.size(), "UNMATCHED", unmatchedTokens);
 
     valueIntf->value(results);
     if (failureCount > 0)

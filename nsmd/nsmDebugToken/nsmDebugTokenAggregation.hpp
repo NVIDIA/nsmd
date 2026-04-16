@@ -135,7 +135,7 @@ class NsmDebugTokenAggregationObject : public DebugTokenAggregationIntf
      */
     using SerialNumber = std::string;
     using TokenData = std::vector<uint8_t>;
-    using TokenMap = std::map<SerialNumber, TokenData>;
+    using TokenMap = std::multimap<SerialNumber, TokenData>;
 
     /**
      * @brief Result type for per-device installation status

@@ -538,7 +538,7 @@ TEST_F(NsmDebugTokenInstallTest, InstallTokensToDevices_NullTokenInList_Skipped)
     mockManager.debugTokenList.push_back(nullptr);
 
     NsmDebugTokenAggregationObject::TokenMap tokens;
-    tokens["SERIAL_A"] = {0x01, 0x02, 0x03};
+    tokens.emplace("SERIAL_A", std::vector<uint8_t>{0x01, 0x02, 0x03});
 
     auto statusIntf =
         std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/ta");
@@ -564,7 +564,7 @@ TEST_F(NsmDebugTokenInstallTest,
     mockManager.debugTokenList.push_back(tokenObj);
 
     NsmDebugTokenAggregationObject::TokenMap tokens;
-    tokens["SERIAL_B"] = {0x04, 0x05, 0x06};
+    tokens.emplace("SERIAL_B", std::vector<uint8_t>{0x04, 0x05, 0x06});
 
     auto statusIntf =
         std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/tb");
@@ -590,7 +590,7 @@ TEST_F(NsmDebugTokenInstallTest,
 
     // Token uses a different serial → deviceMap.find() returns end()
     NsmDebugTokenAggregationObject::TokenMap tokens;
-    tokens["OTHERSERIAL_C"] = {0x07, 0x08, 0x09};
+    tokens.emplace("OTHERSERIAL_C", std::vector<uint8_t>{0x07, 0x08, 0x09});
 
     auto statusIntf =
         std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/tc");
@@ -654,7 +654,7 @@ TEST_F(NsmDebugTokenInstallWithDeviceTest,
     mockManager.debugTokenList.push_back(tokenObj);
 
     NsmDebugTokenAggregationObject::TokenMap tokens;
-    tokens["DEVSERIAL_TD"] = {0xAA, 0xBB, 0xCC};
+    tokens.emplace("DEVSERIAL_TD", std::vector<uint8_t>{0xAA, 0xBB, 0xCC});
 
     auto statusIntf =
         std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/td");
@@ -685,7 +685,7 @@ TEST_F(NsmDebugTokenInstallWithDeviceTest,
     mockManager.debugTokenList.push_back(tokenObj);
 
     NsmDebugTokenAggregationObject::TokenMap tokens;
-    tokens["DEVSERIAL_TE"] = {0xDD, 0xEE};
+    tokens.emplace("DEVSERIAL_TE", std::vector<uint8_t>{0xDD, 0xEE});
 
     auto statusIntf =
         std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/te");

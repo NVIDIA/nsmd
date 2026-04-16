@@ -308,7 +308,7 @@ TEST_F(NsmDebugTokenAggInstallBranch2Test,
     mockManager.debugTokenList.push_back(nullptr);
 
     NsmDebugTokenAggregationObject::TokenMap tokens;
-    tokens["SERIAL_X"] = {0x01};
+    tokens.emplace("SERIAL_X", std::vector<uint8_t>{0x01});
 
     auto statusIntf =
         std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/b2_null");
@@ -339,7 +339,7 @@ TEST_F(NsmDebugTokenAggInstallBranch2Test,
     mockManager.debugTokenList.push_back(tokenObj);
 
     NsmDebugTokenAggregationObject::TokenMap tokens;
-    tokens["SERIAL_Y"] = {0x02};
+    tokens.emplace("SERIAL_Y", std::vector<uint8_t>{0x02});
 
     auto statusIntf = std::make_shared<AsyncStatusIntf>(
         bus, "/com/nvidia/nsmd/aop/b2_empty_id");
@@ -372,7 +372,7 @@ TEST_F(NsmDebugTokenAggInstallBranch2Test,
 
     NsmDebugTokenAggregationObject::TokenMap tokens;
     // Serial does not match "0xAABBCCDD"
-    tokens["0x11223344"] = {0x03};
+    tokens.emplace("0x11223344", std::vector<uint8_t>{0x03});
 
     auto statusIntf = std::make_shared<AsyncStatusIntf>(
         bus, "/com/nvidia/nsmd/aop/b2_nomatch");
@@ -461,7 +461,7 @@ TEST_F(NsmDebugTokenAggInstallBranch2Test,
 
     // Token that doesn't match any device
     NsmDebugTokenAggregationObject::TokenMap tokens;
-    tokens["0xBBBB"] = {0x01};
+    tokens.emplace("0xBBBB", std::vector<uint8_t>{0x01});
 
     auto statusIntf =
         std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/b2_mixed");

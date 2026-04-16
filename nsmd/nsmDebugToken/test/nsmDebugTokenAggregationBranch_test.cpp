@@ -384,7 +384,7 @@ TEST_F(NsmDebugTokenAggInstallBranchTest,
     mockManager.debugTokenList.push_back(tokenObj2);
 
     NsmDebugTokenAggregationObject::TokenMap tokens;
-    tokens["SERIAL_OTHER"] = {0x01, 0x02};
+    tokens.emplace("SERIAL_OTHER", std::vector<uint8_t>{0x01, 0x02});
 
     auto statusIntf =
         std::make_shared<AsyncStatusIntf>(bus, "/com/nvidia/nsmd/aop/br_dup");
