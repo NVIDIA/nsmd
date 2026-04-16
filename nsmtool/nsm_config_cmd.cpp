@@ -31,9 +31,16 @@
 #include "cmd_helper.hpp"
 #include "utils.hpp"
 
+#include <endian.h>
+
 #include <CLI/CLI.hpp>
 
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <ctime>
+#include <string>
+#include <vector>
 
 namespace nsmtool
 {
@@ -46,6 +53,31 @@ namespace
 
 using namespace nsmtool::helper;
 std::vector<std::unique_ptr<CommandInterface>> commands;
+
+bool parseHexToBytes(const std::string& hex, std::vector<uint8_t>& out)
+{
+    out.clear();
+    if (hex.empty())
+    {
+        return true;
+    }
+    if (hex.size() % 2 != 0)
+    {
+        return false;
+    }
+    for (size_t i = 0; i < hex.size(); i += 2)
+    {
+        char pair[3] = {hex[i], hex[i + 1], '\0'};
+        char* end = nullptr;
+        unsigned long v = std::strtoul(pair, &end, 16);
+        if (end != pair + 2 || v > 255)
+        {
+            return false;
+        }
+        out.push_back(static_cast<uint8_t>(v));
+    }
+    return true;
+}
 
 } // namespace
 
@@ -1657,6 +1689,183 @@ class SetDeviceModeSettingsV2 : public CommandInterface
     double deviceModeValue = 0;
 };
 
+class SetDeviceConfig : public CommandInterface
+{
+  public:
+    ~SetDeviceConfig() = default;
+    SetDeviceConfig() = delete;
+    SetDeviceConfig(const SetDeviceConfig&) = delete;
+    SetDeviceConfig(SetDeviceConfig&&) = default;
+    SetDeviceConfig& operator=(const SetDeviceConfig&) = delete;
+    SetDeviceConfig& operator=(SetDeviceConfig&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetDeviceConfig(const char* type, const char* name,
+                             CLI::App* app) : CommandInterface(type, name, app)
+    {
+        auto g = app->add_option_group("Required", "Set Device Config (0x10)");
+        g->add_option("-t,--type", typeStr,
+                      "Device configuration type (decimal or 0x hex)");
+        g->add_option(
+            "-d,--data-hex", dataHex,
+            "Configuration data as hex string (even length; total with 4-byte "
+            "type must fit uint16_t V2 data_size)");
+        g->require_option(2);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> payload;
+        if (!parseHexToBytes(dataHex, payload))
+        {
+            std::cerr << "Invalid --data-hex (use pairs of hex digits)\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        if (payload.size() > static_cast<size_t>(UINT16_MAX) - sizeof(uint32_t))
+        {
+            std::cerr << "Data plus 4-byte type exceeds uint16_t data_size\n";
+            return {NSM_SW_ERROR_LENGTH, {}};
+        }
+        char* endptr = nullptr;
+        unsigned long parsedType = std::strtoul(typeStr.c_str(), &endptr, 0);
+        if (endptr == typeStr.c_str() || *endptr != '\0')
+        {
+            std::cerr << "Invalid --type value\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        uint32_t cfgType = static_cast<uint32_t>(parsedType);
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                            sizeof(nsm_common_req_v2) +
+                                            sizeof(uint32_t) + payload.size(),
+                                        0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        int rc = encode_set_device_config_v2_req(
+            instanceId, cfgType, payload.data(),
+            static_cast<uint16_t>(payload.size()), request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        auto rc = decode_set_device_config_v2_resp(responsePtr, payloadLength,
+                                                   &cc, &reasonCode);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "SetDeviceConfig response error: rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << reasonCode << "\n";
+            return;
+        }
+        ordered_json result;
+        result["Completion Code"] = static_cast<int>(cc);
+        result["Command"] = "SetDeviceConfig (0x10)";
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    std::string typeStr;
+    std::string dataHex;
+};
+
+class GetDeviceConfig : public CommandInterface
+{
+  public:
+    ~GetDeviceConfig() = default;
+    GetDeviceConfig() = delete;
+    GetDeviceConfig(const GetDeviceConfig&) = delete;
+    GetDeviceConfig(GetDeviceConfig&&) = default;
+    GetDeviceConfig& operator=(const GetDeviceConfig&) = delete;
+    GetDeviceConfig& operator=(GetDeviceConfig&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetDeviceConfig(const char* type, const char* name,
+                             CLI::App* app) : CommandInterface(type, name, app)
+    {
+        auto g = app->add_option_group("Required", "Get Device Config (0x11)");
+        g->add_option("-t,--type", typeStr,
+                      "Device configuration type (decimal or 0x hex)");
+        g->add_option(
+            "-q,--query-hex", queryHex,
+            "Optional query blob as hex (identifier fields per spec)");
+        g->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> query;
+        if (!parseHexToBytes(queryHex, query))
+        {
+            std::cerr << "Invalid --query-hex\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        char* endptr = nullptr;
+        unsigned long parsedType = std::strtoul(typeStr.c_str(), &endptr, 0);
+        if (endptr == typeStr.c_str() || *endptr != '\0')
+        {
+            std::cerr << "Invalid --type value\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        uint32_t cfgType = static_cast<uint32_t>(parsedType);
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                            sizeof(nsm_common_req_v2) +
+                                            sizeof(uint32_t) + query.size(),
+                                        0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        int rc = encode_get_device_config_v2_req(
+            instanceId, cfgType, query.data(),
+            static_cast<uint16_t>(query.size()), request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        std::vector<uint8_t> cur(static_cast<size_t>(UINT16_MAX));
+        uint16_t curLen = 0;
+        std::vector<uint8_t> pend(static_cast<size_t>(UINT16_MAX));
+        uint16_t pendLen = 0;
+        auto rc = decode_get_device_config_v2_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, cur.data(), &curLen,
+            pend.data(), &pendLen);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "GetDeviceConfig response error: rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << reasonCode << "\n";
+            return;
+        }
+        ordered_json result;
+        result["Completion Code"] = static_cast<int>(cc);
+        result["Command"] = "GetDeviceConfig (0x11)";
+        result["Current Config Length"] = curLen;
+        result["Current Config Hex"] = bytesToHexString(cur.data(), curLen);
+        result["Pending Config Length"] = pendLen;
+        result["Pending Config Hex"] = bytesToHexString(pend.data(), pendLen);
+        if (curLen == sizeof(uint32_t))
+        {
+            uint32_t v;
+            std::memcpy(&v, cur.data(), sizeof(v));
+            result["Current Config As NvU32"] = le32toh(v);
+        }
+        if (pendLen == sizeof(uint32_t))
+        {
+            uint32_t v;
+            std::memcpy(&v, pend.data(), sizeof(v));
+            result["Pending Config As NvU32"] = le32toh(v);
+        }
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    std::string typeStr;
+    std::string queryHex;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto config = app.add_subcommand("config",
@@ -1767,6 +1976,16 @@ void registerCommand(CLI::App& app)
         "SetDeviceModeSettingsV2", "Set device mode settings v2 (0x82)");
     commands.push_back(std::make_unique<SetDeviceModeSettingsV2>(
         "config", "SetDeviceModeSettingsV2", setDeviceModeSettingsV2));
+
+    auto setDeviceConfig = config->add_subcommand(
+        "SetDeviceConfig", "Set Device Config Type 5 command 0x10 (V2)");
+    commands.push_back(std::make_unique<SetDeviceConfig>(
+        "config", "SetDeviceConfig", setDeviceConfig));
+
+    auto getDeviceConfig = config->add_subcommand(
+        "GetDeviceConfig", "Get Device Config Type 5 command 0x11 (V2)");
+    commands.push_back(std::make_unique<GetDeviceConfig>(
+        "config", "GetDeviceConfig", getDeviceConfig));
 }
 
 } // namespace config

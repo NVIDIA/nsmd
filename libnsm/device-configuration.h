@@ -38,6 +38,8 @@ enum device_configuration_command {
 	NSM_GET_ERROR_INJECTION_PAYLOAD = 0x0A,
 	NSM_SET_ERROR_INJECTION_PAYLOAD = 0x0B,
 	NSM_ACTIVATE_ERROR_INJECTION = 0x0C,
+	NSM_SET_DEVICE_CONFIG_V2 = 0x10,
+	NSM_GET_DEVICE_CONFIG_V2 = 0x11,
 	NSM_SET_RECONFIGURATION_PERMISSIONS_V1 = 0x40,
 	NSM_GET_RECONFIGURATION_PERMISSIONS_V1 = 0x41,
 	NSM_ENABLE_DISABLE_GPU_IST_MODE = 0x62,
@@ -49,6 +51,12 @@ enum device_configuration_command {
 	NSM_SET_DEVICE_MODE_SETTINGS_V2 = 0x82,
 	NSM_GET_DEVICE_MODE_SETTINGS_V2 = 0x83,
 	NSM_GET_SUPPORTED_DEVICE_MODES_V2 = 0x84,
+};
+
+/** NSM Type 5 (Device Configuration) event IDs — Fractal Boot (NVBugs 5919843).
+ */
+enum nsm_device_configuration_event_id {
+	NSM_DEVICE_CONFIGURATION_REQUEST_EVENT_V1 = 0x01,
 };
 
 enum protection_mode {
@@ -663,6 +671,42 @@ struct nsm_get_supported_device_modes_resp {
 	uint16_t handle;
 	uint16_t mode_count;
 	uint32_t supported_mode_list[1];
+} __attribute__((packed));
+
+/** @struct nsm_set_device_config_v2_req
+ *
+ *  Set Device Config request (Type 5, command 0x10). Uses V2 header.
+ *  Spec: Device configuration type (NvU32) + Data (Variable).
+ */
+struct nsm_set_device_config_v2_req {
+	struct nsm_common_req_v2 hdr;
+	uint32_t device_config_type;
+	uint8_t data[1];
+} __attribute__((packed));
+
+/** @struct nsm_get_device_config_v2_req
+ *
+ *  Get Device Config request (Type 5, command 0x11). Uses V2 header.
+ *  Spec: Device configuration type (NvU32) + Device Configuration (Variable,
+ * query).
+ */
+struct nsm_get_device_config_v2_req {
+	struct nsm_common_req_v2 hdr;
+	uint32_t device_config_type;
+	uint8_t device_config_query[1];
+} __attribute__((packed));
+
+/** @struct nsm_get_device_config_v2_resp
+ *
+ *  Get Device Config response (Type 5, command 0x11).
+ *  Spec: current/pending lengths (NvU16) + Current + Pending Device
+ * Configuration.
+ */
+struct nsm_get_device_config_v2_resp {
+	struct nsm_common_resp hdr;
+	uint16_t current_config_length;
+	uint16_t pending_config_length;
+	uint8_t config_data[1];
 } __attribute__((packed));
 
 /** @brief Encode a Set Protection Options request message
@@ -1934,6 +1978,147 @@ int decode_get_supported_device_modes_resp(const struct nsm_msg *msg,
 					   uint16_t *handle,
 					   uint16_t *mode_count,
 					   uint32_t *supported_mode_list);
+
+/** @brief Encode a Set Device Config request (Type 5, command 0x10, V2 header)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] device_config_type - Device configuration type (NvU32)
+ *  @param[in] data - Device configuration to apply (may be NULL if data_length
+ * 0)
+ *  @param[in] data_length - Length of data in bytes; with the NvU32 config
+ * type, sizeof(device_config_type)+data_length must fit in the V2 request
+ *  hdr.data_size (uint16_t), i.e. at most UINT16_MAX - sizeof(uint32_t)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_device_config_v2_req(uint8_t instance_id,
+				    uint32_t device_config_type,
+				    const uint8_t *data, uint16_t data_length,
+				    struct nsm_msg *msg);
+
+/** @brief Decode a Set Device Config request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] device_config_type - Device configuration type
+ *  @param[out] data - Buffer for config data; must be non-NULL if the decoded
+ *  payload has non-zero data length
+ *  @param[out] data_length - Length of config data
+ *  @return nsm_completion_codes
+ */
+int decode_set_device_config_v2_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint32_t *device_config_type, uint8_t *data,
+				    uint16_t *data_length);
+
+/** @brief Encode a Set Device Config V2 response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_device_config_v2_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode a Set Device Config V2 response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - completion code
+ *  @param[out] reason_code - NSM reason code
+ *  @return nsm_completion_codes
+ */
+int decode_set_device_config_v2_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code);
+
+/** @brief Encode a Get Device Config request (Type 5, command 0x11, V2 header)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] device_config_type - Device configuration type (NvU32)
+ *  @param[in] query_data - Query (identifier fields); NULL only if
+ * query_length is 0; sizeof(device_config_type)+query_length must fit in
+ * hdr.data_size (uint16_t)
+ *  @param[in] query_length - Length of query in bytes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_config_v2_req(uint8_t instance_id,
+				    uint32_t device_config_type,
+				    const uint8_t *query_data,
+				    uint16_t query_length, struct nsm_msg *msg);
+
+/** @brief Decode a Get Device Config request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] device_config_type - Device configuration type
+ *  @param[out] query_data - Buffer for query; must be non-NULL if the decoded
+ *  query length is non-zero
+ *  @param[out] query_length - Length of query data
+ *  @return nsm_completion_codes
+ */
+int decode_get_device_config_v2_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint32_t *device_config_type,
+				    uint8_t *query_data,
+				    uint16_t *query_length);
+
+/** @brief Encode a Get Device Config V2 response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] current_config_data - current config blob (may be NULL if length
+ * 0)
+ *  @param[in] current_config_length - length of current config in bytes
+ *  @param[in] pending_config_data - pending config blob (may be NULL if length
+ * 0)
+ *  @param[in] pending_config_length - length of pending config in bytes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_config_v2_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code,
+				     const uint8_t *current_config_data,
+				     uint16_t current_config_length,
+				     const uint8_t *pending_config_data,
+				     uint16_t pending_config_length,
+				     struct nsm_msg *msg);
+
+/** @brief Decode a Get Device Config V2 response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - completion code
+ *  @param[out] reason_code - NSM reason code
+ *  @param[out] current_config_data - buffer for current config; must be
+ *  non-NULL if decoded current length is non-zero
+ *  @param[out] current_config_length - length of current config
+ *  @param[out] pending_config_data - buffer for pending config; must be
+ *  non-NULL if decoded pending length is non-zero
+ *  @param[out] pending_config_length - length of pending config
+ *  @return nsm_completion_codes
+ */
+int decode_get_device_config_v2_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code,
+				     uint8_t *current_config_data,
+				     uint16_t *current_config_length,
+				     uint8_t *pending_config_data,
+				     uint16_t *pending_config_length);
+
+/** @brief Encode Device Configuration Request event v1 (Type 5, event ID 0x01,
+ *         class 0). No payload beyond standard NSM event header.
+ */
+int encode_nsm_device_config_request_event_v1(uint8_t instance_id, bool ackr,
+					      struct nsm_msg *msg);
+
+/** @brief Decode Device Configuration Request event v1; optional event_class
+ *         echo (or NULL). Fails if message type, id, class, or data_size wrong.
+ */
+int decode_nsm_device_config_request_event_v1(const struct nsm_msg *msg,
+					      size_t msg_len,
+					      uint8_t *event_class,
+					      uint16_t *event_state);
 
 #ifdef __cplusplus
 }

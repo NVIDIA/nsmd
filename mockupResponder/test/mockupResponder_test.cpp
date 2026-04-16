@@ -5295,6 +5295,47 @@ TEST_F(MockupResponderTest, testSendFabricManagerStateEventVerbose)
     mockupResponder->verbose = false;
 }
 
+TEST_F(MockupResponderTest, testSendDeviceConfigurationRequestEventV1)
+{
+    EXPECT_NO_THROW(
+        mockupResponder->sendDeviceConfigurationRequestEventV1(30, true));
+    EXPECT_NO_THROW(
+        mockupResponder->sendDeviceConfigurationRequestEventV1(30, false));
+}
+
+TEST_F(MockupResponderTest, testSendDeviceConfigurationRequestEventV1Verbose)
+{
+    mockupResponder->verbose = true;
+    EXPECT_NO_THROW(
+        mockupResponder->sendDeviceConfigurationRequestEventV1(30, true));
+    mockupResponder->verbose = false;
+}
+
+/** Same encode path as MockupResponder::sendDeviceConfigurationRequestEventV1;
+ *  decode verifies Type-5 device-configuration request event wire format.
+ */
+TEST_F(MockupResponderTest, testDeviceConfigurationRequestEventV1EncodeDecode)
+{
+    for (bool ackr : {false, true})
+    {
+        std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN,
+                                      0);
+        auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+        ASSERT_EQ(NSM_SW_SUCCESS,
+                  encode_nsm_device_config_request_event_v1(
+                      mockupResponder->mockInstanceId, ackr, msg));
+
+        uint8_t event_class = 0;
+        uint16_t event_state = 0xFFFF;
+        EXPECT_EQ(NSM_SW_SUCCESS,
+                  decode_nsm_device_config_request_event_v1(
+                      msg, eventMsg.size(), &event_class, &event_state));
+        EXPECT_EQ(static_cast<int>(NSM_GENERAL_EVENT_CLASS),
+                  static_cast<int>(event_class));
+        EXPECT_EQ(0, event_state);
+    }
+}
+
 TEST_F(MockupResponderTest, testSendNsmEvent)
 {
     uint8_t data[4] = {0x01, 0x02, 0x03, 0x04};

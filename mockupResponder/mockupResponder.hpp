@@ -359,6 +359,10 @@ class MockupResponder
 
     void sendResetRequiredEvent(uint8_t eid, bool ackr);
 
+    /** Type 5, event ID 0x01 — device ready for volatile config (Fractal Boot).
+     */
+    void sendDeviceConfigurationRequestEventV1(uint8_t dest, bool ackr);
+
     void sendFabricManagerStateEvent(uint8_t dest, bool ackr, uint8_t state,
                                      uint8_t status, uint64_t last_restart_time,
                                      uint64_t last_restart_duration);
@@ -618,6 +622,10 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         setDeviceModeSettingsV2Handler(const nsm_msg* requestMsg,
                                        size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setDeviceConfigV2Handler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getDeviceConfigV2Handler(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         dotCAKInstallHandler(const nsm_msg* requestMsg, size_t requestLen);

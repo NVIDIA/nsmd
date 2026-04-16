@@ -174,6 +174,11 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
         "genResetRequiredEvent",
         [&](uint8_t eid, bool ackr) { sendResetRequiredEvent(eid, ackr); });
 
+    iface->register_method("genDeviceConfigurationRequestEventV1",
+                           [&](uint8_t eid, bool ackr) {
+        sendDeviceConfigurationRequestEventV1(eid, ackr);
+    });
+
     iface->register_method(
         "genThreasholdEvent",
         [&](uint8_t dest, bool ackr, bool port_rcv_errors_threshold,
@@ -735,6 +740,10 @@ std::optional<Response>
                     return getDeviceModeSettingsV2Handler(request, requestLen);
                 case NSM_SET_DEVICE_MODE_SETTINGS_V2:
                     return setDeviceModeSettingsV2Handler(request, requestLen);
+                case NSM_SET_DEVICE_CONFIG_V2:
+                    return setDeviceConfigV2Handler(request, requestLen);
+                case NSM_GET_DEVICE_CONFIG_V2:
+                    return getDeviceConfigV2Handler(request, requestLen);
                 case NSM_GET_PROTECTION_OPTIONS:
                     return getProtectionOptionsHandler(request, requestLen);
                 default:
@@ -982,7 +991,8 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_ERASE_DEBUG_INFO}},
                  {5,
                   {3, 4, 5, 6, 7, 8, 9, 64, 65, NSM_SET_DEVICE_MODE_SETTINGS_V2,
-                   NSM_GET_DEVICE_MODE_SETTINGS_V2}},
+                   NSM_GET_DEVICE_MODE_SETTINGS_V2, NSM_SET_DEVICE_CONFIG_V2,
+                   NSM_GET_DEVICE_CONFIG_V2}},
                  {6,
                   {1, 2, 3, 4, 5, 6, NSM_FW_DOT_CAK_INSTALL,
                    NSM_FW_DOT_CAK_BYPASS, NSM_FW_DOT_LOCK,
@@ -1039,6 +1049,8 @@ std::optional<std::vector<uint8_t>>
                       NSM_GET_ERROR_INJECTION_PAYLOAD,
                       NSM_SET_ERROR_INJECTION_PAYLOAD,
                       NSM_ACTIVATE_ERROR_INJECTION,
+                      NSM_SET_DEVICE_CONFIG_V2,
+                      NSM_GET_DEVICE_CONFIG_V2,
                       NSM_GET_PROTECTION_OPTIONS,
                       NSM_SET_DEVICE_MODE_SETTINGS_V2,
                       NSM_GET_DEVICE_MODE_SETTINGS_V2,
@@ -3856,6 +3868,31 @@ void MockupResponder::sendResetRequiredEvent(uint8_t dest, bool ackr)
     if (rc != NSM_SUCCESS)
     {
         lg2::error("sendResetRequiredEvent failed");
+    }
+
+    rc = mctpSockSend(dest, eventMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendDeviceConfigurationRequestEventV1(uint8_t dest,
+                                                            bool ackr)
+{
+    if (verbose)
+    {
+        lg2::info("sendDeviceConfigurationRequestEventV1 dest eid={EID}", "EID",
+                  dest);
+    }
+
+    uint8_t instanceId = mockInstanceId;
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN);
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_device_config_request_event_v1(instanceId, ackr, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendDeviceConfigurationRequestEventV1 encode failed");
     }
 
     rc = mctpSockSend(dest, eventMsg);
@@ -8193,6 +8230,108 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
+    return response;
+}
+
+namespace
+{
+uint32_t g_mockDeviceConfigStoredType = 0;
+std::vector<uint8_t> g_mockDeviceConfigStoredData;
+} // namespace
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setDeviceConfigV2Handler(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setDeviceConfigV2Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    uint32_t cfgType = 0;
+    std::vector<uint8_t> dataBuf(static_cast<size_t>(UINT16_MAX));
+    uint16_t dataLen = 0;
+    auto rc = decode_set_device_config_v2_req(requestMsg, requestLen, &cfgType,
+                                              dataBuf.data(), &dataLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_device_config_v2_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    g_mockDeviceConfigStoredType = cfgType;
+    g_mockDeviceConfigStoredData.assign(dataBuf.begin(),
+                                        dataBuf.begin() + dataLen);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_device_config_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_set_device_config_v2_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDeviceConfigV2Handler(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getDeviceConfigV2Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    uint32_t cfgType = 0;
+    std::vector<uint8_t> queryBuf(static_cast<size_t>(UINT16_MAX));
+    uint16_t queryLen = 0;
+    auto rc = decode_get_device_config_v2_req(requestMsg, requestLen, &cfgType,
+                                              queryBuf.data(), &queryLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_device_config_v2_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    (void)queryLen;
+
+    const uint8_t* curData = g_mockDeviceConfigStoredData.data();
+    uint16_t curLen =
+        static_cast<uint16_t>(g_mockDeviceConfigStoredData.size());
+    if (cfgType != g_mockDeviceConfigStoredType)
+    {
+        static const uint8_t placeholder[] = {0xde, 0xad, 0xbe, 0xef};
+        curData = placeholder;
+        curLen = sizeof(placeholder);
+    }
+    static const uint8_t pending[] = {0xca, 0xfe};
+    const uint32_t maxPairSum = static_cast<uint32_t>(UINT16_MAX) -
+                                (uint32_t)sizeof(uint16_t) -
+                                (uint32_t)sizeof(uint16_t);
+    uint16_t pendLen =
+        (static_cast<uint32_t>(curLen) + sizeof(pending) <= maxPairSum)
+            ? static_cast<uint16_t>(sizeof(pending))
+            : 0;
+    const uint8_t* pendPtr = pendLen ? pending : nullptr;
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                      sizeof(nsm_get_device_config_v2_resp) -
+                                      1 + curLen + pendLen,
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_device_config_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, curData, curLen,
+        pendPtr, pendLen, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_device_config_v2_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
     return response;
 }
 

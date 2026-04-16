@@ -22,6 +22,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <types.hpp>
+#include <vector>
 
 TEST(setErrorInjectionMode, testRequest)
 {
@@ -3196,6 +3197,329 @@ TEST(deviceModeSettingsV2, testAllDeviceModeIndices)
 		EXPECT_EQ(rc, NSM_SW_SUCCESS);
 		EXPECT_EQ(static_cast<uint32_t>(idx), decoded_index);
 	}
+}
+
+TEST(deviceConfigV2, setEncodeDecodeRoundTrip)
+{
+	const uint32_t cfgType = 0x12345678;
+	const std::vector<uint8_t> data = {0x01, 0x02, 0xab, 0xcd};
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					    sizeof(nsm_common_req_v2) +
+					    sizeof(uint32_t) + data.size(),
+					0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	int rc = encode_set_device_config_v2_req(
+	    1, cfgType, data.data(), static_cast<uint16_t>(data.size()),
+	    request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint32_t outType = 0;
+	std::vector<uint8_t> outBuf(data.size());
+	uint16_t outLen = 0;
+	rc = decode_set_device_config_v2_req(request, requestMsg.size(),
+					     &outType, outBuf.data(), &outLen);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(outType, cfgType);
+	EXPECT_EQ(outLen, data.size());
+	EXPECT_EQ(memcmp(outBuf.data(), data.data(), data.size()), 0);
+}
+
+TEST(deviceConfigV2, getEncodeDecodeRoundTrip)
+{
+	const uint32_t cfgType = 0xdeadbeef;
+	const std::vector<uint8_t> query = {0x11, 0x22};
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					    sizeof(nsm_common_req_v2) +
+					    sizeof(uint32_t) + query.size(),
+					0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	int rc = encode_get_device_config_v2_req(
+	    2, cfgType, query.data(), static_cast<uint16_t>(query.size()),
+	    request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint32_t outType = 0;
+	uint8_t outQuery[64];
+	uint16_t outQLen = 0;
+	rc = decode_get_device_config_v2_req(request, requestMsg.size(),
+					     &outType, outQuery, &outQLen);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(outType, cfgType);
+	EXPECT_EQ(outQLen, query.size());
+	EXPECT_EQ(memcmp(outQuery, query.data(), query.size()), 0);
+}
+
+TEST(deviceConfigV2, getResponseEncodeDecode)
+{
+	const uint8_t cur[] = {0xaa, 0xbb};
+	const uint8_t pend[] = {0xcc};
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_config_v2_resp) - 1 +
+		sizeof(cur) + sizeof(pend),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	int rc = encode_get_device_config_v2_resp(0, NSM_SUCCESS, ERR_NULL, cur,
+						  sizeof(cur), pend,
+						  sizeof(pend), response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason = 0xffff;
+	uint8_t curOut[16];
+	uint16_t curLen = 0;
+	uint8_t pendOut[16];
+	uint16_t pendLen = 0;
+	rc = decode_get_device_config_v2_resp(response, responseMsg.size(), &cc,
+					      &reason, curOut, &curLen, pendOut,
+					      &pendLen);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(curLen, sizeof(cur));
+	EXPECT_EQ(pendLen, sizeof(pend));
+	EXPECT_EQ(memcmp(curOut, cur, curLen), 0);
+	EXPECT_EQ(memcmp(pendOut, pend, pendLen), 0);
+}
+
+TEST(deviceConfigV2, setEncodeErrors)
+{
+	const uint32_t cfgType = 1;
+	uint8_t data[] = {0x01};
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					    sizeof(nsm_common_req_v2) +
+					    sizeof(uint32_t) + sizeof(data),
+					0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	EXPECT_EQ(NSM_SW_ERROR_NULL,
+		  encode_set_device_config_v2_req(0, cfgType, data,
+						  sizeof(data), nullptr));
+
+	EXPECT_EQ(NSM_SW_ERROR_NULL, encode_set_device_config_v2_req(
+					 0, cfgType, nullptr, 1, request));
+}
+
+TEST(deviceConfigV2, setDecodeErrors)
+{
+	const uint32_t cfgType = 0x11223344;
+	const std::vector<uint8_t> data = {0x55, 0x66};
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					    sizeof(nsm_common_req_v2) +
+					    sizeof(uint32_t) + data.size(),
+					0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	int rc = encode_set_device_config_v2_req(
+	    0, cfgType, data.data(), static_cast<uint16_t>(data.size()),
+	    request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint32_t outType = 0;
+	uint8_t outBuf[8];
+	uint16_t outLen = 0;
+
+	rc = decode_set_device_config_v2_req(nullptr, requestMsg.size(),
+					     &outType, outBuf, &outLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_config_v2_req(request, requestMsg.size(),
+					     nullptr, outBuf, &outLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_config_v2_req(request, requestMsg.size(),
+					     &outType, outBuf, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_config_v2_req(request, requestMsg.size() - 1,
+					     &outType, outBuf, &outLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	auto *req =
+	    reinterpret_cast<nsm_set_device_config_v2_req *>(request->payload);
+	uint8_t savedCmd = req->hdr.command;
+	req->hdr.command = 0xff;
+	rc = decode_set_device_config_v2_req(request, requestMsg.size(),
+					     &outType, outBuf, &outLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	req->hdr.command = savedCmd;
+
+	rc = decode_set_device_config_v2_req(request, requestMsg.size(),
+					     &outType, nullptr, &outLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(deviceConfigV2, getEncodeErrors)
+{
+	const uint32_t cfgType = 2;
+	uint8_t q[] = {0xab};
+
+	EXPECT_EQ(NSM_SW_ERROR_NULL, encode_get_device_config_v2_req(
+					 0, cfgType, q, sizeof(q), nullptr));
+}
+
+TEST(deviceConfigV2, getDecodeErrors)
+{
+	const uint32_t cfgType = 3;
+	const std::vector<uint8_t> query = {0x01};
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					    sizeof(nsm_common_req_v2) +
+					    sizeof(uint32_t) + query.size(),
+					0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	int rc = encode_get_device_config_v2_req(
+	    0, cfgType, query.data(), static_cast<uint16_t>(query.size()),
+	    request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint32_t outType = 0;
+	uint8_t outQ[8];
+	uint16_t outQLen = 0;
+
+	rc = decode_get_device_config_v2_req(nullptr, requestMsg.size(),
+					     &outType, outQ, &outQLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_config_v2_req(request, requestMsg.size(),
+					     nullptr, outQ, &outQLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_config_v2_req(request, requestMsg.size(),
+					     &outType, outQ, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_config_v2_req(request, requestMsg.size() - 1,
+					     &outType, outQ, &outQLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	auto *req =
+	    reinterpret_cast<nsm_get_device_config_v2_req *>(request->payload);
+	uint8_t savedCmd = req->hdr.command;
+	req->hdr.command = 0xfe;
+	rc = decode_get_device_config_v2_req(request, requestMsg.size(),
+					     &outType, outQ, &outQLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	req->hdr.command = savedCmd;
+
+	rc = decode_get_device_config_v2_req(request, requestMsg.size(),
+					     &outType, nullptr, &outQLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(deviceConfigV2, getResponseEncodeErrors)
+{
+	const uint8_t cur[] = {0x01};
+	const uint8_t pend[] = {0x02};
+
+	EXPECT_EQ(NSM_SW_ERROR_NULL,
+		  encode_get_device_config_v2_resp(0, NSM_SUCCESS, ERR_NULL,
+						   cur, sizeof(cur), pend,
+						   sizeof(pend), nullptr));
+}
+
+TEST(deviceConfigV2, getResponseDecodeErrors)
+{
+	const uint8_t cur[] = {0x11};
+	const uint8_t pend[] = {0x22};
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_config_v2_resp) - 1 +
+		sizeof(cur) + sizeof(pend),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	int rc = encode_get_device_config_v2_resp(0, NSM_SUCCESS, ERR_NULL, cur,
+						  sizeof(cur), pend,
+						  sizeof(pend), response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason = 0;
+	uint8_t curOut[8];
+	uint16_t curLen = 0;
+	uint8_t pendOut[8];
+	uint16_t pendLen = 0;
+
+	rc = decode_get_device_config_v2_resp(nullptr, responseMsg.size(), &cc,
+					      &reason, curOut, &curLen, pendOut,
+					      &pendLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_config_v2_resp(response, responseMsg.size(),
+					      nullptr, &reason, curOut, &curLen,
+					      pendOut, &pendLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_config_v2_resp(response, responseMsg.size(), &cc,
+					      nullptr, curOut, &curLen, pendOut,
+					      &pendLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_config_v2_resp(response, responseMsg.size() - 1,
+					      &cc, &reason, curOut, &curLen,
+					      pendOut, &pendLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_device_config_v2_resp(response, responseMsg.size(), &cc,
+					      &reason, nullptr, &curLen,
+					      pendOut, &pendLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_config_v2_resp(response, responseMsg.size(), &cc,
+					      &reason, curOut, &curLen, pendOut,
+					      nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> bad = responseMsg;
+	auto badMsg = reinterpret_cast<nsm_msg *>(bad.data());
+	auto *resp =
+	    reinterpret_cast<nsm_get_device_config_v2_resp *>(badMsg->payload);
+	resp->current_config_length = htole16(200);
+	resp->pending_config_length = htole16(200);
+	resp->hdr.data_size =
+	    htole16(sizeof(resp->current_config_length) +
+		    sizeof(resp->pending_config_length) + 200 + 200);
+	rc = decode_get_device_config_v2_resp(badMsg, bad.size(), &cc, &reason,
+					      curOut, &curLen, pendOut,
+					      &pendLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(deviceConfigV2, deviceConfigurationRequestEventV1EncodeDecode)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+	auto msg = reinterpret_cast<nsm_msg *>(buf.data());
+	int rc = encode_nsm_device_config_request_event_v1(7, true, msg);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_DEVICE_CONFIGURATION);
+
+	uint8_t evClass = 0xff;
+	uint16_t evState = 0xffff;
+	rc = decode_nsm_device_config_request_event_v1(msg, buf.size(),
+						       &evClass, &evState);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(evClass, NSM_GENERAL_EVENT_CLASS);
+	EXPECT_EQ(evState, 0u);
+
+	std::vector<uint8_t> wrongType(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN,
+				       0);
+	auto wmsg = reinterpret_cast<nsm_msg *>(wrongType.data());
+	rc = encode_nsm_event(1, NSM_TYPE_PLATFORM_ENVIRONMENTAL, false,
+			      NSM_EVENT_VERSION,
+			      NSM_DEVICE_CONFIGURATION_REQUEST_EVENT_V1,
+			      NSM_GENERAL_EVENT_CLASS, 0, 0, NULL, wmsg);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	rc = decode_nsm_device_config_request_event_v1(wmsg, wrongType.size(),
+						       &evClass, &evState);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+
+	uint8_t extra = 0x55;
+	std::vector<uint8_t> withData(
+	    sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN + 1, 0);
+	auto dmsg = reinterpret_cast<nsm_msg *>(withData.data());
+	rc = encode_nsm_event(1, NSM_TYPE_DEVICE_CONFIGURATION, false,
+			      NSM_EVENT_VERSION,
+			      NSM_DEVICE_CONFIGURATION_REQUEST_EVENT_V1,
+			      NSM_GENERAL_EVENT_CLASS, 0, 1, &extra, dmsg);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	rc = decode_nsm_device_config_request_event_v1(dmsg, withData.size(),
+						       &evClass, &evState);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
 TEST(getSupportedDeviceModesV2, testGoodEncodeRequest)
