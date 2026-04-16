@@ -85,7 +85,21 @@ class Handler
                                      const std::vector<uint8_t>& pathName) = 0;
 
     virtual int sendMsg(uint8_t tag, eid_t eid, int mctpFd,
-                        const uint8_t* nsmMsg, size_t nsmMsgLen) const = 0;
+                        const uint8_t* nsmMsg, size_t nsmMsgLen) = 0;
+
+    /** @brief Drop any MCTP tag previously allocated for the given EID.
+     *
+     *  For in-kernel AF_MCTP sockets this issues ioctl(SIOCMCTPDROPTAG).
+     *  The default implementation is a no-op (used by DaemonHandler).
+     *
+     *  @param[in] eid - destination MCTP endpoint ID
+     *  @param[in] fd  - socket file descriptor
+     */
+    virtual void dropTag(eid_t eid, int fd)
+    {
+        (void)eid;
+        (void)fd;
+    }
 
   private:
     virtual void handleReceivedMsg(IO& io, int fd, uint32_t revents) = 0;
@@ -112,7 +126,9 @@ class InKernelHandler : public Handler
                              const std::vector<uint8_t>& pathName) override;
 
     int sendMsg(uint8_t tag, eid_t eid, int mctpFd, const uint8_t* nsmMsg,
-                size_t nsmMsgLen) const override;
+                size_t nsmMsgLen) override;
+
+    void dropTag(eid_t eid, int fd) override;
 
   private:
     void handleReceivedMsg(IO& io, int fd, uint32_t revents) override;
@@ -121,6 +137,19 @@ class InKernelHandler : public Handler
     int fd;
     int sendBufferSize;
     bool isFdValid{false};
+
+    using TagKey = std::pair<eid_t, uint8_t>; // (eid, logical_tag)
+    struct TagKeyHash
+    {
+        std::size_t operator()(const TagKey& k) const noexcept
+        {
+            return std::hash<uint16_t>()(
+                (static_cast<uint16_t>(k.first) << 8) | k.second);
+        }
+    };
+    /** @brief Allocated MCTP kernel tag per (destination EID, logical tag).
+     *  Allows one tag per request type (e.g. normal + long-running) per EID. */
+    std::unordered_map<TagKey, uint8_t, TagKeyHash> allocatedTags;
 
     static constexpr size_t STATIC_BUF_SIZE = 64;
     alignas(64) static uint8_t staticBuffer[STATIC_BUF_SIZE];
@@ -135,7 +164,7 @@ class DaemonHandler : public Handler
                              const std::vector<uint8_t>& pathName) override;
 
     int sendMsg(uint8_t tag, eid_t eid, int mctpFd, const uint8_t* nsmMsg,
-                size_t nsmMsgLen) const override;
+                size_t nsmMsgLen) override;
 
   private:
     SocketInfo initSocket(eid_t eid, int type, int protocol,

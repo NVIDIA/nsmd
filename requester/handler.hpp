@@ -330,6 +330,7 @@ class Handler
                         "Failed to stop the instance ID expiry timer. RC={RC}",
                         "RC", rc);
                 }
+
                 // Call responseHandler after erase it from the handlers to
                 // avoid starting it again in runRegisteredRequest()
                 auto unique_handler = std::move(responseHandler);
@@ -345,7 +346,7 @@ class Handler
         return requestFound;
     }
 
-    void setSocketHandler(const mctp_socket::Handler* handler)
+    void setSocketHandler(mctp_socket::Handler* handler)
     {
         socketHandler = handler;
     }
@@ -373,7 +374,7 @@ class Handler
 
     std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>> timerToFree;
 
-    const mctp_socket::Handler* socketHandler; // MCTP socket handler
+    mctp_socket::Handler* socketHandler; // MCTP socket handler
 
     /** @brief Remove request entry for which the instance ID expired
      *
