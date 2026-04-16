@@ -25,6 +25,8 @@
 
 #include <linux/if_arp.h>
 #include <linux/mctp.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/un.h>
 
@@ -187,7 +189,7 @@ SocketInfo DaemonHandler::initSocket([[maybe_unused]] eid_t eid, int type,
 }
 
 int DaemonHandler::sendMsg(uint8_t tag, eid_t eid, int mctpFd,
-                           const uint8_t* nsmMsg, size_t nsmMsgLen) const
+                           const uint8_t* nsmMsg, size_t nsmMsgLen)
 {
     uint8_t hdr[3] = {tag, eid,
                       MCTP_MSG_TYPE_PCI_VDM}; // TO_TAG, EID, MCTP_MSG_TYPE
@@ -392,17 +394,68 @@ int InKernelHandler::registerMctpEndpoint(
     return NSM_SUCCESS;
 }
 
-int InKernelHandler::sendMsg([[maybe_unused]] uint8_t tag, eid_t eid,
-                             int mctpFd, const uint8_t* nsmMsg,
-                             size_t nsmMsgLen) const
+void InKernelHandler::dropTag(eid_t eid, int mctpFd)
 {
+    for (auto it = allocatedTags.begin(); it != allocatedTags.end();)
+    {
+        if (it->first.first != eid)
+        {
+            ++it;
+            continue;
+        }
+
+        struct mctp_ioc_tag_ctl ctl = {};
+        ctl.peer_addr = eid;
+        ctl.tag = it->second;
+
+        if (ioctl(mctpFd, SIOCMCTPDROPTAG, &ctl) < 0)
+        {
+            lg2::info(
+                "MCTP tag drop returned error (tag may already be released). "
+                "EID={EID}, tag={TAG}, errno={ERR}",
+                "EID", eid, "TAG", it->second, "ERR", strerror(errno));
+        }
+
+        it = allocatedTags.erase(it);
+    }
+}
+
+int InKernelHandler::sendMsg(uint8_t tag, eid_t eid, int mctpFd,
+                             const uint8_t* nsmMsg, size_t nsmMsgLen)
+{
+    uint8_t sendTag = MCTP_TAG_OWNER;
+    TagKey key{eid, tag};
+
+    auto it = allocatedTags.find(key);
+    if (it != allocatedTags.end())
+    {
+        sendTag = it->second;
+    }
+    else
+    {
+        struct mctp_ioc_tag_ctl ctl = {};
+        ctl.peer_addr = eid;
+
+        if (ioctl(mctpFd, SIOCMCTPALLOCTAG, &ctl) < 0)
+        {
+            lg2::error("Failed to allocate MCTP tag via ioctl, falling back to "
+                       "MCTP_TAG_OWNER. EID={EID}, errno={ERR}",
+                       "EID", eid, "ERR", strerror(errno));
+        }
+        else
+        {
+            sendTag = ctl.tag;
+            allocatedTags[key] = ctl.tag;
+        }
+    }
+
     struct sockaddr_mctp addr;
     memset(&addr, 0, sizeof(addr));
 
     addr.smctp_family = AF_MCTP;
     addr.smctp_network = MCTP_NET_ANY;
     addr.smctp_addr.s_addr = eid;
-    addr.smctp_tag = MCTP_TAG_OWNER;
+    addr.smctp_tag = sendTag;
     addr.smctp_type = MCTP_MSG_TYPE_PCI_VDM;
 
     if (verbose)

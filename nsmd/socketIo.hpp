@@ -18,6 +18,7 @@
 #pragma once
 
 #include <poll.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -57,6 +58,8 @@ class SocketIoInterface
                            socklen_t* optlen) = 0;
     virtual int setsockopt(int fd, int level, int optname, const void* optval,
                            socklen_t optlen) = 0;
+
+    virtual int ioctl(int fd, unsigned long request, void* argp) = 0;
 };
 
 /** Returns the currently active SocketIoInterface (real or injected mock). */
@@ -88,6 +91,7 @@ SocketIoInterface& getSocketIo();
 #define recvfrom(...)   getSocketIo().recvfrom(__VA_ARGS__)
 #define sendto(...)     getSocketIo().sendto(__VA_ARGS__)
 #define bind(...)       getSocketIo().bind(__VA_ARGS__)
+#define ioctl(...)      getSocketIo().ioctl(__VA_ARGS__)
 // clang-format on
 // NOLINTEND(cppcoreguidelines-macro-usage)
 #endif // NSMD_SOCKET_REDIRECT
