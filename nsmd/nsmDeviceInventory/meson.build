@@ -23,8 +23,13 @@ foreach name : include_dev_inv_list
     endif
 endforeach
 
+# nsmNvSwitchDeviceConfiguration needs libnsm device-configuration (encode/decode
+# 0x10/0x11) — enable via libnsm-all or libnsm-include in the nsmd recipe.
 if include_all_dev_inv or include_dev_inv_list.contains('switch')
-    sources += ['nsmDeviceInventory/nsmSwitch.cpp']
+    sources += [
+        'nsmDeviceInventory/nsmSwitch.cpp',
+        'nsmDeviceInventory/nsmNvSwitchDeviceConfiguration.cpp',
+    ]
 endif
 if include_all_dev_inv or include_dev_inv_list.contains('pcie-retimer-fabrics')
     sources += ['nsmDeviceInventory/nsmPCIeRetimerFabricsDI.cpp']

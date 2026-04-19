@@ -57,4 +57,17 @@ class EventType3Handler : public DelegatingEventHandler
     }
 };
 
+/** Forwards Type 5 (device configuration) events to the per-device
+ *  EventDispatcher (e.g. configuration request event ID 1). */
+class EventType5Handler : public DelegatingEventHandler
+{
+  public:
+    EventType5Handler();
+
+    uint8_t nsmType() override
+    {
+        return NSM_TYPE_DEVICE_CONFIGURATION;
+    }
+};
+
 } // namespace nsm

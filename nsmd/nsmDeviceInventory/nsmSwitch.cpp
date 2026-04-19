@@ -43,6 +43,7 @@
 #include "nsmLogInfo.hpp"
 #endif
 #include "nsmManagers/nsmFabricManager.hpp"
+#include "nsmNvSwitchDeviceConfiguration.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
 #ifdef NVIDIA_SHMEM
@@ -51,9 +52,44 @@
 #endif
 
 #include <unordered_map>
+#include <variant>
 
 namespace nsm
 {
+namespace
+{
+bool dbusPropertyMapAsBool(const dbus::PropertyMap& map,
+                           const dbus::Property& key)
+{
+    auto it = map.find(key);
+    if (it == map.end())
+    {
+        return false;
+    }
+    const dbus::Value& v = it->second;
+    if (std::holds_alternative<bool>(v))
+    {
+        return std::get<bool>(v);
+    }
+    if (std::holds_alternative<int64_t>(v))
+    {
+        return std::get<int64_t>(v) != 0;
+    }
+    if (std::holds_alternative<uint64_t>(v))
+    {
+        return std::get<uint64_t>(v) != 0;
+    }
+    if (std::holds_alternative<int32_t>(v))
+    {
+        return std::get<int32_t>(v) != 0;
+    }
+    if (std::holds_alternative<uint32_t>(v))
+    {
+        return std::get<uint32_t>(v) != 0;
+    }
+    return false;
+}
+} // namespace
 
 NsmSwitchDIReset::NsmSwitchDIReset(sdbusplus::bus::bus& bus,
                                    const std::string& name,
@@ -785,6 +821,12 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
 #endif
 
         std::string dbusObjPath = inventoryObjPath + name;
+
+        const bool supportNvSwitchDeviceConfiguration = dbusPropertyMapAsBool(
+            allBaseIfaceProperties, "SupportNvSwitchDeviceConfiguration");
+        addNvSwitchDeviceConfigurationSensorIfEnabled(
+            supportNvSwitchDeviceConfiguration, bus, name, dbusObjPath, device);
+
         auto isolationModeIntf =
             std::make_shared<SwitchIsolationIntf>(bus, dbusObjPath.c_str());
         auto isolationModeSensor = std::make_shared<NsmSwitchIsolationMode>(

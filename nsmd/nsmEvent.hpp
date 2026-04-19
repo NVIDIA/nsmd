@@ -38,6 +38,8 @@ class NsmEvent
         name(name), type(type)
     {}
 
+    virtual ~NsmEvent() = default;
+
     virtual int handle(eid_t eid, NsmType type, NsmEventId eventId,
                        const nsm_msg* event, size_t eventLen) = 0;
 

@@ -1,5 +1,6 @@
 tests = [
     'nsmDeviceInventory_test',
+    'nsmNvSwitchDeviceConfiguration_test',
     'nsmNetworkAdapter_test',
     'nsmSwitch_extended_test',
     'nsmSwitchBranch_test',

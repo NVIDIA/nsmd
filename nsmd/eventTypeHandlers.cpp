@@ -18,6 +18,7 @@
 #include "eventTypeHandlers.hpp"
 
 #include "device-capability-discovery.h"
+#include "device-configuration.h"
 #include "network-ports.h"
 #include "platform-environmental.h"
 
@@ -50,6 +51,12 @@ EventType3Handler::EventType3Handler()
 {
     enableDelegation(NSM_XID_EVENT);
     enableDelegation(NSM_RESET_REQUIRED_EVENT);
+}
+
+EventType5Handler::EventType5Handler()
+{
+    // Device Configuration Request v1 (signoff): Type 5, event ID 1, class 0
+    enableDelegation(NSM_DEVICE_CONFIGURATION_REQUEST_EVENT_V1);
 }
 
 } // namespace nsm

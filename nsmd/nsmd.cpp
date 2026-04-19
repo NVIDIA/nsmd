@@ -153,6 +153,7 @@ int main(int argc, char** argv)
             std::make_unique<nsm::EventType0Handler>(),
             std::make_unique<nsm::EventType1Handler>(),
             std::make_unique<nsm::EventType3Handler>(),
+            std::make_unique<nsm::EventType5Handler>(),
         };
         for (auto& handler : eventHandlers)
         {
