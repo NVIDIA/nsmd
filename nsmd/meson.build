@@ -70,6 +70,7 @@ subdir('nsmEvent')
 subdir('nsmSetAsync')
 subdir('nsmCommon')
 subdir('nsmProgressCounters')
+subdir('nsmAsioInterface')
 
 # Conditional subdirectories - controlled by nsmd-subdirs-all/nsmd-subdirs-include
 nsmd_subdirs_all = get_option('nsmd-subdirs-all')
