@@ -268,8 +268,17 @@ struct NsmChassisHelperFuncTest :
     std::shared_ptr<MockNsmDevice> gpuDev;
     std::shared_ptr<MockNsmDevice> cx8Dev;
 
-    NsmChassisHelperFuncTest() : SensorManagerTest(devices)
+    boost::asio::io_context io;
+    std::shared_ptr<sdbusplus::asio::connection> systemBus;
+    std::shared_ptr<sdbusplus::asio::object_server> objServer;
+
+    NsmChassisHelperFuncTest() :
+        SensorManagerTest(devices),
+        systemBus(std::make_shared<sdbusplus::asio::connection>(io)),
+        objServer(std::make_shared<sdbusplus::asio::object_server>(systemBus))
     {
+        ON_CALL(mockManager, getObjServer())
+            .WillByDefault(ReturnRef(*objServer));
         gpuDev = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
         EXPECT_NE(gpuDev, nullptr);
@@ -364,8 +373,18 @@ struct NsmChassisPCIeDeviceHelperTest :
     std::shared_ptr<MockNsmDevice> gpuDev;
     std::shared_ptr<MockNsmDevice> retimerDev;
 
-    NsmChassisPCIeDeviceHelperTest() : SensorManagerTest(devices)
+    boost::asio::io_context io;
+    std::shared_ptr<sdbusplus::asio::connection> systemBus;
+    std::shared_ptr<sdbusplus::asio::object_server> objServer;
+
+    NsmChassisPCIeDeviceHelperTest() :
+        SensorManagerTest(devices),
+        systemBus(std::make_shared<sdbusplus::asio::connection>(io)),
+        objServer(std::make_shared<sdbusplus::asio::object_server>(systemBus))
     {
+        ON_CALL(mockManager, getObjServer())
+            .WillByDefault(ReturnRef(*objServer));
+
         gpuDev = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
         EXPECT_NE(gpuDev, nullptr);

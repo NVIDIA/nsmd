@@ -17,6 +17,7 @@
 
 #include "nsmPCIeLinkSpeed.hpp"
 
+#include "nsmAsioInterface/nsmAsioPCIeDeviceInterface.hpp"
 #include "nsmDevice.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -208,4 +209,28 @@ uint32_t NsmPCIeLinkSpeedBase::linkWidth(uint32_t value)
     return (value > 0) ? (uint32_t)pow(2, value - 1) : 0;
 }
 
+NsmPCIeDeviceLinkSpeedAsio::NsmPCIeDeviceLinkSpeedAsio(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<NsmAsioPCIeDeviceInterface> pcieDeviceIntf,
+    uint8_t deviceIndex, bool isMultiPciePort) :
+    NsmPCIeLinkSpeedBase(NsmObject(name, type), deviceIndex, isMultiPciePort),
+    pcieDeviceIntf(std::move(pcieDeviceIntf))
+{}
+
+void NsmPCIeDeviceLinkSpeedAsio::handleResponse(
+    const nsm_query_scalar_group_telemetry_group_1& data)
+{
+    if (!pcieDeviceIntf)
+    {
+        return;
+    }
+    pcieDeviceIntf->updateLinkSpeed(
+        PCIeDeviceIntf::convertPCIeTypesToString(
+            pcieType(data.negotiated_link_speed)),
+        PCIeSlotIntf::convertGenerationsToString(
+            generation(data.negotiated_link_speed)),
+        PCIeDeviceIntf::convertPCIeTypesToString(pcieType(data.max_link_speed)),
+        static_cast<size_t>(linkWidth(data.negotiated_link_width)),
+        static_cast<size_t>(linkWidth(data.max_link_width)));
+}
 } // namespace nsm

@@ -22,6 +22,8 @@
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmAsioInterface/nsmAsioPCIeDeviceInterface.hpp"
+#include "sensorManager.hpp"
 #if defined(ENABLE_PCIE_AER_ERROR)
 #include "nsmAERError.hpp"
 #endif
@@ -118,28 +120,37 @@ void createChassisPCIeDevicePCIeDevice(
             allCurrentIfaceProperties.at("Functions"));
     }
 
-    auto pcieDeviceObject = NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName,
-                                                                 name);
-    pcieDeviceObject.invoke(
-        pdiMethod(deviceType),
-        PCIeDeviceIntf::convertDeviceTypesFromString(deviceType));
-    device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-                          pcieDeviceObject, 0, false),
-                      PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY);
+    const std::string inventoryObjPath = chassisInventoryBasePath /
+                                         chassisName / "PCIeDevices" / name;
+
+    auto pcieDeviceIntf = NsmAsioPCIeDeviceInterface::createSinglePortDevice(
+        SensorManager::getInstance().getObjServer(), inventoryObjPath,
+        deviceType, functionIds);
+
+    if (!pcieDeviceIntf)
+    {
+        lg2::error("Failed to create PCIeDevice interface for {NAME} at {PATH}",
+                   "NAME", name, "PATH", inventoryObjPath);
+        return;
+    }
+
+    device->addSensor(
+        std::make_shared<NsmPCIeDeviceLinkSpeedAsio>(
+            name, "NSM_ChassisPCIeDevice", pcieDeviceIntf, 0, false),
+        PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY);
 
     for (auto& id : functionIds)
     {
-        auto function = std::make_shared<NsmPCIeFunction>(pcieDeviceObject, 0,
-                                                          id);
+        auto function = std::make_shared<NsmPCIeDeviceFunctionAsio>(
+            name, "NSM_ChassisPCIeDevice", pcieDeviceIntf, 0, id);
         device->addStaticSensor(function);
     }
+
     if (device->getDeviceType() == NSM_DEV_ID_GPU)
     {
 #if defined(ENABLE_PCIE_AER_ERROR)
-        const std::string inventoyObjPath = chassisInventoryBasePath /
-                                            chassisName / "PCIeDevices" / name;
         auto aerErrorIntf = std::make_shared<NsmAERErrorStatusIntf>(
-            utils::DBusHandler::getBus(), inventoyObjPath.c_str(), 0, device);
+            utils::DBusHandler::getBus(), inventoryObjPath.c_str(), 0, device);
         auto aerErrorSensor = std::make_shared<NsmPCIeAERErrorStatus>(
             name, "PCIeAerErrorStatus", aerErrorIntf, 0);
         aerErrorIntf->linkAerStatusSensor(aerErrorSensor);

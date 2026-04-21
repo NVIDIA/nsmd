@@ -60,4 +60,30 @@ class NsmPCIeFunction :
     uint8_t multiPortUpstreamPortNumber;
 };
 
+class NsmAsioPCIeDeviceInterface;
+
+/**
+ * @brief PCIe function sensor that updates function properties on an
+ *        NsmAsioPCIeDeviceInterface via typed API.
+ */
+class NsmPCIeDeviceFunctionAsio : public NsmSensor
+{
+  public:
+    NsmPCIeDeviceFunctionAsio(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<NsmAsioPCIeDeviceInterface> pcieDeviceIntf,
+        uint8_t deviceIndex, uint8_t functionId);
+    NsmPCIeDeviceFunctionAsio() = delete;
+
+    std::optional<Request> genRequestMsg(eid_t eid,
+                                         uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::shared_ptr<NsmAsioPCIeDeviceInterface> pcieDeviceIntf;
+    uint8_t deviceIndex;
+    const uint8_t functionId;
+};
+
 } // namespace nsm

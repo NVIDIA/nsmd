@@ -19,6 +19,8 @@
 
 #include "libnsm/pci-links.h"
 
+#include "nsmAsioInterface/nsmAsioPCIeDeviceInterface.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 
 namespace nsm
@@ -164,6 +166,69 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
     }
 
     return cc ? cc : rc;
+}
+
+NsmPCIeDeviceFunctionAsio::NsmPCIeDeviceFunctionAsio(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<NsmAsioPCIeDeviceInterface> pcieDeviceIntf,
+    uint8_t deviceIndex, uint8_t functionId) :
+    NsmSensor(name, type), pcieDeviceIntf(std::move(pcieDeviceIntf)),
+    deviceIndex(deviceIndex), functionId(functionId)
+{}
+
+std::optional<Request>
+    NsmPCIeDeviceFunctionAsio::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_scalar_group_telemetry_v1_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_query_scalar_group_telemetry_v1_req(
+        instanceId, deviceIndex, GROUP_ID_0, requestPtr);
+    if (rc)
+    {
+        lg2::debug(
+            "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmPCIeDeviceFunctionAsio::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    nsm_query_scalar_group_telemetry_group_0 data = {};
+    uint16_t size = 0;
+
+    auto rc = decode_query_scalar_group_telemetry_v1_group0_resp(
+        responseMsg, responseLen, &cc, &size, &reasonCode, &data);
+
+    LG2_ERROR_FLT(
+        "decode_query_scalar_group_telemetry_v1_group0_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+
+    auto hexFormat = [](const uint32_t value) -> std::string {
+        char buf[sizeof("0x0000")];
+        snprintf(buf, sizeof(buf), "0x%04X", static_cast<uint16_t>(value));
+        return std::string(buf);
+    };
+
+    pcieDeviceIntf->updateFunction(functionId, hexFormat(data.pci_vendor_id),
+                                   hexFormat(data.pci_device_id),
+                                   std::string("0x000000"), std::string("0x00"),
+                                   std::string("Physical"),
+                                   std::string("ProcessingAccelerators"),
+                                   hexFormat(data.pci_subsystem_vendor_id),
+                                   hexFormat(data.pci_subsystem_device_id));
+
+    return NSM_SUCCESS;
 }
 
 } // namespace nsm

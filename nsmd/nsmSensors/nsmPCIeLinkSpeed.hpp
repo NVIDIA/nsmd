@@ -237,4 +237,26 @@ inline void NsmPCIeLinkSpeed<NsmPortInfoIntf>::handleResponse(
     invoke(pdiMethod(width), linkWidth(data.max_link_width));
 }
 
+class NsmAsioPCIeDeviceInterface;
+
+/**
+ * @brief PCIe link speed sensor that updates properties on an
+ *        NsmAsioPCIeDeviceInterface rather than a compile-time PDI.
+ */
+class NsmPCIeDeviceLinkSpeedAsio : public NsmPCIeLinkSpeedBase
+{
+  public:
+    NsmPCIeDeviceLinkSpeedAsio(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<NsmAsioPCIeDeviceInterface> pcieDeviceIntf,
+        uint8_t deviceIndex, bool isMultiPciePort);
+
+  protected:
+    void handleResponse(
+        const nsm_query_scalar_group_telemetry_group_1& data) override;
+
+  private:
+    void updateMetricOnSharedMemory() override {}
+    std::shared_ptr<NsmAsioPCIeDeviceInterface> pcieDeviceIntf;
+};
 } // namespace nsm

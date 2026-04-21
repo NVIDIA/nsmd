@@ -76,8 +76,17 @@ struct NsmChassisPCIeDeviceBranch2Test :
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
 
-    NsmChassisPCIeDeviceBranch2Test() : SensorManagerTest(devices)
+    boost::asio::io_context io;
+    std::shared_ptr<sdbusplus::asio::connection> systemBus;
+    std::shared_ptr<sdbusplus::asio::object_server> objServer;
+
+    NsmChassisPCIeDeviceBranch2Test() :
+        SensorManagerTest(devices),
+        systemBus(std::make_shared<sdbusplus::asio::connection>(io)),
+        objServer(std::make_shared<sdbusplus::asio::object_server>(systemBus))
     {
+        ON_CALL(mockManager, getObjServer())
+            .WillByDefault(ReturnRef(*objServer));
         gpu = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
         EXPECT_NE(gpu, nullptr);

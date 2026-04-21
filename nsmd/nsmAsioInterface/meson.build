@@ -1,4 +1,7 @@
-asio_interface_sources = files('nsmAsioInterfaceBase.cpp')
+asio_interface_sources = files(
+    'nsmAsioInterfaceBase.cpp',
+    'nsmAsioPCIeDeviceInterface.cpp',
+)
 
 # Export sources to parent
 sources += asio_interface_sources

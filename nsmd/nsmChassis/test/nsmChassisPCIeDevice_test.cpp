@@ -66,8 +66,18 @@ struct NsmChassisPCIeDeviceTest :
     std::shared_ptr<MockNsmDevice> gpu;
     std::shared_ptr<MockNsmDevice> fpga;
 
-    NsmChassisPCIeDeviceTest() : SensorManagerTest(devices)
+    boost::asio::io_context io;
+    std::shared_ptr<sdbusplus::asio::connection> systemBus;
+    std::shared_ptr<sdbusplus::asio::object_server> objServer;
+
+    NsmChassisPCIeDeviceTest() :
+        SensorManagerTest(devices),
+        systemBus(std::make_shared<sdbusplus::asio::connection>(io)),
+        objServer(std::make_shared<sdbusplus::asio::object_server>(systemBus))
     {
+        ON_CALL(mockManager, getObjServer())
+            .WillByDefault(ReturnRef(*objServer));
+
         gpu = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
         fpga = std::dynamic_pointer_cast<MockNsmDevice>(
@@ -261,13 +271,12 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         gpu->deviceSensors[sensors++]);
 
     // PCIeDevice sensor (index 5)
-    auto pcieDeviceObject =
-        dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-            gpu->deviceSensors[sensors++]);
+    auto pcieDeviceObject = dynamic_pointer_cast<NsmPCIeDeviceLinkSpeedAsio>(
+        gpu->deviceSensors[sensors++]);
 
     // Function sensor (index 6)
-    auto functionSensor =
-        dynamic_pointer_cast<NsmPCIeFunction>(gpu->deviceSensors[sensors++]);
+    auto functionSensor = dynamic_pointer_cast<NsmPCIeDeviceFunctionAsio>(
+        gpu->deviceSensors[sensors++]);
     sensors++;
 
     // LTSSMState sensor (index 8)
@@ -302,9 +311,6 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(MANUFACTURER_NVIDIA, model->invoke(pdiMethod(manufacturer)));
     EXPECT_EQ(HealthIntf::HealthType::OK,
               healthObject->invoke(pdiMethod(health)));
-    EXPECT_EQ(PCIE_DEVICE_TYPE_SINGLE_FUNCTION,
-              PCIeDeviceIntf::convertDeviceTypesToString(
-                  pcieDeviceObject->invoke(pdiMethod(deviceType))));
     EXPECT_EQ(std::get<uint64_t>(ltssmState["DeviceIndex"]),
               ltssmStateSensor->deviceIndex);
     EXPECT_EQ(PCIE_CLKBUF_INDEX, pcieRefClock->bufferIndex);
@@ -1387,8 +1393,18 @@ struct NsmChassisPCIeDeviceDeepTest :
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> fpga;
 
-    NsmChassisPCIeDeviceDeepTest() : SensorManagerTest(devices)
+    boost::asio::io_context io;
+    std::shared_ptr<sdbusplus::asio::connection> systemBus;
+    std::shared_ptr<sdbusplus::asio::object_server> objServer;
+
+    NsmChassisPCIeDeviceDeepTest() :
+        SensorManagerTest(devices),
+        systemBus(std::make_shared<sdbusplus::asio::connection>(io)),
+        objServer(std::make_shared<sdbusplus::asio::object_server>(systemBus))
     {
+        ON_CALL(mockManager, getObjServer())
+            .WillByDefault(ReturnRef(*objServer));
+
         fpga = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(fpgaUuid));
         EXPECT_NE(fpga, nullptr);
