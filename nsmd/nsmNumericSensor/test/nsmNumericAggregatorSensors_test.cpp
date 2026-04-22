@@ -29,11 +29,16 @@ using ::testing::DoubleNear;
 #define protected public
 
 #include "nsmEnergyAggregator.hpp"
+#include "nsmNumericSensor.hpp"
 #include "nsmPeakPowerAggregator.hpp"
 #include "nsmPowerAggregator.hpp"
 #include "nsmTempAggregator.hpp"
 #include "nsmThresholdAggregator.hpp"
 #include "nsmVoltageAggregator.hpp"
+
+#ifdef NVIDIA_SHMEM
+#include "sharedMemCommon.hpp"
+#endif
 
 using namespace nsm;
 
@@ -609,3 +614,26 @@ TEST(nsmThresholdAggregator, BadHandleSampleData)
         {1, static_cast<uint8_t>(data_size - 1), sample.data(), true});
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+#ifdef NVIDIA_SHMEM
+// End-to-end test: valid_bit=0 (handleSample valid=false) must cache rc=1 in
+// TAL so the smbus stale bit gets set instead of reporting 0°C as a valid
+// reading.
+TEST(nsmTempSensorAggregator, HandleSample_ValidFalse_ShmemCachesNanWithRcOne)
+{
+    NsmTempAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true};
+    auto aggregate = std::make_shared<NsmNumericSensorValueAggregate>(
+        std::make_unique<NsmNumericSensorShmem>(
+            "GPU_SXM_1_TLIMIT", "temperature",
+            "/xyz/openbmc_project/inventory/chassis",
+            std::make_unique<SMBPBITempSMBusSensorBytesConverter>()));
+
+    nsm_shmem_utils::SharedMemoryManager::telemetryData.clear();
+    aggregator.addSensor(1, aggregate);
+    auto rc = aggregator.handleSample({1, 0, nullptr, false});
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    ASSERT_EQ(nsm_shmem_utils::SharedMemoryManager::telemetryData.size(), 1u);
+    EXPECT_EQ(nsm_shmem_utils::SharedMemoryManager::telemetryData.back().rc, 1);
+}
+#endif

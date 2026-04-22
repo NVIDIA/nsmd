@@ -31,6 +31,9 @@
 #define protected public
 
 #include "nsmNumericSensor.hpp"
+#ifdef NVIDIA_SHMEM
+#include "sharedMemCommon.hpp"
+#endif
 #include "nsmNumericSensorValue_mock.hpp"
 
 static auto& bus = utils::DBusHandler::getBus();
@@ -147,6 +150,32 @@ TEST(NsmNumericSensorShmem, GoodTest)
     EXPECT_EQ(value.objPath,
               "/xyz/openbmc_project/sensors/dummy_type/dummy_sensor");
     EXPECT_EQ(value.association, "/xyz/openbmc_project/inventory/dummy_device");
+}
+
+TEST(NsmNumericSensorShmem, NanReadingSetsRcToOne)
+{
+    nsm::NsmNumericSensorShmem value{
+        sensorName, sensorType, associations[0].absolutePath,
+        std::make_unique<nsm::SMBPBITempSMBusSensorBytesConverter>()};
+
+    nsm_shmem_utils::SharedMemoryManager::telemetryData.clear();
+    value.updateReading(std::numeric_limits<double>::quiet_NaN());
+
+    ASSERT_EQ(nsm_shmem_utils::SharedMemoryManager::telemetryData.size(), 1u);
+    EXPECT_EQ(nsm_shmem_utils::SharedMemoryManager::telemetryData.back().rc, 1);
+}
+
+TEST(NsmNumericSensorShmem, ValidReadingKeepsRcZero)
+{
+    nsm::NsmNumericSensorShmem value{
+        sensorName, sensorType, associations[0].absolutePath,
+        std::make_unique<nsm::SMBPBITempSMBusSensorBytesConverter>()};
+
+    nsm_shmem_utils::SharedMemoryManager::telemetryData.clear();
+    value.updateReading(42.5);
+
+    ASSERT_EQ(nsm_shmem_utils::SharedMemoryManager::telemetryData.size(), 1u);
+    EXPECT_EQ(nsm_shmem_utils::SharedMemoryManager::telemetryData.back().rc, 0);
 }
 #endif
 

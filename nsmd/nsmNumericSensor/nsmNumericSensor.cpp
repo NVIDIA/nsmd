@@ -27,6 +27,8 @@
 #include "sharedMemCommon.hpp"
 
 #include <tal.hpp>
+
+#include <cmath>
 #endif
 namespace nsm
 {
@@ -288,9 +290,10 @@ void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
 
     std::vector<uint8_t> smbusData = smbusSensorBytesConverter->convert(value);
 
+    uint8_t rc = std::isnan(value) ? 1 : 0;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, valueInterface, valueProperty, smbusData, valueVariant,
-        association);
+        association, rc);
 }
 #endif
 
