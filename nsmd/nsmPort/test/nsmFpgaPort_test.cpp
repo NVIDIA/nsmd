@@ -20,6 +20,7 @@
 using namespace ::testing;
 
 #include "nsmFpgaPort.hpp"
+#include "nsmGpuPciePort.hpp"
 
 #include <sdbusplus/bus.hpp>
 
@@ -274,8 +275,18 @@ struct NsmFpgaPortFactoryTest :
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> fpga;
 
-    NsmFpgaPortFactoryTest() : SensorManagerTest(devices)
+    boost::asio::io_context io;
+    std::shared_ptr<sdbusplus::asio::connection> systemBus;
+    std::shared_ptr<sdbusplus::asio::object_server> objServer;
+
+    NsmFpgaPortFactoryTest() :
+        SensorManagerTest(devices),
+        systemBus(std::make_shared<sdbusplus::asio::connection>(io)),
+        objServer(std::make_shared<sdbusplus::asio::object_server>(systemBus))
     {
+        ON_CALL(mockManager, getObjServer())
+            .WillByDefault(ReturnRef(*objServer));
+
         fpga = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(fpgaUuid));
         EXPECT_NE(fpga, nullptr);
@@ -380,11 +391,10 @@ TEST_F(NsmFpgaPortFactoryTest, CreateNsmFpgaPortSensorPortInfoSuccess)
 
     createNsmFpgaPortSensor(mockManager, interface, objPath);
 
-    // 1 auto device sensor + 1 portInfoSensor + 1 pcieECCGroup1 via
-    // addSensorBase
-    EXPECT_EQ(3, fpga->deviceSensors.size());
-    auto portInfo =
-        std::dynamic_pointer_cast<NsmFpgaPortInfo>(fpga->deviceSensors[1]);
+    // 1 auto device sensor + 1 NsmPCIePortInfoGroup1 via addSensor
+    EXPECT_EQ(2, fpga->deviceSensors.size());
+    auto portInfo = std::dynamic_pointer_cast<NsmPCIePortInfoGroup1>(
+        fpga->deviceSensors[1]);
     EXPECT_NE(nullptr, portInfo);
     EXPECT_EQ(name, portInfo->getName());
     EXPECT_EQ(std::string("NSM_PortInfo"), portInfo->getType());

@@ -113,15 +113,17 @@ class NsmPCIeECCGroup1 : public NsmPcieGroup
                               size_t responseLen) override;
     void updateMetricOnSharedMemory() override;
 
+    static double convertEncodedSpeedToGbps(const uint32_t& speed);
+    static size_t convertEncodedWidthToActualWidth(const uint32_t& width);
+
   private:
     std::string objPath;
-    double convertEncodedSpeedToGbps(const uint32_t& speed);
-    size_t convertEncodedWidthToActualWidth(const uint32_t& width);
-    size_t convertEncodedSizeToBytes(const uint32_t& size);
+    static size_t convertEncodedSizeToBytes(const uint32_t& size);
     ClockMode convertEncodedClockModeToEnum(const uint32_t& clockMode);
     std::shared_ptr<PortInfoIntf> portInfoIntf = nullptr;
     std::shared_ptr<PortWidthIntf> portWidthIntf = nullptr;
     std::shared_ptr<PCIeClockModeIntf> pcieClockModeIntf = nullptr;
+    bool isEnhancedPCIeTelemetryEnabled = false;
 };
 
 class NsmPCIeECCGroup2 : public NsmPcieGroup

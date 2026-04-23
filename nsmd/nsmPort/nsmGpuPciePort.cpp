@@ -24,10 +24,16 @@
 #include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmAsioInterface/nsmAsioPortInfoInterface.hpp"
 #include "nsmCommon/nsmPcieGroup.hpp"
 #include "nsmCommon/nsmPciePortIntf.hpp"
 #include "nsmInterface.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
+#include "sensorManager.hpp"
+
+#ifdef NVIDIA_SHMEM
+#include "sharedMemCommon.hpp"
+#endif
 
 #include <cstdint>
 #include <unordered_map>
@@ -348,6 +354,80 @@ std::shared_ptr<NsmPcieGroup>
     return (it != clearCoutnerSensorMap.end()) ? it->second : nullptr;
 }
 
+NsmPCIePortInfoGroup1::NsmPCIePortInfoGroup1(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    const std::string& inventoryObjPath,
+    std::unique_ptr<NsmAsioPortInfoInterface> portInfoIntf,
+    uint8_t deviceIndex) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_1),
+    objPath(inventoryObjPath), portInfoIntf(std::move(portInfoIntf))
+{
+    lg2::info("NsmPCIePortInfoGroup1: {NAME}", "NAME", name.c_str());
+
+    portWidthIntf = std::make_shared<PortWidthIntf>(bus,
+                                                    inventoryObjPath.c_str());
+    portWidthIntf->width(0);
+    portWidthIntf->activeWidth(0);
+
+    updateMetricOnSharedMemory();
+}
+
+uint8_t
+    NsmPCIePortInfoGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                             size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t dataSize;
+    uint16_t reasonCode = ERR_NULL;
+    struct nsm_query_scalar_group_telemetry_group_1 data;
+
+    auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
+        responseMsg, responseLen, &cc, &dataSize, &reasonCode, &data);
+
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        LG2_ERROR_FLT(
+            "NsmPCIePortInfoGroup1 decode_query_scalar_group_telemetry_v1_group1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        return cc ? cc : rc;
+    }
+
+    portInfoIntf->updateSpeeds(
+        NsmPCIeECCGroup1::convertEncodedSpeedToGbps(data.negotiated_link_speed),
+        NsmPCIeECCGroup1::convertEncodedSpeedToGbps(data.max_link_speed),
+        NsmPCIeECCGroup1::convertEncodedSpeedToGbps(data.target_link_speed));
+    portWidthIntf->width(NsmPCIeECCGroup1::convertEncodedWidthToActualWidth(
+        data.max_link_width));
+    portWidthIntf->activeWidth(
+        NsmPCIeECCGroup1::convertEncodedWidthToActualWidth(
+            data.negotiated_link_width));
+
+    updateMetricOnSharedMemory();
+    return NSM_SUCCESS;
+}
+
+void NsmPCIePortInfoGroup1::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    std::string ifacePortInfoName =
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo";
+    auto ifacePortWidthName = std::string(portWidthIntf->interface);
+    std::vector<uint8_t> rawSmbpbiData = {};
+
+    nv::sensor_aggregation::DbusVariantType variantCS{
+        portInfoIntf->getCurrentSpeed()};
+    std::string propName = "CurrentSpeed";
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifacePortInfoName, propName, rawSmbpbiData, variantCS);
+
+    nv::sensor_aggregation::DbusVariantType variantAW{
+        portWidthIntf->activeWidth()};
+    propName = "ActiveWidth";
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifacePortWidthName, propName, rawSmbpbiData, variantAW);
+#endif
+}
+
 requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                                             const std::string& interface,
                                             const std::string& objPath)
@@ -522,17 +602,21 @@ requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
             }
 
             auto portInfoIntf =
-                std::make_shared<PortInfoIntf>(bus, inventoryObjPath.c_str());
-            auto portWidthIntf =
-                std::make_shared<PortWidthIntf>(bus, inventoryObjPath.c_str());
-            auto portInfoSensor = std::make_shared<NsmGpuPciePortInfo>(
-                name, type, portType, portProtocol, portInfoIntf);
-            nsmDevice->addDeviceSensors(portInfoSensor);
-            auto pcieECCIntfSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
-                name, type, inventoryObjPath, portInfoIntf, portWidthIntf,
-                deviceIndex);
+                NsmAsioPortInfoInterface::createSinglePortDevice(
+                    SensorManager::getInstance().getObjServer(),
+                    inventoryObjPath, portType, portProtocol);
+            if (!portInfoIntf)
+            {
+                lg2::error(
+                    "Failed to create PortInfo interface for {NAME} at {PATH}",
+                    "NAME", name, "PATH", inventoryObjPath);
+                co_return NSM_ERROR;
+            }
 
-            nsmDevice->addSensor(pcieECCIntfSensorGroup1, priority);
+            auto portInfoGroup1 = std::make_shared<NsmPCIePortInfoGroup1>(
+                bus, name, type, inventoryObjPath, std::move(portInfoIntf),
+                deviceIndex);
+            nsmDevice->addSensor(portInfoGroup1, priority);
         }
     }
 

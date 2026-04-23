@@ -16,10 +16,12 @@
  */
 #pragma once
 #include "asyncOperationManager.hpp"
+#include "nsmAsioInterface/nsmAsioPortInfoInterface.hpp"
 #include "nsmCommon/nsmPcieGroup.hpp"
 #include "nsmCommon/nsmPciePortIntf.hpp"
 #include "nsmRetimerPort.hpp"
 
+#include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortState/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
@@ -144,6 +146,31 @@ class NsmClearPCIeCounters : public NsmObject
     uint8_t groupId;
     uint8_t deviceIndex;
     std::shared_ptr<ClearPCIeIntf> clearPCIeIntf = nullptr;
+};
+
+/**
+ * @brief Combined PCIe port info and link speed/width sensor using
+ *        NsmAsioPortInfoInterface for selective PortInfo property
+ *        registration. Replaces separate NsmGpuPciePortInfo +
+ *        NsmPCIeECCGroup1 pair for GPU PCIe and FPGA ports.
+ */
+class NsmPCIePortInfoGroup1 : public NsmPcieGroup
+{
+  public:
+    NsmPCIePortInfoGroup1(
+        sdbusplus::bus::bus& bus, const std::string& name,
+        const std::string& type, const std::string& inventoryObjPath,
+        std::unique_ptr<NsmAsioPortInfoInterface> portInfoIntf,
+        uint8_t deviceIndex);
+
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
+
+  private:
+    std::string objPath;
+    std::unique_ptr<NsmAsioPortInfoInterface> portInfoIntf;
+    std::shared_ptr<PortWidthIntf> portWidthIntf;
 };
 
 } // namespace nsm

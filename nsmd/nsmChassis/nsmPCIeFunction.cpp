@@ -205,12 +205,11 @@ uint8_t NsmPCIeDeviceFunctionAsio::handleResponseMsg(
     auto rc = decode_query_scalar_group_telemetry_v1_group0_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
 
-    LG2_ERROR_FLT(
-        "decode_query_scalar_group_telemetry_v1_group0_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
+        LG2_ERROR_FLT(
+            "decode_query_scalar_group_telemetry_v1_group0_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         return cc ? cc : rc;
     }
 

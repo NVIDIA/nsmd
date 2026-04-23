@@ -74,7 +74,8 @@ NsmPCIeECCGroup1::NsmPCIeECCGroup1(
     NsmPcieGroup(name, type, GROUP_ID_1, multiPortType, multiPortIndex,
                  multiPortUpstreamPortNumber),
     objPath(inventoryPath), portInfoIntf(portInfoIntf),
-    portWidthIntf(portWidthIntf), pcieClockModeIntf(pcieClockModeIntf)
+    portWidthIntf(portWidthIntf), pcieClockModeIntf(pcieClockModeIntf),
+    isEnhancedPCIeTelemetryEnabled(pcieClockModeIntf != nullptr)
 {
     lg2::info("NsmMultiPCIeECCGroup1: {NAME}", "NAME", name.c_str());
 
@@ -107,8 +108,8 @@ double NsmPCIeECCGroup1::convertEncodedSpeedToGbps(const uint32_t& speed)
         case NSM_PCIE_LINK_SPEED_CODE_GEN6:
             return NSM_PCIE_SPEED_GBPS_GEN6;
         default:
-            lg2::debug("NsmPCIeECCGroup1: {NAME}, unknown speed {SPEED}",
-                       "NAME", getName(), "SPEED", speed);
+            lg2::debug("NsmPCIeECCGroup1: unknown speed {SPEED}", "SPEED",
+                       speed);
             return 0;
     }
 }
@@ -176,7 +177,7 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
             pcieClockModeIntf->commonClockMode(
                 convertEncodedClockModeToEnum(data.clock_mode));
         }
-        if (portInfoIntf)
+        if (isEnhancedPCIeTelemetryEnabled)
         {
             portInfoIntf->maxReadRequestSizeBytes(
                 convertEncodedSizeToBytes(data.max_read_request_size_bytes));

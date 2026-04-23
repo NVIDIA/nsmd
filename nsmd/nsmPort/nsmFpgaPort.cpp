@@ -2,6 +2,8 @@
 
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
+#include "nsmGpuPciePort.hpp"
+#include "sensorManager.hpp"
 
 #include <unordered_map>
 
@@ -168,17 +170,21 @@ requester::Coroutine createNsmFpgaPortSensor(SensorManager& manager,
             }
 
             auto portInfoIntf =
-                std::make_shared<PortInfoIntf>(bus, inventoryObjPath.c_str());
-            auto portWidthIntf =
-                std::make_shared<PortWidthIntf>(bus, inventoryObjPath.c_str());
-            auto portInfoSensor = std::make_shared<NsmFpgaPortInfo>(
-                name, type, portType, portProtocol, portInfoIntf);
-            nsmDevice->addDeviceSensors(portInfoSensor);
-            auto pcieECCIntfSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
-                name, type, inventoryObjPath, portInfoIntf, portWidthIntf,
-                deviceIndex);
+                NsmAsioPortInfoInterface::createSinglePortDevice(
+                    SensorManager::getInstance().getObjServer(),
+                    inventoryObjPath, portType, portProtocol);
+            if (!portInfoIntf)
+            {
+                lg2::error(
+                    "Failed to create PortInfo interface for {NAME} at {PATH}",
+                    "NAME", name, "PATH", inventoryObjPath);
+                co_return NSM_ERROR;
+            }
 
-            nsmDevice->addSensor(pcieECCIntfSensorGroup1, priority);
+            auto portInfoGroup1 = std::make_shared<NsmPCIePortInfoGroup1>(
+                bus, name, type, inventoryObjPath, std::move(portInfoIntf),
+                deviceIndex);
+            nsmDevice->addSensor(portInfoGroup1, priority);
         }
         else if (type == "NSM_PortState")
         {
