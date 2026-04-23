@@ -24,6 +24,7 @@
 
 #include <endian.h>
 
+#include <cmath>
 #include <tal.hpp>
 
 namespace nsm
@@ -252,8 +253,8 @@ void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
     std::vector<uint8_t> smbusData = smbusSensorBytesConverter->convert(value);
 
     tal::TelemetryAggregator::updateTelemetry(
-        objPath, valueInterface, valueProperty, smbusData, timestamp, 0,
-        valueVariant, association);
+        objPath, valueInterface, valueProperty, smbusData, timestamp,
+        std::isnan(value) ? 1 : 0, valueVariant, association);
 }
 #endif
 
