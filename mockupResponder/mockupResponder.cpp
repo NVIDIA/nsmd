@@ -8186,7 +8186,7 @@ std::vector<uint8_t>
         }
         case DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE:
         {
-            uint32_t rampRate = htole32(doubleToNvUFXP8_24(25.0));
+            uint32_t rampRate = htole32(25u);
             data.resize(sizeof(uint32_t));
             memcpy(data.data(), &rampRate, sizeof(uint32_t));
             break;

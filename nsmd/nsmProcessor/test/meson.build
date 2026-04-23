@@ -32,6 +32,7 @@ tests = [
     'nsmReconfigPermissionsBranch3_test',
     'nsmPowerLimitBranch3_test',
     'nsmPowerSmoothingBranch5_test',
+    'nsmSoCPowerSmoothing_test',
     'nsmWorkloadPowerProfileBranch3_test',
     'nsmOemResetStatisticsBranch_test',
     'nsmFpgaProcessorBranch2_test',

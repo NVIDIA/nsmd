@@ -33,8 +33,8 @@ static const std::string socFeaturesIntfName =
 static void registerMaxACPowerRampRate(
     std::shared_ptr<sdbusplus::asio::dbus_interface> intf)
 {
-    intf->register_property("MaxACPowerRampPercentPerSecond",
-                            double{std::numeric_limits<double>::quiet_NaN()});
+    intf->register_property("MaxACPowerRampRateWattsPerSecond",
+                            uint32_t{std::numeric_limits<uint32_t>::max()});
 }
 
 static void updateMaxACPowerRampRate(
@@ -48,8 +48,7 @@ static void updateMaxACPowerRampRate(
     uint32_t raw;
     std::memcpy(&raw, data, sizeof(uint32_t));
     raw = le32toh(raw);
-    intf->set_property("MaxACPowerRampPercentPerSecond",
-                       NvUFXP8_24ToDouble(raw));
+    intf->set_property("MaxACPowerRampRateWattsPerSecond", raw);
 }
 
 static void registerPowerSmoothingEnabled(
@@ -117,7 +116,7 @@ static void updatePowerBrakeEnabled(
 
 static const SoCModePropertyMap gpuV1ModePropertyMap = {
     {DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE,
-     {{"MaxACPowerRampPercentPerSecond", registerMaxACPowerRampRate,
+     {{"MaxACPowerRampRateWattsPerSecond", registerMaxACPowerRampRate,
        updateMaxACPowerRampRate}}},
     {DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED,
      {{"PowerSmoothingEnabled", registerPowerSmoothingEnabled,
@@ -126,7 +125,7 @@ static const SoCModePropertyMap gpuV1ModePropertyMap = {
 
 static const SoCModePropertyMap mcuV1ModePropertyMap = {
     {DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE,
-     {{"MaxACPowerRampPercentPerSecond", registerMaxACPowerRampRate,
+     {{"MaxACPowerRampRateWattsPerSecond", registerMaxACPowerRampRate,
        updateMaxACPowerRampRate}}},
     {DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED,
      {{"PowerSmoothingEnabled", registerPowerSmoothingEnabled,
@@ -239,8 +238,8 @@ requester::Coroutine
     {
         case DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE:
         {
-            const auto* dblVal = std::get_if<double>(&value);
-            if (!dblVal)
+            const auto* u32Val = std::get_if<uint32_t>(&value);
+            if (!u32Val)
             {
                 lg2::error(
                     "setSoCSetting: invalid value type for modeIndex={IDX} eid={EID}",
@@ -249,9 +248,9 @@ requester::Coroutine
                     InvalidArgument{};
             }
             lg2::info("setSoCSetting: eid={EID} modeIndex={IDX} value={VAL}",
-                      "EID", eid, "IDX", deviceModeIndex, "VAL", *dblVal);
+                      "EID", eid, "IDX", deviceModeIndex, "VAL", *u32Val);
 
-            uint32_t raw = htole32(doubleToNvUFXP8_24(*dblVal));
+            uint32_t raw = htole32(*u32Val);
             payload.assign(reinterpret_cast<const uint8_t*>(&raw),
                            reinterpret_cast<const uint8_t*>(&raw) +
                                sizeof(raw));
