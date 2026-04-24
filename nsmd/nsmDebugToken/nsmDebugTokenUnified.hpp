@@ -18,6 +18,7 @@
 #pragma once
 
 #include "asyncOperationManager.hpp"
+#include "debugTokenUtils.hpp"
 #include "nsmObjectFactory.hpp"
 #include "types.hpp"
 
@@ -186,11 +187,35 @@ class NsmDebugTokenUnifiedObject :
         createInstallTokenRequest(std::shared_ptr<TokenInstallationInfo> info);
 
     /**
-     * @brief Asynchronous handler for token installation operations
+     * @brief Installs a multi-record debug token file
      *
-     * Handles the actual token installation by sending chunks to the NSM
-     * device. Manages chunked installation for large token files and updates
-     * progress.
+     * Parses the TLV records contained in a DebugTokenHeader multi-record
+     * container and installs each record sequentially via installTokenDirect().
+     * The file descriptor in @p info is expected to be positioned at the start
+     * of the file. Aggregate status is reported through the supplied async
+     * interfaces (full success, all records failed, or partial success).
+     *
+     * @param info Token installation information with file descriptor and size
+     * @param header Parsed multi-record file header
+     * @param statusIntf Interface for reporting operation status
+     * @param valueIntf Interface for reporting operation result
+     * @return Coroutine that completes when the operation finishes
+     */
+    requester::Coroutine
+        installMultiRecordToken(std::shared_ptr<TokenInstallationInfo> info,
+                                const token_utils::DebugTokenHeader& header,
+                                std::shared_ptr<AsyncStatusIntf> statusIntf,
+                                std::shared_ptr<AsyncValueIntf> valueIntf);
+
+    /**
+     * @brief Asynchronous handler for single-record token installation
+     *
+     * Streams a single-record (TLV) token file to the NSM device one chunk
+     * per invocation, recursing (via detach) for the next chunk until the
+     * entire file has been sent. The single- vs multi-record decision is made
+     * up front in installToken(); this handler only ever streams a
+     * single-record token. Progress and result are reported through the
+     * supplied async interfaces.
      *
      * @param info Token installation information with file descriptor and
      * progress

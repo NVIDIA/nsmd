@@ -17,12 +17,76 @@
 
 #include "debugTokenUtils.hpp"
 
+#include "debug-token/tlv.h"
+
+#include <endian.h>
+
 #include <array>
+#include <cstring>
 #include <unordered_map>
 #include <utility>
 
 namespace nsm::token_utils
 {
+
+std::vector<std::span<const uint8_t>>
+    parseTokenRecords(std::span<const uint8_t> fileData,
+                      const DebugTokenHeader& header)
+{
+    const size_t tlvOff = header.offsetToListOfStructs;
+    const uint16_t totalRecords = header.numberOfRecords;
+
+    std::vector<std::span<const uint8_t>> records;
+    if (tlvOff > fileData.size())
+    {
+        return records;
+    }
+
+    records.reserve(totalRecords);
+
+    size_t off = 0;
+    for (uint16_t i = 0; i < totalRecords; ++i)
+    {
+        if (tlvOff + off + sizeof(debug_token::StructureHeader) >
+            fileData.size())
+        {
+            break;
+        }
+
+        debug_token::StructureHeader th{};
+        std::memcpy(&th, fileData.data() + tlvOff + off, sizeof(th));
+        const size_t recSz = sizeof(th) + le32toh(th.size);
+
+        if (tlvOff + off + recSz > fileData.size())
+        {
+            break;
+        }
+
+        records.emplace_back(fileData.data() + tlvOff + off, recSz);
+        off += recSz;
+    }
+
+    return records;
+}
+
+bool isMultiRecordContainer(std::span<const uint8_t> prefix)
+{
+    if (prefix.size() >= sizeof(debug_token::TLV_IDENTIFIER) &&
+        std::memcmp(prefix.data(), debug_token::TLV_IDENTIFIER,
+                    sizeof(debug_token::TLV_IDENTIFIER)) == 0)
+    {
+        return false;
+    }
+
+    if (prefix.size() < sizeof(DebugTokenHeader))
+    {
+        return false;
+    }
+
+    DebugTokenHeader header{};
+    std::memcpy(&header, prefix.data(), sizeof(header));
+    return header.type == FileTypeDebugToken;
+}
 
 /**
  * @brief Device-specific token type and subtype mappings.

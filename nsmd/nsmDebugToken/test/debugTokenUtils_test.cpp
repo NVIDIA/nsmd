@@ -15,9 +15,12 @@
  * limitations under the License.
  */
 
+#include "debug-token/tlv.h"
+
 #include "debugTokenUtils.hpp"
 
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -689,4 +692,246 @@ TEST(DebugTokenUtilsTest, BmcIrotBitmapZeroReturnsEmpty)
 {
     auto result = tokenSubtypeBitmapToEnumArray(1, 0, "BMCIRoT");
     EXPECT_TRUE(result.empty());
+}
+
+// ============================================================================
+// parseTokenRecords tests
+//
+// Exercises every reachable bound check in parseTokenRecords:
+//   1. Well-formed multi-record file -> all records returned, sizes match
+//   2. Truncated header (file ends mid-StructureHeader) -> partial parse
+//   3. Truncated payload (StructureHeader.size points past EOF) -> partial
+//   4. Zero records declared -> empty result without scanning
+//   5. tlvOff > fileSize -> early return, empty result
+// ============================================================================
+
+namespace
+{
+
+DebugTokenHeader makeHeader(uint16_t numRecords, uint16_t tlvOff,
+                            uint32_t fileSize)
+{
+    DebugTokenHeader h{};
+    std::memset(&h, 0, sizeof(h));
+    h.version = 1;
+    h.type = FileTypeDebugToken;
+    h.numberOfRecords = numRecords;
+    h.offsetToListOfStructs = tlvOff;
+    h.fileSize = fileSize;
+    return h;
+}
+
+// Build a single TLV-record's bytes: a StructureHeader followed by
+// payloadSize bytes of dummy payload. Caller-controlled payloadSize lets
+// tests forge truncated payloads by claiming a larger size in the header
+// than is actually appended to the file.
+std::vector<uint8_t> makeRecordBytes(uint32_t payloadSize, uint8_t fillByte,
+                                     uint32_t headerSize = UINT32_MAX)
+{
+    debug_token::StructureHeader sh{};
+    std::memset(&sh, 0, sizeof(sh));
+    sh.identifier[0] = debug_token::TLV_IDENTIFIER[0];
+    sh.identifier[1] = debug_token::TLV_IDENTIFIER[1];
+    sh.identifier[2] = debug_token::TLV_IDENTIFIER[2];
+    sh.identifier[3] = debug_token::TLV_IDENTIFIER[3];
+    sh.versionMajor = 1;
+    sh.versionMinor = 0;
+    sh.size = (headerSize == UINT32_MAX) ? payloadSize : headerSize;
+
+    std::vector<uint8_t> bytes(sizeof(sh) + payloadSize);
+    std::memcpy(bytes.data(), &sh, sizeof(sh));
+    std::fill(bytes.begin() + sizeof(sh), bytes.end(), fillByte);
+    return bytes;
+}
+
+std::pair<std::vector<uint8_t>, DebugTokenHeader>
+    makeMultiRecordFile(std::initializer_list<uint32_t> payloadSizes)
+{
+    std::vector<std::vector<uint8_t>> records;
+    for (auto sz : payloadSizes)
+    {
+        records.push_back(makeRecordBytes(sz, 0xAA));
+    }
+
+    size_t total = sizeof(DebugTokenHeader);
+    for (const auto& r : records)
+    {
+        total += r.size();
+    }
+
+    auto hdr = makeHeader(static_cast<uint16_t>(records.size()),
+                          sizeof(DebugTokenHeader),
+                          static_cast<uint32_t>(total));
+
+    std::vector<uint8_t> out(total);
+    std::memcpy(out.data(), &hdr, sizeof(hdr));
+    size_t off = sizeof(DebugTokenHeader);
+    for (const auto& r : records)
+    {
+        std::memcpy(out.data() + off, r.data(), r.size());
+        off += r.size();
+    }
+    return {out, hdr};
+}
+
+} // namespace
+
+TEST(DebugTokenUtilsParseTokenRecordsTest, WellFormedMultiRecord)
+{
+    constexpr uint32_t payloadA = 16;
+    constexpr uint32_t payloadB = 32;
+    constexpr uint32_t payloadC = 8;
+
+    auto recA = makeRecordBytes(payloadA, 0xAA);
+    auto recB = makeRecordBytes(payloadB, 0xBB);
+    auto recC = makeRecordBytes(payloadC, 0xCC);
+
+    const uint16_t tlvOff = sizeof(DebugTokenHeader);
+    const uint32_t fileSize = tlvOff + recA.size() + recB.size() + recC.size();
+    auto header = makeHeader(3, tlvOff, fileSize);
+
+    std::vector<uint8_t> file(fileSize);
+    std::memcpy(file.data(), &header, sizeof(header));
+    std::memcpy(file.data() + tlvOff, recA.data(), recA.size());
+    std::memcpy(file.data() + tlvOff + recA.size(), recB.data(), recB.size());
+    std::memcpy(file.data() + tlvOff + recA.size() + recB.size(), recC.data(),
+                recC.size());
+
+    auto records = parseTokenRecords(file, header);
+
+    ASSERT_EQ(records.size(), 3u);
+    EXPECT_EQ(records[0].size(),
+              sizeof(debug_token::StructureHeader) + payloadA);
+    EXPECT_EQ(records[1].size(),
+              sizeof(debug_token::StructureHeader) + payloadB);
+    EXPECT_EQ(records[2].size(),
+              sizeof(debug_token::StructureHeader) + payloadC);
+    // Spans must reference the original buffer and start at the TLV offsets.
+    EXPECT_EQ(records[0].data(), file.data() + tlvOff);
+    EXPECT_EQ(records[1].data(), file.data() + tlvOff + recA.size());
+    EXPECT_EQ(records[2].data(),
+              file.data() + tlvOff + recA.size() + recB.size());
+}
+
+TEST(DebugTokenUtilsParseTokenRecordsTest, TruncatedStructureHeader)
+{
+    auto recA = makeRecordBytes(16, 0xAA);
+
+    const uint16_t tlvOff = sizeof(DebugTokenHeader);
+    // Append recA in full, then half of a StructureHeader to simulate a
+    // file that ends mid-record-header.
+    const size_t shortHdr = sizeof(debug_token::StructureHeader) / 2;
+    const uint32_t fileSize = tlvOff + recA.size() + shortHdr;
+    // Claim two records in the header even though only one fully fits.
+    auto header = makeHeader(2, tlvOff, fileSize);
+
+    std::vector<uint8_t> file(fileSize, 0);
+    std::memcpy(file.data(), &header, sizeof(header));
+    std::memcpy(file.data() + tlvOff, recA.data(), recA.size());
+
+    auto records = parseTokenRecords(file, header);
+
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].size(), sizeof(debug_token::StructureHeader) + 16u);
+}
+
+TEST(DebugTokenUtilsParseTokenRecordsTest, TruncatedPayload)
+{
+    // First record claims 64 bytes of payload but only 4 bytes are
+    // present in the file -> tlvOff + off + recSz > fileData.size() ->
+    // parser stops with an empty result.
+    auto truncated = makeRecordBytes(/*actualPayload=*/4, 0xDE,
+                                     /*headerSize=*/64);
+
+    const uint16_t tlvOff = sizeof(DebugTokenHeader);
+    const uint32_t fileSize = tlvOff + truncated.size();
+    auto header = makeHeader(1, tlvOff, fileSize);
+
+    std::vector<uint8_t> file(fileSize, 0);
+    std::memcpy(file.data(), &header, sizeof(header));
+    std::memcpy(file.data() + tlvOff, truncated.data(), truncated.size());
+
+    auto records = parseTokenRecords(file, header);
+    EXPECT_TRUE(records.empty());
+}
+
+TEST(DebugTokenUtilsParseTokenRecordsTest, ZeroRecordsReturnsEmpty)
+{
+    auto header = makeHeader(0, sizeof(DebugTokenHeader),
+                             sizeof(DebugTokenHeader));
+    std::vector<uint8_t> file(sizeof(DebugTokenHeader), 0);
+    std::memcpy(file.data(), &header, sizeof(header));
+
+    auto records = parseTokenRecords(file, header);
+    EXPECT_TRUE(records.empty());
+}
+
+TEST(DebugTokenUtilsParseTokenRecordsTest, TlvOffsetBeyondFileSize)
+{
+    // tlvOff points past the end of fileData -> immediate empty return.
+    auto header = makeHeader(/*numRecords=*/3, /*tlvOff=*/4096,
+                             /*fileSize=*/sizeof(DebugTokenHeader));
+
+    std::vector<uint8_t> file(sizeof(DebugTokenHeader), 0);
+    std::memcpy(file.data(), &header, sizeof(header));
+
+    auto records = parseTokenRecords(file, header);
+    EXPECT_TRUE(records.empty());
+}
+
+TEST(IsMultiRecordContainerTest, TlvMagicPrefixReturnsFalse)
+{
+    std::vector<uint8_t> file(64, 0);
+    std::memcpy(file.data(), debug_token::TLV_IDENTIFIER,
+                sizeof(debug_token::TLV_IDENTIFIER));
+    EXPECT_FALSE(isMultiRecordContainer(file));
+}
+
+TEST(IsMultiRecordContainerTest, DebugTokenHeaderTypeMatchReturnsTrue)
+{
+    auto [file, hdr] = makeMultiRecordFile({8});
+    EXPECT_TRUE(isMultiRecordContainer(file));
+}
+
+TEST(IsMultiRecordContainerTest, DebugTokenHeaderTypeMismatchReturnsFalse)
+{
+    auto [file, hdr] = makeMultiRecordFile({8});
+    file[offsetof(DebugTokenHeader, type)] = 0x00;
+    EXPECT_FALSE(isMultiRecordContainer(file));
+}
+
+TEST(IsMultiRecordContainerTest, PrefixShorterThanHeaderReturnsFalse)
+{
+    std::vector<uint8_t> shortPrefix(sizeof(DebugTokenHeader) - 1, 0xFF);
+    EXPECT_FALSE(isMultiRecordContainer(shortPrefix));
+}
+
+TEST(IsMultiRecordContainerTest, EmptyPrefixReturnsFalse)
+{
+    EXPECT_FALSE(isMultiRecordContainer({}));
+}
+
+TEST(IsMultiRecordContainerTest, PartialTlvMagicFallsThroughToHeaderCheck)
+{
+    // A prefix that partially matches the TLV magic but differs on the
+    // last byte must miss the magic check and fall through to the header
+    // interpretation. With type == FileTypeDebugToken, the header check
+    // then returns true.
+    std::vector<uint8_t> prefix(sizeof(DebugTokenHeader), 0);
+    prefix[0] = debug_token::TLV_IDENTIFIER[0];
+    prefix[2] = debug_token::TLV_IDENTIFIER[2];
+    prefix[3] = debug_token::TLV_IDENTIFIER[3] ^ 0xFF;
+    prefix[offsetof(DebugTokenHeader, type)] = FileTypeDebugToken;
+    EXPECT_TRUE(isMultiRecordContainer(prefix));
+}
+
+TEST(IsMultiRecordContainerTest, TlvIdentifierMatchesSpec)
+{
+    // Regression guard: the spec mandates the TLV identifier is the ASCII
+    // string "TLV1". If this ever changes upstream, the detection logic in
+    // isMultiRecordContainer needs to be re-evaluated.
+    EXPECT_EQ(debug_token::TLV_IDENTIFIER[0], 0x54); // 'T'
+    EXPECT_EQ(debug_token::TLV_IDENTIFIER[1], 0x4C); // 'L'
+    EXPECT_EQ(debug_token::TLV_IDENTIFIER[2], 0x56); // 'V'
+    EXPECT_EQ(debug_token::TLV_IDENTIFIER[3], 0x31); // '1'
 }

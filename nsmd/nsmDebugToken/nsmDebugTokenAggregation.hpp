@@ -18,6 +18,7 @@
 #pragma once
 
 #include "asyncOperationManager.hpp"
+#include "debugTokenUtils.hpp"
 
 #include <com/nvidia/DebugToken/Aggregation/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
@@ -39,24 +40,8 @@ class NsmDebugTokenAggregationObject;
 using DebugTokenAggregationIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::debug_token::Aggregation>;
 
-// File type constant for debug token files
-constexpr uint8_t FileTypeDebugToken = 2;
-
-/**
- * @brief Debug token file header structure
- *
- * This structure matches the token file format used for aggregated
- * debug token installation across multiple devices.
- */
-struct DebugTokenHeader
-{
-    uint8_t version;
-    uint8_t type;
-    uint16_t numberOfRecords;
-    uint16_t offsetToListOfStructs;
-    uint32_t fileSize;
-    uint8_t reserved[6];
-} __attribute__((packed));
+using token_utils::DebugTokenHeader;
+using token_utils::FileTypeDebugToken;
 
 /**
  * @brief Singleton manager for debug token aggregation

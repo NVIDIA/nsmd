@@ -174,63 +174,34 @@ int NsmDebugTokenAggregationObject::parseTlvTokens(
     const std::vector<uint8_t>& fileData, const DebugTokenHeader& header,
     TokenMap& tokens)
 {
-    uint32_t tlvOffset = header.offsetToListOfStructs;
-    uint16_t numRecords = header.numberOfRecords;
-    std::vector<uint8_t> tokenData(fileData.begin() + tlvOffset,
-                                   fileData.end());
+    auto records = token_utils::parseTokenRecords(fileData, header);
 
-    size_t offset = 0;
-    for (uint16_t i = 0; i < numRecords; i++)
+    for (size_t i = 0; i < records.size(); ++i)
     {
-        if (offset >= tokenData.size())
-        {
-            lg2::error(
-                "DebugToken: Reached end of data at record {REC}/{TOTAL}",
-                "REC", i, "TOTAL", numRecords);
-            return -1;
-        }
-
-        if (offset + sizeof(debug_token::StructureHeader) > tokenData.size())
-        {
-            lg2::error("DebugToken: Insufficient data for TLV header at offset "
-                       "{OFFSET}",
-                       "OFFSET", offset);
-            return -1;
-        }
-
-        const auto* tlvHeader =
-            reinterpret_cast<const debug_token::StructureHeader*>(
-                tokenData.data() + offset);
-        uint32_t payloadSize = le32toh(tlvHeader->size);
-        size_t totalStructSize = sizeof(debug_token::StructureHeader) +
-                                 payloadSize;
-
-        if (offset + totalStructSize > tokenData.size())
-        {
-            lg2::error("DebugToken: Insufficient data for TLV structure at "
-                       "offset {OFFSET}",
-                       "OFFSET", offset);
-            return -1;
-        }
-
-        std::vector<uint8_t> singleTlvData(tokenData.begin() + offset,
-                                           tokenData.begin() + offset +
-                                               totalStructSize);
+        const auto& rec = records[i];
+        std::vector<uint8_t> singleTlvData(rec.begin(), rec.end());
 
         std::string serialNumber = extractSerialNumber(singleTlvData);
         if (serialNumber.empty())
         {
-            lg2::warning("DebugToken: Token {INDEX} missing serial number, "
-                         "skipping",
-                         "INDEX", i);
-            offset += totalStructSize;
+            lg2::warning(
+                "DebugToken: Token {INDEX} missing serial number, skipping",
+                "INDEX", i);
             continue;
         }
 
         lg2::debug("DebugToken: Parsed token {INDEX} for serial {SERIAL}",
                    "INDEX", i, "SERIAL", serialNumber);
         tokens.emplace(serialNumber, singleTlvData);
-        offset += totalStructSize;
+    }
+
+    if (records.size() < header.numberOfRecords)
+    {
+        lg2::error(
+            "DebugToken: truncated multi-record file, parsed {N} of {TOTAL}",
+            "N", records.size(), "TOTAL",
+            static_cast<uint16_t>(header.numberOfRecords));
+        return -1;
     }
 
     if (tokens.empty())
