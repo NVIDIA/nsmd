@@ -512,7 +512,8 @@ TEST(DebugTokenUtilsTest, TokenSubtypeBitmapToEnumArrayEmptyDevice)
 
 TEST(DebugTokenUtilsTest, AllDeviceTypesHandleTokenTypeConversion)
 {
-    const std::vector<std::string> deviceTypes = {"ERoT", "CPU", "GPU", "SMA"};
+    const std::vector<std::string> deviceTypes = {"ERoT", "CPU", "GPU", "SMA",
+                                                  "BMCIRoT"};
 
     for (const auto& deviceType : deviceTypes)
     {
@@ -526,7 +527,8 @@ TEST(DebugTokenUtilsTest, AllDeviceTypesHandleTokenTypeConversion)
 
 TEST(DebugTokenUtilsTest, AllDeviceTypesHandleSubtypeConversion)
 {
-    const std::vector<std::string> deviceTypes = {"ERoT", "CPU", "GPU", "SMA"};
+    const std::vector<std::string> deviceTypes = {"ERoT", "CPU", "GPU", "SMA",
+                                                  "BMCIRoT"};
 
     for (const auto& deviceType : deviceTypes)
     {
@@ -537,7 +539,8 @@ TEST(DebugTokenUtilsTest, AllDeviceTypesHandleSubtypeConversion)
 
 TEST(DebugTokenUtilsTest, AllDeviceTypesHandleBitmapConversion)
 {
-    const std::vector<std::string> deviceTypes = {"ERoT", "CPU", "GPU", "SMA"};
+    const std::vector<std::string> deviceTypes = {"ERoT", "CPU", "GPU", "SMA",
+                                                  "BMCIRoT"};
 
     for (const auto& deviceType : deviceTypes)
     {
@@ -644,4 +647,46 @@ TEST(DebugTokenUtilsTest,
     ASSERT_EQ(result.size(), 2u);
     EXPECT_EQ(result[0], TokenSubtypeEnum::VBIOS);
     EXPECT_EQ(result[1], TokenSubtypeEnum::FSPRT);
+}
+
+// ============================================================================
+// BMCIRoT token type/subtype mappings
+// ============================================================================
+
+TEST(DebugTokenUtilsTest, BmcIrotTokenTypeNone)
+{
+    EXPECT_EQ(tokenTypeToEnum(0, "BMCIRoT"), TokenTypeEnum::None);
+}
+
+TEST(DebugTokenUtilsTest, BmcIrotTokenTypeDebugFirmwareUnlock)
+{
+    EXPECT_EQ(tokenTypeToEnum(1, "BMCIRoT"),
+              TokenTypeEnum::DebugFirmwareUnlock);
+}
+
+TEST(DebugTokenUtilsTest, BmcIrotTokenTypeRoundTrip)
+{
+    uint32_t val = tokenTypeToUint32(TokenTypeEnum::DebugFirmwareUnlock,
+                                     "BMCIRoT");
+    EXPECT_EQ(val, 1u);
+    EXPECT_EQ(tokenTypeToEnum(val, "BMCIRoT"),
+              TokenTypeEnum::DebugFirmwareUnlock);
+}
+
+TEST(DebugTokenUtilsTest, BmcIrotUnmappedTokenTypeReturnsNone)
+{
+    EXPECT_EQ(tokenTypeToEnum(2, "BMCIRoT"), TokenTypeEnum::None);
+    EXPECT_EQ(tokenTypeToEnum(0xFF, "BMCIRoT"), TokenTypeEnum::None);
+}
+
+TEST(DebugTokenUtilsTest, BmcIrotSubtypeNone)
+{
+    EXPECT_EQ(tokenSubtypeToEnum(0, 0, "BMCIRoT"), TokenSubtypeEnum::None);
+    EXPECT_EQ(tokenSubtypeToEnum(1, 0, "BMCIRoT"), TokenSubtypeEnum::None);
+}
+
+TEST(DebugTokenUtilsTest, BmcIrotBitmapZeroReturnsEmpty)
+{
+    auto result = tokenSubtypeBitmapToEnumArray(1, 0, "BMCIRoT");
+    EXPECT_TRUE(result.empty());
 }

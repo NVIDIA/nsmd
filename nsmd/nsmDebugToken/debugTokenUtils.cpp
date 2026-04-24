@@ -235,6 +235,17 @@ const std::unordered_map<uint32_t,
                            {2, {{0, TokenSubtypeEnum::None}}},  // CRCS
                            {3, {{0, TokenSubtypeEnum::None}}}}; // CRDT
 
+// BMCIRoT device token types (numeric to enum)
+constexpr std::array<std::pair<uint32_t, TokenTypeEnum>, 2> bmcIrotTokenTypes{
+    {{0, TokenTypeEnum::None}, {1, TokenTypeEnum::DebugFirmwareUnlock}}};
+
+// BMCIRoT device token subtypes - no subtypes supported
+const std::unordered_map<uint32_t,
+                         std::vector<std::pair<uint32_t, TokenSubtypeEnum>>>
+    bmcIrotTokenSubtypesMap = {
+        {0, {{0, TokenSubtypeEnum::None}}},
+        {1, {{0, TokenSubtypeEnum::None}}}}; // DebugFirmwareUnlock
+
 // Default/generic token types for other devices (numeric to enum)
 constexpr std::array<std::pair<uint32_t, TokenTypeEnum>, 4> defaultTokenTypes{
     {{0, TokenTypeEnum::None},
@@ -265,6 +276,10 @@ std::pair<const std::pair<uint32_t, TokenTypeEnum>*, size_t>
     {
         return {nicTokenTypes.data(), nicTokenTypes.size()};
     }
+    if (deviceType == "BMCIRoT")
+    {
+        return {bmcIrotTokenTypes.data(), bmcIrotTokenTypes.size()};
+    }
     return {defaultTokenTypes.data(), defaultTokenTypes.size()};
 }
 
@@ -291,6 +306,10 @@ const std::unordered_map<uint32_t,
     if (deviceType == "NIC")
     {
         return &nicTokenSubtypesMap;
+    }
+    if (deviceType == "BMCIRoT")
+    {
+        return &bmcIrotTokenSubtypesMap;
     }
     return nullptr;
 }
