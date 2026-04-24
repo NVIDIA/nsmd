@@ -28,6 +28,7 @@
 #include "nsmSensor.hpp"
 
 #include <errno.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -162,9 +163,10 @@ std::optional<Request> NsmDebugTokenUnifiedObject::createInstallTokenRequest(
 
     std::unique_ptr<uint8_t[]> buffer(new uint8_t[bytesToRead]);
     auto readBytes = read(info->fd, buffer.get(), bytesToRead);
-    if (readBytes < 0)
+    if (readBytes <= 0)
     {
-        lg2::error("DebugToken: read failed: {ERR}", "ERR", strerror(errno));
+        lg2::error("DebugToken: read failed: {ERR}", "ERR",
+                   readBytes == 0 ? "unexpected EOF" : strerror(errno));
         return std::nullopt;
     }
     uint32_t lengthRemaining = info->totalSize - info->offset - readBytes;
@@ -182,6 +184,148 @@ std::optional<Request> NsmDebugTokenUnifiedObject::createInstallTokenRequest(
 
     info->offset += readBytes;
     return request;
+}
+
+requester::Coroutine NsmDebugTokenUnifiedObject::installMultiRecordToken(
+    std::shared_ptr<TokenInstallationInfo> info,
+    const token_utils::DebugTokenHeader& header,
+    std::shared_ptr<AsyncStatusIntf> statusIntf,
+    std::shared_ptr<AsyncValueIntf> valueIntf)
+{
+    // Bound the in-memory copy by the on-wire header.fileSize against the
+    // actual file size, so a malicious or accidentally-large input cannot
+    // cause us to allocate more than the caller supplied. Anything that fails
+    // these checks is rejected before we touch the heap.
+    const size_t headerFileSize = header.fileSize;
+    if (headerFileSize <= sizeof(token_utils::DebugTokenHeader) ||
+        headerFileSize > info->totalSize)
+    {
+        lg2::error(
+            "DebugToken: rejecting multi-record file: header.fileSize={HSZ} fdSize={FSZ}",
+            "HSZ", static_cast<uint64_t>(headerFileSize), "FSZ",
+            static_cast<uint64_t>(info->totalSize));
+        valueIntf->value(
+            std::make_tuple(static_cast<uint16_t>(NSM_SW_ERROR),
+                            std::format("Operation failed: {}",
+                                        static_cast<int>(NSM_SW_ERROR))));
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR;
+    }
+
+    std::vector<uint8_t> data(headerFileSize);
+    auto fileBytes = read(info->fd, data.data(), headerFileSize);
+    if (fileBytes != static_cast<ssize_t>(headerFileSize))
+    {
+        lg2::error(
+            "DebugToken: failed to read multi-record token file: bytes={N} expected={EXP} {ERR}",
+            "N", static_cast<int64_t>(fileBytes), "EXP",
+            static_cast<uint64_t>(headerFileSize), "ERR",
+            fileBytes < 0 ? strerror(errno) : "short read");
+        valueIntf->value(
+            std::make_tuple(static_cast<uint16_t>(NSM_SW_ERROR),
+                            std::format("Operation failed: {}",
+                                        static_cast<int>(NSM_SW_ERROR))));
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR;
+    }
+
+    auto records = token_utils::parseTokenRecords(data, header);
+
+    const uint16_t totalRecords = header.numberOfRecords;
+    const uint16_t parsedRecords = static_cast<uint16_t>(records.size());
+    uint16_t okCount = 0;
+    uint16_t failCount = static_cast<uint16_t>(totalRecords - parsedRecords);
+    if (failCount > 0)
+    {
+        lg2::error(
+            "DebugToken: truncated multi-record file, parsed {N} of {TOTAL}",
+            "N", parsedRecords, "TOTAL", totalRecords);
+    }
+
+    for (uint16_t i = 0; i < parsedRecords; ++i)
+    {
+        const auto& rec = records[i];
+        int memFd = memfd_create("debug_token_record", MFD_CLOEXEC);
+        if (memFd < 0)
+        {
+            lg2::error(
+                "DebugToken: memfd_create failed for record {REC}/{TOTAL}: {ERR}",
+                "REC", static_cast<uint16_t>(i + 1), "TOTAL", totalRecords,
+                "ERR", strerror(errno));
+            failCount++;
+            continue;
+        }
+        auto written = write(memFd, rec.data(), rec.size());
+        if (written != static_cast<ssize_t>(rec.size()))
+        {
+            lg2::error(
+                "DebugToken: memfd write failed for record {REC}/{TOTAL}: bytes={N} expected={EXP} {ERR}",
+                "REC", static_cast<uint16_t>(i + 1), "TOTAL", totalRecords, "N",
+                static_cast<int64_t>(written), "EXP",
+                static_cast<uint64_t>(rec.size()), "ERR",
+                written < 0 ? strerror(errno) : "short write");
+            close(memFd);
+            failCount++;
+            continue;
+        }
+        lseek(memFd, 0, SEEK_SET);
+
+        uint16_t errCode = 0;
+        std::string errMsg;
+        // installTokenDirect both returns an rc and sets errCode; treat any
+        // non-success return as a failure even if errCode were left unset, so
+        // this loop never silently swallows a coroutine error.
+        auto rc = co_await installTokenDirect(memFd, rec.size(), errCode,
+                                              errMsg);
+        close(memFd);
+        if (rc == NSM_SW_SUCCESS && errCode == 0)
+        {
+            okCount++;
+        }
+        else
+        {
+            failCount++;
+        }
+        lg2::debug("DebugToken: Record {REC}/{TOTAL}: rc={RC} {MSG}", "REC",
+                   static_cast<uint16_t>(i + 1), "TOTAL", totalRecords, "RC",
+                   rc, "MSG", errMsg);
+    }
+
+    // Refresh device-side token status if any record installed.
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    if (device && okCount > 0)
+    {
+        queryTokenHandler(device).detach();
+    }
+
+    lg2::info(
+        "DebugToken: multi-record install complete: ok={OK} failed={FAIL} total={TOTAL}",
+        "OK", okCount, "FAIL", failCount, "TOTAL", totalRecords);
+
+    if (okCount == totalRecords && failCount == 0)
+    {
+        valueIntf->value(std::make_tuple(static_cast<uint16_t>(0), "Success"));
+        statusIntf->status(AsyncOperationStatusType::Success);
+    }
+    else if (okCount == 0)
+    {
+        valueIntf->value(std::make_tuple(
+            static_cast<uint16_t>(1),
+            std::format("All {} record(s) failed", totalRecords)));
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+    }
+    else
+    {
+        valueIntf->value(std::make_tuple(
+            static_cast<uint16_t>(1),
+            std::format("Installed {} of {} record(s); {} failed", okCount,
+                        totalRecords, failCount)));
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+    }
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
@@ -365,8 +509,36 @@ sdbusplus::message::object_path
         throw Common::Error::InternalFailure();
     }
 
-    auto info = std::make_shared<TokenInstallationInfo>(dupFd,
-                                                        fileStat.st_size);
+    auto info = std::make_shared<TokenInstallationInfo>(
+        dupFd, static_cast<size_t>(fileStat.st_size));
+
+    // Decide single- vs multi-record up front and dispatch accordingly.
+    // isMultiRecordContainer() returns false when the file begins with the
+    // spec-mandated TLV identifier "TLV1" (a single-record TLV) and true when
+    // the prefix is a DebugTokenHeader (a multi-record container). The header
+    // read advances the fd, so rewind to the start before handing it to either
+    // install path.
+    if (info->totalSize > sizeof(token_utils::DebugTokenHeader))
+    {
+        token_utils::DebugTokenHeader header{};
+        auto bytesRead = read(dupFd, &header, sizeof(header));
+        auto seekBack = lseek(dupFd, 0, SEEK_SET);
+        if (seekBack < 0)
+        {
+            lg2::error("DebugToken: lseek failed {RETURNCODE} {ERROR}",
+                       "RETURNCODE", seekBack, "ERROR", strerror(errno));
+            throw Common::Error::InternalFailure();
+        }
+        if (bytesRead == static_cast<ssize_t>(sizeof(header)) &&
+            token_utils::isMultiRecordContainer(std::span<const uint8_t>(
+                reinterpret_cast<const uint8_t*>(&header), sizeof(header))))
+        {
+            installMultiRecordToken(info, header, statusIntf, valueIntf)
+                .detach();
+            return objPath;
+        }
+    }
+
     installTokenAsyncHandler(info, statusIntf, valueIntf).detach();
     return objPath;
 }
@@ -454,9 +626,6 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenDirect(
             co_return reasonCode;
         }
     }
-
-    // Installation complete - update token status
-    queryTokenHandler(device).detach();
 
     errorCode = 0;
     errorMessage = "Success";

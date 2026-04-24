@@ -20,6 +20,7 @@
 #include <com/nvidia/DebugToken/Common/server.hpp>
 
 #include <cstdint>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -30,6 +31,40 @@ using TokenTypeEnum =
     sdbusplus::common::com::nvidia::debug_token::Common::Types;
 using TokenSubtypeEnum =
     sdbusplus::common::com::nvidia::debug_token::Common::SubTypes;
+
+// File type constant for debug token files
+constexpr uint8_t FileTypeDebugToken = 2;
+
+// Multi-record debug-token file header.
+struct DebugTokenHeader
+{
+    uint8_t version;
+    uint8_t type;
+    uint16_t numberOfRecords;
+    uint16_t offsetToListOfStructs;
+    uint32_t fileSize;
+    uint8_t reserved[6];
+} __attribute__((packed));
+
+// Parse the multi-record file into byte-spans, one per TLV record (spans
+// reference @p fileData). On a truncated/malformed record, parsing stops and
+// the spans collected so far are returned; callers can detect truncation by
+// comparing the result size against header.numberOfRecords.
+std::vector<std::span<const uint8_t>>
+    parseTokenRecords(std::span<const uint8_t> fileData,
+                      const DebugTokenHeader& header);
+
+// Determine whether @p prefix is the start of a multi-record
+// DebugTokenHeader container (not a single-record TLV file).
+//
+// The debug-token TLV spec requires every TLV structure to begin with the
+// 4-byte magic identifier "TLV1" at offset 0. A prefix that starts with
+// that magic is a single-record TLV file and this function returns false.
+// Otherwise the prefix is interpreted as a DebugTokenHeader and the
+// function returns true iff its type field equals FileTypeDebugToken.
+// A prefix shorter than sizeof(DebugTokenHeader) that does not match the
+// TLV magic returns false.
+bool isMultiRecordContainer(std::span<const uint8_t> prefix);
 
 /**
  * @brief Converts an enum token type to its numeric representation
