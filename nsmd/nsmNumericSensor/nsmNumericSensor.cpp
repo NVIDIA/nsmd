@@ -124,6 +124,15 @@ void NsmNumericSensorDbusValue::updateReading(double value, uint64_t timestamp)
         previousValue = value;
     }
 
+    if (std::isnan(value))
+    {
+        // NaN is written using the HMC wall clock but valid readings use the
+        // NSM device clock. Resetting to 0 ensures the next valid update
+        // always passes canUpdate regardless of which timebase it uses.
+        nextUpdateTimestamp = 0;
+        return;
+    }
+
     calculateNextUpdateTimestamp(timestamp, nextUpdateTimestamp);
 }
 bool NsmNumericSensorDbusValue::canUpdate(const uint64_t& timestamp) const
