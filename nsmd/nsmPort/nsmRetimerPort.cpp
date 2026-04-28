@@ -1721,7 +1721,8 @@ uint8_t
 
     auto& bus = utils::DBusHandler::getBus();
     bool includeInboundCounters =
-        (device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9);
+        (device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 ||
+         device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC);
 
     // 1. Remove excess upstream ports (and their downstream children)
     removeExcessUpstreamPorts(newUpstreamPortsCount);

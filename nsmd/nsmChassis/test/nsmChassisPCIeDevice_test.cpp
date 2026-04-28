@@ -61,6 +61,8 @@ struct NsmChassisPCIeDeviceTest :
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
     const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
     const uuid_t gpuDeviceUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+    const uuid_t bluefieldNicUuid =
+        "STATIC:1026:0:NSM_DEVICE_INSTANCE_NUMBER:55";
 
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;

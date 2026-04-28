@@ -1135,6 +1135,9 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
         case MARKETING_NAME:
             populateFrom(property, "NV123");
             break;
+        case PRODUCT_NAME:
+            populateFrom(property, "BlueField-4");
+            break;
         case BUILD_DATE:
             populateFrom(property, "2022-08-06T00:00:00Z");
             break;

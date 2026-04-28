@@ -214,6 +214,7 @@ TEST_F(MockupResponderTest, goodTestGetPropertyTest)
     testProperty(BOARD_PART_NUMBER, "MCX750500B-0D00_DK");
     testProperty(SERIAL_NUMBER, "SN123456789");
     testProperty(MARKETING_NAME, "NV123");
+    testProperty(PRODUCT_NAME, "BlueField-4");
     testProperty(PRODUCT_LENGTH, 850);
     testProperty(PRODUCT_WIDTH, 730);
     testProperty(PRODUCT_HEIGHT, 2600);

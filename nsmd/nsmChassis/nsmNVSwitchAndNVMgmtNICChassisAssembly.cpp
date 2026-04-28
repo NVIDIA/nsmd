@@ -47,8 +47,10 @@ void createAssemblyAsset(std::shared_ptr<NsmDevice> device,
     auto serialNumberSensor =
         std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(assetObject,
                                                              SERIAL_NUMBER);
+    const auto modelProperty = getModelInventoryProperty(
+        device->getDeviceType(), device->getDeviceRole());
     auto modelSensor = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-        assetObject, MARKETING_NAME);
+        assetObject, modelProperty);
     auto buildDateSensor = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
         assetObject, BUILD_DATE);
     device->addStaticSensor(partNumberSensor);

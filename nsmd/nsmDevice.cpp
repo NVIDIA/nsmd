@@ -816,6 +816,10 @@ requester::Coroutine NsmDevice::updateFruDeviceIntf()
     {
         currentProperties.insert("MARKETING_NAME");
     }
+    if (properties.find(PRODUCT_NAME) != properties.end())
+    {
+        currentProperties.insert("PRODUCT_NAME");
+    }
     if (properties.find(BUILD_DATE) != properties.end())
     {
         currentProperties.insert("BUILD_DATE");
@@ -871,7 +875,7 @@ requester::Coroutine NsmDevice::getFRU(nsm::InventoryProperties& properties,
               BUILD_DATE}},
             {NSM_DEV_ID_PCIE_BRIDGE,
              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
-              BUILD_DATE, ASSET_TAG}},
+              PRODUCT_NAME, BUILD_DATE, ASSET_TAG}},
             {NSM_DEV_ID_BASEBOARD, {}},
             {NSM_DEV_ID_EROT,
              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
@@ -958,6 +962,7 @@ requester::Coroutine
         case BUILD_DATE:
         case FIRMWARE_VERSION:
         case INFO_ROM_VERSION:
+        case PRODUCT_NAME:
         {
             property = std::string((char*)data.data(), dataSize);
         }
@@ -1272,6 +1277,12 @@ void FruInterfaceManager::updateAllPropertyValues(
             std::get<std::string>(properties.at(MARKETING_NAME)));
     }
 
+    if (properties.find(PRODUCT_NAME) != properties.end())
+    {
+        interface->set_property(
+            "PRODUCT_NAME", std::get<std::string>(properties.at(PRODUCT_NAME)));
+    }
+
     if (properties.find(BUILD_DATE) != properties.end())
     {
         interface->set_property(
@@ -1320,6 +1331,12 @@ void FruInterfaceManager::registerAllProperties(
         interface->register_property(
             "MARKETING_NAME",
             std::get<std::string>(properties.at(MARKETING_NAME)));
+    }
+
+    if (properties.find(PRODUCT_NAME) != properties.end())
+    {
+        interface->register_property(
+            "PRODUCT_NAME", std::get<std::string>(properties.at(PRODUCT_NAME)));
     }
 
     if (properties.find(BUILD_DATE) != properties.end())

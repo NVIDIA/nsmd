@@ -316,7 +316,7 @@ TEST_F(NsmDeviceDI3Test, GetFRU_Switch_QueriesCorrectProps)
     EXPECT_TRUE(props.find(SERIAL_NUMBER) != props.end());
 }
 
-// getFRU — PCIE_BRIDGE (6 properties including ASSET_TAG)
+// getFRU — PCIE_BRIDGE (7 properties including PRODUCT_NAME and ASSET_TAG)
 TEST_F(NsmDeviceDI3Test, GetFRU_PcieBridge_IncludesAssetTag)
 {
     const char* strValue = "bridge";
@@ -331,6 +331,7 @@ TEST_F(NsmDeviceDI3Test, GetFRU_PcieBridge_IncludesAssetTag)
         .WillOnce(mockSendRecv3(strResp))  // SERIAL_NUMBER
         .WillOnce(mockSendRecv3(uuidResp)) // DEVICE_GUID
         .WillOnce(mockSendRecv3(strResp))  // MARKETING_NAME
+        .WillOnce(mockSendRecv3(strResp))  // PRODUCT_NAME
         .WillOnce(mockSendRecv3(strResp))  // BUILD_DATE
         .WillOnce(mockSendRecv3(strResp)); // ASSET_TAG (default case)
 

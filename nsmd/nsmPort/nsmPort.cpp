@@ -1849,7 +1849,9 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
             portPacketCountersIntf);
         if (nsmDevice->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
             (nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8 ||
-             nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9))
+             nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 ||
+             nsmDevice->getDeviceRole() ==
+                 NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC))
         {
             auto portECCCountersSensor =
                 std::make_shared<NsmGetPortECCCounters>(
@@ -1872,7 +1874,9 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
 
         if (nsmDevice->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
             (nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8 ||
-             nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9))
+             nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 ||
+             nsmDevice->getDeviceRole() ==
+                 NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC))
         {
             auto ethPortMetricsSensor =
                 std::make_shared<EthPortTelemetryAggregator>(

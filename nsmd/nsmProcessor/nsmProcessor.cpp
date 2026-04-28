@@ -3614,9 +3614,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->addStaticSensor(
             std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
                 assetObject, SERIAL_NUMBER));
+        const auto modelProperty = getModelInventoryProperty(
+            nsmDevice->getDeviceType(), nsmDevice->getDeviceRole());
         nsmDevice->addStaticSensor(
             std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-                assetObject, MARKETING_NAME));
+                assetObject, modelProperty));
 
         // Handle Location and LocationCode from ProcessorAttributes
         if (allCurrentIfaceProperties.count("LocationType"))

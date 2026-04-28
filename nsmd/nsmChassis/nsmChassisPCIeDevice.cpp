@@ -83,8 +83,10 @@ void createChassisPCIeDeviceAsset(std::shared_ptr<NsmDevice> device,
         assetObject, DEVICE_PART_NUMBER);
     auto serialNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
         assetObject, SERIAL_NUMBER);
+    const auto modelProperty = getModelInventoryProperty(
+        device->getDeviceType(), device->getDeviceRole());
     auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-        assetObject, MARKETING_NAME);
+        assetObject, modelProperty);
     device->addStaticSensor(partNumber);
     device->addStaticSensor(serialNumber);
     device->addStaticSensor(model);

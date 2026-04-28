@@ -47,6 +47,24 @@ TEST(NsmInventoryPropertyBase, Constructor)
     EXPECT_EQ(invProp.property, SERIAL_NUMBER);
 }
 
+TEST(NsmInventoryPropertyBase, GetModelInventoryProperty_DefaultsToMarketing)
+{
+    EXPECT_EQ(getModelInventoryProperty(NSM_DEV_ID_PCIE_BRIDGE,
+                                        NSM_PCIE_BRIDGE_DEV_ROLE_CX9),
+              MARKETING_NAME);
+    EXPECT_EQ(getModelInventoryProperty(NSM_DEV_ID_GPU, NSM_DEV_ROLE_RESERVED),
+              MARKETING_NAME);
+}
+
+TEST(NsmInventoryPropertyBase,
+     GetModelInventoryProperty_BlueFieldNicUsesProduct)
+{
+    EXPECT_EQ(
+        getModelInventoryProperty(NSM_DEV_ID_PCIE_BRIDGE,
+                                  NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC),
+        PRODUCT_NAME);
+}
+
 TEST(NsmInventoryPropertyBase, GenRequestMsg)
 {
     std::filesystem::path path = "/xyz/openbmc_project/inventory/test/device";

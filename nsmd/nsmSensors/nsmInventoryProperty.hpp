@@ -43,6 +43,17 @@ using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
 using RevisionIntf = object_t<Inventory::Decorator::server::Revision>;
 using VersionIntf = object_t<Software::server::Version>;
 
+inline constexpr nsm_inventory_property_identifiers
+    getModelInventoryProperty(uint8_t deviceType, uint8_t deviceRole)
+{
+    if (deviceType == NSM_DEV_ID_PCIE_BRIDGE &&
+        deviceRole == NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC)
+    {
+        return PRODUCT_NAME;
+    }
+    return MARKETING_NAME;
+}
+
 class NsmInventoryPropertyBase : public NsmSensor
 {
   public:
@@ -97,6 +108,7 @@ inline void
                    std::string((char*)data.data(), data.size()));
             break;
         case MARKETING_NAME:
+        case PRODUCT_NAME:
             invoke(pdiMethod(model),
                    std::string((char*)data.data(), data.size()));
             break;

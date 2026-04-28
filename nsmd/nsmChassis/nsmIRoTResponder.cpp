@@ -145,8 +145,10 @@ void createIRoTResponderAsset(std::shared_ptr<NsmDevice> device,
 
     auto buildDate = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
         *assetObject, BUILD_DATE);
+    const auto modelProperty = getModelInventoryProperty(
+        device->getDeviceType(), device->getDeviceRole());
     auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-        *assetObject, MARKETING_NAME);
+        *assetObject, modelProperty);
     auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
         *assetObject, DEVICE_PART_NUMBER);
     device->addStaticSensor(buildDate);

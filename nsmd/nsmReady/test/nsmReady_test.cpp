@@ -102,6 +102,17 @@ TEST(NsmReadyUtilsTest, CombineDeviceTypeAndRole_PCIeBridge_CX9)
     EXPECT_EQ((combined >> 8) & 0xFF, deviceRole);
 }
 
+TEST(NsmReadyUtilsTest, CombineDeviceTypeAndRole_PCIeBridge_CXBlueFieldNic)
+{
+    uint8_t deviceType = NSM_DEV_ID_PCIE_BRIDGE;
+    uint8_t deviceRole = NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC;
+
+    uint16_t combined = utils::combineDeviceTypeAndRole(deviceType, deviceRole);
+
+    EXPECT_EQ(combined & 0xFF, deviceType);
+    EXPECT_EQ((combined >> 8) & 0xFF, deviceRole);
+}
+
 TEST(NsmReadyUtilsTest, CombineDeviceTypeAndRole_AllDeviceTypes)
 {
     // Test all device types mentioned in nsmRemapInstanceNumber.cpp

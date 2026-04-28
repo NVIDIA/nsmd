@@ -74,8 +74,10 @@ void createChassisAsset(std::shared_ptr<NsmDevice> device, std::string& name,
     auto serialNumberSensor =
         std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(chassisAsset,
                                                              SERIAL_NUMBER);
+    const auto modelProperty = getModelInventoryProperty(
+        device->getDeviceType(), device->getDeviceRole());
     auto modelSensor = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-        chassisAsset, MARKETING_NAME);
+        chassisAsset, modelProperty);
     device->addStaticSensor(partNumberSensor);
     device->addStaticSensor(serialNumberSensor);
     device->addStaticSensor(modelSensor);
@@ -263,7 +265,9 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
         }
         if (device->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
             (device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8 ||
-             device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9))
+             device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 ||
+             device->getDeviceRole() ==
+                 NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC))
         {
             createAssetTag(device, name, baseType);
             createChassisVersion(device, name, baseType);

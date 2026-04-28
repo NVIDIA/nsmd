@@ -99,6 +99,11 @@ requester::Coroutine
         deviceType = NSM_DEV_ID_PCIE_BRIDGE;
         deviceRole = NSM_PCIE_BRIDGE_DEV_ROLE_CX9;
     }
+    else if (name == "BlueFieldNICPCIEBridgeMapping")
+    {
+        deviceType = NSM_DEV_ID_PCIE_BRIDGE;
+        deviceRole = NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC;
+    }
     if (deviceType == NSM_DEV_ID_UNKNOWN)
     {
         lg2::error(

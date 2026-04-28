@@ -58,6 +58,7 @@ void markAssetPropertiesNotSupported(
                 asset.invoke(pdiMethod(serialNumber), val);
                 break;
             case MARKETING_NAME:
+            case PRODUCT_NAME:
                 asset.invoke(pdiMethod(model), val);
                 break;
             default:
@@ -83,8 +84,10 @@ void createAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
 
     markAssetPropertiesNotSupported(*chassisAsset, unsupported);
 
-    static const std::vector<nsm_inventory_property_identifiers>
-        assetSensorProps = {FRU_PART_NUMBER, SERIAL_NUMBER, MARKETING_NAME};
+    const auto modelProperty = getModelInventoryProperty(
+        device->getDeviceType(), device->getDeviceRole());
+    const std::vector<nsm_inventory_property_identifiers> assetSensorProps = {
+        FRU_PART_NUMBER, SERIAL_NUMBER, modelProperty};
 
     bool anySensorAdded = false;
     for (const auto& nsmProp : assetSensorProps)
