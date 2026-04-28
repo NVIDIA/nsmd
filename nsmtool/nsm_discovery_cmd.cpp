@@ -235,7 +235,7 @@ class QueryDeviceIdentification : public CommandInterface
         }
 
         ordered_json result;
-        result["Compeletion Code"] = cc;
+        result["Completion Code"] = cc;
         switch (device_identification)
         {
             case NSM_DEV_ID_GPU:
