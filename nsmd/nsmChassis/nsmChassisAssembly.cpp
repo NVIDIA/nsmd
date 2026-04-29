@@ -92,6 +92,10 @@ requester::Coroutine
         device->addStaticSensor(serialNumber);
         device->addStaticSensor(model);
         device->addStaticSensor(buildDate);
+        device->standByToDcRefreshSensors.emplace_back(partNumber);
+        device->standByToDcRefreshSensors.emplace_back(serialNumber);
+        device->standByToDcRefreshSensors.emplace_back(model);
+        device->standByToDcRefreshSensors.emplace_back(buildDate);
     }
     else if (type == "NSM_Health")
     {
