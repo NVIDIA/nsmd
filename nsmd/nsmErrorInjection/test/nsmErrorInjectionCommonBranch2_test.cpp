@@ -205,6 +205,20 @@ TEST_F(NsmErrorInjectionCommonBranch2Test,
 }
 
 TEST_F(NsmErrorInjectionCommonBranch2Test,
+       CreateNsmMCUErrorInjectionSensors_RoleQmSma)
+{
+    auto qmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(
+            "STATIC:1285:22:NSM_DEVICE_INSTANCE_NUMBER:22"));
+    ASSERT_NE(qmDevice, nullptr);
+    qmDevice->deviceRole = NSM_MCTP_BRIDGE_DEV_ROLE_QM_SMA;
+
+    EXPECT_NO_THROW(createNsmMCUErrorInjectionSensors(mockManager, qmDevice,
+                                                      "/xyz/test/mcu_qm22"));
+    cleanupDeviceSensors(devices);
+}
+
+TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateNsmMCUErrorInjectionSensors_OtherRole)
 {
     auto otherDevice = std::dynamic_pointer_cast<MockNsmDevice>(

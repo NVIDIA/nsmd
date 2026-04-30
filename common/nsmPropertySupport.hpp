@@ -28,15 +28,16 @@ namespace nsm
 
 constexpr std::string_view propertyNotSupported = "NOT_SUPPORTED";
 
-// SMA devices (GPU SMA / HPM SMA) do not expose PartNumber, SerialNumber,
-// or Model via NSM. Return properties that should be marked NOT_SUPPORTED
-// on D-Bus and excluded from polling, based on deviceType and deviceRole.
+// SMA devices do not expose PartNumber, SerialNumber, or Model via NSM. Return
+// properties that should be marked NOT_SUPPORTED on D-Bus and excluded from
+// polling, based on deviceType and deviceRole.
 inline std::unordered_set<nsm_inventory_property_identifiers>
     getUnsupportedAssetProperties(uint8_t deviceType, uint8_t deviceRole)
 {
     if (deviceType == NSM_DEV_ID_MCTP_BRIDGE &&
         (deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_SXM_SMA ||
-         deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA))
+         deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA ||
+         deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_QM_SMA))
     {
         return {FRU_PART_NUMBER, SERIAL_NUMBER, MARKETING_NAME};
     }

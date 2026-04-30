@@ -464,6 +464,16 @@ TEST(NsmPropertySupportBranch, MctpBridgeCxSma_ReturnsEmptySet)
     EXPECT_TRUE(result.empty());
 }
 
+TEST(NsmPropertySupportBranch, MctpBridgeQmSmaRole_ReturnsUnsupportedSet)
+{
+    auto result = nsm::getUnsupportedAssetProperties(
+        NSM_DEV_ID_MCTP_BRIDGE, NSM_MCTP_BRIDGE_DEV_ROLE_QM_SMA);
+    EXPECT_EQ(3, result.size());
+    EXPECT_TRUE(result.count(FRU_PART_NUMBER));
+    EXPECT_TRUE(result.count(SERIAL_NUMBER));
+    EXPECT_TRUE(result.count(MARKETING_NAME));
+}
+
 TEST(NsmPropertySupportBranch, NonMctpBridgeDevice_ReturnsEmptySet)
 {
     // GPU device type should always return empty
