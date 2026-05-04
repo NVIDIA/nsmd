@@ -734,6 +734,169 @@ uint8_t NsmGPMPerInstance::handleResponseMsg(const nsm_msg* responseMsg,
     return returnValue;
 }
 
+NsmGPMPerInstanceV1::NsmGPMPerInstanceV1(
+    const std::string& name, const std::string& type, uint8_t retrievalSource,
+    uint8_t gpuInstance, uint8_t computeInstance, uint8_t metricId,
+    uint32_t instanceBitmask, GPMMetricsUnit unit,
+    std::shared_ptr<MetricPerInstanceUpdator> metricUpdator) :
+    NsmSensor(name, type), retrievalSource(retrievalSource),
+    gpuInstance(gpuInstance), computeInstance(computeInstance),
+    metricId(metricId), instanceBitmask(instanceBitmask),
+    metricUpdator(metricUpdator)
+{
+    metrics.reserve(32);
+    switch (unit)
+    {
+        case GPMMetricsUnit::PERCENTAGE:
+            decodeFunc = decodePercentage;
+            break;
+
+        case GPMMetricsUnit::BANDWIDTH:
+            decodeFunc = decodeBandwidth;
+            break;
+    };
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmGPMPerInstanceV1::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_per_instance_gpm_metrics_req));
+
+    auto requestPtr = reinterpret_cast<nsm_msg*>(request.data());
+
+    auto rc = encode_query_per_instance_gpm_metrics_req(
+        instanceId, retrievalSource, gpuInstance, computeInstance, metricId,
+        instanceBitmask, requestPtr);
+
+    if (rc)
+    {
+        if (shouldLog(
+                "NsmGPMPerInstanceV1 encode_query_per_instance_gpm_metrics_req " +
+                    getName(),
+                uint16_t(0), NSM_SUCCESS, rc))
+        {
+            lg2::error("encode_query_per_instance_gpm_metrics_req failed. "
+                       "eid={EID}, rc={RC}.",
+                       "EID", eid, "RC", rc);
+        }
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t NsmGPMPerInstanceV1::handleResponseMsg(const nsm_msg* responseMsg,
+                                               size_t responseLen)
+{
+    uint8_t returnValue = NSM_SW_SUCCESS;
+    uint8_t cc = NSM_SUCCESS;
+    size_t consumedLen{};
+    auto responseData = reinterpret_cast<const uint8_t*>(responseMsg);
+
+    uint16_t telemetryCount{};
+
+    auto rc = decode_aggregate_resp(responseMsg, responseLen, &consumedLen, &cc,
+                                    &telemetryCount);
+
+    if (shouldLog("decode_aggregate_resp", uint16_t(0), cc, rc))
+    {
+        LG2_ERROR("decode_aggregate_resp | cc: {CC}, rc: {RC}", "CC", cc, "RC",
+                  rc);
+    }
+
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+
+    if (telemetryCount == 0)
+    {
+        metricUpdator->updateMetric(std::vector<double>());
+        return returnValue;
+    }
+
+    metrics.clear();
+
+    responseData += consumedLen;
+    responseLen -= consumedLen;
+
+    while (telemetryCount--)
+    {
+        uint8_t tag;
+        bool valid;
+        const uint8_t* data;
+        size_t dataLen;
+
+        auto sampleData =
+            reinterpret_cast<const nsm_aggregate_resp_sample*>(responseData);
+
+        rc = decode_aggregate_resp_sample(sampleData, responseLen, &consumedLen,
+                                          &tag, &valid, &data, &dataLen);
+
+        responseData += consumedLen;
+        responseLen -= consumedLen;
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            if (shouldLog("NsmGPMPerInstanceV1 decode_aggregate_resp_sample " +
+                              getName(),
+                          uint16_t(0), NSM_SUCCESS, rc))
+            {
+                lg2::error(
+                    "NsmGPMPerInstanceV1 decode_aggregate_resp_sample failed. "
+                    "Type={TYPE}, Tag={TAG}, sensor={NAME}, rc={RC}, valid_bit={VALID}",
+                    "TYPE", getType(), "TAG", tag, "NAME", getName(), "RC", rc,
+                    "VALID", valid);
+            }
+            continue;
+        }
+
+        const bool sampleRejected =
+            !valid || tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE;
+        if (shouldLog("NsmGPMPerInstanceV1 invalid_sample " + getName(),
+                      sampleRejected) &&
+            sampleRejected)
+        {
+            lg2::error(
+                "responseHandler: skipping sample with invalid tag or valid bit. "
+                "Tag={TAG}, Valid={VALID}, sensor={NAME}",
+                "TAG", tag, "VALID", valid, "NAME", getName());
+        }
+        if (sampleRejected)
+        {
+            continue;
+        }
+
+        if (tag >= metrics.size())
+        {
+            metrics.resize(tag + 1, std::numeric_limits<double>::quiet_NaN());
+        }
+
+        auto [decodeRc, val] = decodeFunc(data, dataLen);
+
+        if (decodeRc != NSM_SW_SUCCESS)
+        {
+            if (shouldLog("NsmGPMPerInstanceV1 decodeFunc " + getName(),
+                          uint16_t(0), NSM_SUCCESS, decodeRc))
+            {
+                lg2::error(
+                    "Failed to decode GPM Per-instance V1 Metric for Instance ID {INSTANCE_ID}. Object Path = {OBJPATH}, rc = {RC}.",
+                    "INSTANCE_ID", tag, "OBJPATH", objPath, "RC", decodeRc);
+            }
+            returnValue = decodeRc;
+        }
+        else
+        {
+            metrics[tag] = val;
+        }
+    }
+
+    metricUpdator->updateMetric(metrics);
+
+    return returnValue;
+}
+
 NsmGetSupportedGPMMetrics::NsmGetSupportedGPMMetrics(
     const std::string& name, const std::string& type, uint8_t metricType,
     std::shared_ptr<NsmDevice> nsmDevice, const std::string& objPath,

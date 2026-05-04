@@ -109,16 +109,22 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
     const uint8_t metricId =
         utils::getPropertyFromCollection<uint64_t>(properties, "MetricId")
             .value();
-    const std::vector<uint64_t> instanceBitfield =
-        utils::getPropertyFromCollection<std::vector<uint64_t>>(
-            properties, "InstanceBitfield")
-            .value();
-    std::vector<bitfield8_t> instanceBitfieldBytes(instanceBitfield.size());
-    for (size_t i = 0; i < instanceBitfield.size(); i++)
+    // InstanceBitfield holds uint64_t for V1 and vector<uint64_t> for V2.
+    // getPropertyFromCollection<uint64_t> throws bad_variant_access on V2
+    // configs; swallow it so the nullopt signals "not V1" -> V2 dispatch.
+    std::optional<uint64_t> v1BitmaskOpt;
+    try
     {
-        instanceBitfieldBytes[i].byte =
-            static_cast<uint8_t>(instanceBitfield[i]);
+        v1BitmaskOpt = utils::getPropertyFromCollection<uint64_t>(
+            properties, "InstanceBitfield");
     }
+    catch (const std::bad_variant_access&)
+    {
+        lg2::info("InstanceBitfield stored as vector<uint64_t>; routing to V2 "
+                  "discovery flow. Name={NAME}, Metric={METRIC}, Config={INTF}",
+                  "NAME", name, "METRIC", metric, "INTF", interface);
+    }
+
     std::shared_ptr<MetricPerInstanceUpdator> metricUpdator{};
     GPMMetricsUnit metricUnit{};
 
@@ -156,6 +162,42 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
             "METRIC", metric, "INTF", interface);
         // coverity[missing_return]
         co_return NSM_ERROR;
+    }
+
+    if (v1BitmaskOpt.has_value())
+    {
+        const uint64_t rawBitmask = v1BitmaskOpt.value();
+        if ((rawBitmask >> 32) != 0U)
+        {
+            lg2::warning(
+                "InstanceBitfield has bits above 31 set; truncating for V1. "
+                "Name={NAME}, Metric={METRIC}, raw={RAW}",
+                "NAME", name, "METRIC", metric, "RAW", rawBitmask);
+        }
+
+        auto v1Sensor = std::make_shared<NsmGPMPerInstanceV1>(
+            name, type, retrievalSource, gpuInstance, computeInstance, metricId,
+            static_cast<uint32_t>(rawBitmask), metricUnit, metricUpdator);
+
+        lg2::info("Created NSM GPM PerInstance V1 sensor: "
+                  "UUID={UUID}, Name={NAME}, Type={TYPE}, Metric={METRIC}",
+                  "UUID", uuid, "NAME", name, "TYPE", type, "METRIC", metric);
+
+        nsmDevice->addSensor(v1Sensor, PollingType::GpuPerformanceMonitoring);
+        // coverity[missing_return]
+        co_return NSM_SUCCESS;
+    }
+
+    // V2 path: InstanceBitfield is required for discovery-based per-instance.
+    const std::vector<uint64_t> instanceBitfield =
+        utils::getPropertyFromCollection<std::vector<uint64_t>>(
+            properties, "InstanceBitfield")
+            .value();
+    std::vector<bitfield8_t> instanceBitfieldBytes(instanceBitfield.size());
+    for (size_t i = 0; i < instanceBitfield.size(); i++)
+    {
+        instanceBitfieldBytes[i].byte =
+            static_cast<uint8_t>(instanceBitfield[i]);
     }
 
     auto staticSensor = std::make_shared<NsmGetSupportedPerInstanceGPMMetrics>(
@@ -336,16 +378,49 @@ requester::Coroutine createNsmPerPortGPMMetrics(SensorManager& manager,
         utils::getPropertyFromCollection<std::vector<uint64_t>>(properties,
                                                                 "Ports")
             .value();
-    const std::vector<uint64_t> instanceBitfield =
-        utils::getPropertyFromCollection<std::vector<uint64_t>>(
-            properties, "InstanceBitfield")
-            .value();
-    std::vector<bitfield8_t> instanceBitfieldBytes(instanceBitfield.size());
-    for (size_t i = 0; i < instanceBitfield.size(); i++)
+    // InstanceBitfield holds uint64_t for V1 and vector<uint64_t> for V2.
+    std::optional<uint64_t> v1BitmaskOpt;
+    try
     {
-        instanceBitfieldBytes[i].byte =
-            static_cast<uint8_t>(instanceBitfield[i]);
+        v1BitmaskOpt = utils::getPropertyFromCollection<uint64_t>(
+            properties, "InstanceBitfield");
     }
+    catch (const std::bad_variant_access&)
+    {
+        lg2::info("InstanceBitfield stored as vector<uint64_t>; routing to V2 "
+                  "discovery flow. Name={NAME}, Config={INTF}",
+                  "NAME", name, "INTF", interface);
+    }
+    const bool useV1 = v1BitmaskOpt.has_value();
+
+    uint32_t instanceBitmaskV1 = 0;
+    std::vector<bitfield8_t> instanceBitfieldBytes;
+    if (useV1)
+    {
+        const uint64_t rawBitmask = v1BitmaskOpt.value();
+        if ((rawBitmask >> 32) != 0U)
+        {
+            lg2::warning(
+                "InstanceBitfield has bits above 31 set; truncating for V1. "
+                "Name={NAME}, raw={RAW}",
+                "NAME", name, "RAW", rawBitmask);
+        }
+        instanceBitmaskV1 = static_cast<uint32_t>(rawBitmask);
+    }
+    else
+    {
+        const std::vector<uint64_t> instanceBitfield =
+            utils::getPropertyFromCollection<std::vector<uint64_t>>(
+                properties, "InstanceBitfield")
+                .value();
+        instanceBitfieldBytes.resize(instanceBitfield.size());
+        for (size_t i = 0; i < instanceBitfield.size(); i++)
+        {
+            instanceBitfieldBytes[i].byte =
+                static_cast<uint8_t>(instanceBitfield[i]);
+        }
+    }
+
     std::string inventoryObjPath =
         utils::getPropertyFromCollection<std::string>(properties,
                                                       "InventoryObjPath")
@@ -402,6 +477,23 @@ requester::Coroutine createNsmPerPortGPMMetrics(SensorManager& manager,
             lg2::error(
                 "Failed to create NSM GPM PerPort Metrics. Unsupported GPM Metric {METRIC}. Config={OBJ}",
                 "METRIC", metric, "OBJ", objPath);
+            continue;
+        }
+
+        if (useV1)
+        {
+            auto v1Sensor = std::make_shared<NsmGPMPerInstanceV1>(
+                name + "_" + metric, type, retrievalSource, gpuInstance,
+                computeInstance, metricId, instanceBitmaskV1, unit,
+                std::move(updator));
+
+            lg2::info("Created NSM GPM PerInstance V1 sensor for PerPort: "
+                      "Metric={METRIC}, UUID={UUID}, Name={NAME}, Type={TYPE}",
+                      "METRIC", metric, "UUID", uuid, "NAME", name, "TYPE",
+                      type);
+
+            nsmDevice->addSensor(v1Sensor,
+                                 PollingType::GpuPerformanceMonitoring);
             continue;
         }
 

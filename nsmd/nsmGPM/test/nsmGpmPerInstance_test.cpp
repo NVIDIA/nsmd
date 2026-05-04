@@ -372,3 +372,162 @@ TEST_F(NsmGPMPerInstanceTest, HandleResponseMsg_DuplicateTag_SkipsResize)
     auto rc = perInstance.handleResponseMsg(responseMsg, responseBuffer.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
+
+// ============================================================================
+// NsmGPMPerInstanceV1: legacy per-instance sensor (opcode 0x4A) tests
+// ============================================================================
+
+TEST_F(NsmGPMPerInstanceTest, V1_testConstructor)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    constexpr uint32_t kBitmask = 0xABCD0123;
+    NsmGPMPerInstanceV1 v1("GPM_V1_Ctor", "GPMPerInstanceV1", 2, 0, 0, 10,
+                           kBitmask, GPMMetricsUnit::PERCENTAGE, updator);
+
+    EXPECT_EQ(v1.getName(), "GPM_V1_Ctor");
+    EXPECT_EQ(v1.getType(), "GPMPerInstanceV1");
+    EXPECT_EQ(v1.retrievalSource, 2);
+    EXPECT_EQ(v1.gpuInstance, 0);
+    EXPECT_EQ(v1.computeInstance, 0);
+    EXPECT_EQ(v1.metricId, 10);
+    EXPECT_EQ(v1.instanceBitmask, kBitmask);
+}
+
+TEST_F(NsmGPMPerInstanceTest, V1_testGenRequest)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    constexpr uint32_t kBitmask = 0x000000FFu;
+    NsmGPMPerInstanceV1 v1("GPM_V1_Req", "GPMPerInstanceV1", 2, 1, 2, 11,
+                           kBitmask, GPMMetricsUnit::BANDWIDTH, updator);
+
+    auto request = v1.genRequestMsg(10, 1);
+    ASSERT_TRUE(request.has_value());
+    EXPECT_EQ(request->size(),
+              sizeof(nsm_msg_hdr) +
+                  sizeof(nsm_query_per_instance_gpm_metrics_req));
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command =
+        reinterpret_cast<const nsm_query_per_instance_gpm_metrics_req*>(
+            msg->payload);
+
+    EXPECT_EQ(command->hdr.command, NSM_QUERY_PER_INSTANCE_GPM_METRICS);
+    EXPECT_EQ(command->retrieval_source, 2);
+    EXPECT_EQ(command->gpu_instance, 1);
+    EXPECT_EQ(command->compute_instance, 2);
+    EXPECT_EQ(command->metric_id, 11);
+
+    uint32_t decodedMask = le32toh(command->instance_bitmask);
+    EXPECT_EQ(decodedMask, kBitmask);
+}
+
+TEST_F(NsmGPMPerInstanceTest, V1_BadGenReq_InvalidInstanceId_ReturnsNullopt)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+    NsmGPMPerInstanceV1 v1("GPM_V1_Bad", "GPMPerInstanceV1", 2, 0, 0, 10, 0xFFu,
+                           GPMMetricsUnit::PERCENTAGE, updator);
+    auto request = v1.genRequestMsg(10, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+TEST_F(NsmGPMPerInstanceTest, V1_testHandleResponseSuccess)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    NsmGPMPerInstanceV1 v1("GPM_V1_Update", "GPMPerInstanceV1", 2, 0, 0, 10,
+                           0x0000000Fu, GPMMetricsUnit::PERCENTAGE, updator);
+
+    EXPECT_CALL(*updator, updateMetric(SizeIs(4))).Times(1);
+
+    const size_t data_len = 4;
+    std::vector<uint8_t> responseBuffer(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp) +
+        4 * (sizeof(nsm_aggregate_resp_sample) - 1 + data_len));
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 4;
+
+    auto sample_ptr = reinterpret_cast<uint8_t*>(payload + 1);
+
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        auto sample = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+        sample->tag = i;
+        sample->valid = 1;
+        sample->length = std::log2(data_len);
+        uint32_t value = (i + 1) * 1000;
+        memcpy(sample->data, &value, data_len);
+        sample_ptr += sizeof(nsm_aggregate_resp_sample) - 1 + data_len;
+    }
+
+    auto rc = v1.handleResponseMsg(responseMsg, responseBuffer.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmGPMPerInstanceTest, V1_badTestCompletionCodeError)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    NsmGPMPerInstanceV1 v1("GPM_V1_Err", "GPMPerInstanceV1", 2, 0, 0, 10,
+                           0x0000000Fu, GPMMetricsUnit::PERCENTAGE, updator);
+
+    std::vector<uint8_t> responseBuffer(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_aggregate_resp));
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_ERROR;
+    payload->telemetry_count = 0;
+
+    auto rc = v1.handleResponseMsg(responseMsg, responseBuffer.size());
+    EXPECT_EQ(rc, NSM_ERROR);
+}
+
+TEST_F(NsmGPMPerInstanceTest, V1_HandleResponseMsg_DecodeFail_ReturnsError)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    NsmGPMPerInstanceV1 v1("GPM_V1_Fail", "GPMPerInstanceV1", 2, 0, 0, 10, 0x1u,
+                           GPMMetricsUnit::PERCENTAGE, updator);
+
+    std::vector<uint8_t> responseBuffer(sizeof(nsm_msg_hdr) + 2, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+
+    auto rc = v1.handleResponseMsg(responseMsg, responseBuffer.size());
+    EXPECT_NE(rc, NSM_SUCCESS);
+}
+
+TEST_F(NsmGPMPerInstanceTest, V1_HandleResponse_ZeroTelemetry_EmitsEmpty)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    NsmGPMPerInstanceV1 v1("GPM_V1_Zero", "GPMPerInstanceV1", 2, 0, 0, 10, 0x1u,
+                           GPMMetricsUnit::PERCENTAGE, updator);
+
+    EXPECT_CALL(*updator, updateMetric(SizeIs(0))).Times(1);
+
+    std::vector<uint8_t> responseBuffer(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_aggregate_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 0;
+
+    auto rc = v1.handleResponseMsg(responseMsg, responseBuffer.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmGPMPerInstanceTest, V1_AddSensor)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+    auto sensor = std::make_shared<NsmGPMPerInstanceV1>(
+        "GPMPerInstV1_AS", "GPMPerInstanceV1", 2, 0, 0, 10, 0x0000000Fu,
+        GPMMetricsUnit::PERCENTAGE, updator);
+    size_t before = gpu->deviceSensors.size();
+    gpu->addSensor(sensor, PollingType::GpuPerformanceMonitoring);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
+}

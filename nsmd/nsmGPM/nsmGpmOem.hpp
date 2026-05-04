@@ -227,6 +227,43 @@ class NsmGPMPerInstance : public NsmSensor
     const std::shared_ptr<MetricPerInstanceUpdator> metricUpdator;
 };
 
+/**
+ * @brief Legacy per-instance GPM metrics sensor using the V1 wire command
+ *        (NSM_QUERY_PER_INSTANCE_GPM_METRICS, opcode 0x4A).
+ *
+ * Unlike NsmGPMPerInstance (V2, opcode 0xAB), V1 has a fixed-width request
+ * payload carrying a single uint32_t instance bitmask, so it supports at most
+ * 32 instances, performs no capability discovery, and is not chunked. It is
+ * intended for backward compatibility with firmware that does not implement
+ * the per-instance V2 / GetSupportedGPMMetrics flow.
+ */
+class NsmGPMPerInstanceV1 : public NsmSensor
+{
+  public:
+    NsmGPMPerInstanceV1(
+        const std::string& name, const std::string& type,
+        uint8_t retrievalSource, uint8_t gpuInstance, uint8_t computeInstance,
+        uint8_t metricId, uint32_t instanceBitmask, GPMMetricsUnit unit,
+        std::shared_ptr<MetricPerInstanceUpdator> metricUpdator);
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::vector<double> metrics;
+    const uint8_t retrievalSource;
+    const uint8_t gpuInstance;
+    const uint8_t computeInstance;
+    const uint8_t metricId;
+    const uint32_t instanceBitmask;
+    const std::string objPath;
+
+    DecodeMetricFunc decodeFunc{};
+    const std::shared_ptr<MetricPerInstanceUpdator> metricUpdator;
+};
+
 class NsmDevice;
 
 /**
