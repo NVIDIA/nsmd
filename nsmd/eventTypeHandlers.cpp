@@ -19,6 +19,7 @@
 
 #include "device-capability-discovery.h"
 #include "device-configuration.h"
+#include "diagnostics.h"
 #include "network-ports.h"
 #include "platform-environmental.h"
 
@@ -52,6 +53,11 @@ EventType3Handler::EventType3Handler()
     enableDelegation(NSM_XID_EVENT);
     enableDelegation(NSM_RESET_REQUIRED_EVENT);
     enableDelegation(NSM_CPER_EVENT);
+}
+
+EventType4Handler::EventType4Handler()
+{
+    enableDelegation(NSM_RUNTIME_IST_COMPLETE_EVENT);
 }
 
 EventType5Handler::EventType5Handler()

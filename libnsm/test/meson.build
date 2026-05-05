@@ -14,6 +14,7 @@ tests = [
     'libnsm_diagnostics_encode_decode_test',
     'libnsm_diagnostics_responses_test',
     'libnsm_diagnostics_helpers_test',
+    'libnsm_diagnostics_runtime_ist_event_test',
     'libnsm_diagnostics_preboot_test',
     'libnsm_firmware_utils_test',
     'libnsm_firmware_utils_null_test',

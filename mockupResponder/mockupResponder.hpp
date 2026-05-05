@@ -365,6 +365,15 @@ class MockupResponder
 
     void sendResetRequiredEvent(uint8_t eid, bool ackr);
 
+    /** Type 4, event ID 0x01 -- Runtime IST Complete v1 (Diagnostics).
+     *  Mockup hardcodes the spec-mandated event_state = 0; libnsm encoder
+     *  itself takes the value as a parameter so it stays generic.
+     */
+    void sendRuntimeISTCompleteEvent(
+        uint8_t dest, bool ackr, std::string gpu_identifier, uint64_t timestamp,
+        std::string app_version, uint8_t result, uint64_t status_code,
+        int32_t max_temperature, int32_t avg_temperature);
+
     /** Type 5, event ID 0x01 — device ready for volatile config (Fractal Boot).
      */
     void sendDeviceConfigurationRequestEventV1(uint8_t dest, bool ackr);

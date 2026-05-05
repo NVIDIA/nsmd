@@ -1659,3 +1659,72 @@ int decode_diag_set_tid_config_req(const struct nsm_msg *msg, size_t msg_len,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_nsm_runtime_ist_complete_event(
+    uint8_t instance_id, bool ackr, uint16_t event_state,
+    const struct nsm_runtime_ist_complete_event_payload *payload,
+    struct nsm_msg *msg)
+{
+	if (payload == NULL || msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_runtime_ist_complete_event_payload wire = *payload;
+
+	wire.timestamp = htole64(wire.timestamp);
+	wire.status_code = htole64(wire.status_code);
+	wire.max_temperature = (int32_t)htole32((uint32_t)wire.max_temperature);
+	wire.avg_temperature = (int32_t)htole32((uint32_t)wire.avg_temperature);
+
+	uint8_t event_data[NSM_EVENT_DATA_MAX_LEN];
+	memcpy(event_data, &wire, sizeof(wire));
+
+	return encode_nsm_event(
+	    instance_id, NSM_TYPE_DIAGNOSTIC, ackr, NSM_EVENT_VERSION_V1,
+	    NSM_RUNTIME_IST_COMPLETE_EVENT, NSM_GENERAL_EVENT_CLASS,
+	    event_state, sizeof(wire), event_data, msg);
+}
+
+int decode_nsm_runtime_ist_complete_event(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *event_class,
+    uint16_t *event_state,
+    struct nsm_runtime_ist_complete_event_payload *payload)
+{
+	if (msg == NULL || event_class == NULL || event_state == NULL ||
+	    payload == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+
+	/* RIST payload is fixed-length, so the wire frame's data_size must
+	 * match the bytes actually present in msg_len exactly (no trailing
+	 * bytes, no missing bytes), and that size must equal sizeof(*payload).
+	 */
+	if (event->data_size !=
+	    msg_len - sizeof(struct nsm_msg_hdr) - NSM_EVENT_MIN_LEN) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	if (event->data_size != sizeof(*payload)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*event_class = event->event_class;
+	*event_state = le16toh(event->event_state);
+
+	memcpy(payload, event->data, sizeof(*payload));
+
+	payload->timestamp = le64toh(payload->timestamp);
+	payload->status_code = le64toh(payload->status_code);
+	payload->max_temperature =
+	    (int32_t)le32toh((uint32_t)payload->max_temperature);
+	payload->avg_temperature =
+	    (int32_t)le32toh((uint32_t)payload->avg_temperature);
+
+	return NSM_SW_SUCCESS;
+}

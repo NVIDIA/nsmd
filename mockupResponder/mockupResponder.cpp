@@ -38,6 +38,7 @@
 #include <phosphor-logging/lg2.hpp>
 
 #include <cstdint>
+#include <cstring>
 #include <ctime>
 #include <functional>
 
@@ -174,6 +175,17 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
     iface->register_method(
         "genResetRequiredEvent",
         [&](uint8_t eid, bool ackr) { sendResetRequiredEvent(eid, ackr); });
+
+    iface->register_method("genRuntimeISTCompleteEvent",
+                           [&](uint8_t eid, bool ackr,
+                               std::string gpu_identifier, uint64_t timestamp,
+                               std::string app_version, uint8_t result,
+                               uint64_t status_code, int32_t max_temperature,
+                               int32_t avg_temperature) {
+        sendRuntimeISTCompleteEvent(eid, ackr, gpu_identifier, timestamp,
+                                    app_version, result, status_code,
+                                    max_temperature, avg_temperature);
+    });
 
     iface->register_method("genDeviceConfigurationRequestEventV1",
                            [&](uint8_t eid, bool ackr) {
@@ -3875,6 +3887,51 @@ void MockupResponder::sendResetRequiredEvent(uint8_t dest, bool ackr)
     if (rc != NSM_SUCCESS)
     {
         lg2::error("sendResetRequiredEvent failed");
+    }
+
+    rc = mctpSockSend(dest, eventMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendRuntimeISTCompleteEvent(
+    uint8_t dest, bool ackr, std::string gpu_identifier, uint64_t timestamp,
+    std::string app_version, uint8_t result, uint64_t status_code,
+    int32_t max_temperature, int32_t avg_temperature)
+{
+    if (verbose)
+    {
+        lg2::info("sendRuntimeISTCompleteEvent dest eid={EID}", "EID", dest);
+    }
+
+    uint8_t instanceId = 23;
+    std::vector<uint8_t> eventMsg(
+        sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+        sizeof(nsm_runtime_ist_complete_event_payload));
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+
+    nsm_runtime_ist_complete_event_payload payload{};
+    // Length-bounded copy: leave the trailing byte as the null terminator
+    // even if the caller's string is exactly NSM_RIST_..._LEN long.
+    std::strncpy(payload.gpu_identifier, gpu_identifier.c_str(),
+                 NSM_RIST_GPU_UUID_LEN - 1);
+    std::strncpy(payload.app_version, app_version.c_str(),
+                 NSM_RIST_APP_VERSION_LEN - 1);
+    payload.timestamp = timestamp;
+    payload.result = result;
+    payload.status_code = status_code;
+    payload.max_temperature = max_temperature;
+    payload.avg_temperature = avg_temperature;
+
+    // event_state = 0 per spec; only the mockup hardcodes this. The libnsm
+    // encoder itself stays generic and takes event_state as a parameter.
+    auto rc = encode_nsm_runtime_ist_complete_event(
+        instanceId, ackr, /*event_state=*/0, &payload, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendRuntimeISTCompleteEvent failed, rc={RC}", "RC", rc);
     }
 
     rc = mctpSockSend(dest, eventMsg);

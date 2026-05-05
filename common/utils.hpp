@@ -827,4 +827,20 @@ int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
 
 void convertBitfieldToVector(const std::vector<uint8_t>& bitfield,
                              std::vector<bool>& supportedGPMMetrics);
+
+/** @brief Convert NvS24.8 (signed fixed-point, 8 fractional bits) to a
+ *         double-precision Celsius value. The lower 8 bits encode the
+ *         fractional part (i.e. raw / 256.0).
+ */
+inline double nvS24_8ToCelsius(int32_t raw)
+{
+    return static_cast<double>(raw) / 256.0;
+}
+
+/** @brief Format a nanosecond-since-epoch timestamp as a human-readable
+ *         string using the system's local timezone (strftime "%c"). The
+ *         input is interpreted as nanoseconds since the system_clock epoch
+ *         (1970-01-01 UTC for typical implementations).
+ */
+std::string formatTimestamp(uint64_t ns);
 } // namespace utils

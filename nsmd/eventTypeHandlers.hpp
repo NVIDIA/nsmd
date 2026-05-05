@@ -57,6 +57,19 @@ class EventType3Handler : public DelegatingEventHandler
     }
 };
 
+/** Forwards Type 4 (diagnostics) events to the per-device EventDispatcher
+ *  (e.g. Runtime IST Complete v1, event ID 1). */
+class EventType4Handler : public DelegatingEventHandler
+{
+  public:
+    EventType4Handler();
+
+    uint8_t nsmType() override
+    {
+        return NSM_TYPE_DIAGNOSTIC;
+    }
+};
+
 /** Forwards Type 5 (device configuration) events to the per-device
  *  EventDispatcher (e.g. configuration request event ID 1). */
 class EventType5Handler : public DelegatingEventHandler

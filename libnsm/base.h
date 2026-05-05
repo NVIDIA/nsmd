@@ -47,7 +47,23 @@ extern "C" {
 
 #define DEFAULT_INSTANCE_ID 0
 #define INSTANCEID_MASK 0x1f
+
+/* Event format versions used in the version field of struct nsm_event.
+ *
+ * NSM_EVENT_VERSION    - Legacy default (v0). Used by every event whose
+ *                        spec predates per-event versioning (XID, CPER,
+ *                        Reset-Required, Rediscovery, GPIO state change,
+ *                        Threshold, Long-Running, Fabric-Manager-State,
+ *                        Device-Configuration-Request).
+ * NSM_EVENT_VERSION_V1 - For specs that mandate Event Version = 1
+ *                        (e.g. Runtime IST Complete v1).
+ *
+ * Encoders pass the appropriate constant explicitly to encode_nsm_event()
+ * so we can introduce a new event version without touching the legacy
+ * wire format of every other event.
+ */
 #define NSM_EVENT_VERSION 0
+#define NSM_EVENT_VERSION_V1 1
 
 #define NSM_EVENT_MIN_LEN 6
 // rsvd:ackr:version(1byte) + event id(1byte) + event class(1byte) + event +

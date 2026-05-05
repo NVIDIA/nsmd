@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <chrono>
 #include <ctime>
 #include <fstream>
 #include <future>
@@ -275,6 +276,17 @@ std::string getCurrentSystemTime()
     ss << std::put_time(std::localtime(&tt), "%F %Z %T.")
        << std::to_string(ms.count());
     return ss.str();
+}
+
+std::string formatTimestamp(uint64_t ns)
+{
+    std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>
+        timePoint{std::chrono::nanoseconds(ns)};
+    std::time_t t = std::chrono::system_clock::to_time_t(timePoint);
+    constexpr size_t kSize{100};
+    char buf[kSize]{};
+    std::strftime(buf, kSize, "%c", std::localtime(&t));
+    return std::string(buf);
 }
 
 // assuming <uuid, eid, mctpMedium, mctpBinding> is unique

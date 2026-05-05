@@ -97,6 +97,67 @@ enum nsm_debug_information_type {
 	INFO_TYPE_DEVICE_DUMP = 3
 };
 
+/** @brief NSM Type4 (Diagnostics) event ids */
+enum nsm_diagnostics_event_id {
+	NSM_RUNTIME_IST_COMPLETE_EVENT = 0x04,
+};
+
+/** @brief Fixed string buffer lengths for the Runtime IST Complete event */
+#define NSM_RIST_GPU_UUID_LEN 64
+#define NSM_RIST_APP_VERSION_LEN 16
+
+/** @brief Spec-defined values for the Runtime IST Complete `result` byte. */
+enum nsm_rist_result {
+	NSM_RIST_RESULT_FAIL = 0,
+	NSM_RIST_RESULT_PASS = 1,
+};
+
+/** @brief Position and width of the spec-defined "status class" field
+ *         packed into the top of the Runtime IST Complete StatusCode.
+ *         StatusCode[63:62] selects severity per the RIST spec table:
+ *           0 -> Ok / Informational (Pass only)
+ *           1 -> Warning             (Fail)
+ *           2 -> Critical            (Fail)
+ */
+#define NSM_RIST_STATUS_CLASS_SHIFT 62
+#define NSM_RIST_STATUS_CLASS_MASK 0x3ULL
+
+/** @brief Spec-defined values for the Runtime IST Complete StatusCode
+ *         "status class" field (StatusCode[63:62]).
+ */
+enum nsm_rist_status_class {
+	NSM_RIST_STATUS_CLASS_OK = 0,
+	NSM_RIST_STATUS_CLASS_WARNING = 1,
+	NSM_RIST_STATUS_CLASS_CRITICAL = 2,
+};
+
+/** @struct nsm_runtime_ist_complete_event_payload
+ *
+ *  Wire payload for the Runtime IST Complete v1 event.
+ *
+ *  Field semantics:
+ *    - gpu_identifier  : Device UUID, ASCII null-terminated. (NOT the MCTP
+ *                        UUID used by the daemon for endpoint lookup.)
+ *    - timestamp       : Nanoseconds since 1970-01-01 UTC.
+ *    - app_version     : RIST application version, ASCII null-terminated.
+ *    - result          : Spec defines 0=Fail, 1=Pass. Carried as raw uint8_t
+ *                        here; interpretation lives in the C++ handler.
+ *    - status_code     : RIST application status code (typically 0 on Pass).
+ *    - max_temperature : Peak GPU temperature during the run, NvS24.8 fixed
+ *                        point in degrees Celsius (signed; divide by 256.0
+ *                        to get the real value).
+ *    - avg_temperature : Average GPU temperature, same NvS24.8 encoding.
+ */
+struct nsm_runtime_ist_complete_event_payload {
+	char gpu_identifier[NSM_RIST_GPU_UUID_LEN];
+	uint64_t timestamp;
+	char app_version[NSM_RIST_APP_VERSION_LEN];
+	uint8_t result;
+	uint64_t status_code;
+	int32_t max_temperature;
+	int32_t avg_temperature;
+} __attribute__((packed));
+
 enum nsm_erase_information_type { INFO_TYPE_FW_SAVED_DUMP_INFO = 0 };
 
 /** @brief NSM Type4 diagnostics events for Vera CPU Pre-Boot Diagnostics
@@ -1275,6 +1336,56 @@ int decode_diag_set_tid_config_req(const struct nsm_msg *msg, size_t msg_len,
 				   uint16_t *loops, uint8_t *console_log_level,
 				   uint8_t *dynamic_data_size,
 				   uint8_t *dynamic_data);
+
+/** @brief Encode a Runtime IST Complete v1 event message.
+ *
+ *  Builds a Type 4 (Diagnostics) NSM event with event_id =
+ * NSM_RUNTIME_IST_COMPLETE_EVENT and event_class = General. The version byte on
+ * the wire is set to NSM_EVENT_VERSION_V1 (1) per spec. event_state is taken
+ * from the caller and not interpreted here; the spec expects 0 but the encoder
+ * is generic so the value can change without an ABI break.
+ *
+ *  Multi-byte fields in the payload are converted to little-endian on
+ *  the wire (timestamp, status_code, both temperatures). String fields
+ *  are copied verbatim.
+ *
+ *  @param[in]  instance_id - NSM instance ID
+ *  @param[in]  ackr        - Ack-required bit
+ *  @param[in]  event_state - 16-bit event_state value (spec: 0)
+ *  @param[in]  payload     - Pointer to the event payload to send
+ *  @param[out] msg         - Output message buffer
+ *
+ *  @return NSM_SW_SUCCESS on success
+ *          NSM_SW_ERROR_NULL if payload or msg is NULL
+ *          NSM_SW_ERROR for encode_nsm_event failures
+ */
+int encode_nsm_runtime_ist_complete_event(
+    uint8_t instance_id, bool ackr, uint16_t event_state,
+    const struct nsm_runtime_ist_complete_event_payload *payload,
+    struct nsm_msg *msg);
+
+/** @brief Decode a Runtime IST Complete v1 event message.
+ *
+ *  Validates length and copies the payload (with little-endian -> host
+ *  conversion for multi-byte fields). Does not validate the version
+ *  byte, the result enum, or any of the string contents -- those
+ *  policies live in the C++ handler.
+ *
+ *  @param[in]  msg         - The received NSM message
+ *  @param[in]  msg_len     - Length of the received message
+ *  @param[out] event_class - Decoded event_class field
+ *  @param[out] event_state - Decoded event_state field (spec: 0)
+ *  @param[out] payload     - Decoded payload (host byte order)
+ *
+ *  @return NSM_SW_SUCCESS on success
+ *          NSM_SW_ERROR_NULL on any null pointer
+ *          NSM_SW_ERROR_LENGTH if the message is too short
+ *          NSM_SW_ERROR_DATA if the payload size does not match the spec
+ */
+int decode_nsm_runtime_ist_complete_event(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *event_class,
+    uint16_t *event_state,
+    struct nsm_runtime_ist_complete_event_payload *payload);
 
 #ifdef __cplusplus
 }

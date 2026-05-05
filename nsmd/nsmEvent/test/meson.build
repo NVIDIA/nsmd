@@ -13,6 +13,7 @@ tests = [
     'nsmThresholdEvent_test',
     'nsmResetRequiredEvent_test',
     'nsmRediscoveryEvent_test',
+    'nsmRuntimeISTCompleteEvent_test',
     'nsmEventInfoBranch_test',
     'nsmEventBranch_test',
     'nsmRediscoveryEventBranch_test',

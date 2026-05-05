@@ -15,6 +15,7 @@ valid_events = [
     'fabric-manager-state',
     'gpio-state',
     'cper',
+    'runtime-ist-complete',
 ]
 foreach name : include_event_list
     if not valid_events.contains(name)
@@ -42,6 +43,9 @@ if include_all_events or include_event_list.contains('gpio-state')
 endif
 if include_all_events or include_event_list.contains('cper')
     sources += ['nsmEvent/nsmCPEREvent.cpp']
+endif
+if include_all_events or include_event_list.contains('runtime-ist-complete')
+    sources += ['nsmEvent/nsmRuntimeISTCompleteEvent.cpp']
 endif
 
 nsmd_headers += ['.', '..', 'nsmEvent']
