@@ -15,6 +15,7 @@ using namespace ::testing;
 #include "diagnostics.h"
 
 #include "nsmDebugInfo.hpp"
+#include "nsmDumpUtils.hpp"
 #include "nsmEraseTrace.hpp"
 #include "nsmLogInfo.hpp"
 
@@ -117,7 +118,8 @@ TEST_F(NsmDumpCollectionTest, EraseDebugInfo_WhenInProgress_Throws)
 }
 
 // When eraseDebugInfo() is called with an unsupported EraseInfoType (Other),
-// the default branch sets InternalFailure and returns without throwing.
+// the default branch sets InvalidArgument (caller error) and returns without
+// throwing.
 TEST_F(NsmDumpCollectionTest, EraseDebugInfo_UnsupportedInfoType_SetsFailure)
 {
     std::string inventoryPath = "/xyz/openbmc_project/inventory/system/test/";
@@ -127,9 +129,10 @@ TEST_F(NsmDumpCollectionTest, EraseDebugInfo_UnsupportedInfoType_SetsFailure)
     // Status starts as Unavailable; call with unsupported type hits default:
     EXPECT_NO_THROW(obj.eraseDebugInfo(nsm::EraseInfoType::Other));
 
-    // The default branch sets InternalFailure
+    // The default branch reports InvalidArgument (unsupported type is a caller
+    // error, not an internal nsmd failure).
     auto [opStatus, eraseSt] = obj.eraseDebugInfoStatus();
-    EXPECT_EQ(opStatus, nsm::EraseOperationStatus::InternalFailure);
+    EXPECT_EQ(opStatus, nsm::EraseOperationStatus::InvalidArgument);
 }
 
 // ============================================================================
@@ -256,7 +259,8 @@ TEST_F(NsmEraseTraceSensorTest, EraseTraceOnDevice_UnknownStatus)
     EXPECT_EQ(eraseSt, nsm::EraseStatus::Unknown);
 }
 
-// eraseTraceOnDevice: postPatchIO fails → InternalFailure
+// eraseTraceOnDevice: postPatchIO fails (transport swRc) → mapped status.
+// NSM_SW_ERROR maps to Unavailable via mapNsmErrorToEraseStatus.
 TEST_F(NsmEraseTraceSensorTest, EraseTraceOnDevice_PostPatchIOFail)
 {
     auto obj = makeEraseTrace("_piof");
@@ -265,7 +269,7 @@ TEST_F(NsmEraseTraceSensorTest, EraseTraceOnDevice_PostPatchIOFail)
 
     auto coro = obj->eraseTraceOnDevice();
     auto [opSt, eraseSt] = obj->eraseTraceStatus();
-    EXPECT_EQ(opSt, nsm::EraseOperationStatus::InternalFailure);
+    EXPECT_EQ(opSt, nsm::EraseOperationStatus::Unavailable);
 }
 
 // eraseTraceOnDevice: decode fails (error CC) → InternalFailure
@@ -355,7 +359,8 @@ TEST_F(NsmEraseTraceSensorTest, EraseDebugInfoOnDevice_UnknownStatus)
     EXPECT_EQ(eraseSt, nsm::EraseStatus::Unknown);
 }
 
-// eraseDebugInfoOnDevice: postPatchIO fails → InternalFailure
+// eraseDebugInfoOnDevice: postPatchIO fails (transport swRc) → mapped status.
+// NSM_SW_ERROR maps to Unavailable via mapNsmErrorToEraseStatus.
 TEST_F(NsmEraseTraceSensorTest, EraseDebugInfoOnDevice_PostPatchIOFail)
 {
     auto obj = makeEraseTrace("_dbi_piof");
@@ -364,7 +369,7 @@ TEST_F(NsmEraseTraceSensorTest, EraseDebugInfoOnDevice_PostPatchIOFail)
 
     auto coro = obj->eraseDebugInfoOnDevice(INFO_TYPE_FW_SAVED_DUMP_INFO);
     auto [opSt, eraseSt] = obj->eraseDebugInfoStatus();
-    EXPECT_EQ(opSt, nsm::EraseOperationStatus::InternalFailure);
+    EXPECT_EQ(opSt, nsm::EraseOperationStatus::Unavailable);
 }
 
 // eraseDebugInfoOnDevice: decode fails (error CC) → InternalFailure
@@ -487,8 +492,9 @@ TEST_F(NsmLogInfoSensorTest,
     int fd = open("/dev/null", O_WRONLY);
     ASSERT_GE(fd, 0);
     EXPECT_NO_THROW(obj->getLogInfo(sdbusplus::message::unix_fd{fd}));
+    // Transport swRc (NSM_SW_ERROR) maps to Unavailable.
     EXPECT_EQ(obj->statusInterface->status(),
-              AsyncOperationStatusType::InternalFailure);
+              AsyncOperationStatusType::Unavailable);
     close(fd);
 }
 
@@ -582,6 +588,28 @@ TEST_F(NsmLogInfoSensorTest, GetLogInfoAsyncHandler_AppendFails_WriteFailure)
     EXPECT_NO_THROW(obj->getLogInfo(sdbusplus::message::unix_fd{fd}));
     EXPECT_EQ(obj->statusInterface->status(),
               AsyncOperationStatusType::WriteFailure);
+    close(fd);
+}
+
+// getLogInfoAsyncHandler: stuck-loop guard — device returns the same
+// nextHandle on consecutive calls → finish(InternalFailure) instead of
+// recursing forever.
+TEST_F(NsmLogInfoSensorTest, GetLogInfoAsyncHandler_StuckHandle_InternalFailure)
+{
+    auto obj = makeLogInfo("_stuck");
+    nsm_device_log_info_breakdown logInfo{};
+    logInfo.synced_time = SYNCED_TIME_TYPE_BOOT;
+    // First call advances to nextHandle=5; second call returns 5 again
+    // (firmware fails to advance) → stuck-loop guard trips.
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeLogInfoResp(NSM_SUCCESS, 5, logInfo)))
+        .WillOnce(mockPostPatchIO(makeLogInfoResp(NSM_SUCCESS, 5, logInfo)));
+
+    int fd = open("/dev/null", O_WRONLY);
+    ASSERT_GE(fd, 0);
+    EXPECT_NO_THROW(obj->getLogInfo(sdbusplus::message::unix_fd{fd}));
+    EXPECT_EQ(obj->statusInterface->status(),
+              AsyncOperationStatusType::InternalFailure);
     close(fd);
 }
 
@@ -754,8 +782,9 @@ TEST_F(NsmDebugInfoSensorTest,
     EXPECT_NO_THROW(
         obj->getDebugInfo(nsm::DebugInformationType::DeviceInformation,
                           sdbusplus::message::unix_fd{fd}));
+    // Transport swRc (NSM_SW_ERROR) maps to Unavailable.
     EXPECT_EQ(obj->statusInterface->status(),
-              AsyncOperationStatusType::InternalFailure);
+              AsyncOperationStatusType::Unavailable);
     close(fd);
 }
 
@@ -829,6 +858,26 @@ TEST_F(NsmDebugInfoSensorTest, GetDebugInfoAsyncHandler_EndRecord_Success)
                                       sdbusplus::message::unix_fd{fd}));
     EXPECT_EQ(obj->statusInterface->status(),
               AsyncOperationStatusType::Success);
+    close(fd);
+}
+
+// getDebugInfoAsyncHandler: stuck-loop guard — device returns the same
+// nextHandle on consecutive calls → finish(InternalFailure).
+TEST_F(NsmDebugInfoSensorTest,
+       GetDebugInfoAsyncHandler_StuckHandle_InternalFailure)
+{
+    auto obj = makeDebugInfo("_stuck");
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeDebugInfoResp(NSM_SUCCESS, 7)))
+        .WillOnce(mockPostPatchIO(makeDebugInfoResp(NSM_SUCCESS, 7)));
+
+    int fd = open("/dev/null", O_WRONLY);
+    ASSERT_GE(fd, 0);
+    EXPECT_NO_THROW(
+        obj->getDebugInfo(nsm::DebugInformationType::DeviceInformation,
+                          sdbusplus::message::unix_fd{fd}));
+    EXPECT_EQ(obj->statusInterface->status(),
+              AsyncOperationStatusType::InternalFailure);
     close(fd);
 }
 
@@ -917,8 +966,9 @@ TEST_F(NsmDebugInfoSensorTest,
     int fd = open("/dev/null", O_WRONLY);
     ASSERT_GE(fd, 0);
     EXPECT_NO_THROW(obj->getDiagnostics(sdbusplus::message::unix_fd{fd}));
+    // Transport swRc (NSM_SW_ERROR) maps to Unavailable.
     EXPECT_EQ(obj->statusInterface->status(),
-              AsyncOperationStatusType::InternalFailure);
+              AsyncOperationStatusType::Unavailable);
     close(fd);
 }
 
@@ -991,6 +1041,24 @@ TEST_F(NsmDebugInfoSensorTest, GetDiagnosticsAsyncHandler_EndRecord_Success)
     close(fd);
 }
 
+// getDiagnosticsAsyncHandler: stuck-loop guard — device returns the same
+// nextSegment on consecutive calls → finish(InternalFailure).
+TEST_F(NsmDebugInfoSensorTest,
+       GetDiagnosticsAsyncHandler_StuckHandle_InternalFailure)
+{
+    auto obj = makeDebugInfo("_diagstuck", nsm::DebugDumpType::Diagnostics);
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeDiagnosticsResp(NSM_SUCCESS, 0x01)))
+        .WillOnce(mockPostPatchIO(makeDiagnosticsResp(NSM_SUCCESS, 0x01)));
+
+    int fd = open("/dev/null", O_WRONLY);
+    ASSERT_GE(fd, 0);
+    EXPECT_NO_THROW(obj->getDiagnostics(sdbusplus::message::unix_fd{fd}));
+    EXPECT_EQ(obj->statusInterface->status(),
+              AsyncOperationStatusType::InternalFailure);
+    close(fd);
+}
+
 // getDiagnosticsAsyncHandler: nextHandle != 0xFF → continues to next segment
 TEST_F(NsmDebugInfoSensorTest,
        GetDiagnosticsAsyncHandler_NextHandleNonEnd_Continues)
@@ -1029,4 +1097,246 @@ TEST_F(NsmDebugInfoSensorTest,
     EXPECT_EQ(obj->statusInterface->status(),
               AsyncOperationStatusType::Success);
     close(fd);
+}
+
+// ---------------------------------------------------------------------------
+// Error mapping helpers.
+//
+// Exercise every branch of mapNsmErrorToAsyncStatus / mapNsmErrorToEraseStatus
+// and validate the pack/unpack round-trip used to carry raw NSM codes through
+// com.nvidia.Async.Value.Value.
+// ---------------------------------------------------------------------------
+
+using nsm::EraseOperationStatus;
+using nsm::mapNsmErrorToAsyncStatus;
+using nsm::mapNsmErrorToEraseStatus;
+using nsm::packNsmError;
+using nsm::unpackNsmError;
+
+// --- mapNsmErrorToAsyncStatus: transport (swRc) branches --------------------
+
+TEST(nsmDumpUtils, AsyncStatus_SwRcTimeout_MapsToTimeout)
+{
+    EXPECT_EQ(
+        mapNsmErrorToAsyncStatus(NSM_SW_ERROR_TIMEOUT, NSM_SUCCESS, ERR_NULL),
+        AsyncOperationStatusType::Timeout);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_SwRcGenericError_MapsToUnavailable)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_ERROR, NSM_SUCCESS, ERR_NULL),
+              AsyncOperationStatusType::Unavailable);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_SwRcDecodeFailures_MapToInternalFailure)
+{
+    EXPECT_EQ(
+        mapNsmErrorToAsyncStatus(NSM_SW_ERROR_DATA, NSM_SUCCESS, ERR_NULL),
+        AsyncOperationStatusType::InternalFailure);
+    EXPECT_EQ(
+        mapNsmErrorToAsyncStatus(NSM_SW_ERROR_LENGTH, NSM_SUCCESS, ERR_NULL),
+        AsyncOperationStatusType::InternalFailure);
+    EXPECT_EQ(
+        mapNsmErrorToAsyncStatus(NSM_SW_ERROR_NULL, NSM_SUCCESS, ERR_NULL),
+        AsyncOperationStatusType::InternalFailure);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_ERROR_COMMAND_FAIL, NSM_SUCCESS,
+                                       ERR_NULL),
+              AsyncOperationStatusType::InternalFailure);
+}
+
+// --- mapNsmErrorToAsyncStatus: success branch -------------------------------
+
+TEST(nsmDumpUtils, AsyncStatus_AllSuccess_MapsToSuccess)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_SUCCESS, ERR_NULL),
+              AsyncOperationStatusType::Success);
+}
+
+// --- mapNsmErrorToAsyncStatus: cc-only branches -----------------------------
+
+TEST(nsmDumpUtils, AsyncStatus_CcAccepted_MapsToInProgress)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ACCEPTED, ERR_NULL),
+              AsyncOperationStatusType::InProgress);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_CcBusy_MapsToUnavailable)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_BUSY, ERR_NULL),
+              AsyncOperationStatusType::Unavailable);
+    EXPECT_EQ(
+        mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERR_NOT_READY, ERR_NULL),
+        AsyncOperationStatusType::Unavailable);
+    EXPECT_EQ(
+        mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERR_BUS_ACCESS, ERR_NULL),
+        AsyncOperationStatusType::Unavailable);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(
+                  NSM_SW_SUCCESS, NSM_ERR_INVALID_STATE_FOR_COMMAND, ERR_NULL),
+              AsyncOperationStatusType::Unavailable);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_CcUnsupported_MapsToUnsupportedRequest)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(
+                  NSM_SW_SUCCESS, NSM_ERR_UNSUPPORTED_COMMAND_CODE, ERR_NULL),
+              AsyncOperationStatusType::UnsupportedRequest);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS,
+                                       NSM_ERR_UNSUPPORTED_MSG_TYPE, ERR_NULL),
+              AsyncOperationStatusType::UnsupportedRequest);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_CcInvalidData_MapsToInvalidArgument)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERR_INVALID_DATA,
+                                       ERR_NULL),
+              AsyncOperationStatusType::InvalidArgument);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS,
+                                       NSM_ERR_INVALID_DATA_LENGTH, ERR_NULL),
+              AsyncOperationStatusType::InvalidArgument);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS,
+                                       NSM_ERR_INVALID_REQUEST_TYPE, ERR_NULL),
+              AsyncOperationStatusType::InvalidArgument);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_UnknownCc_MapsToInternalFailure)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR, ERR_NULL),
+              AsyncOperationStatusType::InternalFailure);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, 0xCD, ERR_NULL),
+              AsyncOperationStatusType::InternalFailure);
+}
+
+// --- mapNsmErrorToAsyncStatus: reasonCode-overrides-cc branches -------------
+
+TEST(nsmDumpUtils, AsyncStatus_ReasonNotSupported_OverridesCc)
+{
+    EXPECT_EQ(
+        mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR, ERR_NOT_SUPPORTED),
+        AsyncOperationStatusType::UnsupportedRequest);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_ReasonTimeout_MapsToTimeout)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR, ERR_TIMEOUT),
+              AsyncOperationStatusType::Timeout);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR,
+                                       ERR_DOWNSTREAM_TIMEOUT),
+              AsyncOperationStatusType::Timeout);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_ReasonUnavailable_MapsToUnavailable)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR,
+                                       ERR_NO_BOOT_COMPLETE),
+              AsyncOperationStatusType::Unavailable);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR,
+                                       ERR_UPDATE_IN_PROGRESS),
+              AsyncOperationStatusType::Unavailable);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR,
+                                       ERR_IMAGE_COPY_IN_PROGRESS),
+              AsyncOperationStatusType::Unavailable);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR,
+                                       ERR_FLASH_WEAR_MITIGATION),
+              AsyncOperationStatusType::Unavailable);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_I2cNackFamily_MapsToUnavailable)
+{
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR,
+                                       ERR_I2C_NACK_FROM_DEV_ADDR),
+              AsyncOperationStatusType::Unavailable);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR,
+                                       ERR_I2C_NACK_FROM_DEV_CMD_DATA),
+              AsyncOperationStatusType::Unavailable);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR,
+                                       ERR_I2C_NACK_FROM_DEV_ADDR_RS),
+              AsyncOperationStatusType::Unavailable);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_ReasonInvalid_MapsToInvalidArgument)
+{
+    EXPECT_EQ(
+        mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR, ERR_INVALID_PCI),
+        AsyncOperationStatusType::InvalidArgument);
+    EXPECT_EQ(
+        mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR, ERR_INVALID_RQD),
+        AsyncOperationStatusType::InvalidArgument);
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_ERROR,
+                                       ERR_INCOMPLETE_COMPONENT_SET),
+              AsyncOperationStatusType::InvalidArgument);
+}
+
+TEST(nsmDumpUtils, AsyncStatus_UnknownReason_FallsThroughToCc)
+{
+    // ERR_NVLINK_PORT_INVALID is a known reason but not in our mapped set;
+    // mapping should fall back to the cc-based decision (NSM_BUSY ->
+    // Unavailable).
+    EXPECT_EQ(mapNsmErrorToAsyncStatus(NSM_SW_SUCCESS, NSM_BUSY,
+                                       ERR_NVLINK_PORT_INVALID),
+              AsyncOperationStatusType::Unavailable);
+}
+
+// --- mapNsmErrorToEraseStatus parity ---------------------------------------
+
+TEST(nsmDumpUtils, EraseStatus_MirrorsAsyncStatus)
+{
+    EXPECT_EQ(mapNsmErrorToEraseStatus(NSM_SW_SUCCESS, NSM_SUCCESS, ERR_NULL),
+              EraseOperationStatus::Success);
+    EXPECT_EQ(
+        mapNsmErrorToEraseStatus(NSM_SW_ERROR_TIMEOUT, NSM_SUCCESS, ERR_NULL),
+        EraseOperationStatus::Timeout);
+    EXPECT_EQ(mapNsmErrorToEraseStatus(
+                  NSM_SW_SUCCESS, NSM_ERR_UNSUPPORTED_COMMAND_CODE, ERR_NULL),
+              EraseOperationStatus::UnsupportedRequest);
+    EXPECT_EQ(mapNsmErrorToEraseStatus(NSM_SW_SUCCESS, NSM_BUSY, ERR_NULL),
+              EraseOperationStatus::Unavailable);
+    EXPECT_EQ(mapNsmErrorToEraseStatus(NSM_SW_SUCCESS, NSM_ERR_INVALID_DATA,
+                                       ERR_NULL),
+              EraseOperationStatus::InvalidArgument);
+    EXPECT_EQ(mapNsmErrorToEraseStatus(NSM_SW_SUCCESS, NSM_ERROR, ERR_NULL),
+              EraseOperationStatus::InternalFailure);
+}
+
+// --- packNsmError / unpackNsmError round-trip ------------------------------
+
+TEST(nsmDumpUtils, PackUnpack_RoundTrip_RecoversAllFields)
+{
+    const struct
+    {
+        int swRc;
+        uint8_t cc;
+        uint16_t reasonCode;
+    } cases[] = {
+        {NSM_SW_SUCCESS, NSM_SUCCESS, ERR_NULL},
+        {NSM_SW_ERROR_TIMEOUT, NSM_SUCCESS, ERR_NULL},
+        {NSM_SW_SUCCESS, NSM_BUSY, ERR_NO_BOOT_COMPLETE},
+        {NSM_SW_SUCCESS, NSM_ERROR, ERR_NOT_SUPPORTED},
+        {NSM_SW_SUCCESS, NSM_ERR_UNSUPPORTED_COMMAND_CODE, ERR_NULL},
+        {NSM_SW_ERROR, 0xFF, 0xFFFF},
+    };
+    for (const auto& c : cases)
+    {
+        const auto packed = packNsmError(c.swRc, c.cc, c.reasonCode);
+        const auto unpacked = unpackNsmError(packed);
+        EXPECT_EQ(unpacked.swRc, c.swRc);
+        EXPECT_EQ(unpacked.cc, c.cc);
+        EXPECT_EQ(unpacked.reasonCode, c.reasonCode);
+    }
+}
+
+TEST(nsmDumpUtils, Pack_AllZeroInputs_YieldsZero)
+{
+    EXPECT_EQ(packNsmError(NSM_SW_SUCCESS, NSM_SUCCESS, ERR_NULL), 0u);
+}
+
+TEST(nsmDumpUtils, Pack_LayoutIsStable)
+{
+    // Verify the documented bit layout so a future refactor doesn't silently
+    // change the on-bus contract with nsm-dump-tool's unpacker.
+    //   bits 32-63: swRc, bits 16-31: reasonCode, bits 8-15: cc, bits 0-7: 0
+    const auto packed = packNsmError(0x12345678, 0xAB, 0xCDEF);
+    EXPECT_EQ((packed >> 32) & 0xFFFFFFFFull, 0x12345678ull);
+    EXPECT_EQ((packed >> 16) & 0xFFFFull, 0xCDEFull);
+    EXPECT_EQ((packed >> 8) & 0xFFull, 0xABull);
+    EXPECT_EQ(packed & 0xFFull, 0u);
 }

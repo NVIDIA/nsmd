@@ -660,7 +660,29 @@ void readFdToBuffer(int fd, std::vector<uint8_t>& buffer);
  */
 void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer);
 /**
- * @brief Writes the contents of a buffer to a file descriptor.
+ * @brief Thrown by appendBufferToFd / writeBufferToFd when the underlying
+ *        write() returns ENOSPC.
+ *
+ * Derives from std::runtime_error so existing `catch (const std::exception&)`
+ * blocks remain correct. New code can `catch (const FilesystemFullError&)`
+ * before the generic catch to differentiate "no space left on device"
+ * (recoverable by freeing space) from other write failures (BMC-side bug).
+ *
+ * Used to provide groundwork for a future `InsufficientStorage` mapping
+ * in `mapNsmErrorToAsyncStatus`; today both ENOSPC and other write
+ * failures continue to surface as `WriteFailure` on the bus.
+ */
+class FilesystemFullError : public std::runtime_error
+{
+  public:
+    using std::runtime_error::runtime_error;
+};
+
+/**
+ * @brief Append the contents of a buffer to a file descriptor.
+ *
+ * Throws FilesystemFullError when the underlying write returns ENOSPC,
+ * std::runtime_error for any other write failure or invalid fd.
  *
  * @param fd File descriptor to write to.
  * @param buffer Buffer to write.

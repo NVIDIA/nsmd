@@ -52,7 +52,7 @@ class NsmDebugInfoObject : public NsmObject, public DebugInfoIntf
         getDiagnostics(sdbusplus::message::unix_fd fd) override;
 
   private:
-    void finish(AsyncOperationStatusType status, uint8_t rc);
+    void finish(AsyncOperationStatusType status, uint64_t packedError);
     void getDebugInfoAsyncHandler(uint32_t recordHandle);
     requester::Coroutine
         getDebugInfoAsyncHandler(std::shared_ptr<Request> request);
@@ -66,6 +66,10 @@ class NsmDebugInfoObject : public NsmObject, public DebugInfoIntf
     std::shared_ptr<AsyncValueIntf> valueInterface;
     sdbusplus::message::unix_fd fd;
     std::vector<uint8_t> buffer;
+    // Record handle last sent on the wire; the stuck-loop guard aborts the
+    // dump if the device echoes it back as the next handle.
+    uint32_t currentDebugInfoHandle{0};
+    uint8_t currentDiagnosticsHandle{0};
 };
 
 } // namespace nsm
