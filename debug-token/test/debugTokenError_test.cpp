@@ -87,6 +87,11 @@ TEST_F(DebugTokenErrorTest, testErrorCodeToString)
     Error tokenHashVerifyFailed(ErrorCode::TokenHashVerificationFailed);
     EXPECT_EQ(tokenHashVerifyFailed.to_string(),
               "Token hash verification failed");
+
+    // Test DebugFirmwareActive
+    Error debugFwActive(ErrorCode::DebugFirmwareActive);
+    EXPECT_EQ(debugFwActive.to_string(),
+              "Token erase not permitted while debug firmware is active");
 }
 
 /**
@@ -121,6 +126,10 @@ TEST_F(DebugTokenErrorTest, testErrorConstructorWithRawHexValues)
 
     Error error4(0x1010); // TokenHashVerificationFailed
     EXPECT_EQ(error4.to_string(), "Token hash verification failed");
+
+    Error error5(0x1011); // DebugFirmwareActive
+    EXPECT_EQ(error5.to_string(),
+              "Token erase not permitted while debug firmware is active");
 }
 
 /**

@@ -51,7 +51,8 @@ enum ErrorCode
     InvalidPsid = 0x100D,
     AlreadyInstalled = 0x100E,
     NotInstalled = 0x100F,
-    TokenHashVerificationFailed = 0x1010
+    TokenHashVerificationFailed = 0x1010,
+    DebugFirmwareActive = 0x1011
 };
 
 /**
@@ -87,7 +88,9 @@ class Error
             {InvalidPsid, "Invalid PSID"},
             {AlreadyInstalled, "Token already installed"},
             {NotInstalled, "Token not installed"},
-            {TokenHashVerificationFailed, "Token hash verification failed"}};
+            {TokenHashVerificationFailed, "Token hash verification failed"},
+            {DebugFirmwareActive,
+             "Token erase not permitted while debug firmware is active"}};
         auto it = errorMessages.find(static_cast<ErrorCode>(code));
         if (it != errorMessages.end())
         {
