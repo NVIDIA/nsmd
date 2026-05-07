@@ -50,6 +50,12 @@ NsmRediscoveryEvent::NsmRediscoveryEvent(const std::string& name,
         {"REDFISH_MESSAGE_ID", info.messageId},
         {"namespace", info.loggingNamespace},
         {"xyz.openbmc_project.Logging.Entry.Resolution", info.resolution}};
+
+    std::string errorId = nsm::getEventErrorId(info, "Rediscovery");
+    if (!errorId.empty())
+    {
+        eventData["xyz.openbmc_project.Logging.Entry.EventId"] = errorId;
+    }
 };
 
 int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
@@ -182,6 +188,11 @@ requester::Coroutine
     {
         info.messageArgs = std::get<std::vector<std::string>>(
             allCurrentIfaceProperties.at("MessageArgs"));
+    }
+    if (allCurrentIfaceProperties.count("EventIds"))
+    {
+        info.errorId = std::get<std::vector<std::string>>(
+            allCurrentIfaceProperties.at("EventIds"));
     }
     info.logging = utils::DBusHandler().tryGetDbusProperty<bool>(
         objPath.c_str(), "Logging", interface.c_str(), true);

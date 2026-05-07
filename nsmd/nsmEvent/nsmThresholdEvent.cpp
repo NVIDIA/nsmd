@@ -121,13 +121,21 @@ int NsmThresholdEvent::handle(eid_t eid, NsmType /*type*/,
         }
     }
 
-    auto loggingTask = logEventAsync(
-        "NsmThresholdEvent", info.severity,
-        {{"REDFISH_ORIGIN_OF_CONDITION", info.originOfCondition},
-         {"REDFISH_MESSAGE_ARGS", messageArg + ", " + errors + ""},
-         {"REDFISH_MESSAGE_ID", info.messageId},
-         {"namespace", info.loggingNamespace},
-         {"xyz.openbmc_project.Logging.Entry.Resolution", info.resolution}});
+    std::map<std::string, std::string> eventData{
+        {"REDFISH_ORIGIN_OF_CONDITION", info.originOfCondition},
+        {"REDFISH_MESSAGE_ARGS", messageArg + ", " + errors + ""},
+        {"REDFISH_MESSAGE_ID", info.messageId},
+        {"namespace", info.loggingNamespace},
+        {"xyz.openbmc_project.Logging.Entry.Resolution", info.resolution}};
+
+    std::string errorId = nsm::getEventErrorId(info, "Threshold");
+    if (!errorId.empty())
+    {
+        eventData["xyz.openbmc_project.Logging.Entry.EventId"] = errorId;
+    }
+
+    auto loggingTask = logEventAsync("NsmThresholdEvent", info.severity,
+                                     eventData);
     loggingTask.detach(); // Fire-and-forget - runs independently
 
     return NSM_SW_SUCCESS;
@@ -187,6 +195,12 @@ requester::Coroutine createNsmThresholdEvent(SensorManager& manager,
     {
         info.messageArgs = std::get<std::vector<std::string>>(
             allCurrentIfaceProperties.at("MessageArgs"));
+    }
+
+    if (allCurrentIfaceProperties.count("EventIds"))
+    {
+        info.errorId = std::get<std::vector<std::string>>(
+            allCurrentIfaceProperties.at("EventIds"));
     }
 
     std::string severityStr{};

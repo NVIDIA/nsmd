@@ -108,6 +108,61 @@ TEST(NsmRediscoveryEvent, Constructor_EventDataContainsExpectedKeys)
         1u);
 }
 
+// errorId vector empty → no EventId entry in eventData
+TEST(NsmRediscoveryEvent, Constructor_EmptyErrorId_NoEventIdInEventData)
+{
+    auto info = makeRediscoveryInfo();
+    info.messageArgs = {"GPU_1"};
+    info.errorId = {};
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
+
+    EXPECT_EQ(event.messageArgs, "GPU_1");
+    EXPECT_EQ(
+        event.eventData.count("xyz.openbmc_project.Logging.Entry.EventId"), 0u);
+}
+
+// errorId well-formed with matching key → EventId set in eventData,
+// messageArgs untouched.
+TEST(NsmRediscoveryEvent, Constructor_ValidErrorId_PopulatesEventIdField)
+{
+    auto info = makeRediscoveryInfo();
+    info.messageArgs = {"GPU_1", "rediscovery"};
+    info.errorId = {"Rediscovery", "GPU-REDISCOVERY-EVENT"};
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
+
+    EXPECT_EQ(event.messageArgs, "GPU_1,rediscovery");
+    EXPECT_EQ(event.eventData["xyz.openbmc_project.Logging.Entry.EventId"],
+              "GPU-REDISCOVERY-EVENT");
+}
+
+// errorId well-formed but key does not match → getEventErrorId returns "" →
+// no EventId entry.
+TEST(NsmRediscoveryEvent, Constructor_WrongErrorIdKey_NoEventIdInEventData)
+{
+    auto info = makeRediscoveryInfo();
+    info.messageArgs = {"GPU_1"};
+    info.errorId = {"Other", "X"};
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
+
+    EXPECT_EQ(event.messageArgs, "GPU_1");
+    EXPECT_EQ(
+        event.eventData.count("xyz.openbmc_project.Logging.Entry.EventId"), 0u);
+}
+
+// errorId odd-sized vector → getEventErrorId logs error and returns "" →
+// no EventId entry.
+TEST(NsmRediscoveryEvent, Constructor_OddSizedErrorId_NoEventIdInEventData)
+{
+    auto info = makeRediscoveryInfo();
+    info.messageArgs = {"GPU_1"};
+    info.errorId = {"Rediscovery"};
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
+
+    EXPECT_EQ(event.messageArgs, "GPU_1");
+    EXPECT_EQ(
+        event.eventData.count("xyz.openbmc_project.Logging.Entry.EventId"), 0u);
+}
+
 // =============================================================================
 // handle – decode failure (buffer too small)
 // =============================================================================
@@ -382,6 +437,24 @@ TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_WithMessageArgs)
                                                           interfaceName);
     dbus::PropertyMap props = basicProperties;
     props["MessageArgs"] = std::vector<std::string>{"arg1", "arg2"};
+    propertyMap = props;
+
+    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
+                                               testPath);
+
+    EXPECT_GE(gpu->deviceEvents.size(), 1);
+}
+
+// With EventIds present → covers the new EventIds D-Bus read branch
+TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_WithEventIds)
+{
+    const std::string testPath =
+        "/xyz/openbmc_project/inventory/system/rediscovery_eventids";
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
+                                                          interfaceName);
+    dbus::PropertyMap props = basicProperties;
+    props["EventIds"] = std::vector<std::string>{"Rediscovery",
+                                                 "GPU-REDISCOVERY-EVENT"};
     propertyMap = props;
 
     NsmObjectFactory::instance().createObjects(mockManager, interfaceName,

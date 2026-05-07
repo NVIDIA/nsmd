@@ -118,6 +118,16 @@ TEST_F(NsmThresholdEventTest, Constructor_EmptyMessageArgs_Throws)
                  std::invalid_argument);
 }
 
+// errorId well-formed with matching key → constructor stores it for later
+// lookup in handle(); behavioural smoke check that ctor still succeeds.
+TEST_F(NsmThresholdEventTest, Constructor_ValidErrorId_Succeeds)
+{
+    auto info = makeThresholdInfo();
+    info.errorId = {"Threshold", "GPU-THRESHOLD-EVENT"};
+    EXPECT_NO_THROW(
+        { NsmThresholdEvent event("threshold", "Threshold", info); });
+}
+
 // =============================================================================
 // handle – decode failure (buffer too small)
 // =============================================================================
@@ -174,6 +184,66 @@ TEST_F(NsmThresholdEventTest, Handle_AllErrorBitsSet_ReturnsSuccess)
     payload.port_rcv_switch_relay_errors_threshold = 1;
     payload.effective_ber_threshold = 1;
     payload.estimated_effective_ber_threshold = 1;
+
+    auto buf = buildHealthEvent(payload);
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = event.handle(5, {}, {}, msg, buf.size());
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// handle – success, errorId well-formed → exercises the new
+// getEventErrorId append branch inside handle().
+TEST_F(NsmThresholdEventTest, Handle_WithValidErrorId_ReturnsSuccess)
+{
+    auto info = makeThresholdInfo();
+    info.errorId = {"Threshold", "GPU-THRESHOLD-EVENT"};
+    NsmThresholdEvent event("threshold", "Threshold", info);
+
+    nsm_health_event_payload payload = {};
+    payload.portNumber = 0;
+    payload.port_rcv_errors_threshold = 1;
+
+    auto buf = buildHealthEvent(payload);
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = event.handle(5, {}, {}, msg, buf.size());
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// handle – success, errorId wrong key → getEventErrorId returns "" →
+// no append branch exercised.
+TEST_F(NsmThresholdEventTest, Handle_WithWrongErrorIdKey_ReturnsSuccess)
+{
+    auto info = makeThresholdInfo();
+    info.errorId = {"Other", "X"};
+    NsmThresholdEvent event("threshold", "Threshold", info);
+
+    nsm_health_event_payload payload = {};
+    payload.portNumber = 0;
+    payload.symbol_ber_threshold = 1;
+
+    auto buf = buildHealthEvent(payload);
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    auto rc = event.handle(5, {}, {}, msg, buf.size());
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// handle – success, errorId odd-sized → getEventErrorId logs error and
+// returns "" → no append.
+TEST_F(NsmThresholdEventTest, Handle_WithOddSizedErrorId_ReturnsSuccess)
+{
+    auto info = makeThresholdInfo();
+    info.errorId = {"Threshold"};
+    NsmThresholdEvent event("threshold", "Threshold", info);
+
+    nsm_health_event_payload payload = {};
+    payload.portNumber = 0;
+    payload.effective_ber_threshold = 1;
 
     auto buf = buildHealthEvent(payload);
     auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
@@ -377,6 +447,22 @@ TEST_F(NsmThresholdEventTest, Factory_MissingResolution_SensorCreated)
     pm["OriginOfCondition"] = std::string("/xyz/test/origin");
     pm["LoggingNamespace"] = std::string("TestNamespace");
     // "Resolution" intentionally omitted → info.resolution=""
+
+    EXPECT_NO_THROW(
+        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath));
+}
+
+// EventIds present → covers the new EventIds D-Bus read branch in
+// createNsmThresholdEvent.
+TEST_F(NsmThresholdEventTest, Factory_WithEventIds_SensorCreated)
+{
+    const std::string objPath = "/xyz/test/threshold/with_eventids";
+    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
+    setBaseThresholdProps(pm);
+    pm["Name"] = std::string("TestThreshold");
+    pm["Severity"] = std::string("Critical");
+    pm["EventIds"] = std::vector<std::string>{"Threshold",
+                                              "GPU-THRESHOLD-EVENT"};
 
     EXPECT_NO_THROW(
         createNsmThresholdEvent(mockManager, kThresholdInterface, objPath));
