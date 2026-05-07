@@ -34,6 +34,7 @@
 #include <endian.h>
 #include <linux/mctp.h>
 #include <sys/socket.h>
+#include <systemd/sd-event.h>
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -79,6 +80,10 @@ std::unordered_map<uint8_t, EventSource>
                                NSM_FABRIC_MANAGER_STATE_EVENT}},
         {NSM_TYPE_PLATFORM_ENVIRONMENTAL,
          std::vector<uint64_t>{NSM_RESET_REQUIRED_EVENT, NSM_XID_EVENT}},
+        {NSM_TYPE_DIAGNOSTIC,
+         std::vector<uint64_t>{
+             NSM_DIAG_GET_SYSTEM_CONFIG_EVENT, NSM_DIAG_GET_TID_CONFIG_EVENT,
+             NSM_DIAG_SET_TEST_RESULT_EVENT, NSM_DIAG_SET_FLOW_CONTROL_EVENT}},
 };
 
 MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
@@ -221,6 +226,30 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             std::vector<std::pair<uint16_t, bool>> gpioEvents) {
         sendGpioStateChangeEvent(dest, ackr, timestamp, gpioEvents);
     });
+
+    iface->register_method("genDiagGetSystemConfigEvent",
+                           [&](uint8_t eid, bool ackr, uint8_t configType) {
+        sendDiagGetSystemConfigEvent(eid, ackr, configType);
+    });
+
+    iface->register_method("genDiagGetTidConfigEvent",
+                           [&](uint8_t eid, bool ackr, uint8_t tid) {
+        sendDiagGetTidConfigEvent(eid, ackr, tid);
+    });
+
+    iface->register_method("genDiagSetTestResultEvent",
+                           [&](uint8_t eid, bool ackr, uint8_t tid,
+                               uint16_t testErrorCode,
+                               std::vector<uint8_t> dynamicData) {
+        sendDiagSetTestResultEvent(eid, ackr, tid, testErrorCode, dynamicData);
+    });
+
+    iface->register_method("genDiagSetFlowControlEvent",
+                           [&](uint8_t eid, uint8_t flowCtrlStatus) {
+        sendDiagSetFlowControlEvent(eid, false, flowCtrlStatus);
+    });
+
+    iface->register_method("runDiagSession", [&]() { runDiagSession(); });
 
     iface->initialize();
 
@@ -700,6 +729,10 @@ std::optional<Response>
                     return getDeviceDebugParametersHandler(request, requestLen);
                 case NSM_SET_DEVICE_DEBUG_PARAMETERS:
                     return setDeviceDebugParametersHandler(request, requestLen);
+                case NSM_DIAG_SET_SYSTEM_CONFIG:
+                    return setDiagSystemConfigHandler(request, requestLen);
+                case NSM_DIAG_SET_TID_CONFIG:
+                    return setDiagTidConfigHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -1075,11 +1108,13 @@ std::optional<std::vector<uint8_t>>
              }},
             {NSM_DEV_ID_CPU,
              {
-                 {0, {0, 1, 2, 9, 10}},
+                 {0, {0, 1, 2, 3, 4, 5, 6, 7, 9, 10}},
                  {1, {}},
                  {2, {}},
                  {3, {0, 2, 3, 12, 97}},
-                 {4, {NSM_INSTALL_TOKEN, NSM_ERASE_TOKEN, NSM_QUERY_TOKEN}},
+                 {4,
+                  {NSM_INSTALL_TOKEN, NSM_ERASE_TOKEN, NSM_QUERY_TOKEN,
+                   NSM_DIAG_SET_SYSTEM_CONFIG, NSM_DIAG_SET_TID_CONFIG}},
                  {5, {}},
                  {6,
                   {NSM_FW_GET_EROT_STATE_INFORMATION,
@@ -9222,6 +9257,496 @@ std::optional<std::vector<uint8_t>>
     }
 
     return response;
+}
+
+// Forward declaration for diagnostic session timer callback
+static int diagSessionTimerCb(sd_event_source*, uint64_t, void*);
+
+/*
+ * Vera CPU Pre-Boot Diagnostics - Event senders
+ */
+
+void MockupResponder::sendDiagGetSystemConfigEvent(uint8_t dest, bool ackr,
+                                                   uint8_t configType)
+{
+    if (verbose)
+    {
+        lg2::info("sendDiagGetSystemConfigEvent dest={EID} configType={CT}",
+                  "EID", dest, "CT", configType);
+    }
+
+    uint8_t instanceId = 23;
+    std::vector<uint8_t> eventMsg(
+        sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+        sizeof(nsm_diag_get_system_config_event_data));
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_diag_get_system_config_event(instanceId, ackr,
+                                                      configType, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("encode_nsm_diag_get_system_config_event failed");
+        return;
+    }
+
+    rc = mctpSockSend(dest, eventMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendDiagGetTidConfigEvent(uint8_t dest, bool ackr,
+                                                uint8_t tid)
+{
+    if (verbose)
+    {
+        lg2::info("sendDiagGetTidConfigEvent dest={EID} tid={TID}", "EID", dest,
+                  "TID", tid);
+    }
+
+    uint8_t instanceId = 23;
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                  sizeof(nsm_diag_get_tid_config_event_data));
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_diag_get_tid_config_event(instanceId, ackr, tid, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("encode_nsm_diag_get_tid_config_event failed");
+        return;
+    }
+
+    rc = mctpSockSend(dest, eventMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendDiagSetTestResultEvent(
+    uint8_t dest, bool ackr, uint8_t tid, uint16_t testErrorCode,
+    const std::vector<uint8_t>& dynamicData)
+{
+    // Guard against silent uint8_t truncation of dynamicData.size() below
+    // — a >255-byte caller buffer would otherwise produce a mis-sized
+    // wire message that the libnsm encoder might still accept.
+    if (dynamicData.size() > NSM_DIAG_MAX_DYNAMIC_DATA_SIZE)
+    {
+        lg2::error(
+            "sendDiagSetTestResultEvent: dynamicData too large ({SZ} > {MAX})",
+            "SZ", dynamicData.size(), "MAX", NSM_DIAG_MAX_DYNAMIC_DATA_SIZE);
+        return;
+    }
+
+    if (verbose)
+    {
+        lg2::info("sendDiagSetTestResultEvent dest={EID} tid={TID} err={ERR}",
+                  "EID", dest, "TID", tid, "ERR", testErrorCode);
+    }
+
+    uint8_t instanceId = 23;
+    size_t fixedSize = sizeof(nsm_diag_set_test_result_event_data) - 1;
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                  fixedSize + dynamicData.size());
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_diag_set_test_result_event(
+        instanceId, ackr, tid, testErrorCode,
+        static_cast<uint8_t>(dynamicData.size()),
+        dynamicData.empty() ? nullptr : dynamicData.data(), msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("encode_nsm_diag_set_test_result_event failed");
+        return;
+    }
+
+    rc = mctpSockSend(dest, eventMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendDiagSetFlowControlEvent(uint8_t dest, bool ackr,
+                                                  uint8_t flowCtrlStatus)
+{
+    if (verbose)
+    {
+        lg2::info("sendDiagSetFlowControlEvent dest={EID} status={ST}", "EID",
+                  dest, "ST", flowCtrlStatus);
+    }
+
+    uint8_t instanceId = 23;
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                  sizeof(nsm_diag_set_flow_control_event_data));
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_diag_set_flow_control_event(instanceId, ackr,
+                                                     flowCtrlStatus, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("encode_nsm_diag_set_flow_control_event failed");
+        return;
+    }
+
+    rc = mctpSockSend(dest, eventMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+/*
+ * Vera CPU Pre-Boot Diagnostics - Command handlers (CPU responder)
+ */
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setDiagSystemConfigHandler(const nsm_msg* requestMsg,
+                                                size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setDiagSystemConfigHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t configType = 0;
+    uint8_t systemTestDuration = 0;
+    uint8_t dynamicDataSize = 0;
+    uint8_t dynamicData[NSM_DIAG_MAX_DYNAMIC_DATA_SIZE] = {};
+
+    auto rc = decode_diag_set_system_config_req(
+        requestMsg, requestLen, &configType, &systemTestDuration,
+        &dynamicDataSize, dynamicData);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_diag_set_system_config_req failed, rc={RC}", "RC",
+                   rc);
+        return unsupportedCommandHandler(requestMsg, requestLen);
+    }
+
+    lg2::info(
+        "setDiagSystemConfig: configType={CT} duration={DUR} dynSize={DS}",
+        "CT", configType, "DUR", systemTestDuration, "DS", dynamicDataSize);
+
+    // Store config for session simulation
+    diagSession.configType = configType;
+    diagSession.systemTestDuration = systemTestDuration;
+    diagSession.systemDynamicData.assign(dynamicData,
+                                         dynamicData + dynamicDataSize);
+    // Parse TID list: DynamicData[0] = count, [1..N] = TID values
+    diagSession.requestedTids.clear();
+    if (dynamicDataSize > 0)
+    {
+        uint8_t tidCount = dynamicData[0];
+        for (uint8_t i = 1; i <= tidCount && i < dynamicDataSize; ++i)
+        {
+            diagSession.requestedTids.push_back(dynamicData[i]);
+        }
+    }
+
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_cc_only_resp(requestMsg->hdr.instance_id, NSM_TYPE_DIAGNOSTIC,
+                             NSM_DIAG_SET_SYSTEM_CONFIG, NSM_SUCCESS, ERR_NULL,
+                             responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    if (diagSessionState == DiagSessionState::WAIT_SYSTEM_CONFIG)
+    {
+        scheduleDiagTimer(500000);
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setDiagTidConfigHandler(const nsm_msg* requestMsg,
+                                             size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setDiagTidConfigHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t tid = 0;
+    uint8_t tidTestDuration = 0;
+    uint16_t loops = 0;
+    uint8_t consoleLogLevel = 0;
+    uint8_t dynamicDataSize = 0;
+    uint8_t dynamicData[NSM_DIAG_MAX_DYNAMIC_DATA_SIZE] = {};
+
+    auto rc = decode_diag_set_tid_config_req(
+        requestMsg, requestLen, &tid, &tidTestDuration, &loops,
+        &consoleLogLevel, &dynamicDataSize, dynamicData);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_diag_set_tid_config_req failed, rc={RC}", "RC", rc);
+        return unsupportedCommandHandler(requestMsg, requestLen);
+    }
+
+    lg2::info(
+        "setDiagTidConfig: tid={TID} duration={DUR} loops={LOOPS} log={LOG} dynSize={DS}",
+        "TID", tid, "DUR", tidTestDuration, "LOOPS", loops, "LOG",
+        consoleLogLevel, "DS", dynamicDataSize);
+
+    // Store per-TID config for session simulation
+    diagSession.tidConfigs[tid] = {
+        tidTestDuration, loops, consoleLogLevel,
+        std::vector<uint8_t>(dynamicData, dynamicData + dynamicDataSize)};
+
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_cc_only_resp(requestMsg->hdr.instance_id, NSM_TYPE_DIAGNOSTIC,
+                             NSM_DIAG_SET_TID_CONFIG, NSM_SUCCESS, ERR_NULL,
+                             responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    if (diagSessionState == DiagSessionState::REQUESTING_TID_CONFIGS)
+    {
+        scheduleDiagTimer(500000);
+    }
+
+    return response;
+}
+
+/*
+ * Vera CPU Pre-Boot Diagnostics - Full session simulation
+ */
+
+std::pair<uint16_t, std::vector<uint8_t>>
+    MockupResponder::generateResultForTid(uint8_t tid)
+{
+    // ResultMask sizes per TID type (from spec Section 10.2 / testplan.py)
+    size_t maskSize = 0;
+    if (tid >= 0x01 && tid <= 0x08)
+    {
+        maskSize = 0x2F; // CPU tests: 47 bytes
+    }
+    else if (tid == 0x09 || tid == 0x0A)
+    {
+        maskSize = 0x94; // Memory tests: 148 bytes
+    }
+
+    // Check error conditions (matching testplan.py golden results)
+    if (tid < 0x01 || tid > 0x0A)
+    {
+        return {NSM_DIAG_TEST_INVALID_TID, {}};
+    }
+
+    auto it = diagSession.tidConfigs.find(tid);
+
+    // If system duration > 0, TID configs are not required (system-level test)
+    if (diagSession.systemTestDuration > 0)
+    {
+        if (diagSession.systemTestDuration > 3)
+        {
+            return {NSM_DIAG_TEST_UNSPECIFIED_ERROR, {}}; // Invalid duration
+        }
+        return {NSM_DIAG_TEST_PASS, std::vector<uint8_t>(maskSize, 0)};
+    }
+
+    // Duration=0 means per-TID config required
+    if (it == diagSession.tidConfigs.end())
+    {
+        return {NSM_DIAG_TEST_TID_NOT_CONFIGURED, {}};
+    }
+    if (it->second.testDuration > 3)
+    {
+        return {NSM_DIAG_TEST_INVALID_PARAMETER, {}}; // Invalid TID duration
+    }
+
+    return {NSM_DIAG_TEST_PASS, std::vector<uint8_t>(maskSize, 0)};
+}
+
+void MockupResponder::runDiagSession()
+{
+    if (eventReceiverEid == 0)
+    {
+        lg2::error("PreBootDiag mock: no event receiver EID set");
+        return;
+    }
+
+    if (diagSessionState != DiagSessionState::IDLE)
+    {
+        lg2::warning(
+            "PreBootDiag mock: session already in progress, cancelling old");
+        if (diagTimerSource)
+        {
+            sd_event_source_unref(diagTimerSource);
+            diagTimerSource = nullptr;
+        }
+    }
+
+    lg2::info("=== Mock CPU: Starting Pre-Boot Diagnostic Session ===");
+    diagSession.reset();
+    pendingTidRequests = {};
+    pendingTidResults = {};
+    diagSessionState = DiagSessionState::WAIT_SYSTEM_CONFIG;
+
+    // Step 1: Request system config from BMC
+    sendDiagGetSystemConfigEvent(eventReceiverEid, true,
+                                 NSM_DIAG_CONFIG_TYPE_TEST);
+}
+
+static int diagSessionTimerCb(sd_event_source* /*s*/, uint64_t /*usec*/,
+                              void* userdata)
+{
+    auto* self = static_cast<MockupResponder*>(userdata);
+    self->advanceDiagSession();
+    return 0;
+}
+
+void MockupResponder::scheduleDiagTimer(uint64_t delayUsec)
+{
+    if (diagTimerSource)
+    {
+        sd_event_source_unref(diagTimerSource);
+        diagTimerSource = nullptr;
+    }
+    uint64_t now;
+    sd_event_now(event.get(), CLOCK_MONOTONIC, &now);
+    sd_event_add_time(event.get(), &diagTimerSource, CLOCK_MONOTONIC,
+                      now + delayUsec, 0, diagSessionTimerCb, this);
+}
+
+void MockupResponder::advanceDiagSession()
+{
+    switch (diagSessionState)
+    {
+        case DiagSessionState::WAIT_SYSTEM_CONFIG:
+        {
+            lg2::info("Mock CPU: System config received, checking validity");
+
+            // Validate system config
+            if (diagSession.systemTestDuration > 3)
+            {
+                lg2::info("Mock CPU: Invalid system duration, reporting error");
+                sendDiagSetTestResultEvent(eventReceiverEid, true, 0x00,
+                                           NSM_DIAG_TEST_UNSPECIFIED_ERROR, {});
+                diagSessionState = DiagSessionState::DONE;
+                scheduleDiagTimer(500000);
+                return;
+            }
+
+            if (diagSession.systemTestDuration == 0 &&
+                diagSession.requestedTids.empty())
+            {
+                lg2::info("Mock CPU: Duration 0 with no TIDs, reporting error");
+                sendDiagSetTestResultEvent(eventReceiverEid, true, 0x00,
+                                           NSM_DIAG_TEST_UNSPECIFIED_ERROR, {});
+                diagSessionState = DiagSessionState::DONE;
+                scheduleDiagTimer(500000);
+                return;
+            }
+
+            // Populate TID request queue
+            pendingTidRequests = {};
+            for (auto tid : diagSession.requestedTids)
+            {
+                pendingTidRequests.push(tid);
+            }
+
+            if (pendingTidRequests.empty())
+            {
+                // System-level test, no per-TID configs needed
+                diagSessionState = DiagSessionState::EXECUTING;
+                lg2::info("Mock CPU: System-level test, skipping TID configs");
+                scheduleDiagTimer(500000);
+                return;
+            }
+
+            // Request TID configs
+            diagSessionState = DiagSessionState::REQUESTING_TID_CONFIGS;
+            [[fallthrough]];
+        }
+        case DiagSessionState::REQUESTING_TID_CONFIGS:
+        {
+            if (!pendingTidRequests.empty())
+            {
+                auto tid = pendingTidRequests.front();
+                pendingTidRequests.pop();
+                lg2::info("Mock CPU: Requesting TID config for TID=0x{TID}",
+                          "TID", lg2::hex, tid);
+                sendDiagGetTidConfigEvent(eventReceiverEid, true, tid);
+                return;
+            }
+
+            // All TID configs received
+            diagSessionState = DiagSessionState::EXECUTING;
+            lg2::info("Mock CPU: All TID configs received, executing tests");
+            scheduleDiagTimer(200000);
+            return;
+        }
+        case DiagSessionState::EXECUTING:
+        {
+            // Send heartbeat
+            sendDiagSetFlowControlEvent(eventReceiverEid, false,
+                                        NSM_DIAG_FLOW_CTRL_IN_PROGRESS);
+
+            // Prepare result queue
+            pendingTidResults = {};
+
+            if (diagSession.requestedTids.empty())
+            {
+                // System-level: generate results for all default TIDs
+                for (uint8_t t :
+                     {0x01, 0x02, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09})
+                {
+                    pendingTidResults.push(t);
+                }
+            }
+            else
+            {
+                for (auto tid : diagSession.requestedTids)
+                {
+                    pendingTidResults.push(tid);
+                }
+            }
+
+            diagSessionState = DiagSessionState::REPORTING;
+            scheduleDiagTimer(500000);
+            return;
+        }
+        case DiagSessionState::REPORTING:
+        {
+            if (!pendingTidResults.empty())
+            {
+                auto tid = pendingTidResults.front();
+                pendingTidResults.pop();
+
+                auto [errorCode, resultMask] = generateResultForTid(tid);
+                lg2::info(
+                    "Mock CPU: Reporting TID=0x{TID} result=0x{ERR} maskSize={MS}",
+                    "TID", lg2::hex, tid, "ERR", lg2::hex, errorCode, "MS",
+                    resultMask.size());
+                sendDiagSetTestResultEvent(eventReceiverEid, true, tid,
+                                           errorCode, resultMask);
+
+                scheduleDiagTimer(500000);
+                return;
+            }
+
+            // All results sent — signal completion
+            diagSessionState = DiagSessionState::DONE;
+            [[fallthrough]];
+        }
+        case DiagSessionState::DONE:
+        {
+            sendDiagSetFlowControlEvent(eventReceiverEid, false,
+                                        NSM_DIAG_FLOW_CTRL_EXECUTION_FINISHED);
+            if (diagTimerSource)
+            {
+                sd_event_source_unref(diagTimerSource);
+                diagTimerSource = nullptr;
+            }
+            lg2::info("=== Mock CPU: Diagnostic Session Complete ===");
+            diagSessionState = DiagSessionState::IDLE;
+            return;
+        }
+        default:
+            return;
+    }
 }
 
 } // namespace MockupResponder

@@ -32,7 +32,9 @@
 #include <sdeventplus/event.hpp>
 #include <sdeventplus/source/io.hpp>
 
+#include <map>
 #include <optional>
+#include <queue>
 
 namespace MockupResponder
 {
@@ -382,6 +384,28 @@ class MockupResponder
                                      uint8_t status, uint64_t last_restart_time,
                                      uint64_t last_restart_duration);
 
+    // Vera CPU Pre-Boot Diagnostics event senders
+    void sendDiagGetSystemConfigEvent(uint8_t dest, bool ackr,
+                                      uint8_t configType);
+    void sendDiagGetTidConfigEvent(uint8_t dest, bool ackr, uint8_t tid);
+    void sendDiagSetTestResultEvent(uint8_t dest, bool ackr, uint8_t tid,
+                                    uint16_t testErrorCode,
+                                    const std::vector<uint8_t>& dynamicData);
+    void sendDiagSetFlowControlEvent(uint8_t dest, bool ackr,
+                                     uint8_t flowCtrlStatus);
+
+    // Vera CPU Pre-Boot Diagnostics command handlers (CPU responder)
+    std::optional<std::vector<uint8_t>>
+        setDiagSystemConfigHandler(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setDiagTidConfigHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    // Vera CPU Pre-Boot Diagnostics - full session simulation
+    void runDiagSession();
+    void advanceDiagSession();
+    std::pair<uint16_t, std::vector<uint8_t>> generateResultForTid(uint8_t tid);
+
     std::optional<Response>
         queryScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
@@ -726,6 +750,46 @@ class MockupResponder
                            std::array<bitfield8_t, EVENT_SOURCES_LENGTH>>
             eventSources;
     } state;
+
+    // Pre-boot diagnostic session simulation
+    struct DiagSessionConfig
+    {
+        uint8_t configType = 0;
+        uint8_t systemTestDuration = 0;
+        std::vector<uint8_t> systemDynamicData;
+        std::vector<uint8_t> requestedTids;
+
+        struct TidConfig
+        {
+            uint8_t testDuration = 0;
+            uint16_t loops = 0;
+            uint8_t logLevel = 0;
+            std::vector<uint8_t> dynamicData;
+        };
+        std::map<uint8_t, TidConfig> tidConfigs;
+
+        void reset()
+        {
+            *this = {};
+        }
+    } diagSession;
+
+    enum class DiagSessionState
+    {
+        IDLE,
+        WAIT_SYSTEM_CONFIG,
+        REQUESTING_TID_CONFIGS,
+        EXECUTING,
+        REPORTING,
+        DONE,
+    };
+    DiagSessionState diagSessionState = DiagSessionState::IDLE;
+    std::queue<uint8_t> pendingTidRequests;
+    std::queue<uint8_t> pendingTidResults;
+    sd_event_source* diagTimerSource = nullptr;
+
+    // Helper to safely schedule the next timer, unreffing any prior source
+    void scheduleDiagTimer(uint64_t delayUsec);
 };
 
 } // namespace MockupResponder
