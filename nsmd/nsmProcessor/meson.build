@@ -9,6 +9,7 @@ sources += [
     'nsmProcessor/nsmReset.cpp',
     'nsmProcessor/nsmOemResetStatistics.cpp',
     'nsmProcessor/nsmPowerLimit.cpp',
+    'nsmProcessor/nsmPreBootDiag.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmProcessor']

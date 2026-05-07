@@ -57,8 +57,10 @@ class EventType3Handler : public DelegatingEventHandler
     }
 };
 
-/** Forwards Type 4 (diagnostics) events to the per-device EventDispatcher
- *  (e.g. Runtime IST Complete v1, event ID 1). */
+/** Forwards Type 4 (diagnostic) events to the per-device EventDispatcher.
+ *  Each event is handled by a dedicated NsmEvent subclass under nsmd/nsmEvent/
+ *  (e.g. NsmRuntimeISTCompleteEvent, NsmDiag*Event). Per-device registration
+ *  happens via factory functions triggered by entity-manager configuration. */
 class EventType4Handler : public DelegatingEventHandler
 {
   public:

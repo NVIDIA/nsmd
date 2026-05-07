@@ -23,15 +23,6 @@
 #include "network-ports.h"
 #include "platform-environmental.h"
 
-#include "nsmDevice.hpp"
-#include "requester/mctp_endpoint_discovery.hpp"
-#include "sensorManager.hpp"
-#include "utils.hpp"
-
-#include <phosphor-logging/lg2.hpp>
-
-#include <memory>
-
 namespace nsm
 {
 
@@ -58,6 +49,10 @@ EventType3Handler::EventType3Handler()
 EventType4Handler::EventType4Handler()
 {
     enableDelegation(NSM_RUNTIME_IST_COMPLETE_EVENT);
+    enableDelegation(NSM_DIAG_GET_SYSTEM_CONFIG_EVENT);
+    enableDelegation(NSM_DIAG_GET_TID_CONFIG_EVENT);
+    enableDelegation(NSM_DIAG_SET_TEST_RESULT_EVENT);
+    enableDelegation(NSM_DIAG_SET_FLOW_CONTROL_EVENT);
 }
 
 EventType5Handler::EventType5Handler()

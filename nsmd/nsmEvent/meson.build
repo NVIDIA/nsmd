@@ -16,6 +16,10 @@ valid_events = [
     'gpio-state',
     'cper',
     'runtime-ist-complete',
+    'diag-get-system-config',
+    'diag-get-tid-config',
+    'diag-set-test-result',
+    'diag-set-flow-control',
 ]
 foreach name : include_event_list
     if not valid_events.contains(name)
@@ -46,6 +50,18 @@ if include_all_events or include_event_list.contains('cper')
 endif
 if include_all_events or include_event_list.contains('runtime-ist-complete')
     sources += ['nsmEvent/nsmRuntimeISTCompleteEvent.cpp']
+endif
+if include_all_events or include_event_list.contains('diag-get-system-config')
+    sources += ['nsmEvent/nsmDiagGetSystemConfigEvent.cpp']
+endif
+if include_all_events or include_event_list.contains('diag-get-tid-config')
+    sources += ['nsmEvent/nsmDiagGetTidConfigEvent.cpp']
+endif
+if include_all_events or include_event_list.contains('diag-set-test-result')
+    sources += ['nsmEvent/nsmDiagSetTestResultEvent.cpp']
+endif
+if include_all_events or include_event_list.contains('diag-set-flow-control')
+    sources += ['nsmEvent/nsmDiagSetFlowControlEvent.cpp']
 endif
 
 nsmd_headers += ['.', '..', 'nsmEvent']

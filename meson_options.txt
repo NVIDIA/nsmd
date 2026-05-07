@@ -245,7 +245,7 @@ option(
     'retry-backoff',
     type: 'array',
     description: 'Constant-delay backoff as [maxRetries, delayMs]',
-    value: ['3', '2000'] # defaults: 3 retries, 2000ms delay keeping consistent with timeout
+    value: ['3', '2000'],  # defaults: 3 retries, 2000ms delay keeping consistent with timeout
 )
 
 option(
@@ -256,10 +256,10 @@ option(
 )
 
 option(
-  'accelerator-dbus',
-  type: 'feature',
-  value: 'enabled',
-  description: 'Expose Accelerator D-Bus Interface for Processor'
+    'accelerator-dbus',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Expose Accelerator D-Bus Interface for Processor',
 )
 
 option(
@@ -268,14 +268,14 @@ option(
     value: 5000,
     min: 1,
     max: 100000,
-    description: 'The minimum required interval time in microseconds between two concurrent requests' ,
+    description: 'The minimum required interval time in microseconds between two concurrent requests',
 )
 
 option(
     'fixup-missing-event-notification',
     type: 'feature',
     value: 'disabled',
-    description: 'This is a work around to solve an issue on Bianca where we are not getting a MCTP rediscovery event on GPU reset to setup event notifications'
+    description: 'This is a work around to solve an issue on Bianca where we are not getting a MCTP rediscovery event on GPU reset to setup event notifications',
 )
 
 option(
@@ -501,5 +501,5 @@ option(
     'enable-association-discovery',
     type: 'feature',
     description: 'Enable support for MCTP Reactor association based discovery',
-    value: 'disabled'
+    value: 'disabled',
 )
