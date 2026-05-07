@@ -136,14 +136,41 @@ TEST_F(NsmRawCommandHandlerTest, BadTestWriteFailure)
 }
 TEST_F(NsmRawCommandHandlerTest, BadTestDecodeError)
 {
+    // nsm_common_resp (6 bytes) is larger than nsm_common_non_success_resp
+    // (4 bytes) — a response length that would fail protocol validation.
+    // For raw commands no validation is done; bytes are passed through
+    // unconditionally so the caller sees the same data as nsmtool raw.
     Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
     auto msg = reinterpret_cast<nsm_msg*>(response.data());
     encode_common_resp(0, NSM_ERROR, ERR_NOT_SUPPORTED, 0, 0, msg);
     EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(response));
-    const auto [rc, statusInterface, _] = sendRequest(0, 0, 0, 0, 0, 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
-    EXPECT_EQ(statusInterface->status(),
-              AsyncOperationStatusType::WriteFailure);
+    const auto [rc, statusInterface, valueInterface] = sendRequest(0, 0, 0, 0,
+                                                                   0, 1);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    std::vector<uint8_t> data;
+    utils::readFdToBuffer(fd, data);
+    // copySuccessResponse: 1 (cc) + (sizeof(nsm_common_resp) - 2) = 5 bytes
+    EXPECT_EQ(data.size(), 1 + sizeof(nsm_common_resp) - 2);
+    EXPECT_EQ(data[0], NSM_ERROR);
+}
+
+// doSendRequest: postPatchIO returns a response shorter than
+// sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) — too short to read CC safely.
+// Expect CC=0xFF and the partial payload bytes forwarded to the caller.
+TEST_F(NsmRawCommandHandlerTest, SendRequest_ShortResponse_CC0xFF)
+{
+    // Build a response with only the header — no payload bytes at all.
+    Response shortResp(sizeof(nsm_msg_hdr), 0);
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(shortResp));
+    const auto [rc, statusInterface, valueInterface] = sendRequest(0, 0, 0, 0,
+                                                                   0, 1);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    std::vector<uint8_t> data;
+    utils::readFdToBuffer(fd, data);
+    EXPECT_EQ(data.size(), 1u); // [CC=0xFF] only, no payload bytes
+    EXPECT_EQ(data[0], 0xFF);
 }
 
 TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequestV2Format)
@@ -174,25 +201,24 @@ TEST_F(NsmRawCommandHandlerTest, BadTestInvalidMsgFormatVersion)
               AsyncOperationStatusType::InvalidArgument);
 }
 
-// doSendRequest: postPatchIO succeeds, decode succeeds with cc != NSM_SUCCESS
-// → if (cc == NSM_SUCCESS) ELSE branch → copyReasonCodeResponse
-TEST_F(NsmRawCommandHandlerTest, SendRequest_DecodeSuccessErrorCC_CoversElse)
+// doSendRequest: postPatchIO succeeds, device returns non-success CC.
+// CC is extracted directly from payload; all response bytes are passed through
+// via copySuccessResponse (raw pass-through, no protocol validation).
+TEST_F(NsmRawCommandHandlerTest, SendRequest_ErrorCC_PassesThrough)
 {
-    // Encode exact-size NSM_ERROR response so decode_reason_code_and_cc
-    // returns NSM_SW_SUCCESS with cc = NSM_ERROR.
     size_t errorLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
     Response errorResp(errorLen, 0);
     auto errMsg = reinterpret_cast<nsm_msg*>(errorResp.data());
     encode_common_resp(0, NSM_ERROR, ERR_NULL, 0, 0, errMsg);
 
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillOnce(mockPostPatchIO(errorResp)); // rc=0, responseLen=errorLen
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(errorResp));
 
     const auto [rc, statusInterface, valueInterface] = sendRequest(0, 0, 0, 0,
                                                                    0, 1);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
-    // Response has cc=NSM_ERROR → copyReasonCodeResponse → 3 bytes in fd
+    // copySuccessResponse: 1 (cc) + (sizeof(nsm_common_non_success_resp) - 2) =
+    // 3 bytes
     std::vector<uint8_t> data;
     utils::readFdToBuffer(fd, data);
     EXPECT_EQ(data.size(), 3u);
@@ -274,23 +300,42 @@ TEST_F(NsmRawLongRunningTest, LongRunning_PostPatchIOFail_WriteFailure)
               AsyncOperationStatusType::WriteFailure);
 }
 
-// doSendLongRunningRequest: postPatchIO succeeds, decode fails (wrong size)
-// → line 161 if (rc != NSM_SW_SUCCESS) TRUE → throw runtime_error → //
-// WriteFailure
-TEST_F(NsmRawLongRunningTest, LongRunning_DecodeFail_WriteFailure)
+// doSendLongRunningRequest: postPatchIO succeeds, device returns non-success CC
+// with a response length that would fail protocol validation (wrong size).
+// For raw commands no validation is done; bytes are passed through
+// unconditionally so the caller sees the same data as nsmtool raw.
+TEST_F(NsmRawLongRunningTest, LongRunning_DecodeErrorLength_PassThrough)
 {
-    // cc=NSM_ERROR but wrong size → decode_reason_code_and_cc returns
-    // NSM_SW_ERROR_LENGTH (same technique as BadTestDecodeError for
-    // doSendRequest)
     Response badResp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
     auto msg = reinterpret_cast<nsm_msg*>(badResp.data());
     encode_common_resp(0, NSM_ERROR, ERR_NOT_SUPPORTED, 0, 0, msg);
     EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(badResp));
 
-    const auto [rc, statusInterface, _] = sendLongRunning(NSM_DEV_ID_GPU, 0, 0,
-                                                          true, 0, 0, 1);
-    EXPECT_EQ(statusInterface->status(),
-              AsyncOperationStatusType::WriteFailure);
+    const auto [rc, statusInterface, valueInterface] =
+        sendLongRunning(NSM_DEV_ID_GPU, 0, 0, true, 0, 0, 1);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    std::vector<uint8_t> data;
+    utils::readFdToBuffer(fd, data);
+    EXPECT_EQ(data.size(), 1 + sizeof(nsm_common_resp) - 2);
+    EXPECT_EQ(data[0], NSM_ERROR);
+}
+
+// doSendLongRunningRequest: response shorter than sizeof(nsm_msg_hdr) +
+// sizeof(nsm_common_resp) — too short to read CC safely.
+// Expect CC=0xFF and the partial payload bytes forwarded to the caller.
+TEST_F(NsmRawLongRunningTest, LongRunning_ShortResponse_CC0xFF)
+{
+    Response shortResp(sizeof(nsm_msg_hdr), 0);
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(shortResp));
+    const auto [rc, statusInterface, valueInterface] =
+        sendLongRunning(NSM_DEV_ID_GPU, 0, 0, true, 0, 0, 1);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    std::vector<uint8_t> data;
+    utils::readFdToBuffer(fd, data);
+    EXPECT_EQ(data.size(), 1u); // [CC=0xFF] only, no payload bytes
+    EXPECT_EQ(data[0], 0xFF);
 }
 
 // doSendLongRunningRequest: postPatchIO succeeds, decode returns cc=NSM_SUCCESS
@@ -377,13 +422,11 @@ TEST_F(NsmRawLongRunningTest, SendRequest_IsLongRunning_CoversDetachBranch)
     EXPECT_NE(path, sdbusplus::message::object_path{});
 }
 
-// doSendLongRunningRequest: decode succeeds with cc=NSM_ERROR
-// → else branch (line 172): initAcceptInstanceId(cc=NSM_ERROR) → accepted=false
-// → if (!accepted) TRUE (line 176): copyReasonCodeResponse called (line 178)
-TEST_F(NsmRawLongRunningTest, LongRunning_CcError_NotAccepted_CopiesReasonCode)
+// doSendLongRunningRequest: postPatchIO succeeds, device returns non-success
+// CC. cc != NSM_ACCEPTED → bytes passed through immediately via
+// copySuccessResponse.
+TEST_F(NsmRawLongRunningTest, LongRunning_ErrorCC_PassesThrough)
 {
-    // Properly-sized error response so decode_reason_code_and_cc succeeds
-    // but cc=NSM_ERROR (not NSM_SUCCESS / NSM_ACCEPTED).
     size_t errorLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
     Response errorResp(errorLen, 0);
     auto errMsg = reinterpret_cast<nsm_msg*>(errorResp.data());
@@ -395,7 +438,8 @@ TEST_F(NsmRawLongRunningTest, LongRunning_CcError_NotAccepted_CopiesReasonCode)
         sendLongRunning(NSM_DEV_ID_GPU, 0, 0, true, 0, 0, 1);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
-    // copyReasonCodeResponse → 3 bytes written: [cc, reasonCode lo, hi]
+    // copySuccessResponse: 1 (cc) + (sizeof(nsm_common_non_success_resp) - 2) =
+    // 3 bytes
     std::vector<uint8_t> data;
     utils::readFdToBuffer(fd, data);
     EXPECT_EQ(data.size(), 3u);
