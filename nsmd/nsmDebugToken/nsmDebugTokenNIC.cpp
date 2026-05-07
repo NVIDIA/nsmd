@@ -65,7 +65,8 @@ requester::Coroutine NsmDebugTokenNICObject::disableTokensAsyncHandler(
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
-                                         "Unsupported command");
+                                         std::format("Unsupported command: {}",
+                                                     static_cast<int>(sendRc)));
             valueIntf->value(error);
             statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
@@ -96,7 +97,8 @@ requester::Coroutine NsmDebugTokenNICObject::disableTokensAsyncHandler(
     }
     else
     {
-        auto error = std::make_tuple(reasonCode, "Operation failed");
+        auto error = std::make_tuple(
+            reasonCode, std::format("Operation failed: {}", reasonCode));
         lg2::error("DebugToken: disableTokens: eid={EID} rc={RC}", "EID", eid,
                    "RC", reasonCode);
         valueIntf->value(error);
@@ -125,7 +127,8 @@ requester::Coroutine NsmDebugTokenNICObject::getRequestAsyncHandler(
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
-                                         "Unsupported command");
+                                         std::format("Unsupported command: {}",
+                                                     static_cast<int>(sendRc)));
             valueIntf->value(error);
             statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
@@ -154,7 +157,8 @@ requester::Coroutine NsmDebugTokenNICObject::getRequestAsyncHandler(
     {
         lg2::info("DebugToken: token already active: eid={EID} rc={RC}", "EID",
                   eid, "RC", reasonCode);
-        auto error = std::make_tuple(reasonCode, "Token already active");
+        auto error = std::make_tuple(
+            reasonCode, std::format("Token already active: {}", reasonCode));
         valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::WriteFailure);
         // coverity[missing_return]
@@ -214,7 +218,8 @@ requester::Coroutine NsmDebugTokenNICObject::getStatusAsyncHandler(
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
-                                         "Unsupported command");
+                                         std::format("Unsupported command: {}",
+                                                     static_cast<int>(sendRc)));
             valueIntf->value(error);
             statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
@@ -357,12 +362,17 @@ requester::Coroutine NsmDebugTokenNICObject::installTokenAsyncHandler(
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
-                                         "Unsupported command");
+                                         std::format("Unsupported command: {}",
+                                                     static_cast<int>(sendRc)));
             valueIntf->value(error);
             statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
         else
         {
+            auto error = std::make_tuple(
+                static_cast<uint16_t>(sendRc),
+                std::format("Operation failed: {}", static_cast<int>(sendRc)));
+            valueIntf->value(error);
             statusIntf->status(AsyncOperationStatusType::WriteFailure);
         }
         // coverity[missing_return]
@@ -377,6 +387,10 @@ requester::Coroutine NsmDebugTokenNICObject::installTokenAsyncHandler(
         lg2::error("DebugToken: decode_nsm_provide_token_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
+        auto error =
+            std::make_tuple(static_cast<uint16_t>(decodeRc),
+                            std::format("Operation failed: {}", decodeRc));
+        valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::InternalFailure);
         // coverity[missing_return]
         co_return decodeRc;
@@ -386,7 +400,7 @@ requester::Coroutine NsmDebugTokenNICObject::installTokenAsyncHandler(
         lg2::info("DebugToken: token not accepted: eid={EID} cc={CC}", "EID",
                   eid, "CC", cc);
         auto error = std::make_tuple(static_cast<uint16_t>(cc),
-                                     "Token not accepted");
+                                     std::format("Token not accepted: {}", cc));
         valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::InvalidArgument);
         // coverity[missing_return]
@@ -401,13 +415,15 @@ requester::Coroutine NsmDebugTokenNICObject::installTokenAsyncHandler(
     {
         lg2::info("DebugToken: token already active: eid={EID} rc={RC}", "EID",
                   eid, "RC", reasonCode);
-        auto error = std::make_tuple(reasonCode, "Token already active");
+        auto error = std::make_tuple(
+            reasonCode, std::format("Token already active: {}", reasonCode));
         valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::WriteFailure);
     }
     else
     {
-        auto error = std::make_tuple(reasonCode, "Operation failed");
+        auto error = std::make_tuple(
+            reasonCode, std::format("Operation failed: {}", reasonCode));
         lg2::error("DebugToken: installToken: eid={EID} rc={RC}", "EID", eid,
                    "RC", reasonCode);
         valueIntf->value(error);

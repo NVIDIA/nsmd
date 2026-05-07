@@ -384,6 +384,10 @@ TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
           valueIntf] = callEraseTokenAsync(NSM_DEBUG_TOKEN_ERASE_ALL_TOKENS);
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::WriteFailure);
+    auto val = valueIntf->value();
+    auto* errorTuple = std::get_if<std::tuple<uint16_t, std::string>>(&val);
+    ASSERT_NE(errorTuple, nullptr);
+    EXPECT_NE(std::get<0>(*errorTuple), 0);
 }
 
 TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
@@ -485,6 +489,10 @@ TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
     auto [rc, statusIntf, valueIntf] = callInstallTokenAsync(info);
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::WriteFailure);
+    auto val = valueIntf->value();
+    auto* errorTuple = std::get_if<std::tuple<uint16_t, std::string>>(&val);
+    ASSERT_NE(errorTuple, nullptr);
+    EXPECT_NE(std::get<0>(*errorTuple), 0);
 }
 
 TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
@@ -536,6 +544,10 @@ TEST_F(NsmDebugTokenUnifiedWithDeviceTest,
     auto [rc, statusIntf, valueIntf] = callInstallTokenAsync(info);
     EXPECT_EQ(rc, NSM_SW_ERROR);
     EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::InternalFailure);
+    auto val = valueIntf->value();
+    auto* errorTuple = std::get_if<std::tuple<uint16_t, std::string>>(&val);
+    ASSERT_NE(errorTuple, nullptr);
+    EXPECT_NE(std::get<0>(*errorTuple), 0);
 }
 
 // ============================================================================

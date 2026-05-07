@@ -382,6 +382,10 @@ TEST_F(NsmDebugTokenNICBranchTest, installTokenAsyncPostPatchIOGenericFail)
     auto request = makeProvideTokenRequest(tokenData);
     auto [rc, statusIntf, valueIntf] = callInstallTokenAsync(request);
     EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::WriteFailure);
+    auto val = valueIntf->value();
+    auto* errorTuple = std::get_if<std::tuple<uint16_t, std::string>>(&val);
+    ASSERT_NE(errorTuple, nullptr);
+    EXPECT_NE(std::get<0>(*errorTuple), 0);
 }
 
 // postPatchIO fail unsupported

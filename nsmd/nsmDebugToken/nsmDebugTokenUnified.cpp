@@ -73,6 +73,9 @@ requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("DebugToken: encode_nsm_erase_token_req: rc={RC}", "RC", rc);
+        auto error = std::make_tuple(static_cast<uint16_t>(rc),
+                                     std::format("Operation failed: {}", rc));
+        valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::InternalFailure);
         throw Common::Error::InternalFailure();
     }
@@ -89,12 +92,17 @@ requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
-                                         "Unsupported command");
+                                         std::format("Unsupported command: {}",
+                                                     static_cast<int>(sendRc)));
             valueIntf->value(error);
             statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
         else
         {
+            auto error = std::make_tuple(
+                static_cast<uint16_t>(sendRc),
+                std::format("Operation failed: {}", static_cast<int>(sendRc)));
+            valueIntf->value(error);
             statusIntf->status(AsyncOperationStatusType::WriteFailure);
         }
         // coverity[missing_return]
@@ -109,6 +117,10 @@ requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
         lg2::error("DebugToken: decode_nsm_erase_token_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
+        auto error =
+            std::make_tuple(static_cast<uint16_t>(decodeRc),
+                            std::format("Operation failed: {}", decodeRc));
+        valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::WriteFailure);
         // coverity[missing_return]
         co_return decodeRc;
@@ -123,8 +135,10 @@ requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
     {
         uint16_t errorCode =
             (reasonCode != ERR_NULL) ? reasonCode : static_cast<uint16_t>(cc);
-        auto error = std::make_tuple(errorCode,
-                                     debug_token::Error(errorCode).to_string());
+        auto error = std::make_tuple(
+            errorCode,
+            std::format("{}: {}", debug_token::Error(errorCode).to_string(),
+                        errorCode));
         lg2::error("DebugToken: eraseToken: eid={EID} cc={CC} rc={RC}", "EID",
                    eid, "CC", cc, "RC", reasonCode);
         valueIntf->value(error);
@@ -180,6 +194,11 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
     auto request = createInstallTokenRequest(info);
     if (!request)
     {
+        auto error =
+            std::make_tuple(static_cast<uint16_t>(NSM_SW_ERROR),
+                            std::format("Operation failed: {}",
+                                        static_cast<int>(NSM_SW_ERROR)));
+        valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::InternalFailure);
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
@@ -197,12 +216,17 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
-                                         "Unsupported command");
+                                         std::format("Unsupported command: {}",
+                                                     static_cast<int>(sendRc)));
             valueIntf->value(error);
             statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
         else
         {
+            auto error = std::make_tuple(
+                static_cast<uint16_t>(sendRc),
+                std::format("Operation failed: {}", static_cast<int>(sendRc)));
+            valueIntf->value(error);
             statusIntf->status(AsyncOperationStatusType::WriteFailure);
         }
         // coverity[missing_return]
@@ -217,6 +241,10 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
         lg2::error("DebugToken: decode_nsm_install_token_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
+        auto error =
+            std::make_tuple(static_cast<uint16_t>(decodeRc),
+                            std::format("Operation failed: {}", decodeRc));
+        valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::InternalFailure);
         // coverity[missing_return]
         co_return decodeRc;
@@ -240,8 +268,10 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
     {
         uint16_t errorCode =
             (reasonCode != ERR_NULL) ? reasonCode : static_cast<uint16_t>(cc);
-        auto error = std::make_tuple(errorCode,
-                                     debug_token::Error(errorCode).to_string());
+        auto error = std::make_tuple(
+            errorCode,
+            std::format("{}: {}", debug_token::Error(errorCode).to_string(),
+                        errorCode));
         lg2::error("DebugToken: installToken: eid={EID} cc={CC} rc={RC}", "EID",
                    eid, "CC", cc, "RC", reasonCode);
         valueIntf->value(error);
@@ -389,7 +419,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenDirect(
                        "RC", utils::nsmSwCodeToString(sendRc), "EID", eid);
             debug_token::Error error(sendRc);
             errorCode = static_cast<uint16_t>(sendRc);
-            errorMessage = std::string(error.to_string());
+            errorMessage = std::format("{}: {}", error.to_string(), errorCode);
             co_return sendRc;
         }
 
@@ -406,7 +436,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenDirect(
                        responseLen);
             errorCode = static_cast<uint16_t>(decodeRc);
             debug_token::Error error(decodeRc);
-            errorMessage = std::string(error.to_string());
+            errorMessage = std::format("{}: {}", error.to_string(), errorCode);
             co_return decodeRc;
         }
 
@@ -420,7 +450,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenDirect(
             // Force copy by creating Error object first, then explicitly copy
             // string
             debug_token::Error error(reasonCode);
-            errorMessage = std::string(error.to_string());
+            errorMessage = std::format("{}: {}", error.to_string(), errorCode);
             co_return reasonCode;
         }
     }
