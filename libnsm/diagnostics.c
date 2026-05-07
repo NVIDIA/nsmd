@@ -1202,3 +1202,460 @@ int decode_set_device_debug_parameters_resp(const struct nsm_msg *msg,
 	*cc = resp->completion_code;
 	return NSM_SW_SUCCESS;
 }
+
+/*
+ * Vera CPU Pre-Boot Diagnostics - Event encode/decode
+ */
+
+int encode_nsm_diag_get_system_config_event(uint8_t instance_id, bool ackr,
+					    uint8_t config_type,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint8_t event_data[1];
+	event_data[0] = config_type;
+
+	return encode_nsm_event(
+	    instance_id, NSM_TYPE_DIAGNOSTIC, ackr,
+	    NSM_DIAG_PREBOOT_EVENT_VERSION, NSM_DIAG_GET_SYSTEM_CONFIG_EVENT,
+	    NSM_GENERAL_EVENT_CLASS, 0, sizeof(event_data), event_data, msg);
+}
+
+int decode_nsm_diag_get_system_config_event(const struct nsm_msg *msg,
+					    size_t msg_len,
+					    uint8_t *event_class,
+					    uint16_t *event_state,
+					    uint8_t *config_type)
+{
+	if (msg == NULL || event_class == NULL || event_state == NULL ||
+	    config_type == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint8_t data_size = 0;
+	int rc =
+	    decode_nsm_event(msg, msg_len, NSM_DIAG_GET_SYSTEM_CONFIG_EVENT,
+			     NSM_GENERAL_EVENT_CLASS, event_state, &data_size);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (data_size < sizeof(struct nsm_diag_get_system_config_event_data)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	*event_class = event->event_class;
+
+	const struct nsm_diag_get_system_config_event_data *data =
+	    (const struct nsm_diag_get_system_config_event_data *)event->data;
+	*config_type = data->config_type;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_diag_get_tid_config_event(uint8_t instance_id, bool ackr,
+					 uint8_t tid, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint8_t event_data[1];
+	event_data[0] = tid;
+
+	return encode_nsm_event(
+	    instance_id, NSM_TYPE_DIAGNOSTIC, ackr,
+	    NSM_DIAG_PREBOOT_EVENT_VERSION, NSM_DIAG_GET_TID_CONFIG_EVENT,
+	    NSM_GENERAL_EVENT_CLASS, 0, sizeof(event_data), event_data, msg);
+}
+
+int decode_nsm_diag_get_tid_config_event(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *event_class,
+					 uint16_t *event_state, uint8_t *tid)
+{
+	if (msg == NULL || event_class == NULL || event_state == NULL ||
+	    tid == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint8_t data_size = 0;
+	int rc =
+	    decode_nsm_event(msg, msg_len, NSM_DIAG_GET_TID_CONFIG_EVENT,
+			     NSM_GENERAL_EVENT_CLASS, event_state, &data_size);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (data_size < sizeof(struct nsm_diag_get_tid_config_event_data)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	*event_class = event->event_class;
+
+	const struct nsm_diag_get_tid_config_event_data *data =
+	    (const struct nsm_diag_get_tid_config_event_data *)event->data;
+	*tid = data->tid;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_diag_set_test_result_event(uint8_t instance_id, bool ackr,
+					  uint8_t tid, uint16_t test_error_code,
+					  uint8_t dynamic_data_size,
+					  const uint8_t *dynamic_data,
+					  struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (dynamic_data_size > 0 && dynamic_data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (dynamic_data_size > NSM_DIAG_MAX_DYNAMIC_DATA_SIZE) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint8_t event_data[NSM_EVENT_DATA_MAX_LEN];
+	size_t fixed_size =
+	    sizeof(struct nsm_diag_set_test_result_event_data) - 1;
+	size_t total_size = fixed_size + dynamic_data_size;
+
+	if (total_size > NSM_EVENT_DATA_MAX_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_diag_set_test_result_event_data *data =
+	    (struct nsm_diag_set_test_result_event_data *)event_data;
+	data->tid = tid;
+	data->test_error_code = htole16(test_error_code);
+	data->dynamic_data_size = dynamic_data_size;
+
+	if (dynamic_data_size > 0) {
+		memcpy(data->dynamic_data, dynamic_data, dynamic_data_size);
+	}
+
+	return encode_nsm_event(
+	    instance_id, NSM_TYPE_DIAGNOSTIC, ackr,
+	    NSM_DIAG_PREBOOT_EVENT_VERSION, NSM_DIAG_SET_TEST_RESULT_EVENT,
+	    NSM_GENERAL_EVENT_CLASS, 0, total_size, event_data, msg);
+}
+
+int decode_nsm_diag_set_test_result_event(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *event_class,
+					  uint16_t *event_state, uint8_t *tid,
+					  uint16_t *test_error_code,
+					  uint8_t *dynamic_data_size,
+					  uint8_t *dynamic_data)
+{
+	if (msg == NULL || event_class == NULL || event_state == NULL ||
+	    tid == NULL || test_error_code == NULL ||
+	    dynamic_data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint8_t data_size = 0;
+	int rc =
+	    decode_nsm_event(msg, msg_len, NSM_DIAG_SET_TEST_RESULT_EVENT,
+			     NSM_GENERAL_EVENT_CLASS, event_state, &data_size);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	size_t fixed_size =
+	    sizeof(struct nsm_diag_set_test_result_event_data) - 1;
+	if (data_size < fixed_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	*event_class = event->event_class;
+
+	const struct nsm_diag_set_test_result_event_data *data =
+	    (const struct nsm_diag_set_test_result_event_data *)event->data;
+
+	*tid = data->tid;
+	*test_error_code = le16toh(data->test_error_code);
+	*dynamic_data_size = data->dynamic_data_size;
+
+	/* Spec §5.3 — DynamicDataSize is bounded to [0, 251]. Reject any
+	 * value above the protocol cap as a protocol violation, before
+	 * any further processing. Without this check, a crafted event with
+	 * dynamic_data_size up to 254 (still within the wire-level data_size
+	 * upper bound of 255) could overflow a caller's stack buffer. */
+	if (*dynamic_data_size > NSM_DIAG_MAX_DYNAMIC_DATA_SIZE) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	if (*dynamic_data_size > data_size - fixed_size) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	if (*dynamic_data_size > 0) {
+		if (dynamic_data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		memcpy(dynamic_data, data->dynamic_data, *dynamic_data_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_diag_set_flow_control_event(uint8_t instance_id, bool ackr,
+					   uint8_t flow_ctrl_status,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint8_t event_data[1];
+	event_data[0] = flow_ctrl_status;
+
+	return encode_nsm_event(
+	    instance_id, NSM_TYPE_DIAGNOSTIC, ackr,
+	    NSM_DIAG_PREBOOT_EVENT_VERSION, NSM_DIAG_SET_FLOW_CONTROL_EVENT,
+	    NSM_GENERAL_EVENT_CLASS, 0, sizeof(event_data), event_data, msg);
+}
+
+int decode_nsm_diag_set_flow_control_event(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *event_class,
+					   uint16_t *event_state,
+					   uint8_t *flow_ctrl_status)
+{
+	if (msg == NULL || event_class == NULL || event_state == NULL ||
+	    flow_ctrl_status == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint8_t data_size = 0;
+	int rc =
+	    decode_nsm_event(msg, msg_len, NSM_DIAG_SET_FLOW_CONTROL_EVENT,
+			     NSM_GENERAL_EVENT_CLASS, event_state, &data_size);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (data_size < sizeof(struct nsm_diag_set_flow_control_event_data)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	*event_class = event->event_class;
+
+	const struct nsm_diag_set_flow_control_event_data *data =
+	    (const struct nsm_diag_set_flow_control_event_data *)event->data;
+	*flow_ctrl_status = data->flow_ctrl_status;
+
+	return NSM_SW_SUCCESS;
+}
+
+/*
+ * Vera CPU Pre-Boot Diagnostics - Command encode/decode
+ */
+
+int encode_diag_set_system_config_req(uint8_t instance_id, uint8_t config_type,
+				      uint8_t system_test_duration,
+				      const uint8_t *dynamic_data,
+				      uint8_t dynamic_data_size,
+				      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (dynamic_data_size > 0 && dynamic_data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (dynamic_data_size > NSM_DIAG_MAX_DYNAMIC_DATA_SIZE) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DIAGNOSTIC;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_diag_set_system_config_req *request =
+	    (struct nsm_diag_set_system_config_req *)msg->payload;
+
+	request->hdr.command = NSM_DIAG_SET_SYSTEM_CONFIG;
+	request->hdr.data_size = sizeof(config_type) +
+				 sizeof(system_test_duration) +
+				 dynamic_data_size;
+	request->config_type = config_type;
+	request->system_test_duration = system_test_duration;
+
+	if (dynamic_data_size > 0) {
+		memcpy(request->dynamic_data, dynamic_data, dynamic_data_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_diag_set_system_config_req(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *config_type,
+				      uint8_t *system_test_duration,
+				      uint8_t *dynamic_data_size,
+				      uint8_t *dynamic_data)
+{
+	if (msg == NULL || config_type == NULL ||
+	    system_test_duration == NULL || dynamic_data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	size_t min_len = sizeof(struct nsm_msg_hdr) +
+			 sizeof(struct nsm_diag_set_system_config_req) - 1;
+	if (msg_len < min_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_diag_set_system_config_req *request =
+	    (const struct nsm_diag_set_system_config_req *)msg->payload;
+
+	*config_type = request->config_type;
+	*system_test_duration = request->system_test_duration;
+
+	uint8_t fixed_fields_size = sizeof(request->config_type) +
+				    sizeof(request->system_test_duration);
+	if (request->hdr.data_size < fixed_fields_size) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*dynamic_data_size = request->hdr.data_size - fixed_fields_size;
+
+	if (*dynamic_data_size > 0) {
+		if (dynamic_data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		size_t available = msg_len - min_len;
+		if (*dynamic_data_size > available) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		memcpy(dynamic_data, request->dynamic_data, *dynamic_data_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_diag_set_tid_config_req(uint8_t instance_id, uint8_t tid,
+				   uint8_t tid_test_duration, uint16_t loops,
+				   uint8_t console_log_level,
+				   uint8_t dynamic_data_size,
+				   const uint8_t *dynamic_data,
+				   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (dynamic_data_size > 0 && dynamic_data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	/* Design §5.2.3 — TID command total must fit in 256-byte budget.
+	 * Tighter cap than the event-side 251 because the TID command also
+	 * carries 6 fixed bytes (tid + duration + loops + log + dyn_size). */
+	if (dynamic_data_size > NSM_DIAG_MAX_TID_DYNAMIC_DATA_SIZE) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DIAGNOSTIC;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_diag_set_tid_config_req *request =
+	    (struct nsm_diag_set_tid_config_req *)msg->payload;
+
+	request->hdr.command = NSM_DIAG_SET_TID_CONFIG;
+	request->hdr.data_size =
+	    sizeof(request->tid) + sizeof(request->tid_test_duration) +
+	    sizeof(request->loops) + sizeof(request->console_log_level) +
+	    sizeof(request->dynamic_data_size) + dynamic_data_size;
+	request->tid = tid;
+	request->tid_test_duration = tid_test_duration;
+	request->loops = htole16(loops);
+	request->console_log_level = console_log_level;
+	request->dynamic_data_size = dynamic_data_size;
+
+	if (dynamic_data_size > 0) {
+		memcpy(request->dynamic_data, dynamic_data, dynamic_data_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_diag_set_tid_config_req(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *tid, uint8_t *tid_test_duration,
+				   uint16_t *loops, uint8_t *console_log_level,
+				   uint8_t *dynamic_data_size,
+				   uint8_t *dynamic_data)
+{
+	if (msg == NULL || tid == NULL || tid_test_duration == NULL ||
+	    loops == NULL || console_log_level == NULL ||
+	    dynamic_data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	size_t min_len = sizeof(struct nsm_msg_hdr) +
+			 sizeof(struct nsm_diag_set_tid_config_req) - 1;
+	if (msg_len < min_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_diag_set_tid_config_req *request =
+	    (const struct nsm_diag_set_tid_config_req *)msg->payload;
+
+	*tid = request->tid;
+	*tid_test_duration = request->tid_test_duration;
+	*loops = le16toh(request->loops);
+	*console_log_level = request->console_log_level;
+	*dynamic_data_size = request->dynamic_data_size;
+
+	if (*dynamic_data_size > 0) {
+		if (dynamic_data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		size_t available = msg_len - min_len;
+		if (*dynamic_data_size > available) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		memcpy(dynamic_data, request->dynamic_data, *dynamic_data_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}

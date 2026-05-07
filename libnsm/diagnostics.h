@@ -36,7 +36,9 @@ enum diagnostics_command {
 	NSM_GET_NETWORK_DEVICE_LOG_INFO = 0x52,
 	NSM_RESET_NETWORK_DEVICE = 0x53,
 	NSM_ERASE_DEBUG_INFO = 0x59,
-	NSM_ENABLE_DISABLE_WP = 0x65
+	NSM_ENABLE_DISABLE_WP = 0x65,
+	NSM_DIAG_SET_SYSTEM_CONFIG = 0x80,
+	NSM_DIAG_SET_TID_CONFIG = 0x81,
 };
 
 enum diagnostics_enable_disable_wp_data_index {
@@ -96,6 +98,125 @@ enum nsm_debug_information_type {
 };
 
 enum nsm_erase_information_type { INFO_TYPE_FW_SAVED_DUMP_INFO = 0 };
+
+/** @brief NSM Type4 diagnostics events for Vera CPU Pre-Boot Diagnostics
+ */
+enum nsm_diagnostics_events {
+	NSM_DIAG_GET_SYSTEM_CONFIG_EVENT = 0x00,
+	NSM_DIAG_GET_TID_CONFIG_EVENT = 0x01,
+	NSM_DIAG_SET_TEST_RESULT_EVENT = 0x02,
+	NSM_DIAG_SET_FLOW_CONTROL_EVENT = 0x03,
+};
+
+/** @brief Event version for Vera CPU Pre-Boot Diagnostics events */
+#define NSM_DIAG_PREBOOT_EVENT_VERSION 1
+
+/** @brief Vera CPU Pre-Boot Diagnostics flow control status values */
+enum nsm_diag_flow_ctrl_status {
+	NSM_DIAG_FLOW_CTRL_IN_PROGRESS = 0x01,
+	NSM_DIAG_FLOW_CTRL_EXECUTION_FINISHED = 0x02,
+};
+
+/** @brief Vera CPU Pre-Boot Diagnostics configuration types */
+enum nsm_diag_config_type {
+	NSM_DIAG_CONFIG_TYPE_MB1 = 0x00,
+	NSM_DIAG_CONFIG_TYPE_TEST = 0x01,
+};
+
+/** @brief Vera CPU Pre-Boot Diagnostics console log levels */
+enum nsm_diag_console_log_level {
+	NSM_DIAG_LOG_NORMAL = 0x00,
+	NSM_DIAG_LOG_ERROR = 0x01,
+	NSM_DIAG_LOG_WARNING = 0x02,
+	NSM_DIAG_LOG_DEBUG = 0x03,
+};
+
+/** @brief Vera CPU Pre-Boot Diagnostics test error codes */
+#define NSM_DIAG_TEST_PASS 0x0000
+#define NSM_DIAG_TEST_FAIL 0x0001
+#define NSM_DIAG_TEST_INVALID_PARAMETER 0x0002
+#define NSM_DIAG_TEST_L3_ALLOC_FAILED 0x0003
+#define NSM_DIAG_TEST_PATTERN_NOT_SUPPORTED 0x0004
+#define NSM_DIAG_TEST_MODE_NOT_SUPPORTED 0x0005
+#define NSM_DIAG_TEST_DATA_MISMATCH 0x0006
+#define NSM_DIAG_TEST_INTERRUPT_STATUS 0x0007
+#define NSM_DIAG_TEST_GSC_CARVEOUT 0x0008
+#define NSM_DIAG_TEST_TZDRAM_CARVEOUT 0x0009
+#define NSM_DIAG_TEST_PRE_UEFI_DIAG_CARVEOUT 0x000A
+#define NSM_DIAG_TEST_TID_NOT_CONFIGURED 0x000B
+#define NSM_DIAG_TEST_INVALID_TID 0x000C
+#define NSM_DIAG_TEST_UNSPECIFIED_ERROR 0xFFFF
+
+/** @brief Maximum dynamic data size for pre-boot diagnostic events
+ *  (Spec §5.3 — Set Diag Test Result event payload). */
+#define NSM_DIAG_MAX_DYNAMIC_DATA_SIZE 251
+
+/** @brief Maximum dynamic data size for the Set Diag TID Config command
+ *  (Design §5.2.3 — total command must fit in 256-byte budget:
+ *   6 fixed bytes + 244 dynamic + 6 NSM header). */
+#define NSM_DIAG_MAX_TID_DYNAMIC_DATA_SIZE 244
+
+/** @struct nsm_diag_get_system_config_event_data
+ *  Event payload for Get Diag System Config (Event ID 0x00)
+ */
+struct nsm_diag_get_system_config_event_data {
+	uint8_t config_type;
+} __attribute__((packed));
+
+/** @struct nsm_diag_get_tid_config_event_data
+ *  Event payload for Get Diag TID Config (Event ID 0x01)
+ */
+struct nsm_diag_get_tid_config_event_data {
+	uint8_t tid;
+} __attribute__((packed));
+
+/** @struct nsm_diag_set_test_result_event_data
+ *  Event payload for Set Diag Test Result (Event ID 0x02)
+ */
+struct nsm_diag_set_test_result_event_data {
+	uint8_t tid;
+	uint16_t test_error_code;
+	uint8_t dynamic_data_size;
+	uint8_t dynamic_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_diag_set_flow_control_event_data
+ *  Event payload for Set Diag Flow Control (Event ID 0x03)
+ */
+struct nsm_diag_set_flow_control_event_data {
+	uint8_t flow_ctrl_status;
+} __attribute__((packed));
+
+/** @struct nsm_diag_set_system_config_req
+ *  Request data for Set Diag System Config (Command 0x80)
+ *
+ *  Note on layout vs. nsm_diag_set_tid_config_req: the spec wire format
+ *  for command 0x80 does not carry an explicit dynamic_data_size byte —
+ *  the dynamic payload size is derived from hdr.data_size minus the two
+ *  fixed-field bytes. Command 0x81 (TID config) does carry an explicit
+ *  dynamic_data_size since it has more fixed fields and the spec chose
+ *  to size the dynamic payload independently. See Vera CPU Pre-Boot
+ *  Diagnostics Communication Spec §10.1 for the byte-level layout.
+ */
+struct nsm_diag_set_system_config_req {
+	struct nsm_common_req hdr;
+	uint8_t config_type;
+	uint8_t system_test_duration;
+	uint8_t dynamic_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_diag_set_tid_config_req
+ *  Request data for Set Diag TID Config (Command 0x81)
+ */
+struct nsm_diag_set_tid_config_req {
+	struct nsm_common_req hdr;
+	uint8_t tid;
+	uint8_t tid_test_duration;
+	uint16_t loops;
+	uint8_t console_log_level;
+	uint8_t dynamic_data_size;
+	uint8_t dynamic_data[1];
+} __attribute__((packed));
 
 /** @struct nsm_get_device_diagnostics_req
  *
@@ -964,6 +1085,196 @@ int decode_set_device_debug_parameters_req(
  */
 int decode_set_device_debug_parameters_resp(const struct nsm_msg *msg,
 					    size_t msg_len, uint8_t *cc);
+
+/*
+ * Vera CPU Pre-Boot Diagnostics - Event encode/decode functions
+ */
+
+/** @brief Encode a Get Diag System Config event (CPU -> BMC)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] ackr - acknowledgement request
+ *  @param[in] config_type - configuration type (0x00=MB1, 0x01=Test)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_diag_get_system_config_event(uint8_t instance_id, bool ackr,
+					    uint8_t config_type,
+					    struct nsm_msg *msg);
+
+/** @brief Decode a Get Diag System Config event
+ *
+ *  @param[in] msg - event message
+ *  @param[in] msg_len - Length of event message
+ *  @param[out] event_class - event class
+ *  @param[out] event_state - event state
+ *  @param[out] config_type - configuration type
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_diag_get_system_config_event(const struct nsm_msg *msg,
+					    size_t msg_len,
+					    uint8_t *event_class,
+					    uint16_t *event_state,
+					    uint8_t *config_type);
+
+/** @brief Encode a Get Diag TID Config event (CPU -> BMC)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] ackr - acknowledgement request
+ *  @param[in] tid - test identifier
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_diag_get_tid_config_event(uint8_t instance_id, bool ackr,
+					 uint8_t tid, struct nsm_msg *msg);
+
+/** @brief Decode a Get Diag TID Config event
+ *
+ *  @param[in] msg - event message
+ *  @param[in] msg_len - Length of event message
+ *  @param[out] event_class - event class
+ *  @param[out] event_state - event state
+ *  @param[out] tid - test identifier
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_diag_get_tid_config_event(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *event_class,
+					 uint16_t *event_state, uint8_t *tid);
+
+/** @brief Encode a Set Diag Test Result event (CPU -> BMC)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] ackr - acknowledgement request
+ *  @param[in] tid - test identifier
+ *  @param[in] test_error_code - test error code
+ *  @param[in] dynamic_data_size - size of dynamic data
+ *  @param[in] dynamic_data - test-specific result data (may be NULL if size=0)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_diag_set_test_result_event(uint8_t instance_id, bool ackr,
+					  uint8_t tid, uint16_t test_error_code,
+					  uint8_t dynamic_data_size,
+					  const uint8_t *dynamic_data,
+					  struct nsm_msg *msg);
+
+/** @brief Decode a Set Diag Test Result event
+ *
+ *  @param[in] msg - event message
+ *  @param[in] msg_len - Length of event message
+ *  @param[out] event_class - event class
+ *  @param[out] event_state - event state
+ *  @param[out] tid - test identifier
+ *  @param[out] test_error_code - test error code
+ *  @param[out] dynamic_data_size - size of dynamic data
+ *  @param[out] dynamic_data - test-specific result data
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_diag_set_test_result_event(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *event_class,
+					  uint16_t *event_state, uint8_t *tid,
+					  uint16_t *test_error_code,
+					  uint8_t *dynamic_data_size,
+					  uint8_t *dynamic_data);
+
+/** @brief Encode a Set Diag Flow Control event (CPU -> BMC)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] ackr - acknowledgement request
+ *  @param[in] flow_ctrl_status - flow control status
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_diag_set_flow_control_event(uint8_t instance_id, bool ackr,
+					   uint8_t flow_ctrl_status,
+					   struct nsm_msg *msg);
+
+/** @brief Decode a Set Diag Flow Control event
+ *
+ *  @param[in] msg - event message
+ *  @param[in] msg_len - Length of event message
+ *  @param[out] event_class - event class
+ *  @param[out] event_state - event state
+ *  @param[out] flow_ctrl_status - flow control status
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_diag_set_flow_control_event(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *event_class,
+					   uint16_t *event_state,
+					   uint8_t *flow_ctrl_status);
+
+/*
+ * Vera CPU Pre-Boot Diagnostics - Command encode/decode functions
+ */
+
+/** @brief Encode a Set Diag System Config request (BMC -> CPU)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] config_type - configuration type
+ *  @param[in] system_test_duration - system test duration preset level
+ *  @param[in] dynamic_data - configuration data (may be NULL if size=0)
+ *  @param[in] dynamic_data_size - size of dynamic data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_diag_set_system_config_req(uint8_t instance_id, uint8_t config_type,
+				      uint8_t system_test_duration,
+				      const uint8_t *dynamic_data,
+				      uint8_t dynamic_data_size,
+				      struct nsm_msg *msg);
+
+/** @brief Decode a Set Diag System Config request
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] config_type - configuration type
+ *  @param[out] system_test_duration - system test duration preset level
+ *  @param[out] dynamic_data_size - size of dynamic data
+ *  @param[out] dynamic_data - configuration data
+ *  @return nsm_completion_codes
+ */
+int decode_diag_set_system_config_req(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *config_type,
+				      uint8_t *system_test_duration,
+				      uint8_t *dynamic_data_size,
+				      uint8_t *dynamic_data);
+
+/** @brief Encode a Set Diag TID Config request (BMC -> CPU)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] tid - test identifier
+ *  @param[in] tid_test_duration - TID test duration preset level
+ *  @param[in] loops - number of test iterations
+ *  @param[in] console_log_level - console logging verbosity
+ *  @param[in] dynamic_data_size - size of dynamic data
+ *  @param[in] dynamic_data - test-specific config data (may be NULL if size=0)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_diag_set_tid_config_req(uint8_t instance_id, uint8_t tid,
+				   uint8_t tid_test_duration, uint16_t loops,
+				   uint8_t console_log_level,
+				   uint8_t dynamic_data_size,
+				   const uint8_t *dynamic_data,
+				   struct nsm_msg *msg);
+
+/** @brief Decode a Set Diag TID Config request
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] tid - test identifier
+ *  @param[out] tid_test_duration - TID test duration preset level
+ *  @param[out] loops - number of test iterations
+ *  @param[out] console_log_level - console logging verbosity
+ *  @param[out] dynamic_data_size - size of dynamic data
+ *  @param[out] dynamic_data - test-specific config data
+ *  @return nsm_completion_codes
+ */
+int decode_diag_set_tid_config_req(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *tid, uint8_t *tid_test_duration,
+				   uint16_t *loops, uint8_t *console_log_level,
+				   uint8_t *dynamic_data_size,
+				   uint8_t *dynamic_data);
 
 #ifdef __cplusplus
 }
