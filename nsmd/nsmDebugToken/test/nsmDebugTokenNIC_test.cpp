@@ -662,6 +662,10 @@ TEST_F(NsmDebugTokenNICWithDeviceTest,
     auto [rc, statusIntf, valueIntf] = callInstallTokenAsync(request);
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(statusIntf->status(), AsyncOperationStatusType::WriteFailure);
+    auto val = valueIntf->value();
+    auto* errorTuple = std::get_if<std::tuple<uint16_t, std::string>>(&val);
+    ASSERT_NE(errorTuple, nullptr);
+    EXPECT_NE(std::get<0>(*errorTuple), 0);
 }
 
 TEST_F(NsmDebugTokenNICWithDeviceTest,
@@ -840,8 +844,7 @@ TEST_F(NsmDebugTokenNICWithDeviceTest,
 }
 
 // installTokenAsyncHandler decode failure via wrong-size error response:
-// decode_reason_code_and_cc checks exact non-success size; wrong size →
-// NSM_SW_ERROR_LENGTH → decodeRc != NSM_SW_SUCCESS → InternalFailure
+// decodeRc != NSM_SW_SUCCESS → handler routes to InternalFailure
 TEST_F(NsmDebugTokenNICWithDeviceTest, installTokenAsyncHandlerDecodeFailure)
 {
     Response malformedResp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
