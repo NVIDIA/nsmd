@@ -21,7 +21,9 @@
 #include "../../common/utils.hpp"
 #include "nsmApSkuId.hpp"
 #include "nsmCommon.hpp"
+#if defined(ENABLE_DEBUG_INFO)
 #include "nsmDebugInfo.hpp"
+#endif
 #include "nsmDevice.hpp"
 #include "nsmErrorInjection/nsmErrorInjectionCommon.hpp"
 #include "nsmGPIO/nsmGPIOStateCommon.hpp"
@@ -349,6 +351,7 @@ void createErrorInjectionPayload(
     }
 }
 
+#if defined(ENABLE_DEBUG_INFO)
 void createDeviceDiagnostics(std::shared_ptr<NsmDevice> device,
                              const std::string& name, const uuid_t& uuid,
                              sdbusplus::bus::bus& bus)
@@ -357,10 +360,12 @@ void createDeviceDiagnostics(std::shared_ptr<NsmDevice> device,
         bus, name, chassisInventoryBasePath.string() + "/",
         "NSM_DeviceDiagnostics", uuid, DebugDumpType::Diagnostics));
 }
+#endif
 
 void createChassisAttributes(std::shared_ptr<NsmDevice> device,
                              SensorManager& manager, sdbusplus::bus::bus& bus,
-                             const std::string& name, const uuid_t& uuid,
+                             const std::string& name,
+                             [[maybe_unused]] const uuid_t& uuid,
                              const dbus::PropertyMap& allCurrentIfaceProperties,
                              const dbus::PropertyMap& allBaseIfaceProperties)
 {
@@ -436,12 +441,14 @@ void createChassisAttributes(std::shared_ptr<NsmDevice> device,
         createErrorInjectionPayload(manager, device, name,
                                     allBaseIfaceProperties);
     }
+#if defined(ENABLE_DEBUG_INFO)
     if (allCurrentIfaceProperties.count("DeviceDiagnosticsSupported") &&
         std::get<bool>(
             allCurrentIfaceProperties.at("DeviceDiagnosticsSupported")))
     {
         createDeviceDiagnostics(device, name, uuid, bus);
     }
+#endif
     if (allCurrentIfaceProperties.count("SoCPowerSmoothingSupported") &&
         std::get<bool>(
             allCurrentIfaceProperties.at("SoCPowerSmoothingSupported")))

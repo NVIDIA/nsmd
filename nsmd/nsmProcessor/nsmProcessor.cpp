@@ -3520,6 +3520,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->addSensor(sysGuidSensor, false, true);
 #endif
 
+#if defined(ENABLE_DEBUG_INFO)
         // NetIR dump for Processor
         size_t pos = inventoryObjPath.find_last_of('/');
         std::string basePath = inventoryObjPath;
@@ -3547,6 +3548,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             bus, processorName, basePath, type, uuid,
             DebugDumpType::Diagnostics);
         nsmDevice->addStaticSensor(processorDiagnosticsObject);
+#endif
 
         auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
             bus, name, type, inventoryObjPath);
