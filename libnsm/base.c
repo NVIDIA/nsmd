@@ -279,6 +279,32 @@ static void letohArrayData(uint8_t *data, uint16_t num_of_element,
 	}
 }
 
+static size_t getElementSize(uint8_t dataType)
+{
+	switch (dataType) {
+	case NvU8:
+		return sizeof(uint8_t);
+	case NvS8:
+		return sizeof(int8_t);
+	case NvU16:
+		return sizeof(uint16_t);
+	case NvS16:
+		return sizeof(int16_t);
+	case NvU32:
+		return sizeof(uint32_t);
+	case NvS32:
+		return sizeof(int32_t);
+	case NvS24_8:
+		return sizeof(float);
+	case NvU64:
+		return sizeof(uint64_t);
+	case NvS64:
+		return sizeof(int64_t);
+	default:
+		return 0;
+	}
+}
+
 static void dataCopy(uint8_t *srcData, uint8_t *destData, uint16_t numOfElement,
 		     uint8_t dataType)
 {
@@ -1259,7 +1285,7 @@ int decode_get_histogram_format_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint16_t *data_size,
     struct nsm_histogram_format_metadata *meta_data, uint8_t *bucket_offsets,
-    uint32_t *bucket_offsets_size)
+    uint32_t *bucket_offsets_size, size_t bucket_offsets_dest_size)
 {
 	if (data_size == NULL || meta_data == NULL || bucket_offsets == NULL ||
 	    bucket_offsets_size == NULL) {
@@ -1280,6 +1306,12 @@ int decode_get_histogram_format_resp(
 	    (struct nsm_get_histogram_format_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_common_resp) + *data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	meta_data->num_of_buckets = le16toh(resp->metadata.num_of_buckets);
 	meta_data->min_sampling_time =
 	    le32toh(resp->metadata.min_sampling_time);
@@ -1292,8 +1324,22 @@ int decode_get_histogram_format_resp(
 	meta_data->reserved1 = 0;
 	meta_data->bucket_data_type = resp->metadata.bucket_data_type;
 	meta_data->reserved2 = 0;
+
+	if (*data_size < sizeof(struct nsm_histogram_format_metadata)) {
+		return NSM_SW_ERROR_DATA;
+	}
 	*bucket_offsets_size =
 	    *data_size - sizeof(struct nsm_histogram_format_metadata);
+	if (*bucket_offsets_size > bucket_offsets_dest_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	size_t element_size = getElementSize(meta_data->bucket_data_type);
+	if (element_size > 0 &&
+	    (size_t)meta_data->num_of_buckets * element_size >
+		*bucket_offsets_size) {
+		return NSM_SW_ERROR_DATA;
+	}
 
 	dataCopy(resp->bucket_offsets, bucket_offsets,
 		 meta_data->num_of_buckets, meta_data->bucket_data_type);
@@ -1408,7 +1454,8 @@ int encode_get_histogram_data_resp(
 int decode_get_histogram_data_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint16_t *data_size, uint8_t *bucket_data_type,
-    uint16_t *num_of_buckets, uint8_t *bucket_data, uint32_t *bucket_data_size)
+    uint16_t *num_of_buckets, uint8_t *bucket_data, uint32_t *bucket_data_size,
+    size_t bucket_data_dest_size)
 {
 	if (data_size == NULL || bucket_data_type == NULL ||
 	    num_of_buckets == NULL || bucket_data == NULL ||
@@ -1430,10 +1477,30 @@ int decode_get_histogram_data_resp(
 	    (struct nsm_get_histogram_data_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_common_resp) + *data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	*bucket_data_type = resp->bucket_data_type;
 	*num_of_buckets = le16toh(resp->num_of_buckets);
-	*bucket_data_size = *data_size - sizeof(resp->num_of_buckets) -
-			    sizeof(resp->bucket_data_type);
+
+	size_t fixed_fields =
+	    sizeof(resp->num_of_buckets) + sizeof(resp->bucket_data_type);
+	if (*data_size < fixed_fields) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*bucket_data_size = *data_size - fixed_fields;
+	if (*bucket_data_size > bucket_data_dest_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	size_t bkt_element_size = getElementSize(*bucket_data_type);
+	if (bkt_element_size > 0 &&
+	    (size_t)*num_of_buckets * bkt_element_size > *bucket_data_size) {
+		return NSM_SW_ERROR_DATA;
+	}
 
 	dataCopy(resp->bucket_data, bucket_data, *num_of_buckets,
 		 *bucket_data_type);

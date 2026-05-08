@@ -315,7 +315,8 @@ class GetHistogramFormat : public CommandInterface
 
         auto rc = decode_get_histogram_format_resp(
             responsePtr, payloadLength, &cc, &reason_code, &data_size,
-            &metaData, bucket_offsets.data(), &total_bucket_offset_size);
+            &metaData, bucket_offsets.data(), &total_bucket_offset_size,
+            bucket_offsets.size());
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
@@ -508,7 +509,7 @@ class GetHistogramData : public CommandInterface
         auto rc = decode_get_histogram_data_resp(
             responsePtr, payloadLength, &cc, &reason_code, &data_size,
             &dataTypeOfBucket, &number_of_buckets, bucket_data.data(),
-            &total_bucket_offset_size);
+            &total_bucket_offset_size, bucket_data.size());
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "

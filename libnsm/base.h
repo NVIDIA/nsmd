@@ -1102,13 +1102,14 @@ int encode_get_histogram_format_resp(
  *  @param[out] meta_data - meta data about histogram format
  *  @param[out] bucket_offsets - list of bucket offsets
  *  @param[out] bucket_offsets_size - total size of list of bucket offsets
+ *  @param[in] bucket_offsets_dest_size - Size of bucket_offsets buffer
  *  @return nsm_completion_codes
  */
 int decode_get_histogram_format_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint16_t *data_size,
     struct nsm_histogram_format_metadata *meta_data, uint8_t *bucket_offsets,
-    uint32_t *bucket_offsets_size);
+    uint32_t *bucket_offsets_size, size_t bucket_offsets_dest_size);
 
 /** @brief Encode Get histogram data request message
  *
@@ -1159,12 +1160,14 @@ int encode_get_histogram_data_resp(
  *  @param[out] num_of_buckets - number of buckets
  *  @param[out] bucket_data - list of bucket offsets
  *  @param[out] bucket_data_size - total size of list of bucket offsets
+ *  @param[in] bucket_data_dest_size - Size of bucket_data buffer
  *  @return nsm_completion_codes
  */
 int decode_get_histogram_data_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint16_t *data_size, uint8_t *bucket_data_type,
-    uint16_t *num_of_buckets, uint8_t *bucket_data, uint32_t *bucket_data_size);
+    uint16_t *num_of_buckets, uint8_t *bucket_data, uint32_t *bucket_data_size,
+    size_t bucket_data_dest_size);
 #ifdef __cplusplus
 }
 #endif

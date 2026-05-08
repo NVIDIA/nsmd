@@ -1448,13 +1448,15 @@ int encode_get_inventory_information_resp(uint8_t instance_id, uint8_t cc,
  *  @param[out] reason_code     - pointer to reason code
  *  @param[out] data_size - data size in bytes
  *  @param[out] inventory_information - Inventory Information
+ *  @param[in] inventory_information_size - Size of inventory_information buffer
  *  @return nsm_completion_codes
  */
 int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 					  size_t msg_len, uint8_t *cc,
 					  uint16_t *reason_code,
 					  uint16_t *data_size,
-					  uint8_t *inventory_information);
+					  uint8_t *inventory_information,
+					  size_t inventory_information_size);
 
 /**
  * @brief Decode a Get Inventory Information response message payload as uint32
