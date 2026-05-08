@@ -54,8 +54,9 @@ uint8_t NsmInventoryPropertyBase::handleResponseMsg(
     uint16_t dataSize = 0;
     Response data(65535, 0);
 
-    auto rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &reasonCode, &dataSize, data.data());
+    auto rc = decode_get_inventory_information_resp(responseMsg, responseLen,
+                                                    &cc, &reasonCode, &dataSize,
+                                                    data.data(), data.size());
 
     auto handlerFuntionName =
         std::format("decode_get_inventory_information_resp({})", int(property));

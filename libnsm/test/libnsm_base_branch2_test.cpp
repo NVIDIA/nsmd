@@ -88,10 +88,10 @@ TEST(BaseBranch2, DecodeGetHistogramFormatResp_NullDataSize)
 	uint8_t offsets[4]{};
 	uint32_t offsets_sz = 0;
 
-	auto rc =
-	    decode_get_histogram_format_resp(msg, buf.size(), &cc, &reason,
-					     nullptr, // data_size==NULL
-					     &meta, offsets, &offsets_sz);
+	auto rc = decode_get_histogram_format_resp(
+	    msg, buf.size(), &cc, &reason,
+	    nullptr, // data_size==NULL
+	    &meta, offsets, &offsets_sz, sizeof(offsets));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -105,10 +105,10 @@ TEST(BaseBranch2, DecodeGetHistogramFormatResp_NullMetaData)
 	uint8_t offsets[4]{};
 	uint32_t offsets_sz = 0;
 
-	auto rc = decode_get_histogram_format_resp(msg, buf.size(), &cc,
-						   &reason, &dsz,
-						   nullptr, // meta_data==NULL
-						   offsets, &offsets_sz);
+	auto rc = decode_get_histogram_format_resp(
+	    msg, buf.size(), &cc, &reason, &dsz,
+	    nullptr, // meta_data==NULL
+	    offsets, &offsets_sz, sizeof(offsets));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -125,7 +125,7 @@ TEST(BaseBranch2, DecodeGetHistogramFormatResp_NullBucketOffsets)
 	auto rc = decode_get_histogram_format_resp(
 	    msg, buf.size(), &cc, &reason, &dsz, &meta,
 	    nullptr, // bucket_offsets==NULL
-	    &offsets_sz);
+	    &offsets_sz, 0);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -140,8 +140,8 @@ TEST(BaseBranch2, DecodeGetHistogramFormatResp_NullBucketOffsetsSz)
 	uint8_t offsets[4]{};
 
 	auto rc = decode_get_histogram_format_resp(
-	    msg, buf.size(), &cc, &reason, &dsz, &meta, offsets,
-	    nullptr); // bucket_offsets_size==NULL
+	    msg, buf.size(), &cc, &reason, &dsz, &meta, offsets, nullptr,
+	    sizeof(offsets)); // bucket_offsets_size==NULL
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -159,7 +159,8 @@ TEST(BaseBranch2, DecodeGetHistogramFormatResp_CcNonSuccess)
 	uint32_t offsets_sz = 0;
 
 	auto rc = decode_get_histogram_format_resp(
-	    msg, buf.size(), &cc, &reason, &dsz, &meta, offsets, &offsets_sz);
+	    msg, buf.size(), &cc, &reason, &dsz, &meta, offsets, &offsets_sz,
+	    sizeof(offsets));
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, 0xFF);
 }
@@ -215,7 +216,8 @@ TEST(BaseBranch2, DecodeGetHistogramDataResp_NullDataSize)
 
 	auto rc = decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason,
 						 nullptr, // data_size==NULL
-						 &bdt, &nob, bdata, &bdata_sz);
+						 &bdt, &nob, bdata, &bdata_sz,
+						 sizeof(bdata));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -230,10 +232,10 @@ TEST(BaseBranch2, DecodeGetHistogramDataResp_NullBucketDataType)
 	uint8_t bdata[4]{};
 	uint32_t bdata_sz = 0;
 
-	auto rc =
-	    decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason, &dsz,
-					   nullptr, // bucket_data_type==NULL
-					   &nob, bdata, &bdata_sz);
+	auto rc = decode_get_histogram_data_resp(
+	    msg, buf.size(), &cc, &reason, &dsz,
+	    nullptr, // bucket_data_type==NULL
+	    &nob, bdata, &bdata_sz, sizeof(bdata));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -251,7 +253,7 @@ TEST(BaseBranch2, DecodeGetHistogramDataResp_NullNumOfBuckets)
 	auto rc = decode_get_histogram_data_resp(
 	    msg, buf.size(), &cc, &reason, &dsz, &bdt,
 	    nullptr, // num_of_buckets==NULL
-	    bdata, &bdata_sz);
+	    bdata, &bdata_sz, sizeof(bdata));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -269,7 +271,7 @@ TEST(BaseBranch2, DecodeGetHistogramDataResp_NullBucketData)
 	auto rc = decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason,
 						 &dsz, &bdt, &nob,
 						 nullptr, // bucket_data==NULL
-						 &bdata_sz);
+						 &bdata_sz, 0);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -285,8 +287,8 @@ TEST(BaseBranch2, DecodeGetHistogramDataResp_NullBucketDataSize)
 	uint8_t bdata[4]{};
 
 	auto rc = decode_get_histogram_data_resp(
-	    msg, buf.size(), &cc, &reason, &dsz, &bdt, &nob, bdata,
-	    nullptr); // bucket_data_size==NULL
+	    msg, buf.size(), &cc, &reason, &dsz, &bdt, &nob, bdata, nullptr,
+	    sizeof(bdata)); // bucket_data_size==NULL
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -302,8 +304,9 @@ TEST(BaseBranch2, DecodeGetHistogramDataResp_CcNonSuccess)
 	uint8_t bdata[4]{};
 	uint32_t bdata_sz = 0;
 
-	auto rc = decode_get_histogram_data_resp(
-	    msg, buf.size(), &cc, &reason, &dsz, &bdt, &nob, bdata, &bdata_sz);
+	auto rc = decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason,
+						 &dsz, &bdt, &nob, bdata,
+						 &bdata_sz, sizeof(bdata));
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, 0xFF);
 }
@@ -915,4 +918,119 @@ TEST(BaseBranch2, EncodeRawCmdReqV2_PackFail)
 	    encode_raw_cmd_req_v2(32, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 				  NSM_PING, payload, sizeof(payload), msg);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// Device-controlled num_of_buckets / data_size must be bounded against the
+// destination buffer and the received message before dataCopy().
+static std::vector<uint8_t> histDataRespBuf(uint16_t dataSize,
+					    uint8_t bucketType,
+					    uint16_t numBuckets,
+					    size_t payloadBytes)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				     sizeof(nsm_get_histogram_data_resp) - 1 +
+				     payloadBytes,
+				 0);
+	auto *resp = reinterpret_cast<nsm_get_histogram_data_resp *>(
+	    buf.data() + sizeof(nsm_msg_hdr));
+	resp->hdr.command = NSM_GET_HISTOGRAM_DATA;
+	resp->hdr.data_size = dataSize;
+	resp->bucket_data_type = bucketType;
+	resp->num_of_buckets = numBuckets;
+	return buf;
+}
+
+TEST(BaseBranch2, DecodeGetHistogramDataResp_DestTooSmall)
+{
+	auto buf = histDataRespBuf(3 + 8, NvU8, 8, 8);
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0, nob = 0;
+	uint8_t bdt = 0;
+	uint8_t bdata[4]{};
+	uint32_t bdata_sz = 0;
+	auto rc = decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason,
+						 &dsz, &bdt, &nob, bdata,
+						 &bdata_sz, sizeof(bdata));
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(BaseBranch2, DecodeGetHistogramDataResp_NumBucketsExceedsData)
+{
+	// 4 x NvU32 claimed (16 bytes) but only 4 bytes of bucket data sent.
+	auto buf = histDataRespBuf(3 + 4, NvU32, 4, 4);
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0, nob = 0;
+	uint8_t bdt = 0;
+	uint8_t bdata[64]{};
+	uint32_t bdata_sz = 0;
+	auto rc = decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason,
+						 &dsz, &bdt, &nob, bdata,
+						 &bdata_sz, sizeof(bdata));
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(BaseBranch2, DecodeGetHistogramDataResp_DataSizeExceedsMsgLen)
+{
+	auto buf = histDataRespBuf(0xFFFF, NvU8, 0xFFFF, 4);
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0, nob = 0;
+	uint8_t bdt = 0;
+	uint8_t bdata[64]{};
+	uint32_t bdata_sz = 0;
+	auto rc = decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason,
+						 &dsz, &bdt, &nob, bdata,
+						 &bdata_sz, sizeof(bdata));
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(BaseBranch2, DecodeGetHistogramDataResp_BoundsOk)
+{
+	auto buf = histDataRespBuf(3 + 8, NvU8, 8, 8);
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0, nob = 0;
+	uint8_t bdt = 0;
+	uint8_t bdata[8]{};
+	uint32_t bdata_sz = 0;
+	auto rc = decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason,
+						 &dsz, &bdt, &nob, bdata,
+						 &bdata_sz, sizeof(bdata));
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(bdata_sz, 8u);
+}
+
+TEST(BaseBranch2, DecodeGetHistogramFormatResp_DestTooSmall)
+{
+	const size_t offsetsBytes = 8;
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				     sizeof(nsm_get_histogram_format_resp) - 1 +
+				     offsetsBytes,
+				 0);
+	auto *resp = reinterpret_cast<nsm_get_histogram_format_resp *>(
+	    buf.data() + sizeof(nsm_msg_hdr));
+	resp->hdr.command = NSM_GET_HISTOGRAM_FORMAT;
+	resp->hdr.data_size =
+	    sizeof(nsm_histogram_format_metadata) + offsetsBytes;
+	resp->metadata.bucket_data_type = NvU8;
+	resp->metadata.num_of_buckets = offsetsBytes;
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0;
+	nsm_histogram_format_metadata meta{};
+	uint8_t offsets[4]{};
+	uint32_t offsets_sz = 0;
+	EXPECT_EQ(decode_get_histogram_format_resp(
+		      msg, buf.size(), &cc, &reason, &dsz, &meta, offsets,
+		      &offsets_sz, sizeof(offsets)),
+		  NSM_SW_ERROR_LENGTH);
+
+	uint8_t offsetsOk[8]{};
+	EXPECT_EQ(decode_get_histogram_format_resp(
+		      msg, buf.size(), &cc, &reason, &dsz, &meta, offsetsOk,
+		      &offsets_sz, sizeof(offsetsOk)),
+		  NSM_SW_SUCCESS);
 }

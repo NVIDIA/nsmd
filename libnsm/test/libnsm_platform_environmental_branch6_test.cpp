@@ -130,7 +130,7 @@ TEST(PlatEnvBranch6, DecodeGetInventoryInfoResp_NullDataSize)
 	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
 	uint8_t inv[64] = {};
 	auto rc = decode_get_inventory_information_resp(
-	    msg, buf.size(), nullptr, nullptr, nullptr, inv);
+	    msg, buf.size(), nullptr, nullptr, nullptr, inv, sizeof(inv));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -143,7 +143,7 @@ TEST(PlatEnvBranch6, DecodeGetInventoryInfoResp_NullInvInfo)
 	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
 	uint16_t ds = 0;
 	auto rc = decode_get_inventory_information_resp(
-	    msg, buf.size(), nullptr, nullptr, &ds, nullptr);
+	    msg, buf.size(), nullptr, nullptr, &ds, nullptr, 0);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
