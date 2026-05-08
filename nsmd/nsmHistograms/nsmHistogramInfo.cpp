@@ -269,7 +269,8 @@ uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     auto rc = decode_get_histogram_format_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, &metaData,
-        bucket_offsets.data(), &total_bucket_offset_size);
+        bucket_offsets.data(), &total_bucket_offset_size,
+        bucket_offsets.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
@@ -406,15 +407,15 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
     uint16_t dataSize = 0;
     uint16_t number_of_buckets;
     // Data size field on nsm response is 2 bytes means max value could be
-    // 0xFFFF (65535). Possible size for buckets = 65535 -
-    // sizeof(nsm_histogram_format_metadata) = 65535 - 16 = 65519.
-    std::vector<uint8_t> bucket_data(65520, 0);
+    // 0xFFFF (65535). Possible size for bucket data = 65535 -
+    // sizeof(bucket_data_type) - sizeof(num_of_buckets) = 65535 - 3 = 65532.
+    std::vector<uint8_t> bucket_data(65532, 0);
     uint32_t total_bucket_data_size;
     uint8_t dataTypeOfBucket;
     auto rc = decode_get_histogram_data_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize,
         &dataTypeOfBucket, &number_of_buckets, bucket_data.data(),
-        &total_bucket_data_size);
+        &total_bucket_data_size, bucket_data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {

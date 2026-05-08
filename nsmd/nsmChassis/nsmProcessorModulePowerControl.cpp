@@ -296,7 +296,7 @@ requester::Coroutine NsmModulePowerLimit::update(SensorManager& manager,
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -376,7 +376,7 @@ requester::Coroutine NsmDefaultModulePowerLimit::update(SensorManager& manager,
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {

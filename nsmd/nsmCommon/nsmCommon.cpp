@@ -68,7 +68,8 @@ uint8_t NsmMemoryCapacity::handleResponseMsg(const struct nsm_msg* responseMsg,
     uint16_t reason_code = ERR_NULL;
 
     auto rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, data.data());
+        responseMsg, responseLen, &cc, &data_size, &reason_code, data.data(),
+        data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
@@ -274,7 +275,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -364,7 +365,7 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -475,7 +476,7 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
 
             rc = decode_get_inventory_information_resp(
                 responseMsg.get(), responseLen, &cc, &reason_code, &dataSize,
-                data.data());
+                data.data(), data.size());
 
             if (loggers[eid].shouldLog(
                     "getDeviceUUID::decode_get_inventory_information_resp",

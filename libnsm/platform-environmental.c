@@ -460,7 +460,8 @@ int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 					  size_t msg_len, uint8_t *cc,
 					  uint16_t *reason_code,
 					  uint16_t *data_size,
-					  uint8_t *inventory_information)
+					  uint8_t *inventory_information,
+					  size_t inventory_information_size)
 {
 	if (data_size == NULL || inventory_information == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -480,6 +481,13 @@ int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 	    (struct nsm_get_inventory_information_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_common_resp) + *data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (*data_size > inventory_information_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(inventory_information, resp->inventory_information, *data_size);
 
 	return NSM_SW_SUCCESS;
@@ -1148,6 +1156,13 @@ int decode_get_driver_info_resp(const struct nsm_msg *msg, size_t msg_len,
 	struct nsm_get_driver_info_resp *response =
 	    (struct nsm_get_driver_info_resp *)msg->payload;
 	size_t data_size = le16toh(response->hdr.data_size);
+	if (data_size < sizeof(response->driver_state) + 1) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_common_resp) + data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	*driver_state = response->driver_state;
 	size_t driver_version_length =
 	    data_size - sizeof(response->driver_state);

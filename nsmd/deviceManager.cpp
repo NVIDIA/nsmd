@@ -540,7 +540,8 @@ requester::Coroutine DeviceManager::getInventoryInformation(
     std::vector<uint8_t> data(65535, 0);
 
     rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &reasonCode, &dataSize, data.data());
+        responseMsg, responseLen, &cc, &reasonCode, &dataSize, data.data(),
+        data.size());
     if (getInventoryLogger.shouldLog("decode_get_inventory_information_resp",
                                      reasonCode, cc, rc))
     {

@@ -679,7 +679,7 @@ TEST(getInventoryInformation, testGoodDecodeResponse)
 
 	auto rc = decode_get_inventory_information_resp(
 	    response, msg_len, &cc, &reason_code, &data_size,
-	    inventory_information);
+	    inventory_information, sizeof(inventory_information));
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);

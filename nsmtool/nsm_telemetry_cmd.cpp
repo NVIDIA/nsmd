@@ -1073,7 +1073,7 @@ class GetInventoryInformation : public CommandInterface
 
         auto rc = decode_get_inventory_information_resp(
             responsePtr, payloadLength, &cc, &reason_code, &dataSize,
-            data.data());
+            data.data(), data.size());
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
