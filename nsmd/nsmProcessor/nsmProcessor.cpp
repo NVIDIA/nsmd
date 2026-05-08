@@ -1210,7 +1210,7 @@ requester::Coroutine NsmMaxEDPpLimit::update(SensorManager& manager, eid_t eid)
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -1274,7 +1274,7 @@ requester::Coroutine NsmMinEDPpLimit::update(SensorManager& manager, eid_t eid)
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -1525,7 +1525,7 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -1597,7 +1597,7 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -1984,7 +1984,7 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -2134,7 +2134,8 @@ uint8_t
     uint16_t reason_code = ERR_NULL;
 
     auto rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, data.data());
+        responseMsg, responseLen, &cc, &data_size, &reason_code, data.data(),
+        data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
@@ -2378,7 +2379,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -2474,7 +2475,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -2554,7 +2555,7 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {

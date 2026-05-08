@@ -56,7 +56,8 @@ uint8_t NsmInventoryPropertyBase::handleResponseMsg(
     Response data(65535, 0);
 
     auto rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &reasonCode, &dataSize, data.data());
+        responseMsg, responseLen, &cc, &reasonCode, &dataSize, data.data(),
+        data.size());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
