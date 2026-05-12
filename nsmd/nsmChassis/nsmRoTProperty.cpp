@@ -254,6 +254,9 @@ requester::Coroutine InbandUpdatePolicyHandler::updateInbandUpdatePolicy(
         co_return cc ? cc : rc;
     }
 
+    lg2::info("InbandUpdatePolicy updated successfully: {POLICY}", "POLICY",
+              *policyString);
+
     *status = AsyncOperationStatusType::Success;
     co_return NSM_SW_SUCCESS;
 }
@@ -467,6 +470,9 @@ requester::Coroutine FailoverPolicyHandler::updateFailoverPolicy(
         *status = AsyncOperationStatusType::WriteFailure;
         co_return cc ? cc : rc;
     }
+
+    lg2::info("FailoverPolicy updated successfully: {POLICY}", "POLICY",
+              *policyStr);
 
     *status = AsyncOperationStatusType::Success;
     co_return NSM_SW_SUCCESS;
@@ -1063,6 +1069,9 @@ requester::Coroutine ImageCopyPolicyHandler::updateImageCopyPolicy(
         *status = AsyncOperationStatusType::WriteFailure;
         co_return cc ? cc : rc;
     }
+
+    lg2::info("ImageCopyPolicy updated successfully: {POLICY}", "POLICY",
+              *policyString);
 
     *status = AsyncOperationStatusType::Success;
     co_return NSM_SW_SUCCESS;
