@@ -976,14 +976,12 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
         bus, name, associations, type, inventoryObjPath);
     nsmDevice->addDeviceSensors(networkAdapterDI);
 
+// Network adapters (CX/BlueField NICs) expose DebugInfo + LogInfo; Erase is
+// omitted because their trace storage is volatile (erase would be a no-op).
 #if defined(ENABLE_DEBUG_INFO)
     auto networkAdapterDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
         bus, name, inventoryObjPath, type, uuid, DebugDumpType::Network);
     nsmDevice->addStaticSensor(networkAdapterDebugInfoObject);
-
-    auto networkAdapterEraseTraceObject = std::make_shared<NsmEraseTraceObject>(
-        bus, name, inventoryObjPath, type, uuid);
-    nsmDevice->addStaticSensor(networkAdapterEraseTraceObject);
 
     auto networkAdapterLogInfoObject = std::make_shared<NsmLogInfoObject>(
         bus, name, inventoryObjPath, type, uuid);

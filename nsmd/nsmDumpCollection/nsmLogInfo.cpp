@@ -19,6 +19,7 @@
 
 #include "diagnostics.h"
 
+#include "nsmDumpUtils.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
 
@@ -44,10 +45,11 @@ NsmLogInfoObject::NsmLogInfoObject(sdbusplus::bus::bus& bus,
     lg2::debug("Created NsmLogInfoObject: {NAME}", "NAME", name.c_str());
 }
 
-void NsmLogInfoObject::finish(AsyncOperationStatusType status, uint8_t rc)
+void NsmLogInfoObject::finish(AsyncOperationStatusType status,
+                              uint64_t packedError)
 {
     statusInterface->status(status);
-    valueInterface->value(rc);
+    valueInterface->value(packedError);
     close(fd);
 }
 
@@ -57,6 +59,7 @@ void NsmLogInfoObject::getLogInfoAsyncHandler(uint32_t recordHandle)
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_network_device_log_info_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
     encode_get_network_device_log_info_req(0, recordHandle, requestMsg);
+    currentLogInfoHandle = recordHandle;
     getLogInfoAsyncHandler(request).detach();
 }
 
@@ -74,7 +77,8 @@ requester::Coroutine
         lg2::error("NsmLogInfoObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", utils::nsmSwCodeToString(rc));
-        finish(AsyncOperationStatusType::InternalFailure, rc);
+        finish(mapNsmErrorToAsyncStatus(rc, NSM_SUCCESS, ERR_NULL),
+               packNsmError(rc, NSM_SUCCESS, ERR_NULL));
         // coverity[missing_return]
         co_return rc;
     }
@@ -91,12 +95,14 @@ requester::Coroutine
         buffer.data(), &bufferSize);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error(
-            "NsmLogInfoObject: decode_get_network_device_log_info_resp: "
-            "eid={EID} rc={RC} cc={CC} len={LEN} reasonCode={REASON_CODE}",
-            "EID", eid, "RC", rc, "CC", cc, "LEN", responseLen, "REASON_CODE",
-            reasonCode);
-        finish(AsyncOperationStatusType::InternalFailure, rc);
+        lg2::error("NsmLogInfoObject: decode_get_network_device_log_info_resp: "
+                   "eid={EID} rc={RC} cc={CC} reason={REASON} len={LEN}",
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc), "CC",
+                   utils::nsmCompletionCodeToString(cc), "REASON",
+                   utils::nsmReasonCodeToString(reasonCode), "LEN",
+                   responseLen);
+        finish(mapNsmErrorToAsyncStatus(rc, cc, reasonCode),
+               packNsmError(rc, cc, reasonCode));
         // coverity[missing_return]
         co_return rc;
     }
@@ -120,7 +126,8 @@ requester::Coroutine
             break;
         default:
             lg2::error("NsmLogInfoObject: unknown value for time synced");
-            finish(AsyncOperationStatusType::InternalFailure, NSM_SW_ERROR);
+            finish(AsyncOperationStatusType::InternalFailure,
+                   packNsmError(NSM_SW_ERROR, NSM_SUCCESS, ERR_NULL));
             // coverity[missing_return]
             co_return NSM_SW_ERROR;
     }
@@ -133,13 +140,26 @@ requester::Coroutine
     {
         lg2::error("NsmLogInfoObject: appendBufferToFd failed: {ERR}", "ERR",
                    e.what());
-        finish(AsyncOperationStatusType::WriteFailure, NSM_SW_ERROR);
+        finish(AsyncOperationStatusType::WriteFailure,
+               packNsmError(NSM_SW_ERROR, NSM_SUCCESS, ERR_NULL));
         co_return NSM_SW_ERROR;
     }
 
     if (nextHandle == NSM_LOG_INFO_END_RECORD)
     {
-        finish(AsyncOperationStatusType::Success, NSM_SW_SUCCESS);
+        finish(AsyncOperationStatusType::Success,
+               packNsmError(NSM_SW_SUCCESS, NSM_SUCCESS, ERR_NULL));
+    }
+    else if (nextHandle == currentLogInfoHandle)
+    {
+        // Device failed to advance the record handle; abort instead of
+        // recursing forever.
+        lg2::error("NsmLogInfoObject: stuck-loop guard tripped on eid={EID}: "
+                   "device returned nextHandle=0x{HANDLE:x} matching the "
+                   "request",
+                   "EID", eid, "HANDLE", currentLogInfoHandle);
+        finish(AsyncOperationStatusType::InternalFailure,
+               packNsmError(NSM_SW_ERROR, NSM_SUCCESS, ERR_NULL));
     }
     else
     {
@@ -177,7 +197,8 @@ sdbusplus::message::object_path
         lg2::error(
             "NsmLogInfoObject: Failed to duplicate file descriptor: {ERR}",
             "ERR", strerror(errno));
-        finish(AsyncOperationStatusType::InternalFailure, NSM_SW_ERROR);
+        finish(AsyncOperationStatusType::InternalFailure,
+               packNsmError(NSM_SW_ERROR, NSM_SUCCESS, ERR_NULL));
         throw Common::Error::InternalFailure();
     }
     getLogInfoAsyncHandler(NSM_LOG_INFO_START_RECORD);

@@ -796,7 +796,8 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
                                             name);
         }
 
-// NetIR dump for NVSwitch
+// NVSwitch exposes the full NetIR set (DebugInfo + LogInfo + Erase);
+// non-volatile flash requires erase after collection.
 #if defined(ENABLE_DEBUG_INFO)
         auto nvSwitchDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
             bus, name, inventoryObjPath, type, uuid, DebugDumpType::Network);

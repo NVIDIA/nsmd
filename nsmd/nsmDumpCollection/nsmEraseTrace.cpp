@@ -21,6 +21,7 @@
 
 #include "globals.hpp"
 #include "nsmDevice.hpp"
+#include "nsmDumpUtils.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
@@ -78,8 +79,11 @@ void NsmEraseTraceObject::eraseDebugInfo(EraseInfoType infoType)
         default:
             lg2::error("NsmEraseDebugInfoObject: unsupported info type: {TP}",
                        "TP", infoType);
+            // Caller passed an EraseInfoType the firmware does not handle;
+            // this is an InvalidArgument from the caller, not an internal
+            // bug in nsmd.
             eraseDebugInfoStatus(std::make_tuple(
-                EraseOperationStatus::InternalFailure, EraseStatus::Unknown));
+                EraseOperationStatus::InvalidArgument, EraseStatus::Unknown));
             return;
     }
     eraseDebugInfoStatus(std::make_tuple(EraseOperationStatus::InProgress,
@@ -100,7 +104,8 @@ requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("NsmEraseTraceObject: encode_erase_trace_req: rc={RC}", "RC",
-                   rc);
+                   utils::nsmSwCodeToString(rc));
+        // Encode failures are BMC-side; caller can't help.
         operationStatus = EraseOperationStatus::InternalFailure;
         eraseTraceStatus(result);
         co_return rc;
@@ -114,7 +119,7 @@ requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
         lg2::error("NsmEraseTraceObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", utils::nsmSwCodeToString(rc));
-        operationStatus = EraseOperationStatus::InternalFailure;
+        operationStatus = mapNsmErrorToEraseStatus(rc, NSM_SUCCESS, ERR_NULL);
         eraseTraceStatus(result);
         co_return rc;
     }
@@ -127,9 +132,11 @@ requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         lg2::error(
-            "NsmEraseTraceObject: decode_erase_trace_resp failed with rc = {RC}, cc = {CC} and reason_code = {REASON_CODE}",
-            "RC", rc, "CC", cc, "REASON_CODE", reasonCode);
-        operationStatus = EraseOperationStatus::InternalFailure;
+            "NsmEraseTraceObject: decode_erase_trace_resp failed with rc={RC}, cc={CC}, reason={REASON}",
+            "RC", utils::nsmSwCodeToString(rc), "CC",
+            utils::nsmCompletionCodeToString(cc), "REASON",
+            utils::nsmReasonCodeToString(reasonCode));
+        operationStatus = mapNsmErrorToEraseStatus(rc, cc, reasonCode);
         eraseTraceStatus(result);
         co_return rc;
     }
@@ -173,7 +180,8 @@ requester::Coroutine
     {
         lg2::error(
             "NsmEraseDebugInfoObject: encode_erase_debug_info_req: rc={RC}",
-            "RC", rc);
+            "RC", utils::nsmSwCodeToString(rc));
+        // Encode failures are BMC-side; caller can't help.
         operationStatus = EraseOperationStatus::InternalFailure;
         eraseDebugInfoStatus(result);
         co_return rc;
@@ -187,7 +195,7 @@ requester::Coroutine
         lg2::error("NsmEraseDebugInfoObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", utils::nsmSwCodeToString(rc));
-        operationStatus = EraseOperationStatus::InternalFailure;
+        operationStatus = mapNsmErrorToEraseStatus(rc, NSM_SUCCESS, ERR_NULL);
         eraseDebugInfoStatus(result);
         co_return rc;
     }
@@ -200,9 +208,11 @@ requester::Coroutine
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         lg2::error(
-            "NsmEraseDebugInfoObject: decode_erase_debug_info_resp failed with rc = {RC}, cc = {CC} and reason_code = {REASON_CODE}",
-            "RC", rc, "CC", cc, "REASON_CODE", reasonCode);
-        operationStatus = EraseOperationStatus::InternalFailure;
+            "NsmEraseDebugInfoObject: decode_erase_debug_info_resp failed with rc={RC}, cc={CC}, reason={REASON}",
+            "RC", utils::nsmSwCodeToString(rc), "CC",
+            utils::nsmCompletionCodeToString(cc), "REASON",
+            utils::nsmReasonCodeToString(reasonCode));
+        operationStatus = mapNsmErrorToEraseStatus(rc, cc, reasonCode);
         eraseDebugInfoStatus(result);
         co_return rc;
     }

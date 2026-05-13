@@ -32,9 +32,11 @@
 #include <sdeventplus/event.hpp>
 #include <sdeventplus/source/io.hpp>
 
+#include <array>
 #include <map>
 #include <optional>
 #include <queue>
+#include <string_view>
 
 namespace MockupResponder
 {
@@ -127,6 +129,150 @@ const std::unordered_map<uint8_t, uint64_t> adminOverrideMockTable = {
     {7, 100000}  // Current primary floor activation offset
 };
 
+// =====================================================================
+// Dump-command failure cycle (Type 4 cmds 0x40/0x50/0x51/0x52/0x59).
+//
+// When the mockup is started with --dump_failure_cycle, the five dump
+// handlers stop returning the happy-path response and instead replay a
+// fixed, ordered list of device responses — one list entry per dump —
+// covering every NSM error -> AsyncOperationStatus mapping. A single
+// global counter is shared across all five commands, so issuing the
+// same NSM raw dump command repeatedly walks the whole list and
+// exercises every failure -> AsyncOperationStatus mapping in turn. When
+// the flag is off (the default) the handlers behave exactly as before.
+//
+// Each list entry (DumpCycleCase) is one complete dump. Most are a
+// single page (pageCount == 1): the device answers the fresh request
+// and the dump terminates. A firmware-protocol violation that needs the
+// BMC to iterate carries up to 3 pages. The bytes on the wire are built
+// with the same libnsm encode_*_resp helpers a real device uses, so the
+// responses are bit-accurate.
+// =====================================================================
+
+// How an iterative dump handler (0x40/0x50/0x52) sets the next handle.
+enum class DumpHandleMode
+{
+    EndSentinel, // next handle = END (0 for 0x50/0x52, 0xFF for 0x40)
+    Advance,     // next handle = requestHandle + 1 (BMC will recurse)
+    Stuck,       // next handle = requestHandle (BMC stuck-loop guard trips)
+};
+
+// One device response within a dump cycle case.
+struct DumpCyclePage
+{
+    bool silent = false;            // true: send no MCTP reply (BMC times out)
+    uint8_t cc = NSM_SUCCESS;       // completion code byte in the response
+    uint16_t reasonCode = ERR_NULL; // reason code bytes in the response
+    DumpHandleMode handleMode = DumpHandleMode::EndSentinel;
+};
+
+// One entry in the failure cycle: a complete dump (1..3 device responses).
+struct DumpCycleCase
+{
+    std::string_view caseId;         // stable id, also referenced by unit tests
+    std::string_view expectedStatus; // expected status (logged for triage)
+    uint32_t pageCount = 1;          // device responses this dump produces
+    std::array<DumpCyclePage, 3> pages{};
+};
+
+// Single-page completion-code case (reason = ERR_NULL): the device
+// answers the fresh request with a non-success cc and terminates.
+constexpr DumpCycleCase ccCase(std::string_view id, std::string_view expected,
+                               uint8_t cc)
+{
+    return DumpCycleCase{
+        id,
+        expected,
+        1,
+        {{DumpCyclePage{false, cc, ERR_NULL, DumpHandleMode::EndSentinel}}}};
+}
+
+// Single-page reason-code case: cc is a non-success carrier (NSM_ERR_NOT_READY)
+// while the reason code drives the mapping. nsmd's mapper gives a recognized
+// reason code precedence over cc (see nsmDumpUtils.cpp), so the carrier cc
+// never masks the reason under test.
+constexpr DumpCycleCase reasonCase(std::string_view id,
+                                   std::string_view expected, uint16_t reason)
+{
+    return DumpCycleCase{id,
+                         expected,
+                         1,
+                         {{DumpCyclePage{false, NSM_ERR_NOT_READY, reason,
+                                         DumpHandleMode::EndSentinel}}}};
+}
+
+// The failure cycle, in walk order. Index 0 is the success baseline.
+inline constexpr std::array<DumpCycleCase, 25> kDumpFailureCycle = {{
+    // Baseline: a clean single-page dump that terminates normally.
+    DumpCycleCase{"SUCCESS",
+                  "Success",
+                  1,
+                  {{DumpCyclePage{false, NSM_SUCCESS, ERR_NULL,
+                                  DumpHandleMode::EndSentinel}}}},
+
+    // Completion-code triggers (cc branch).
+    ccCase("CC_UNSUPPORTED_COMMAND_CODE", "UnsupportedRequest",
+           NSM_ERR_UNSUPPORTED_COMMAND_CODE),
+    ccCase("CC_UNSUPPORTED_MSG_TYPE", "UnsupportedRequest",
+           NSM_ERR_UNSUPPORTED_MSG_TYPE),
+    ccCase("CC_NSM_BUSY", "Unavailable", NSM_BUSY),
+    ccCase("CC_NSM_ERR_NOT_READY", "Unavailable", NSM_ERR_NOT_READY),
+    ccCase("CC_NSM_ERR_BUS_ACCESS", "Unavailable", NSM_ERR_BUS_ACCESS),
+    ccCase("CC_INVALID_STATE_FOR_COMMAND", "Unavailable",
+           NSM_ERR_INVALID_STATE_FOR_COMMAND),
+    ccCase("CC_INVALID_DATA", "InvalidArgument", NSM_ERR_INVALID_DATA),
+    ccCase("CC_INVALID_DATA_LENGTH", "InvalidArgument",
+           NSM_ERR_INVALID_DATA_LENGTH),
+    ccCase("CC_INVALID_REQUEST_TYPE", "InvalidArgument",
+           NSM_ERR_INVALID_REQUEST_TYPE),
+    ccCase("CC_NSM_ACCEPTED", "InProgress", NSM_ACCEPTED),
+
+    // Reason-code triggers (reason branch — overrides cc).
+    reasonCase("REASON_ERR_TIMEOUT", "Timeout", ERR_TIMEOUT),
+    reasonCase("REASON_ERR_DOWNSTREAM_TIMEOUT", "Timeout",
+               ERR_DOWNSTREAM_TIMEOUT),
+    reasonCase("REASON_ERR_NOT_SUPPORTED", "UnsupportedRequest",
+               ERR_NOT_SUPPORTED),
+    reasonCase("REASON_ERR_NO_BOOT_COMPLETE", "Unavailable",
+               ERR_NO_BOOT_COMPLETE),
+    reasonCase("REASON_ERR_UPDATE_IN_PROGRESS", "Unavailable",
+               ERR_UPDATE_IN_PROGRESS),
+    reasonCase("REASON_ERR_IMAGE_COPY_IN_PROGRESS", "Unavailable",
+               ERR_IMAGE_COPY_IN_PROGRESS),
+    reasonCase("REASON_ERR_FLASH_WEAR_MITIGATION", "Unavailable",
+               ERR_FLASH_WEAR_MITIGATION),
+    reasonCase("REASON_ERR_INVALID_PCI", "InvalidArgument", ERR_INVALID_PCI),
+    reasonCase("REASON_ERR_INVALID_RQD", "InvalidArgument", ERR_INVALID_RQD),
+    reasonCase("REASON_ERR_INCOMPLETE_COMPONENT_SET", "InvalidArgument",
+               ERR_INCOMPLETE_COMPONENT_SET),
+    reasonCase("REASON_ERR_I2C_NACK_FROM_DEV_ADDR", "Unavailable",
+               ERR_I2C_NACK_FROM_DEV_ADDR),
+
+    // Transport silence: device sends no reply, BMC sees NSM_SW_ERROR_TIMEOUT.
+    DumpCycleCase{"NO_RESPONSE_TIMEOUT",
+                  "Timeout",
+                  1,
+                  {{DumpCyclePage{true, NSM_SUCCESS, ERR_NULL,
+                                  DumpHandleMode::EndSentinel}}}},
+
+    // Unmapped (cc, reason) pair: exercises the mapper fall-through.
+    DumpCycleCase{"CATCHALL_UNMAPPED",
+                  "InternalFailure",
+                  1,
+                  {{DumpCyclePage{false, NSM_ERROR, ERR_NULL,
+                                  DumpHandleMode::EndSentinel}}}},
+
+    // Firmware-protocol violation page 0 advances the handle so the BMC
+    // recurses,
+    // page 1 repeats the request handle so nsmd's stuck-loop guard trips.
+    DumpCycleCase{
+        "PROTO_STUCK_HANDLE",
+        "InternalFailure",
+        2,
+        {{DumpCyclePage{false, NSM_SUCCESS, ERR_NULL, DumpHandleMode::Advance},
+          DumpCyclePage{false, NSM_SUCCESS, ERR_NULL, DumpHandleMode::Stuck}}}},
+}};
+
 constexpr uint8_t MCTP_MSG_TYPE_VDM = 0x7e;
 constexpr uint8_t MCTP_MSG_EMU_PREFIX = 0xFF;
 // these are for use with the mctp-demux-daemon
@@ -151,7 +297,8 @@ class MockupResponder
   public:
     MockupResponder(bool verbose, sdeventplus::Event& event,
                     sdbusplus::asio::object_server& server, eid_t eid,
-                    uint8_t deviceType, uint8_t instanceId);
+                    uint8_t deviceType, uint8_t instanceId,
+                    bool dumpFailureCycle = false);
     ~MockupResponder();
 
     int initSocket();
@@ -757,6 +904,21 @@ class MockupResponder
                            std::array<bitfield8_t, EVENT_SOURCES_LENGTH>>
             eventSources;
     } state;
+
+    // Dump failure-cycle state (see --dump_failure_cycle / kDumpFailureCycle).
+    // When dumpFailureCycle is false the dump handlers run their happy path.
+    // When true, a single global counter walks kDumpFailureCycle: cyclePage-
+    // Index selects the page within the current case, cycleCaseIndex selects
+    // the case. The pair is advanced by nextDumpCyclePage() on every dump
+    // request and wraps at the end of the list.
+    bool dumpFailureCycle = false;
+    uint32_t cycleCaseIndex = 0;
+    uint32_t cyclePageIndex = 0;
+
+    // Resolve the page for the current cycle position, log it, and advance
+    // the global counter. iterative is true for the page-based commands
+    // (0x40/0x50/0x52) and false for single-shot erase (0x51/0x59);
+    DumpCyclePage nextDumpCyclePage(std::string_view cmdName, bool iterative);
 
     // Pre-boot diagnostic session simulation
     struct DiagSessionConfig

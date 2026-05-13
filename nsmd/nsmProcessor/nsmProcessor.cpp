@@ -3521,6 +3521,9 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 #endif
 
 #if defined(ENABLE_DEBUG_INFO)
+        // GPU exposes DebugInfo (Network) + Diagnostics; LogInfo/Erase are not
+        // implemented by GPU firmware. Per-platform support is gated by the
+        // NETIR_DUMP_ENABLED / DIAGNOSTIC_DUMP_ENABLED meson options.
         size_t pos = inventoryObjPath.find_last_of('/');
         std::string basePath = inventoryObjPath;
         std::string processorName = name;
@@ -3529,24 +3532,16 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             basePath = inventoryObjPath.substr(0, pos + 1);
             processorName = inventoryObjPath.substr(pos + 1);
         }
+        lg2::debug("NetIR: processor {NAME} at {PATH}", "NAME", processorName,
+                   "PATH", basePath + processorName);
 
 #if NETIR_DUMP_ENABLED
-        // NetIR dump for Processor
         auto processorDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
             bus, processorName, basePath, type, uuid, DebugDumpType::Network);
         nsmDevice->addStaticSensor(processorDebugInfoObject);
 #endif
 
-        auto processorEraseTraceObject = std::make_shared<NsmEraseTraceObject>(
-            bus, processorName, basePath, type, uuid);
-        nsmDevice->addStaticSensor(processorEraseTraceObject);
-
-        auto processorLogInfoObject = std::make_shared<NsmLogInfoObject>(
-            bus, processorName, basePath, type, uuid);
-        nsmDevice->addStaticSensor(processorLogInfoObject);
-
 #if DIAGNOSTIC_DUMP_ENABLED
-        // Device Diagnostics(MSE DUMP) for Processor
         auto processorDiagnosticsObject = std::make_shared<NsmDebugInfoObject>(
             bus, processorName, basePath, type, uuid,
             DebugDumpType::Diagnostics);

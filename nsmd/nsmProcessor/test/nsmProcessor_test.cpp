@@ -2047,13 +2047,14 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     // 8 are added as part of createNsmProcessorSensor() and 2 are added as part
     // of createNsmErrorInjectionSensors()
     // Total device sensors for type = NSM_Processor:
-    // 10 are added as part of createNsmProcessorSensor() (NOTE:
+    // 8 are added as part of createNsmProcessorSensor() (NOTE:
     // NVIDIA_RESET_METRICS & ENABLE_SYSTEM_GUID are disabled during this test
-    // run) and 8 are added as part of createNsmErrorInjectionSensors()
+    // run; GPU no longer exposes NetIR Erase/LogInfo dump objects) and 8 are
+    // added as part of createNsmErrorInjectionSensors()
     // +1 for msgTypes sensor added at index 0
-    EXPECT_EQ(16 + capabilitiesCount, gpu->deviceSensors.size());
+    EXPECT_EQ(14 + capabilitiesCount, gpu->deviceSensors.size());
 
-    int si = 11; // Start after msgTypes sensor at index 0
+    int si = 9; // Start after msgTypes sensor at index 0
 
     // expectedInterfaces is the actual number of interfaces created (4, not 8)
     auto expectedInterfaces = int(4);

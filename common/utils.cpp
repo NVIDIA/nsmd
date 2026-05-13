@@ -840,8 +840,17 @@ void appendBufferToFd(int fd, const std::vector<uint8_t>& buffer)
                                      buffer.size() - totalBytesWritten);
         if (bytesWritten < 0)
         {
-            throw std::runtime_error("appendBufferToFd - write failed: " +
-                                     std::string(strerror(errno)));
+            const int savedErrno = errno;
+            const std::string msg = "appendBufferToFd - write failed: " +
+                                    std::string(strerror(savedErrno));
+            if (savedErrno == ENOSPC)
+            {
+                // Distinguish "no space left on device" so callers can
+                // (eventually) map it to InsufficientStorage rather than the
+                // generic WriteFailure status.
+                throw FilesystemFullError(msg);
+            }
+            throw std::runtime_error(msg);
         }
         totalBytesWritten += bytesWritten;
     }

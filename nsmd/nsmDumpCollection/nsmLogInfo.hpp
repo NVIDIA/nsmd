@@ -44,7 +44,7 @@ class NsmLogInfoObject : public NsmObject, public LogInfoIntf
         getLogInfo(sdbusplus::message::unix_fd fd) override;
 
   private:
-    void finish(AsyncOperationStatusType status, uint8_t rc);
+    void finish(AsyncOperationStatusType status, uint64_t packedError);
     void getLogInfoAsyncHandler(uint32_t recordHandle);
     requester::Coroutine
         getLogInfoAsyncHandler(std::shared_ptr<Request> request);
@@ -54,5 +54,8 @@ class NsmLogInfoObject : public NsmObject, public LogInfoIntf
     std::shared_ptr<AsyncValueIntf> valueInterface;
     sdbusplus::message::unix_fd fd;
     std::vector<uint8_t> buffer;
+    // Record handle last sent on the wire; the stuck-loop guard aborts the
+    // fetch if the device echoes it back as the next handle.
+    uint32_t currentLogInfoHandle{0};
 };
 } // namespace nsm

@@ -555,16 +555,16 @@ TEST_F(NsmEraseTraceObjectTest, EraseDebugInfo_WhenInProgress_ThrowsUnavailable)
 }
 
 TEST_F(NsmEraseTraceObjectTest,
-       EraseDebugInfo_UnsupportedType_SetsInternalFailure)
+       EraseDebugInfo_UnsupportedType_SetsInvalidArgument)
 {
     NsmEraseTraceObject obj(bus, "EraseTrace6",
                             "/xyz/openbmc_project/inventory/system/test/",
                             "GPU", testUuid);
     // EraseInfoType::Other is defined in the enum but not in the switch →
-    // hits the default: branch → sets InternalFailure and returns.
+    // hits the default: branch → reports InvalidArgument (caller error).
     obj.eraseDebugInfo(EraseInfoType::Other);
     auto status = obj.eraseDebugInfoStatus();
-    EXPECT_EQ(std::get<0>(status), EraseOperationStatus::InternalFailure);
+    EXPECT_EQ(std::get<0>(status), EraseOperationStatus::InvalidArgument);
 }
 
 TEST_F(NsmEraseTraceObjectTest, Constructor_SetsObjPath)
