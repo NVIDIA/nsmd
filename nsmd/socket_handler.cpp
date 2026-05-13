@@ -563,7 +563,7 @@ void InKernelHandler::handleReceivedMsg(IO& io, int fd,
                     destAddr.smctp_family = AF_MCTP;
                     destAddr.smctp_network = MCTP_NET_ANY;
                     destAddr.smctp_addr.s_addr = addr.smctp_addr.s_addr;
-                    destAddr.smctp_type = requestMsgData[0];
+                    destAddr.smctp_type = addr.smctp_type;
 
                     constexpr uint8_t tagOwnerBitPos = 3;
                     constexpr uint8_t tagOwnerMask = ~(1 << tagOwnerBitPos);
