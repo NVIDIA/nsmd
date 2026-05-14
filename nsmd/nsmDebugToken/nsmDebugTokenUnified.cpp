@@ -480,11 +480,11 @@ requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await nsmDevice->postPatchIO(eid, *request, responseMsg,
-                                                  responseLen);
+    auto sendRc = co_await nsmDevice->sensorIO(eid, *request, responseMsg,
+                                               responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::debug("DebugToken: queryToken postPatchIO "
+        lg2::debug("DebugToken: queryToken sensorIO "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", utils::nsmSwCodeToString(sendRc));
         // coverity[missing_return]
@@ -666,11 +666,11 @@ requester::Coroutine NsmDebugTokenUnifiedObject::deviceCapabilitiesHandler(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await nsmDevice->postPatchIO(eid, *request, responseMsg,
-                                                  responseLen);
+    auto sendRc = co_await nsmDevice->sensorIO(eid, *request, responseMsg,
+                                               responseLen);
     if (sendRc)
     {
-        lg2::debug("DebugToken: deviceCapabilitiesHandler postPatchIO: "
+        lg2::debug("DebugToken: deviceCapabilitiesHandler sensorIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", utils::nsmSwCodeToString(sendRc));
         // coverity[missing_return]
@@ -718,11 +718,11 @@ requester::Coroutine NsmDebugTokenUnifiedObject::deviceIdHandler(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await nsmDevice->postPatchIO(eid, *request, responseMsg,
-                                                  responseLen);
+    auto sendRc = co_await nsmDevice->sensorIO(eid, *request, responseMsg,
+                                               responseLen);
     if (sendRc)
     {
-        lg2::debug("DebugToken: deviceIdHandler postPatchIO "
+        lg2::debug("DebugToken: deviceIdHandler sensorIO "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", utils::nsmSwCodeToString(sendRc));
         // coverity[missing_return]
