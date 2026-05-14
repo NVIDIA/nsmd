@@ -185,6 +185,12 @@ class MctpDiscovery
     std::map<std::string, MctpInfo> cachedMctpInfoByPath;
     std::map<eid_t, std::queue<MctpInfo>> perEidQueuedMctpInfos;
     std::map<eid_t, std::coroutine_handle<>> perEidDiscoverNsmDeviceTaskHandle;
+    // Per-EID counter of consecutive discovery attempts ended by transport
+    // timeout. Used by discoverNsmDeviceTask to bound re-queue retries when
+    // ping/QueryDeviceIdentification time out (e.g., the device is briefly
+    // unresponsive after BMC soft reboot or while in firmware-update mode).
+    // Reset on success or on terminal (non-timeout) failure.
+    std::map<eid_t, uint8_t> perEidDiscoveryTimeoutRetries;
     std::map<eid_t, std::shared_ptr<nsm::DiscoveryEvents>>
         perEidDiscoveryEvents;
     std::map<uint8_t, std::map<uint16_t, std::shared_ptr<nsm::NsmDevice>>>

@@ -19,6 +19,7 @@
 
 #include "mctp_endpoint_discovery.hpp"
 
+#include "common/sleep.hpp"
 #include "common/types.hpp"
 #include "common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
@@ -29,6 +30,7 @@
 
 #include <nlohmann/json.hpp>
 #include <phosphor-logging/lg2.hpp>
+#include <sdeventplus/event.hpp>
 
 #include <algorithm>
 #include <fstream>
@@ -41,6 +43,16 @@
 
 namespace mctp
 {
+// Bounded application-level retry budget when coSetdeviceStateOnlineTask
+// returns NSM_SW_ERROR_TIMEOUT for an EID. The transport layer already
+// exhausts its retries before escalating; this protects against transient
+// post-reboot unresponsiveness (e.g., late MCTP link-up, device in
+// firmware-update mode) where the device is alive but answers a moment late.
+// Mirrors the LinearBackoffConfig defaults used by MctpEndpointProber for
+// NSM_ERR_NOT_READY retries (see requester/retry_backoff_utils.hpp).
+constexpr uint8_t DiscoveryTimeoutMaxRetries = 3;
+constexpr uint32_t DiscoveryTimeoutRetryDelayMs = 2000;
+
 std::unique_ptr<MctpDiscovery> mctpDiscoveryInstance;
 
 MctpDiscovery& MctpDiscovery::getInstance()
@@ -968,12 +980,40 @@ requester::Coroutine MctpDiscovery::discoverNsmDeviceTask(eid_t eid)
             auto rc = co_await coSetdeviceStateOnlineTask(mctpInfos);
             discoveryEvents(eid).setValue(
                 nsm::DiscoveryEventType::SetDeviceStateOnline, rc);
+            if (rc == NSM_SW_ERROR_TIMEOUT &&
+                perEidDiscoveryTimeoutRetries[eid] < DiscoveryTimeoutMaxRetries)
+            {
+                ++perEidDiscoveryTimeoutRetries[eid];
+                lg2::info(
+                    "discoverNsmDeviceTask: ping/QDI timeout, re-queueing eid={EID} attempt={ATTEMPT}/{MAX} delayMs={DELAY}",
+                    "EID", eid, "ATTEMPT", perEidDiscoveryTimeoutRetries[eid],
+                    "MAX", DiscoveryTimeoutMaxRetries, "DELAY",
+                    DiscoveryTimeoutRetryDelayMs);
+                auto event = sdeventplus::Event::get_default();
+                co_await common::Sleep(
+                    event,
+                    static_cast<uint64_t>(DiscoveryTimeoutRetryDelayMs) * 1000,
+                    common::NonPriority);
+                perEidQueuedMctpInfos[eid].emplace(mctpInfo);
+            }
+            else
+            {
+                if (rc == NSM_SW_ERROR_TIMEOUT)
+                {
+                    lg2::error(
+                        "discoverNsmDeviceTask: timeout retry budget exhausted, eid={EID} attempts={ATTEMPTS}",
+                        "EID", eid, "ATTEMPTS",
+                        perEidDiscoveryTimeoutRetries[eid]);
+                }
+                perEidDiscoveryTimeoutRetries.erase(eid);
+            }
         }
         else
         {
             auto rc = co_await coSetdeviceStateOfflineTask(mctpInfos);
             discoveryEvents(eid).setValue(
                 nsm::DiscoveryEventType::SetDeviceStateOffline, rc);
+            perEidDiscoveryTimeoutRetries.erase(eid);
         }
         perEidQueuedMctpInfos[eid].pop();
         lg2::info("discoverNsmDeviceTask eid={EID}, size={SIZE}", "EID", eid,
