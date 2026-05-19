@@ -111,7 +111,7 @@ enum nsm_debug_token_device_type_id {
 	NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NVSWITCH = 3,
 	NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX7 = 4,
 	NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_MCU = 5,
-	NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX8 = 6
+	NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NIC = 6
 };
 
 /** @brief NSM debug token challenge query status

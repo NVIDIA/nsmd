@@ -124,7 +124,7 @@ TEST(NsmDiagCmdParse, QueryTokenParameters_AllDeviceTypes)
 {
     const uint8_t deviceTypes[] = {
         NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX7, NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_MCU,
-        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX8,
+        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NIC,
         0xFF // default case
     };
     const uint8_t statuses[] = {
