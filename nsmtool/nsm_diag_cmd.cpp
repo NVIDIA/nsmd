@@ -191,8 +191,8 @@ class QueryTokenParameters : public CommandInterface
             case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_MCU:
                 result["Device type"] = "MCU";
                 break;
-            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX8:
-                result["Device type"] = "CX8";
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NIC:
+                result["Device type"] = "NIC";
                 break;
             default:
                 result["Device type"] =

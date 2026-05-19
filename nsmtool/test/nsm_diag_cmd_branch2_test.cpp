@@ -63,7 +63,7 @@ TEST(NsmDiagBranch2, QueryTokenParams_AllDeviceTypes)
                           NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NVSWITCH,
                           NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX7,
                           NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_MCU,
-                          NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX8,
+                          NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NIC,
                           99};
     uint8_t statuses[] = {
         NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_OK,
