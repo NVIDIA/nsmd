@@ -820,6 +820,10 @@ requester::Coroutine NsmDevice::updateFruDeviceIntf()
     {
         currentProperties.insert("PRODUCT_NAME");
     }
+    if (properties.find(ASSET_TAG) != properties.end())
+    {
+        currentProperties.insert("ASSET_TAG");
+    }
     if (properties.find(BUILD_DATE) != properties.end())
     {
         currentProperties.insert("BUILD_DATE");
@@ -963,6 +967,7 @@ requester::Coroutine
         case FIRMWARE_VERSION:
         case INFO_ROM_VERSION:
         case PRODUCT_NAME:
+        case ASSET_TAG:
         {
             property = std::string((char*)data.data(), dataSize);
         }
@@ -1283,6 +1288,12 @@ void FruInterfaceManager::updateAllPropertyValues(
             "PRODUCT_NAME", std::get<std::string>(properties.at(PRODUCT_NAME)));
     }
 
+    if (properties.find(ASSET_TAG) != properties.end())
+    {
+        interface->set_property(
+            "ASSET_TAG", std::get<std::string>(properties.at(ASSET_TAG)));
+    }
+
     if (properties.find(BUILD_DATE) != properties.end())
     {
         interface->set_property(
@@ -1337,6 +1348,12 @@ void FruInterfaceManager::registerAllProperties(
     {
         interface->register_property(
             "PRODUCT_NAME", std::get<std::string>(properties.at(PRODUCT_NAME)));
+    }
+
+    if (properties.find(ASSET_TAG) != properties.end())
+    {
+        interface->register_property(
+            "ASSET_TAG", std::get<std::string>(properties.at(ASSET_TAG)));
     }
 
     if (properties.find(BUILD_DATE) != properties.end())
