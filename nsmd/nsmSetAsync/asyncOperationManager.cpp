@@ -140,6 +140,26 @@ sdbusplus::message::object_path
                                      std::string property,
                                      AsyncSetOperationValueType value)
 {
+    auto findInterface = asyncOperations.find(interface);
+    if (findInterface == asyncOperations.end())
+    {
+        lg2::error("AsyncSet request Interface {INTF} not found", "INTF",
+                   interface);
+
+        throw sdbusplus::error::xyz::openbmc_project::common::
+            UnsupportedRequest{};
+    }
+
+    if (findInterface->second.find(property) == findInterface->second.end())
+    {
+        lg2::error(
+            "AsyncSet request Property {PROP} not found for Interface {INTF}",
+            "PROP", property, "INTF", interface);
+
+        throw sdbusplus::error::xyz::openbmc_project::common::
+            UnsupportedRequest{};
+    }
+
     const auto result =
         AsyncOperationManager::getInstance()->getNewStatusInterface();
 
@@ -172,28 +192,7 @@ requester::Coroutine AsyncSetOperationDispatcher::setImpl(
     const AsyncSetOperationValueType value,
     std::shared_ptr<AsyncStatusIntf> resultIntf)
 {
-    auto findInterface = asyncOperations.find(interface);
-    if (findInterface == asyncOperations.end())
-    {
-        lg2::error("AsyncSet request Interface {INTF} not found", "INTF",
-                   interface);
-
-        throw sdbusplus::error::xyz::openbmc_project::common::
-            UnsupportedRequest{};
-    }
-
-    auto findProperty = findInterface->second.find(property);
-    if (findProperty == findInterface->second.end())
-    {
-        lg2::error(
-            "AsyncSet request Property {PROP} not found for Interface {INTF}",
-            "PROP", property, "INTF", interface);
-
-        throw sdbusplus::error::xyz::openbmc_project::common::
-            UnsupportedRequest{};
-    }
-
-    auto& operation = findProperty->second;
+    auto& operation = asyncOperations.at(interface).at(property);
 
     AsyncOperationStatusType status{AsyncOperationStatusType::Success};
 
