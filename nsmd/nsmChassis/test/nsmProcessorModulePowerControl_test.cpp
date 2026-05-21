@@ -1021,6 +1021,7 @@ struct NsmModulePowerLimitUpdateTest :
     ~NsmModulePowerLimitUpdateTest()
     {
         cleanupDeviceSensors(devices);
+        nsmDevice.reset();
     }
 
     void SetUp() override
@@ -1130,6 +1131,7 @@ struct NsmDefaultModulePowerLimitTest :
     ~NsmDefaultModulePowerLimitTest()
     {
         cleanupDeviceSensors(devices);
+        nsmDevice.reset();
     }
 
     void SetUp() override
@@ -1377,6 +1379,7 @@ struct CreatePMPCFactoryTest :
     {
         cleanupDeviceSensors(devices);
         mockManager.processorModuleToDeviceMap.clear();
+        gpu.reset();
     }
 
     void setupConfig(const std::string& objPath, const std::string& sensorName,

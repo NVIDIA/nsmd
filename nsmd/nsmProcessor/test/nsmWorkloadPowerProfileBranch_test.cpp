@@ -299,6 +299,27 @@ struct PageCollectionTest : public Test, public utils::DBusTest
 {
     std::shared_ptr<MockNsmDevice> device = std::make_shared<MockNsmDevice>(
         0, 0, "NSM_DEVICE_INSTANCE_NUMBER", "0", 0);
+
+    ~PageCollectionTest()
+    {
+        device->deviceSensors.clear();
+        device->staticSensors.clear();
+        device->longRunningSensors.clear();
+        device->prioritySensors.clear();
+        device->roundRobinSensors.clear();
+        device->capabilityRefreshSensors.clear();
+        device->standByToDcRefreshSensors.clear();
+        device->deviceEvents.clear();
+        device->setSensors.clear();
+        device->sensorAggregators.clear();
+        device->gpuDriverSensor.reset();
+        device->msgTypesSensor.reset();
+        device->eventDispatcher.eventsMap.clear();
+        device->task.detach();
+        device->longRunningTask.detach();
+        device->nsmMsgHandler.reset();
+        device->objServer.reset();
+    }
 };
 
 TEST_F(PageCollectionTest, HasPageId_NotFound)
@@ -428,8 +449,26 @@ struct NsmWPPPageHandleTest : public Test, public utils::DBusTest
 
     ~NsmWPPPageHandleTest()
     {
-        // Break circular reference: pageCol → added pages → pageCol
+        // Break pageCol → dynamically-added pages → pageCol cycle first
         pageCol->supportedPages.clear();
+        // Break device → deviceSensors → sensors → device cycle
+        device->deviceSensors.clear();
+        device->staticSensors.clear();
+        device->longRunningSensors.clear();
+        device->prioritySensors.clear();
+        device->roundRobinSensors.clear();
+        device->capabilityRefreshSensors.clear();
+        device->standByToDcRefreshSensors.clear();
+        device->deviceEvents.clear();
+        device->setSensors.clear();
+        device->sensorAggregators.clear();
+        device->gpuDriverSensor.reset();
+        device->msgTypesSensor.reset();
+        device->eventDispatcher.eventsMap.clear();
+        device->task.detach();
+        device->longRunningTask.detach();
+        device->nsmMsgHandler.reset();
+        device->objServer.reset();
     }
 };
 

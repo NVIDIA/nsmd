@@ -81,6 +81,8 @@ struct NsmChassisTest :
     ~NsmChassisTest()
     {
         cleanupDeviceSensors(devices);
+        gpu.reset();
+        fpga.reset();
     }
 
     dbus::PropertyMap error = {

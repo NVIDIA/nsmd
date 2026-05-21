@@ -400,6 +400,7 @@ class NsmSwitchDIPowerModeUpdateTest :
     ~NsmSwitchDIPowerModeUpdateTest()
     {
         cleanupDeviceSensors(devices);
+        nvswitch.reset();
     }
 
     std::shared_ptr<NsmSwitchDIPowerMode> makePowerMode()
@@ -585,6 +586,7 @@ struct NsmSwitchDIFactoryTest :
     ~NsmSwitchDIFactoryTest()
     {
         cleanupDeviceSensors(devices);
+        nvswitchDev.reset();
     }
 };
 

@@ -115,6 +115,7 @@ struct WPPBranch3Test :
     ~WPPBranch3Test()
     {
         cleanupDeviceSensors(devices);
+        gpu.reset();
     }
 };
 
