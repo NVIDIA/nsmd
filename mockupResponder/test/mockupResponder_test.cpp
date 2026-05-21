@@ -136,6 +136,14 @@ class MockupResponderTest : public Test
             true, event, *objServer, eid, deviceType, instanceId);
     }
 
+    void TearDown() override
+    {
+        mockupResponder.reset();
+        objServer.reset();
+        systemBus.reset();
+        io.stop();
+    }
+
     void testProperty(uint8_t propertyIdentifier,
                       const std::string& expectedValue)
     {
@@ -9489,3 +9497,23 @@ TEST_F(MockupResponderTest, testUpdateMinSecurityVersionDecodeFailure)
                                                           request.size());
     EXPECT_FALSE(resp.has_value());
 }
+
+namespace
+{
+class MockupResponderProcessCleanup : public ::testing::Environment
+{
+  public:
+    void TearDown() override
+    {
+        sd_event* ev = nullptr;
+        if (sd_event_default(&ev) >= 0 && ev != nullptr)
+        {
+            sd_event_exit(ev, 0);
+            sd_event_unref(ev);
+        }
+    }
+};
+
+const ::testing::Environment* const mockupResponderProcessCleanupEnv =
+    ::testing::AddGlobalTestEnvironment(new MockupResponderProcessCleanup);
+} // namespace

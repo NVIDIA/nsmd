@@ -35,6 +35,7 @@
 #include <linux/mctp.h>
 #include <sys/socket.h>
 #include <systemd/sd-event.h>
+#include <unistd.h>
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -260,6 +261,23 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
     sockFd = initSocket();
 }
 
+MockupResponder::~MockupResponder()
+{
+    if (diagTimerSource != nullptr)
+    {
+        sd_event_source_unref(diagTimerSource);
+        diagTimerSource = nullptr;
+    }
+
+    io.reset();
+
+    if (sockFd >= 0)
+    {
+        close(sockFd);
+        sockFd = -1;
+    }
+}
+
 int MockupResponder::initSocket()
 {
     auto fd = socket(AF_MCTP, SOCK_DGRAM, 0);
@@ -289,6 +307,7 @@ int MockupResponder::initSocket()
         lg2::error(
             "Error while binding the socket to NSM Msg Type, RC={RC}, EID={ED}",
             "RC", strerror(-rc), "ED", mockEid);
+        close(fd);
         return rc;
     }
 

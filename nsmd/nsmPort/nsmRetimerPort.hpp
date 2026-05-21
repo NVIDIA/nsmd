@@ -64,19 +64,6 @@ using PortProtocol = sdbusplus::server::xyz::openbmc_project::inventory::
 using ClockMode =
     sdbusplus::xyz::openbmc_project::PCIe::server::PCIeClockMode::ClockMode;
 
-class NsmRetimerAERErrorStatusIntf : public AERErrorStatusIntf
-{
-  public:
-    NsmRetimerAERErrorStatusIntf(sdbusplus::bus::bus& bus, const char* path) :
-        AERErrorStatusIntf(bus, path)
-    {}
-    sdbusplus::message::object_path clearAERStatus() override
-    {
-        // Empty implementation - no action taken
-        return sdbusplus::message::object_path();
-    }
-};
-
 class NsmPort : public NsmObject
 {
   public:
@@ -274,17 +261,15 @@ class NsmPCIeECCGroup8 : public NsmPcieGroup
 class NsmPCIeECCGroup9 : public NsmPcieGroup
 {
   public:
-    NsmPCIeECCGroup9(
-        const std::string& name, const std::string& type,
-        const std::string& inventoryPath,
-        std::shared_ptr<NsmRetimerAERErrorStatusIntf> aerErrorStatusIntf,
-        uint8_t deviceIndex);
-    NsmPCIeECCGroup9(
-        const std::string& name, const std::string& type,
-        const std::string& inventoryPath,
-        std::shared_ptr<NsmRetimerAERErrorStatusIntf> aerErrorStatusIntf,
-        uint8_t multiPortType, uint8_t multiPortIndex,
-        uint8_t multiPortUpstreamPortNumber);
+    NsmPCIeECCGroup9(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
+                     std::shared_ptr<AERErrorStatusIntf> aerErrorStatusIntf,
+                     uint8_t deviceIndex);
+    NsmPCIeECCGroup9(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
+                     std::shared_ptr<AERErrorStatusIntf> aerErrorStatusIntf,
+                     uint8_t multiPortType, uint8_t multiPortIndex,
+                     uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup9() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -292,7 +277,7 @@ class NsmPCIeECCGroup9 : public NsmPcieGroup
 
   private:
     std::string objPath;
-    std::shared_ptr<NsmRetimerAERErrorStatusIntf> aerErrorStatusIntf = nullptr;
+    std::shared_ptr<AERErrorStatusIntf> aerErrorStatusIntf = nullptr;
 };
 
 class NsmPCIeECCGroup10 : public NsmPcieGroup

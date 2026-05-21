@@ -152,7 +152,7 @@ class MockupResponder
     MockupResponder(bool verbose, sdeventplus::Event& event,
                     sdbusplus::asio::object_server& server, eid_t eid,
                     uint8_t deviceType, uint8_t instanceId);
-    ~MockupResponder() {}
+    ~MockupResponder();
 
     int initSocket();
 

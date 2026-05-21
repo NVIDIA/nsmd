@@ -810,7 +810,7 @@ void NsmPCIeECCGroup8::updateMetricOnSharedMemory()
 NsmPCIeECCGroup9::NsmPCIeECCGroup9(
     const std::string& name, const std::string& type,
     const std::string& inventoryPath,
-    std::shared_ptr<NsmRetimerAERErrorStatusIntf> aerErrorStatusIntf,
+    std::shared_ptr<AERErrorStatusIntf> aerErrorStatusIntf,
     uint8_t deviceIndex) :
     NsmPcieGroup(name, type, deviceIndex, GROUP_ID_9), objPath(inventoryPath),
     aerErrorStatusIntf(aerErrorStatusIntf)
@@ -824,7 +824,7 @@ NsmPCIeECCGroup9::NsmPCIeECCGroup9(
 NsmPCIeECCGroup9::NsmPCIeECCGroup9(
     const std::string& name, const std::string& type,
     const std::string& inventoryPath,
-    std::shared_ptr<NsmRetimerAERErrorStatusIntf> aerErrorStatusIntf,
+    std::shared_ptr<AERErrorStatusIntf> aerErrorStatusIntf,
     uint8_t multiPortType, uint8_t multiPortIndex,
     uint8_t multiPortUpstreamPortNumber) :
     NsmPcieGroup(name, type, GROUP_ID_9, multiPortType, multiPortIndex,

@@ -1071,8 +1071,8 @@ TEST(NsmPCIeECCGroup9, ConstructorDeviceIndex)
 {
     std::string name = "group9_sensor";
     std::string type = "NSM_PCIeRetimer";
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
 
     NsmPCIeECCGroup9 group(name, type, inventoryObjPath, aerIntf, uint8_t(1));
 
@@ -1088,8 +1088,8 @@ TEST(NsmPCIeECCGroup9, ConstructorMultiPort)
 {
     std::string name = "group9_multi_sensor";
     std::string type = "NSM_PCIeRetimer";
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
 
     NsmPCIeECCGroup9 group(name, type, inventoryObjPath, aerIntf,
                            NSM_PORT_TYPE_DOWNSTREAM, uint8_t(2), uint8_t(4));
@@ -1106,8 +1106,8 @@ TEST(NsmPCIeECCGroup9, HandleResponseMsgSuccess)
 {
     std::string name = "group9_resp";
     std::string type = "NSM_PCIeRetimer";
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
 
     NsmPCIeECCGroup9 group(name, type, inventoryObjPath, aerIntf, uint8_t(1));
 
@@ -1139,8 +1139,8 @@ TEST(NsmPCIeECCGroup9, HandleResponseMsgError)
 {
     std::string name = "group9_err";
     std::string type = "NSM_PCIeRetimer";
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
 
     NsmPCIeECCGroup9 group(name, type, inventoryObjPath, aerIntf, uint8_t(1));
 
@@ -1164,8 +1164,8 @@ TEST(NsmPCIeECCGroup9, HandleResponseMsgHexFormatZero)
 {
     std::string name = "group9_zero";
     std::string type = "NSM_PCIeRetimer";
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
 
     NsmPCIeECCGroup9 group(name, type, inventoryObjPath, aerIntf, uint8_t(1));
 
@@ -1197,8 +1197,8 @@ TEST(NsmPCIeECCGroup9, HandleResponseMsgHexFormatMaxValue)
 {
     std::string name = "group9_max";
     std::string type = "NSM_PCIeRetimer";
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
 
     NsmPCIeECCGroup9 group(name, type, inventoryObjPath, aerIntf, uint8_t(1));
 
@@ -1230,8 +1230,8 @@ TEST(NsmPCIeECCGroup9, GenRequestMsg)
 {
     std::string name = "group9_req";
     std::string type = "NSM_PCIeRetimer";
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
 
     NsmPCIeECCGroup9 group(name, type, inventoryObjPath, aerIntf, uint8_t(1));
 
@@ -1500,19 +1500,6 @@ TEST_F(NsmPCIeECCGroup10RetimerFixture, HandleResponseMsgInboundCounters)
     EXPECT_EQ(group.reqDroppedNonPostCredit, 7u);
     EXPECT_EQ(group.inboundTLPCount, 333u);
     EXPECT_EQ(group.inboundTLPsTransfer, static_cast<uint64_t>(444) * 4);
-}
-
-// ============================================================================
-// NsmRetimerAERErrorStatusIntf Tests
-// ============================================================================
-
-TEST(NsmRetimerAERErrorStatusIntf, ClearAERStatus)
-{
-    NsmRetimerAERErrorStatusIntf aerIntf(bus, inventoryObjPath.c_str());
-
-    // clearAERStatus returns an empty object_path
-    auto result = aerIntf.clearAERStatus();
-    EXPECT_EQ(result, sdbusplus::message::object_path());
 }
 
 // ============================================================================
@@ -2324,8 +2311,8 @@ TEST(NsmPCIeECCGroup9, HandleResponseMsgDecodeFail)
 {
     std::string name = "group9_dec";
     std::string type = "NSM_PCIeRetimer";
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
     NsmPCIeECCGroup9 group(name, type, inventoryObjPath, aerIntf, uint8_t(1));
 
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + 2, 0);
@@ -3398,8 +3385,8 @@ TEST(NsmPCIeECCGroup8, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 
 TEST(NsmPCIeECCGroup9, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 {
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
     NsmPCIeECCGroup9 group("g9_badreq", "NSM_PCIeRetimer", inventoryObjPath,
                            aerIntf, uint8_t(1));
     auto request = group.genRequestMsg(12, NSM_INSTANCE_MAX + 1);
@@ -3870,8 +3857,8 @@ TEST(NsmPCIeECCGroup8, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
 
 TEST(NsmPCIeECCGroup9, HandleResponseMsg_DecodeSuccessNonZeroCC_SkipsUpdate)
 {
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, inventoryObjPath.c_str());
+    auto aerIntf =
+        std::make_shared<AERErrorStatusIntf>(bus, inventoryObjPath.c_str());
     NsmPCIeECCGroup9 group("g9_cc", "NSM_PCIeRetimer", inventoryObjPath,
                            aerIntf, uint8_t(0));
     std::vector<uint8_t> buf(

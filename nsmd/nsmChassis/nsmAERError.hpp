@@ -23,6 +23,7 @@
 #include "nsmSensor.hpp"
 
 #include <com/nvidia/PCIe/AERErrorStatus/server.hpp>
+#include <com/nvidia/PCIe/ClearAERErrorStatus/server.hpp>
 
 #include <optional>
 
@@ -33,16 +34,20 @@ using namespace sdbusplus::server;
 
 using AERErrorStatusIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::pc_ie::AERErrorStatus>;
+using ClearAERErrorStatusIntf = sdbusplus::server::object_t<
+    sdbusplus::server::com::nvidia::pc_ie::ClearAERErrorStatus>;
 class NsmPCIeAERErrorStatus; // forward declaration
 class NsmAERErrorStatusIntf :
     public AERErrorStatusIntf,
+    public ClearAERErrorStatusIntf,
     public StateChangeLogger
 {
   public:
     NsmAERErrorStatusIntf(sdbusplus::bus::bus& bus, const char* path,
                           uint8_t deviceIndex,
                           std::shared_ptr<NsmDevice> device) :
-        AERErrorStatusIntf(bus, path), deviceIndex(deviceIndex), device(device)
+        AERErrorStatusIntf(bus, path), ClearAERErrorStatusIntf(bus, path),
+        deviceIndex(deviceIndex), device(device)
     {}
     sdbusplus::message::object_path clearAERStatus() override;
     requester::Coroutine clearAERError(AsyncOperationStatusType* status);
