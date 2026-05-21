@@ -129,7 +129,11 @@ class NsmDevice :
     NsmDevice() = default;
 
   public:
-    virtual ~NsmDevice() = default;
+    virtual ~NsmDevice()
+    {
+        task.detach();
+        longRunningTask.detach();
+    }
     /**
      * @brief Constructor for NsmDevice
      *

@@ -235,7 +235,7 @@ struct Coroutine
 
     ~Coroutine()
     {
-        if (handle && handle.done())
+        if (handle)
         {
             handle.destroy();
         }
