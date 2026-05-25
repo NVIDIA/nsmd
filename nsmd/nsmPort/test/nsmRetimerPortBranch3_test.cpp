@@ -399,16 +399,6 @@ TEST_F(NsmRetimerPortBranch3Test, NsmPort_Constructor_VerifiesAssociations)
 }
 
 // ===========================================================================
-// NsmRetimerAERErrorStatusIntf::clearAERStatus - returns empty path
-// ===========================================================================
-TEST_F(NsmRetimerPortBranch3Test, AERErrorStatusIntf_ClearReturnsEmptyPath)
-{
-    NsmRetimerAERErrorStatusIntf aerIntf(rt3Bus, rt3InvPath.c_str());
-    auto result = aerIntf.clearAERStatus();
-    EXPECT_EQ(result, sdbusplus::message::object_path());
-}
-
-// ===========================================================================
 // NsmPCIeECCGroup1 handleResponseMsg success via deviceIndex ctor
 // (pcieClockModeIntf is null -> skips clock mode branch)
 // ===========================================================================
@@ -717,8 +707,8 @@ TEST_F(NsmRetimerPortBranch3Test, Group8_DeviceIndex_HandleResponseMsg_Success)
 // ===========================================================================
 TEST_F(NsmRetimerPortBranch3Test, Group9_DeviceIndex_HandleResponseMsg_Success)
 {
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        rt3Bus, rt3InvPath.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(rt3Bus,
+                                                        rt3InvPath.c_str());
 
     NsmPCIeECCGroup9 group("g9_ri_ok", "T", rt3InvPath, aerIntf, uint8_t(1));
 
@@ -748,8 +738,8 @@ TEST_F(NsmRetimerPortBranch3Test, Group9_DeviceIndex_HandleResponseMsg_Success)
 // ===========================================================================
 TEST_F(NsmRetimerPortBranch3Test, Group9_HandleResponseMsg_Success_ZeroValues)
 {
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        rt3Bus, rt3InvPath.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(rt3Bus,
+                                                        rt3InvPath.c_str());
 
     NsmPCIeECCGroup9 group("g9_zero", "T", rt3InvPath, aerIntf,
                            NSM_PORT_TYPE_UPSTREAM, uint8_t(0), uint8_t(1));

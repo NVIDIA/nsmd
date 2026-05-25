@@ -1157,25 +1157,13 @@ TEST(NsmPCIeECCGroup4, GenRequestMsg_MultiPort)
 }
 
 /**
- * NsmRetimerAERErrorStatusIntf_ClearAERStatus_ReturnsEmptyPath
- * Verifies the clearAERStatus override returns an empty object_path.
- */
-TEST(NsmRetimerAERErrorStatusIntf, ClearAERStatus_ReturnsEmptyPath)
-{
-    NsmRetimerAERErrorStatusIntf aerIntf(bus, retimerInvPath.c_str());
-
-    auto result = aerIntf.clearAERStatus();
-    EXPECT_EQ(result, sdbusplus::message::object_path());
-}
-
-/**
  * NsmPCIeECCGroup9_GenRequestMsg_MultiPort
  * Verifies genRequestMsg for multi-port variant of Group9.
  */
 TEST(NsmPCIeECCGroup9, GenRequestMsg_MultiPort)
 {
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        bus, retimerInvPath.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(bus,
+                                                        retimerInvPath.c_str());
 
     NsmPCIeECCGroup9 group("g9_multi_gen", "NSM_PCIeRetimer", retimerInvPath,
                            aerIntf, NSM_PORT_TYPE_DOWNSTREAM, uint8_t(1),

@@ -218,7 +218,7 @@ void createChassisPCIeDeviceRetimerAERErrorStatus(
 {
     const std::string inventoyObjPath = chassisInventoryBasePath / chassisName /
                                         "PCIeDevices" / name;
-    auto aerErrorIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
+    auto aerErrorIntf = std::make_shared<AERErrorStatusIntf>(
         utils::DBusHandler::getBus(), inventoyObjPath.c_str());
     auto aerErrorSensor = std::make_shared<NsmPCIeECCGroup9>(
         name, "PCIeAerErrorStatus", inventoyObjPath, aerErrorIntf, 0, 0, 0);

@@ -21,7 +21,6 @@
  * - NsmPCIeECCGroup1/2/3/4/5/7/8/9/10 retimer (deviceIndex) constructor
  * - NsmPCIeECCGroup9 handleResponseMsg success with hex values
  * - NsmPCIeECCGroup10 helper functions
- * - NsmRetimerAERErrorStatusIntf::clearAERStatus
  * - NsmPort constructor with associations
  * - NsmPCIeECCGroup7 PCIeDeviceIntf single function
  */
@@ -359,8 +358,8 @@ TEST_F(NsmRetimerPortBranch2Test, Group8_DeviceIndex_Ctor)
 
 TEST_F(NsmRetimerPortBranch2Test, Group9_DeviceIndex_Ctor)
 {
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        rt2Bus, rt2InvPath.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(rt2Bus,
+                                                        rt2InvPath.c_str());
     NsmPCIeECCGroup9 group("g9_ri", "T", rt2InvPath, aerIntf, uint8_t(1));
 
     auto request = group.genRequestMsg(10, 0);
@@ -373,8 +372,8 @@ TEST_F(NsmRetimerPortBranch2Test, Group9_DeviceIndex_Ctor)
 
 TEST_F(NsmRetimerPortBranch2Test, Group9_HandleResponseMsg_Success)
 {
-    auto aerIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
-        rt2Bus, rt2InvPath.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(rt2Bus,
+                                                        rt2InvPath.c_str());
     NsmPCIeECCGroup9 group("g9_ok2", "T", rt2InvPath, aerIntf,
                            NSM_PORT_TYPE_UPSTREAM, uint8_t(0), uint8_t(1));
 
@@ -419,17 +418,6 @@ TEST_F(NsmRetimerPortBranch2Test, Group10_DeviceIndex_WithInbound_Ctor)
 
     auto request = group.genRequestMsg(10, 0);
     EXPECT_TRUE(request.has_value());
-}
-
-// ===========================================================================
-// NsmRetimerAERErrorStatusIntf::clearAERStatus
-// ===========================================================================
-
-TEST_F(NsmRetimerPortBranch2Test, AERErrorStatusIntf_ClearAERStatus)
-{
-    NsmRetimerAERErrorStatusIntf aerIntf(rt2Bus, rt2InvPath.c_str());
-    auto result = aerIntf.clearAERStatus();
-    EXPECT_EQ(result, sdbusplus::message::object_path());
 }
 
 // ===========================================================================

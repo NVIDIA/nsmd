@@ -655,8 +655,7 @@ TEST_F(NsmRetimerPortBranchTest, NsmPCIeECCGroup8_HandleResponseMsg_DecodeFail)
 TEST_F(NsmRetimerPortBranchTest,
        NsmPCIeECCGroup9_GenRequestMsg_InvalidInstanceId)
 {
-    auto aerIntf =
-        std::make_shared<NsmRetimerAERErrorStatusIntf>(bus, invPath.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(bus, invPath.c_str());
     NsmPCIeECCGroup9 group("g9_bad", "T", invPath, aerIntf,
                            NSM_PORT_TYPE_UPSTREAM, uint8_t(0), uint8_t(1));
 
@@ -668,8 +667,7 @@ TEST_F(NsmRetimerPortBranchTest,
 
 TEST_F(NsmRetimerPortBranchTest, NsmPCIeECCGroup9_HandleResponseMsg_ErrorCC)
 {
-    auto aerIntf =
-        std::make_shared<NsmRetimerAERErrorStatusIntf>(bus, invPath.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(bus, invPath.c_str());
     NsmPCIeECCGroup9 group("g9_err", "T", invPath, aerIntf,
                            NSM_PORT_TYPE_UPSTREAM, uint8_t(0), uint8_t(1));
 
@@ -687,8 +685,7 @@ TEST_F(NsmRetimerPortBranchTest, NsmPCIeECCGroup9_HandleResponseMsg_ErrorCC)
 
 TEST_F(NsmRetimerPortBranchTest, NsmPCIeECCGroup9_HandleResponseMsg_DecodeFail)
 {
-    auto aerIntf =
-        std::make_shared<NsmRetimerAERErrorStatusIntf>(bus, invPath.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(bus, invPath.c_str());
     NsmPCIeECCGroup9 group("g9_dec", "T", invPath, aerIntf,
                            NSM_PORT_TYPE_UPSTREAM, uint8_t(0), uint8_t(1));
 
@@ -1431,8 +1428,7 @@ TEST_F(NsmRetimerPortBranchTest,
        NsmPCIeECCGroup9_HandleResponseMsg_Success_Fixed)
 {
     std::string g9Path = invPath + "/g9_ok_fixed";
-    auto aerIntf =
-        std::make_shared<NsmRetimerAERErrorStatusIntf>(bus, g9Path.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(bus, g9Path.c_str());
     NsmPCIeECCGroup9 group("g9_ok_fixed", "T", g9Path, aerIntf,
                            NSM_PORT_TYPE_UPSTREAM, uint8_t(0), uint8_t(1));
 
@@ -1673,8 +1669,7 @@ TEST_F(NsmRetimerPortBranchTest, NsmPCIeECCGroup8_DeviceIndexConstructor)
 TEST_F(NsmRetimerPortBranchTest, NsmPCIeECCGroup9_DeviceIndexConstructor)
 {
     std::string g9Path = invPath + "/g9_di";
-    auto aerIntf =
-        std::make_shared<NsmRetimerAERErrorStatusIntf>(bus, g9Path.c_str());
+    auto aerIntf = std::make_shared<AERErrorStatusIntf>(bus, g9Path.c_str());
 
     NsmPCIeECCGroup9 group("g9_di", "T", g9Path, aerIntf, uint8_t(5));
     EXPECT_STREQ(aerIntf->aerUncorrectableErrorStatus().c_str(), "0x00000000");
