@@ -37,6 +37,39 @@
 #include "nsmTemp.hpp"
 #include "nsmThreshold.hpp"
 #include "nsmVoltage.hpp"
+#include "test/mockSensorManager.hpp"
+
+// Fixture that initializes the SensorManager singleton so sensor ctors
+// (which call SensorManager::getInstance().getObjServer() to publish
+// Sensor.Type via Boost-ASIO) succeed under gtest.
+namespace
+{
+struct NumericSensorDevicesStorage
+{
+    NsmDeviceTable nsmDevices;
+};
+
+struct NumericSensorFixtureBase :
+    private NumericSensorDevicesStorage,
+    public ::testing::Test,
+    public SensorManagerTest
+{
+    NumericSensorFixtureBase() : SensorManagerTest(nsmDevices) {}
+    ~NumericSensorFixtureBase() override
+    {
+        cleanupDeviceSensors(nsmDevices);
+    }
+};
+} // namespace
+
+using nsmTempFixture = NumericSensorFixtureBase;
+using nsmPowerFixture = NumericSensorFixtureBase;
+using nsmPeakPowerFixture = NumericSensorFixtureBase;
+using nsmEnergyFixture = NumericSensorFixtureBase;
+using nsmVoltageFixture = NumericSensorFixtureBase;
+using nsmAltitudePressureFixture = NumericSensorFixtureBase;
+using nsmThresholdFixture = NumericSensorFixtureBase;
+using NsmNumericSensorCompositeFixture = NumericSensorFixtureBase;
 
 static auto& bus = utils::DBusHandler::getBus();
 static const std::string sensorName("dummy_sensor");
@@ -51,7 +84,7 @@ static const double minValue{std::numeric_limits<double>::lowest()};
 static const std::string readingBasis("Headroom");
 static const std::string description("dummy_sensor");
 
-TEST(nsmTemp, GoodGenReq)
+TEST_F(nsmTempFixture, GoodGenReq)
 {
     nsm::NsmTemp sensor{bus,
                         sensorName,
@@ -83,7 +116,7 @@ TEST(nsmTemp, GoodGenReq)
     EXPECT_EQ(command->sensor_id, 1);
 }
 
-TEST(nsmTemp, GoodHandleResp)
+TEST_F(nsmTempFixture, GoodHandleResp)
 {
     nsm::NsmTemp sensor{bus,
                         sensorName,
@@ -123,7 +156,7 @@ TEST(nsmTemp, GoodHandleResp)
     sensor.handleResponseMsg(msg, msg_size);
 }
 
-TEST(nsmTemp, BadHandleResp)
+TEST_F(nsmTempFixture, BadHandleResp)
 {
     nsm::NsmTemp sensor{bus,
                         sensorName,
@@ -166,7 +199,7 @@ TEST(nsmTemp, BadHandleResp)
     EXPECT_EQ(cc, NSM_ERROR);
 }
 
-TEST(nsmPower, GoodGenReq)
+TEST_F(nsmPowerFixture, GoodGenReq)
 {
     nsm::NsmPower sensor{bus,
                          sensorName,
@@ -202,7 +235,7 @@ TEST(nsmPower, GoodGenReq)
     EXPECT_EQ(command->averaging_interval, 1);
 }
 
-TEST(nsmPower, GoodHandleResp)
+TEST_F(nsmPowerFixture, GoodHandleResp)
 {
     nsm::NsmPower sensor{bus,
                          sensorName,
@@ -242,7 +275,7 @@ TEST(nsmPower, GoodHandleResp)
     sensor.handleResponseMsg(msg, msg_size);
 }
 
-TEST(nsmPower, BadHandleResp)
+TEST_F(nsmPowerFixture, BadHandleResp)
 {
     nsm::NsmPower sensor{bus,
                          sensorName,
@@ -286,7 +319,7 @@ TEST(nsmPower, BadHandleResp)
     EXPECT_EQ(cc, NSM_ERR_NOT_READY);
 }
 
-TEST(nsmPeakPower, GoodGenReq)
+TEST_F(nsmPeakPowerFixture, GoodGenReq)
 {
     nsm::NsmPeakPower sensor{bus, sensorName, sensorType, 1, 1};
 
@@ -309,7 +342,7 @@ TEST(nsmPeakPower, GoodGenReq)
     EXPECT_EQ(command->averaging_interval, 1);
 }
 
-TEST(nsmPeakPower, GoodHandleResp)
+TEST_F(nsmPeakPowerFixture, GoodHandleResp)
 {
     nsm::NsmPeakPower sensor{bus, sensorName, sensorType, 1, 1};
 
@@ -336,7 +369,7 @@ TEST(nsmPeakPower, GoodHandleResp)
     sensor.handleResponseMsg(msg, msg_size);
 }
 
-TEST(nsmPeakPower, BadHandleResp)
+TEST_F(nsmPeakPowerFixture, BadHandleResp)
 {
     nsm::NsmPeakPower sensor{bus, sensorName, sensorType, 1, 1};
 
@@ -367,7 +400,7 @@ TEST(nsmPeakPower, BadHandleResp)
     EXPECT_EQ(cc, NSM_ERR_NOT_READY);
 }
 
-TEST(nsmEnergy, GoodGenReq)
+TEST_F(nsmEnergyFixture, GoodGenReq)
 {
     nsm::NsmEnergy sensor{bus,
                           sensorName,
@@ -400,7 +433,7 @@ TEST(nsmEnergy, GoodGenReq)
     EXPECT_EQ(command->sensor_id, 1);
 }
 
-TEST(nsmEnergy, GoodHandleResp)
+TEST_F(nsmEnergyFixture, GoodHandleResp)
 {
     nsm::NsmEnergy sensor{bus,
                           sensorName,
@@ -440,7 +473,7 @@ TEST(nsmEnergy, GoodHandleResp)
     sensor.handleResponseMsg(msg, msg_size);
 }
 
-TEST(nsmEnergy, BadHandleResp)
+TEST_F(nsmEnergyFixture, BadHandleResp)
 {
     nsm::NsmEnergy sensor{bus,
                           sensorName,
@@ -483,7 +516,7 @@ TEST(nsmEnergy, BadHandleResp)
     EXPECT_EQ(cc, NSM_ERROR);
 }
 
-TEST(nsmVoltage, GoodGenReq)
+TEST_F(nsmVoltageFixture, GoodGenReq)
 {
     nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
                            1,        associations,      physicalContexnt,
@@ -506,7 +539,7 @@ TEST(nsmVoltage, GoodGenReq)
     EXPECT_EQ(command->sensor_id, 1);
 }
 
-TEST(nsmVoltage, GoodHandleResp)
+TEST_F(nsmVoltageFixture, GoodHandleResp)
 {
     nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
                            1,        associations,      physicalContexnt,
@@ -536,7 +569,7 @@ TEST(nsmVoltage, GoodHandleResp)
     sensor.handleResponseMsg(msg, msg_size);
 }
 
-TEST(nsmVoltage, BadHandleResp)
+TEST_F(nsmVoltageFixture, BadHandleResp)
 {
     nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
                            1,        associations,      physicalContexnt,
@@ -569,7 +602,7 @@ TEST(nsmVoltage, BadHandleResp)
     EXPECT_EQ(cc, NSM_ERR_NOT_READY);
 }
 
-TEST(nsmAltitudePressure, GoodGenReq)
+TEST_F(nsmAltitudePressureFixture, GoodGenReq)
 {
     nsm::NsmAltitudePressure sensor{
         bus,     sensorName,        sensorType, associations, physicalContexnt,
@@ -588,7 +621,7 @@ TEST(nsmAltitudePressure, GoodGenReq)
     EXPECT_EQ(command->data_size, 0);
 }
 
-TEST(nsmAltitudePressure, GoodHandleResp)
+TEST_F(nsmAltitudePressureFixture, GoodHandleResp)
 {
     nsm::NsmAltitudePressure sensor{
         bus,     sensorName,        sensorType, associations, physicalContexnt,
@@ -616,7 +649,7 @@ TEST(nsmAltitudePressure, GoodHandleResp)
     sensor.handleResponseMsg(msg, msg_size);
 }
 
-TEST(nsmAltitudePressure, BadHandleResp)
+TEST_F(nsmAltitudePressureFixture, BadHandleResp)
 {
     nsm::NsmAltitudePressure sensor{
         bus,     sensorName,        sensorType, associations, physicalContexnt,
@@ -649,7 +682,7 @@ TEST(nsmAltitudePressure, BadHandleResp)
     EXPECT_EQ(cc, NSM_ERR_NOT_READY);
 }
 
-TEST(nsmThreshold, GoodGenReq)
+TEST_F(nsmThresholdFixture, GoodGenReq)
 {
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
     nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
@@ -671,7 +704,7 @@ TEST(nsmThreshold, GoodGenReq)
     EXPECT_EQ(command->parameter_id, 1);
 }
 
-TEST(nsmThreshold, GoodHandleResp)
+TEST_F(nsmThresholdFixture, GoodHandleResp)
 {
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
     nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
@@ -694,7 +727,7 @@ TEST(nsmThreshold, GoodHandleResp)
     sensor.handleResponseMsg(msg, msg_size);
 }
 
-TEST(nsmThreshold, BadHandleResp)
+TEST_F(nsmThresholdFixture, BadHandleResp)
 {
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
     nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
@@ -732,7 +765,7 @@ static const std::string
 static const std::string compositePhysicalContext("GPU");
 static const std::string compositeImplementation("PhysicalSensor");
 
-TEST(NsmNumericSensorComposite, Constructor_CreatesObject)
+TEST_F(NsmNumericSensorCompositeFixture, Constructor_CreatesObject)
 {
     std::string name = "composite_power";
     std::string type = "NSM_Power";
@@ -752,7 +785,8 @@ TEST(NsmNumericSensorComposite, Constructor_CreatesObject)
     EXPECT_EQ(sensor.getType(), type);
 }
 
-TEST(NsmNumericSensorComposite, UpdateCompositeReading_SingleChild_SetsValue)
+TEST_F(NsmNumericSensorCompositeFixture,
+       UpdateCompositeReading_SingleChild_SetsValue)
 {
     std::string name = "composite_power2";
     std::string type = "NSM_Power";
@@ -773,8 +807,8 @@ TEST(NsmNumericSensorComposite, UpdateCompositeReading_SingleChild_SetsValue)
     sensor.updateCompositeReading("child1", 100.0);
 }
 
-TEST(NsmNumericSensorComposite,
-     UpdateCompositeReading_MultipleChildren_UpdatesAll)
+TEST_F(NsmNumericSensorCompositeFixture,
+       UpdateCompositeReading_MultipleChildren_UpdatesAll)
 {
     std::string name = "composite_power3";
     std::string type = "NSM_Power";
@@ -797,7 +831,8 @@ TEST(NsmNumericSensorComposite,
 
 // When any child value is NaN, updateCompositeReading sets totalValue to NaN
 // (hits the hasNaN branch) and writes NaN to valueIntf.
-TEST(NsmNumericSensorComposite, UpdateCompositeReading_NaNChild_SetsNaN)
+TEST_F(NsmNumericSensorCompositeFixture,
+       UpdateCompositeReading_NaNChild_SetsNaN)
 {
     std::string name = "composite_power4";
     std::string type = "NSM_Power";
@@ -830,7 +865,7 @@ TEST(NsmNumericSensorComposite, UpdateCompositeReading_NaNChild_SetsNaN)
 // getSensorType() tests — covers inline virtual override in each hpp
 // =============================================================================
 
-TEST(nsmTemp, GetSensorType)
+TEST_F(nsmTempFixture, GetSensorType)
 {
     nsm::NsmTemp sensor{bus,
                         sensorName,
@@ -848,7 +883,7 @@ TEST(nsmTemp, GetSensorType)
     EXPECT_EQ(sensor.getSensorType(), "temperature");
 }
 
-TEST(nsmPower, GetSensorType)
+TEST_F(nsmPowerFixture, GetSensorType)
 {
     nsm::NsmPower sensor{bus,
                          sensorName,
@@ -867,13 +902,13 @@ TEST(nsmPower, GetSensorType)
     EXPECT_EQ(sensor.getSensorType(), "power");
 }
 
-TEST(nsmPeakPower, GetSensorType)
+TEST_F(nsmPeakPowerFixture, GetSensorType)
 {
     nsm::NsmPeakPower sensor{bus, sensorName, sensorType, 1, 1};
     EXPECT_EQ(sensor.getSensorType(), "peak_power");
 }
 
-TEST(nsmEnergy, GetSensorType)
+TEST_F(nsmEnergyFixture, GetSensorType)
 {
     nsm::NsmEnergy sensor{bus,
                           sensorName,
@@ -891,7 +926,7 @@ TEST(nsmEnergy, GetSensorType)
     EXPECT_EQ(sensor.getSensorType(), "energy");
 }
 
-TEST(nsmVoltage, GetSensorType)
+TEST_F(nsmVoltageFixture, GetSensorType)
 {
     nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
                            1,        associations,      physicalContexnt,
@@ -900,7 +935,7 @@ TEST(nsmVoltage, GetSensorType)
     EXPECT_EQ(sensor.getSensorType(), "voltage");
 }
 
-TEST(nsmAltitudePressure, GetSensorType)
+TEST_F(nsmAltitudePressureFixture, GetSensorType)
 {
     nsm::NsmAltitudePressure sensor{
         bus,     sensorName,        sensorType, associations, physicalContexnt,
@@ -908,7 +943,7 @@ TEST(nsmAltitudePressure, GetSensorType)
     EXPECT_EQ(sensor.getSensorType(), "altitude");
 }
 
-TEST(nsmThreshold, GetSensorType)
+TEST_F(nsmThresholdFixture, GetSensorType)
 {
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
     nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
@@ -922,7 +957,7 @@ TEST(nsmThreshold, GetSensorType)
 // genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
 // encode_get_max_observed_power_req fail → if(rc) TRUE → return nullopt.
 // Covers lines 58-61 in nsmPeakPower.cpp.
-TEST(nsmPeakPower, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+TEST_F(nsmPeakPowerFixture, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 {
     nsm::NsmPeakPower sensor{bus, sensorName, sensorType, 1, 1};
     // NSM_INSTANCE_MAX + 1 causes encode to fail
@@ -933,7 +968,7 @@ TEST(nsmPeakPower, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 // genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
 // encode_get_current_power_draw_req fail → if(rc) TRUE → return nullopt.
 // Covers lines 72,74-75 in nsmPower.cpp.
-TEST(nsmPower, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+TEST_F(nsmPowerFixture, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 {
     nsm::NsmPower sensor{bus,
                          sensorName,
@@ -956,7 +991,7 @@ TEST(nsmPower, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 // genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
 // encode_get_altitude_pressure_req fail → if(rc) TRUE → return nullopt.
 // Covers lines 36,38-39 in nsmAltitudePressure.cpp.
-TEST(nsmAltitudePressure, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+TEST_F(nsmAltitudePressureFixture, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 {
     nsm::NsmAltitudePressure sensor{
         bus,     sensorName,        sensorType, associations, physicalContexnt,
@@ -968,7 +1003,7 @@ TEST(nsmAltitudePressure, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 // genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
 // encode_get_current_energy_count_req fail → if(rc) TRUE → return nullopt.
 // Covers lines 67,69-70 in nsmEnergy.cpp.
-TEST(nsmEnergy, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+TEST_F(nsmEnergyFixture, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 {
     nsm::NsmEnergy sensor{bus,
                           sensorName,
@@ -990,7 +1025,7 @@ TEST(nsmEnergy, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 // genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
 // encode_get_temperature_reading_req fail → if(rc) TRUE → return nullopt.
 // Covers lines 66,68-69 in nsmTemp.cpp.
-TEST(nsmTemp, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+TEST_F(nsmTempFixture, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 {
     nsm::NsmTemp sensor{bus,
                         sensorName,
@@ -1012,7 +1047,7 @@ TEST(nsmTemp, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 // genRequestMsg failure: instanceId > NSM_INSTANCE_MAX makes
 // encode_get_voltage_req fail → if(rc) TRUE → return nullopt.
 // Covers lines 57,59-60 in nsmVoltage.cpp.
-TEST(nsmVoltage, BadGenReq_InvalidInstanceId_ReturnsNullopt)
+TEST_F(nsmVoltageFixture, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 {
     nsm::NsmVoltage sensor{bus,      sensorName,        sensorType,
                            1,        associations,      physicalContexnt,
@@ -1022,7 +1057,7 @@ TEST(nsmVoltage, BadGenReq_InvalidInstanceId_ReturnsNullopt)
     EXPECT_FALSE(request.has_value());
 }
 
-TEST(nsmPeakPower, PeakPowerBuilder_MakeAggregator)
+TEST_F(nsmPeakPowerFixture, PeakPowerBuilder_MakeAggregator)
 {
     nsm::PeakPowerSensorBuilder builder;
     nsm::NumericSensorInfo info;

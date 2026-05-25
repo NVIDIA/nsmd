@@ -52,12 +52,12 @@ NsmNumericSensorComposite::NsmNumericSensorComposite(
                 "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType." +
                 physicalContext));
 
-    typeIntf = std::make_unique<TypeIntf>(bus, path.c_str());
-    typeIntf->implementation(
-        sdbusplus::common::xyz::openbmc_project::sensor::Type::
-            convertImplementationTypeFromString(
-                "xyz.openbmc_project.Sensor.Type.ImplementationType." +
-                implementation));
+    // Composite: publish only Implementation on Sensor.Type
+    // (readingBasis=nullptr — no per-physical-measurement reading basis).
+    sensorTypeAsioIntf = NsmAsioSensorTypeInterface::create(
+        SensorManager::getInstance().getObjServer(), path, &implementation,
+        /* readingBasis = */ nullptr);
+
     associationDefinitionsInft =
         std::make_unique<AssociationDefinitionsInft>(bus, path.c_str());
     valueIntf = std::make_unique<ValueIntf>(bus, path.c_str());

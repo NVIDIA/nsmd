@@ -50,9 +50,6 @@
  *      processThresholdsPair with lower/upper thresholds.
  */
 
-#include "test/mockDBusHandler.hpp"
-#include "test/mockSensorManager.hpp"
-
 #include <endian.h>
 
 #include <cmath>
@@ -80,11 +77,39 @@ using namespace ::testing;
 #include "nsmNumericSensor/nsmThresholdAggregator.hpp"
 #include "nsmNumericSensor/nsmThresholdFactory.hpp"
 #include "nsmNumericSensor/nsmThresholdValue.hpp"
+#include "test/mockDBusHandler.hpp"
+#include "test/mockSensorManager.hpp"
 
 #undef private
 #undef protected
 
 using namespace nsm;
+
+// Fixture so NsmNumericSensorDbusValue ctors (which call
+// SensorManager::getInstance().getObjServer() to publish Sensor.Type via
+// Boost-ASIO) succeed under gtest.
+namespace
+{
+struct DbusValueDevicesStorage
+{
+    NsmDeviceTable nsmDevices;
+};
+
+struct DbusValueFixtureBase :
+    private DbusValueDevicesStorage,
+    public ::testing::Test,
+    public SensorManagerTest
+{
+    DbusValueFixtureBase() : SensorManagerTest(nsmDevices) {}
+    ~DbusValueFixtureBase() override
+    {
+        cleanupDeviceSensors(nsmDevices);
+    }
+};
+} // namespace
+
+using CanUpdateB12FFixture = DbusValueFixtureBase;
+using NsmNumericSensorDbusValueB12FFixture = DbusValueFixtureBase;
 
 // ============================================================================
 // Mock classes for LongRunning sensors
@@ -753,7 +778,7 @@ TEST(CalculateNextUpdateTimestampB12F,
 // PART 7: NsmNumericSensorDbusValue::canUpdate
 // ============================================================================
 
-TEST(CanUpdateB12F, ZeroNextUpdate_ReturnsTrue)
+TEST_F(CanUpdateB12FFixture, ZeroNextUpdate_ReturnsTrue)
 {
     // Arrange
     auto& dbus = utils::DBusHandler::getBus();
@@ -772,7 +797,7 @@ TEST(CanUpdateB12F, ZeroNextUpdate_ReturnsTrue)
     EXPECT_TRUE(value.canUpdate(5000));
 }
 
-TEST(CanUpdateB12F, AfterUpdate_BeforeNextTimestamp_ReturnsFalse)
+TEST_F(CanUpdateB12FFixture, AfterUpdate_BeforeNextTimestamp_ReturnsFalse)
 {
     // Arrange
     auto& dbus = utils::DBusHandler::getBus();
@@ -792,7 +817,7 @@ TEST(CanUpdateB12F, AfterUpdate_BeforeNextTimestamp_ReturnsFalse)
     EXPECT_FALSE(value.canUpdate(1500));
 }
 
-TEST(CanUpdateB12F, AfterUpdate_AtOrAfterNextTimestamp_ReturnsTrue)
+TEST_F(CanUpdateB12FFixture, AfterUpdate_AtOrAfterNextTimestamp_ReturnsTrue)
 {
     // Arrange
     auto& dbus = utils::DBusHandler::getBus();
@@ -1990,7 +2015,8 @@ TEST(NsmThresholdRoundTripB12F, GetSensorType_ReturnsThreshold)
 // PART 24: NsmNumericSensorDbusValue -- updateReading value dedup
 // ============================================================================
 
-TEST(NsmNumericSensorDbusValueB12F, UpdateReading_SameValue_DoesNotUpdate)
+TEST_F(NsmNumericSensorDbusValueB12FFixture,
+       UpdateReading_SameValue_DoesNotUpdate)
 {
     // Arrange
     auto& dbus = utils::DBusHandler::getBus();

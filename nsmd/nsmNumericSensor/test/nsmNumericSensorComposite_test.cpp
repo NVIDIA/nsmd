@@ -15,9 +15,6 @@
  * limitations under the License.
  */
 
-#include "test/mockDBusHandler.hpp"
-#include "test/mockSensorManager.hpp"
-
 #include <limits>
 
 #include <gmock/gmock.h>
@@ -30,11 +27,28 @@ using namespace ::testing;
 
 #include "nsmNumericSensor/nsmNumericSensorComposite.hpp"
 #include "nsmObjectFactory.hpp"
+#include "test/mockDBusHandler.hpp"
+#include "test/mockSensorManager.hpp"
 
 using namespace nsm;
 
-struct NsmNumericSensorCompositeTest : public Test, public utils::DBusTest
+struct NsmNumericSensorCompositeDevicesStorage
 {
+    NsmDeviceTable devices;
+};
+
+struct NsmNumericSensorCompositeTest :
+    private NsmNumericSensorCompositeDevicesStorage,
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    NsmNumericSensorCompositeTest() : SensorManagerTest(devices) {}
+    ~NsmNumericSensorCompositeTest() override
+    {
+        cleanupDeviceSensors(devices);
+    }
+
     std::shared_ptr<NsmNumericSensorComposite>
         makeComposite(const std::string& suffix = "test",
                       const std::vector<utils::Association>& assocs = {})
@@ -186,7 +200,13 @@ TEST_F(NsmNumericSensorCompositeTest,
 // CreateFPGATotalGPUPower factory tests (via NsmObjectFactory dispatch)
 // =============================================================================
 
+struct NsmNumericSensorCompositeFactoryDevicesStorage
+{
+    NsmDeviceTable devices;
+};
+
 struct NsmNumericSensorCompositeFactoryTest :
+    private NsmNumericSensorCompositeFactoryDevicesStorage,
     public Test,
     public utils::DBusTest,
     public SensorManagerTest
@@ -198,7 +218,6 @@ struct NsmNumericSensorCompositeFactoryTest :
     const std::string name = "TotalGPUPower";
     const uuid_t gpuUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
-    NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> fpga;
 
     NsmNumericSensorCompositeFactoryTest() : SensorManagerTest(devices)

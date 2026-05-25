@@ -35,9 +35,25 @@
 #include "nsmNumericSensorValue_mock.hpp"
 #include "nsmPower.hpp"
 #include "nsmTemp.hpp"
+#include "test/mockSensorManager.hpp"
 
-class NsmNumericSensorValueAggregateTest : public ::testing::Test
+struct NsmNumericSensorValueAggregateDevicesStorage
 {
+    NsmDeviceTable devices;
+};
+
+class NsmNumericSensorValueAggregateTest :
+    private NsmNumericSensorValueAggregateDevicesStorage,
+    public ::testing::Test,
+    public SensorManagerTest
+{
+  public:
+    NsmNumericSensorValueAggregateTest() : SensorManagerTest(devices) {}
+    ~NsmNumericSensorValueAggregateTest() override
+    {
+        cleanupDeviceSensors(devices);
+    }
+
   protected:
     sdbusplus::bus::bus& bus = utils::DBusHandler::getBus();
     std::string sensorName = "test_sensor";

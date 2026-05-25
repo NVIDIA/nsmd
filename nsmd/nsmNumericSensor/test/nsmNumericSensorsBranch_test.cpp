@@ -51,8 +51,39 @@ using ::testing::Truly;
 #include "nsmPower.hpp"
 #include "nsmTemp.hpp"
 #include "nsmVoltage.hpp"
+#include "test/mockSensorManager.hpp"
 
 using namespace nsm;
+
+// Fixture so sensor ctors (which call
+// SensorManager::getInstance().getObjServer() to publish Sensor.Type via
+// Boost-ASIO) succeed under gtest.
+namespace
+{
+struct NumericSensorBranchDevicesStorage
+{
+    NsmDeviceTable nsmDevices;
+};
+
+struct NumericSensorBranchFixtureBase :
+    private NumericSensorBranchDevicesStorage,
+    public ::testing::Test,
+    public SensorManagerTest
+{
+    NumericSensorBranchFixtureBase() : SensorManagerTest(nsmDevices) {}
+    ~NumericSensorBranchFixtureBase() override
+    {
+        cleanupDeviceSensors(nsmDevices);
+    }
+};
+} // namespace
+
+using nsmTempBranchFixture = NumericSensorBranchFixtureBase;
+using nsmPowerBranchFixture = NumericSensorBranchFixtureBase;
+using nsmEnergyBranchFixture = NumericSensorBranchFixtureBase;
+using nsmVoltageBranchFixture = NumericSensorBranchFixtureBase;
+using nsmPeakPowerBranchFixture = NumericSensorBranchFixtureBase;
+using nsmAltitudePressureBranchFixture = NumericSensorBranchFixtureBase;
 
 static auto& bus = utils::DBusHandler::getBus();
 static const std::string sensorName("branch_sensor");
@@ -80,7 +111,8 @@ static std::vector<uint8_t> makeNonSuccessCCBuf()
 // ── NsmTemp ──────────────────────────────────────────────────────────────────
 
 // handleResponseMsg: rc==NSM_SW_SUCCESS, cc==NSM_ERROR → reading = NaN
-TEST(nsmTempBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
+TEST_F(nsmTempBranchFixture,
+       HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 {
     NsmTemp sensor{bus,          sensorName,
                    sensorType,   1,
@@ -106,7 +138,8 @@ TEST(nsmTempBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 
 // ── NsmPower ─────────────────────────────────────────────────────────────────
 
-TEST(nsmPowerBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
+TEST_F(nsmPowerBranchFixture,
+       HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 {
     NsmPower sensor{bus,
                     sensorName,
@@ -139,7 +172,8 @@ TEST(nsmPowerBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 
 // ── NsmEnergy ────────────────────────────────────────────────────────────────
 
-TEST(nsmEnergyBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
+TEST_F(nsmEnergyBranchFixture,
+       HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 {
     NsmEnergy sensor{bus,          sensorName,
                      sensorType,   1,
@@ -165,7 +199,8 @@ TEST(nsmEnergyBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 
 // ── NsmVoltage ───────────────────────────────────────────────────────────────
 
-TEST(nsmVoltageBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
+TEST_F(nsmVoltageBranchFixture,
+       HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 {
     NsmVoltage sensor{
         bus,     sensorName,   sensorType,
@@ -189,7 +224,8 @@ TEST(nsmVoltageBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 
 // ── NsmPeakPower ─────────────────────────────────────────────────────────────
 
-TEST(nsmPeakPowerBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
+TEST_F(nsmPeakPowerBranchFixture,
+       HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 {
     NsmPeakPower sensor{bus, sensorName, sensorType, 1, 1};
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
@@ -211,8 +247,8 @@ TEST(nsmPeakPowerBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 
 // handleResponseMsg: rc==NSM_SW_SUCCESS, cc==NSM_ERROR → else branch
 // → sensorValue->updateReading(NaN)
-TEST(nsmAltitudePressureBranch,
-     HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
+TEST_F(nsmAltitudePressureBranchFixture,
+       HandleResponseMsg_DecodeSuccessNonZeroCC_UpdatesNaN)
 {
     NsmAltitudePressure sensor{
         bus,        sensorName,

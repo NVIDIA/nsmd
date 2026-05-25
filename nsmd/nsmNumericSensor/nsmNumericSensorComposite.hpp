@@ -19,16 +19,15 @@
 #include "platform-environmental.h"
 
 #include "globals.hpp"
+#include "nsmAsioInterface/nsmAsioSensorTypeInterface.hpp"
 #include "nsmDevice.hpp"
 #include "nsmNumericSensor.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
-#include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
-#include <xyz/openbmc_project/Sensor/Type/server.hpp>
 #include <xyz/openbmc_project/Sensor/Value/server.hpp>
 #include <xyz/openbmc_project/Time/EpochTime/server.hpp>
 
@@ -46,7 +45,8 @@ using namespace sdbusplus::server;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using ValueIntf = object_t<Sensor::server::Value>;
 using TimestampIntf = object_t<Time::server::EpochTime>;
-using TypeIntf = object_t<Sensor::server::Type>;
+// Composite sensors publish only Implementation on Sensor.Type
+// (ReadingBasis is a per-physical-measurement concept; n/a here).
 using DecoratorAreaIntf = object_t<Inventory::Decorator::server::Area>;
 class NsmNumericSensorComposite : public NsmObject
 {
@@ -69,7 +69,7 @@ class NsmNumericSensorComposite : public NsmObject
     std::unique_ptr<AssociationDefinitionsInft> associationDefinitionsInft =
         nullptr;
     std::unique_ptr<DecoratorAreaIntf> decoratorAreaIntf = nullptr;
-    std::unique_ptr<TypeIntf> typeIntf = nullptr;
+    std::unique_ptr<NsmAsioSensorTypeInterface> sensorTypeAsioIntf{};
     std::map<std::string, double> childValues;
 #ifdef NVIDIA_SHMEM
     std::unique_ptr<NsmNumericSensorShmem> shmemSensor;

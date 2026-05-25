@@ -31,10 +31,43 @@
 #define protected public
 
 #include "nsmNumericSensor.hpp"
+#include "test/mockSensorManager.hpp"
 #ifdef NVIDIA_SHMEM
 #include "sharedMemCommon.hpp"
 #endif
 #include "nsmNumericSensorValue_mock.hpp"
+
+// Fixture so sensor ctors (which call
+// SensorManager::getInstance().getObjServer() to publish Sensor.Type via
+// Boost-ASIO) succeed under gtest.
+namespace
+{
+struct NumericDevicesStorage
+{
+    NsmDeviceTable nsmDevices;
+};
+
+struct NumericFixtureBase :
+    private NumericDevicesStorage,
+    public ::testing::Test,
+    public SensorManagerTest
+{
+    NumericFixtureBase() : SensorManagerTest(nsmDevices) {}
+    ~NumericFixtureBase() override
+    {
+        cleanupDeviceSensors(nsmDevices);
+    }
+};
+} // namespace
+
+using NsmNumericSensorDbusValueFixture = NumericFixtureBase;
+using NsmNumericSensorDbusValueTimestampFixture = NumericFixtureBase;
+using SMBPBIPowerSMBusSensorBytesConverterFixture = NumericFixtureBase;
+using Uint64SMBusSensorBytesConverterFixture = NumericFixtureBase;
+using SFxP24F8SMBusSensorBytesConverterFixture = NumericFixtureBase;
+using NsmNumericSensorShmemFixture = NumericFixtureBase;
+using NsmNumericSensorDbusStatusFixture = NumericFixtureBase;
+using NsmNumericSensorAggregatorFixture = NumericFixtureBase;
 
 static auto& bus = utils::DBusHandler::getBus();
 static const std::string sensorName("dummy_sensor");
@@ -51,7 +84,7 @@ static const std::string description("dummy_sensor");
 
 static const double val{32432.8970};
 
-TEST(NsmNumericSensorDbusValue, GoodTest)
+TEST_F(NsmNumericSensorDbusValueFixture, GoodTest)
 {
     nsm::NsmNumericSensorDbusValue value{
         bus,           sensorName,
@@ -66,7 +99,7 @@ TEST(NsmNumericSensorDbusValue, GoodTest)
     EXPECT_EQ(value.valueIntf.unit(), nsm::SensorUnit::DegreesC);
 }
 
-TEST(NsmNumericSensorDbusValueTimestamp, GoodTest)
+TEST_F(NsmNumericSensorDbusValueTimestampFixture, GoodTest)
 {
     nsm::NsmNumericSensorDbusValueTimestamp value{
         bus,           sensorName,
@@ -83,7 +116,7 @@ TEST(NsmNumericSensorDbusValueTimestamp, GoodTest)
     EXPECT_EQ(value.valueIntf.unit(), nsm::SensorUnit::DegreesC);
 }
 
-TEST(SMBPBIPowerSMBusSensorBytesConverter, GoodTest)
+TEST_F(SMBPBIPowerSMBusSensorBytesConverterFixture, GoodTest)
 {
     nsm::SMBPBIPowerSMBusSensorBytesConverter converter;
 
@@ -102,7 +135,7 @@ TEST(SMBPBIPowerSMBusSensorBytesConverter, GoodTest)
     }
 }
 
-TEST(Uint64SMBusSensorBytesConverter, GoodTest)
+TEST_F(Uint64SMBusSensorBytesConverterFixture, GoodTest)
 {
     nsm::Uint64SMBusSensorBytesConverter converter;
 
@@ -121,7 +154,7 @@ TEST(Uint64SMBusSensorBytesConverter, GoodTest)
     }
 }
 
-TEST(SFxP24F8SMBusSensorBytesConverter, GoodTest)
+TEST_F(SFxP24F8SMBusSensorBytesConverterFixture, GoodTest)
 {
     nsm::SFxP24F8SMBusSensorBytesConverter converter;
 
@@ -141,7 +174,7 @@ TEST(SFxP24F8SMBusSensorBytesConverter, GoodTest)
 }
 
 #ifdef NVIDIA_SHMEM
-TEST(NsmNumericSensorShmem, GoodTest)
+TEST_F(NsmNumericSensorShmemFixture, GoodTest)
 {
     nsm::NsmNumericSensorShmem value{
         sensorName, sensorType, associations[0].absolutePath,
@@ -152,7 +185,7 @@ TEST(NsmNumericSensorShmem, GoodTest)
     EXPECT_EQ(value.association, "/xyz/openbmc_project/inventory/dummy_device");
 }
 
-TEST(NsmNumericSensorShmem, NanReadingSetsRcToOne)
+TEST_F(NsmNumericSensorShmemFixture, NanReadingSetsRcToOne)
 {
     nsm::NsmNumericSensorShmem value{
         sensorName, sensorType, associations[0].absolutePath,
@@ -165,7 +198,7 @@ TEST(NsmNumericSensorShmem, NanReadingSetsRcToOne)
     EXPECT_EQ(nsm_shmem_utils::SharedMemoryManager::telemetryData.back().rc, 1);
 }
 
-TEST(NsmNumericSensorShmem, ValidReadingKeepsRcZero)
+TEST_F(NsmNumericSensorShmemFixture, ValidReadingKeepsRcZero)
 {
     nsm::NsmNumericSensorShmem value{
         sensorName, sensorType, associations[0].absolutePath,
@@ -179,7 +212,7 @@ TEST(NsmNumericSensorShmem, ValidReadingKeepsRcZero)
 }
 #endif
 
-TEST(NsmNumericSensorDbusStatus, GoodTest)
+TEST_F(NsmNumericSensorDbusStatusFixture, GoodTest)
 {
     nsm::NsmNumericSensorDbusStatus status{bus, sensorName, sensorType};
     status.updateStatus(true, false);
@@ -188,7 +221,7 @@ TEST(NsmNumericSensorDbusStatus, GoodTest)
     EXPECT_EQ(status.operationalStatusIntf.functional(), false);
 }
 
-TEST(NsmNumericSensorAggregator, GoodTest)
+TEST_F(NsmNumericSensorAggregatorFixture, GoodTest)
 {
     auto elem1 = std::make_unique<MockNsmNumericSensorValue>();
     auto elem1Ptr = elem1.get();

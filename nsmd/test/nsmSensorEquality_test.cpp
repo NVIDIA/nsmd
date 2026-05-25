@@ -29,7 +29,6 @@
 #include "base.h"
 #include "platform-environmental.h"
 
-#include "test/mockSensorManager.hpp"
 #include "utils.hpp"
 
 #include <sdbusplus/bus.hpp>
@@ -40,12 +39,39 @@
 #define protected public
 
 #include "nsmNumericSensor/nsmTemp.hpp"
+#include "test/mockSensorManager.hpp"
 
 #undef private
 #undef protected
 
 using namespace nsm;
 using namespace ::testing;
+
+// Fixture that initializes SensorManager singleton so sensor ctors (which
+// publish Sensor.Type via Boost-ASIO and call
+// SensorManager::getInstance().getObjServer()) succeed.
+namespace
+{
+struct EqualityDevicesStorage
+{
+    NsmDeviceTable devices;
+};
+
+struct EqualityFixtureBase :
+    private EqualityDevicesStorage,
+    public ::testing::Test,
+    public SensorManagerTest
+{
+    EqualityFixtureBase() : SensorManagerTest(devices) {}
+    ~EqualityFixtureBase() override
+    {
+        cleanupDeviceSensors(devices);
+    }
+};
+} // namespace
+
+using NsmSensorEqualsFixture = EqualityFixtureBase;
+using NsmSensorOperatorEqualFixture = EqualityFixtureBase;
 
 // ============================================================================
 // Test helpers
@@ -112,7 +138,7 @@ class ValidRequestSensor : public NsmSensor
 // Two NsmTemp sensors with the same sensorId produce identical request
 // messages (same NSM command + same sensor_id field). equals() must return
 // true.
-TEST(NsmSensorEquals, SameSensorType_SameSensorId_ReturnsTrue)
+TEST_F(NsmSensorEqualsFixture, SameSensorType_SameSensorId_ReturnsTrue)
 {
     NsmTemp sensorA{bus,
                     "temp_sensor_A",
@@ -147,7 +173,7 @@ TEST(NsmSensorEquals, SameSensorType_SameSensorId_ReturnsTrue)
 
 // Two NsmTemp sensors with different sensorIds produce different request
 // messages. equals() must return false.
-TEST(NsmSensorEquals, SameSensorType_DifferentSensorId_ReturnsFalse)
+TEST_F(NsmSensorEqualsFixture, SameSensorType_DifferentSensorId_ReturnsFalse)
 {
     NsmTemp sensorA{bus,
                     "temp_sensor_C",
@@ -181,7 +207,7 @@ TEST(NsmSensorEquals, SameSensorType_DifferentSensorId_ReturnsFalse)
 }
 
 // Comparing a sensor to itself must return true.
-TEST(NsmSensorEquals, SelfComparison_ReturnsTrue)
+TEST_F(NsmSensorEqualsFixture, SelfComparison_ReturnsTrue)
 {
     NsmTemp sensor{bus,
                    "temp_sensor_self",
@@ -202,7 +228,7 @@ TEST(NsmSensorEquals, SelfComparison_ReturnsTrue)
 
 // When either sensor returns nullopt from genRequestMsg, equals() returns
 // false because the short-circuit "requestMsg && sensorRequestMsg" fails.
-TEST(NsmSensorEquals, NullRequestSensor_ReturnsFalse)
+TEST_F(NsmSensorEqualsFixture, NullRequestSensor_ReturnsFalse)
 {
     NsmTemp normalSensor{bus,
                          "temp_sensor_normal",
@@ -225,7 +251,7 @@ TEST(NsmSensorEquals, NullRequestSensor_ReturnsFalse)
 
 // Two NullRequestSensors: both return nullopt; result is false because
 // "requestMsg && sensorRequestMsg" evaluates to false.
-TEST(NsmSensorEquals, BothNullRequest_ReturnsFalse)
+TEST_F(NsmSensorEqualsFixture, BothNullRequest_ReturnsFalse)
 {
     NullRequestSensor sensorA("null_A", "NSM_Null");
     NullRequestSensor sensorB("null_B", "NSM_Null");
@@ -237,7 +263,7 @@ TEST(NsmSensorEquals, BothNullRequest_ReturnsFalse)
 // NsmSensor::operator==() tests — delegates to equals()
 // ============================================================================
 
-TEST(NsmSensorOperatorEqual, SameSensorId_ReturnsTrue)
+TEST_F(NsmSensorOperatorEqualFixture, SameSensorId_ReturnsTrue)
 {
     NsmTemp sensorA{bus,
                     "temp_op_A",
@@ -269,7 +295,7 @@ TEST(NsmSensorOperatorEqual, SameSensorId_ReturnsTrue)
     EXPECT_TRUE(sensorA == sensorB);
 }
 
-TEST(NsmSensorOperatorEqual, DifferentSensorId_ReturnsFalse)
+TEST_F(NsmSensorOperatorEqualFixture, DifferentSensorId_ReturnsFalse)
 {
     NsmTemp sensorA{bus,
                     "temp_op_C",
@@ -301,7 +327,7 @@ TEST(NsmSensorOperatorEqual, DifferentSensorId_ReturnsFalse)
     EXPECT_FALSE(sensorA == sensorB);
 }
 
-TEST(NsmSensorOperatorEqual, SelfComparison_ReturnsTrue)
+TEST_F(NsmSensorOperatorEqualFixture, SelfComparison_ReturnsTrue)
 {
     NsmTemp sensor{bus,
                    "temp_op_self",

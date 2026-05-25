@@ -304,11 +304,13 @@ TEST_F(NsmNumericSensorBranchTest, NumericSensorUpdate_Success_ReturnsSuccess)
 }
 
 // ============================================================================
-// NsmNumericSensorDbusValue: non-null readingBasis → lines 79-90
+// NsmNumericSensorDbusValue: non-null readingBasis branch.
+// Constructor registers ReadingBasis via NsmAsioSensorTypeInterface;
+// asserts the path does not throw.
 // ============================================================================
 
 TEST_F(NsmNumericSensorBranchTest,
-       DbusValue_NonNullReadingBasis_CreatesReadingBasisIntf)
+       DbusValue_NonNullReadingBasis_RegistersAsioReadingBasis)
 {
     auto& bus = utils::DBusHandler::getBus();
     const std::string basis{"Headroom"};

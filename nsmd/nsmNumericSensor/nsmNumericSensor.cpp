@@ -68,31 +68,11 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
                 "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType." +
                 physicalContext));
 
-    if (implementation)
-    {
-        typeIntf = std::make_unique<TypeIntf>(
-            bus, ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name)
-                     .c_str());
-
-        typeIntf->implementation(
-            sdbusplus::common::xyz::openbmc_project::sensor::Type::
-                convertImplementationTypeFromString(
-                    "xyz.openbmc_project.Sensor.Type.ImplementationType." +
-                    *implementation));
-    }
-
-    if (readingBasis)
-    {
-        readingBasisIntf = std::make_unique<ReadingBasisIntf>(
-            bus, ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name)
-                     .c_str());
-
-        readingBasisIntf->readingBasis(
-            sdbusplus::common::xyz::openbmc_project::sensor::ReadingBasis::
-                convertReadingBasisTypeFromString(
-                    "xyz.openbmc_project.Sensor.ReadingBasis.ReadingBasisType." +
-                    *readingBasis));
-    }
+    // Selective Sensor.Type publication; nullptr if both args are null.
+    sensorTypeAsioIntf = NsmAsioSensorTypeInterface::create(
+        SensorManager::getInstance().getObjServer(),
+        "/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name,
+        implementation, readingBasis);
 
     if (description)
     {

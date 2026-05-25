@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "nsmAsioInterface/nsmAsioSensorTypeInterface.hpp"
 #include "nsmNumericSensorComposite.hpp"
 #include "nsmSensor.hpp"
 
@@ -24,8 +25,6 @@
 #include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 #include <xyz/openbmc_project/Sensor/Description/server.hpp>
 #include <xyz/openbmc_project/Sensor/PeakValue/server.hpp>
-#include <xyz/openbmc_project/Sensor/ReadingBasis/server.hpp>
-#include <xyz/openbmc_project/Sensor/Type/server.hpp>
 #include <xyz/openbmc_project/Sensor/Value/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Availability/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
@@ -44,12 +43,10 @@ class NsmNumericSensorComposite;
 using SensorUnit = sdbusplus::xyz::openbmc_project::Sensor::server::Value::Unit;
 using ValueIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Sensor::server::Value>;
-using TypeIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Sensor::server::Type>;
+// Sensor.Type publication is delegated to NsmAsioSensorTypeInterface
+// (selective per-property Boost-ASIO registration).
 using PeakValueIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Sensor::server::PeakValue>;
-using ReadingBasisIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Sensor::server::ReadingBasis>;
 using DescriptionIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Sensor::server::Description>;
 using AvailabilityIntf = sdbusplus::server::object_t<
@@ -101,8 +98,9 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
     ValueIntf valueIntf;
     AssociationDefinitionsInft associationDefinitionsIntf;
     DecoratorAreaIntf decoratorAreaIntf;
-    std::unique_ptr<TypeIntf> typeIntf{};
-    std::unique_ptr<ReadingBasisIntf> readingBasisIntf{};
+    // Created by NsmAsioSensorTypeInterface::create() iff implementation
+    // and/or readingBasis is non-null; stays nullptr otherwise.
+    std::unique_ptr<NsmAsioSensorTypeInterface> sensorTypeAsioIntf{};
     std::unique_ptr<DescriptionIntf> descriptionIntf{};
 };
 

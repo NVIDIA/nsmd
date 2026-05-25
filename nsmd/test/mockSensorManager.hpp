@@ -190,8 +190,22 @@ class SensorManagerTest
     }
 
   protected:
-    NiceMock<MockSensorManager> mockManager;
+    // Default asio plumbing so MockSensorManager::getObjServer() has a
+    // valid return reference for fixtures that don't override it.
+    // Producers that construct sensors needing Sensor.Type publication
+    // (NsmNumericSensorDbusValue, NsmNumericSensorComposite, ...) call
+    // SensorManager::getInstance().getObjServer() unconditionally, so
+    // every SensorManagerTest-derived fixture needs a default.
+    // Declared BEFORE mockManager so they outlive it during destruction:
+    // ~SensorManager destroys the objects map whose NsmObjects hold
+    // sdbusplus interfaces backed by this io_context; if io_context died
+    // first, the interface destructors would touch freed asio descriptors
+    // (heap-use-after-free under ASan).
+    boost::asio::io_context defaultIoCtx;
+    std::shared_ptr<sdbusplus::asio::connection> defaultSystemBus;
+    std::shared_ptr<sdbusplus::asio::object_server> defaultObjServer;
     Response lastResponse;
+    NiceMock<MockSensorManager> mockManager;
     template <typename DataType>
     DataType& data(size_t lastResponseOffset)
     {
@@ -290,9 +304,18 @@ class SensorManagerTest
     }
 
     SensorManagerTest() = delete;
-    SensorManagerTest(NsmDeviceTable& devices) : mockManager(devices)
+    SensorManagerTest(NsmDeviceTable& devices) :
+        defaultSystemBus(
+            std::make_shared<sdbusplus::asio::connection>(defaultIoCtx)),
+        defaultObjServer(
+            std::make_shared<sdbusplus::asio::object_server>(defaultSystemBus)),
+        mockManager(devices)
     {
         sensorManagerInstance.reset(&mockManager);
+        // Provide a real object_server reference by default; derived
+        // fixtures may override with their own ON_CALL.
+        ON_CALL(mockManager, getObjServer())
+            .WillByDefault(::testing::ReturnRef(*defaultObjServer));
     }
     virtual ~SensorManagerTest()
     {
