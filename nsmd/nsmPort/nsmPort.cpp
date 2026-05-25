@@ -4,6 +4,10 @@
 #include "dBusAsyncUtils.hpp"
 #include "utils.hpp"
 
+#if defined(ENABLE_LLDP)
+#include "nsmLLDPLib/nsmLldpPort.hpp"
+#endif
+
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -1751,6 +1755,17 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
         co_return NSM_ERROR;
     }
 
+#if defined(ENABLE_LLDP)
+    bool lldpPacketSupported = false;
+    auto lldpRc = co_await coIsLldpPacketSupported(uuid, lldpPacketSupported);
+    if (lldpRc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "coIsLldpPacketSupported failed for port sensor creation: UUID={UUID}, NAME={NAME}, RC={RC}",
+            "UUID", uuid, "NAME", name, "RC", lldpRc);
+    }
+#endif
+
     // get topology information from EM
     std::string deviceName =
         parentObjPath.substr(parentObjPath.find_last_of('/') + 1);
@@ -1898,6 +1913,15 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
                 bus, portName, type, objPath, nsmDevice,
                 static_cast<uint32_t>(i));
             nsmDevice->addDeviceSensors(opticalResetSensor);
+        }
+#endif
+
+#if defined(ENABLE_LLDP)
+        if (lldpPacketSupported)
+        {
+            createLldpPacketSensorsForPort(
+                bus, nsmDevice, deviceName + '_' + portName, type, objPath,
+                static_cast<uint16_t>(i), priority);
         }
 #endif
 

@@ -364,6 +364,102 @@ class GetPortTelemetryCounter : public CommandInterface
     uint8_t portNumber;
 };
 
+/* OOB Miswiring Detection: Get LLDP Packet on
+ * a (port, direction) for devices reporting NSM_DEV_ID_PCIE_BRIDGE via Type 0
+ * GetDeviceIdentification. Exercises NSM Type 1 cmd 0x16 from the CLI so the
+ * integration path can be validated in the lab. */
+class GetLLDPPacket : public CommandInterface
+{
+  public:
+    ~GetLLDPPacket() = default;
+    GetLLDPPacket() = delete;
+    GetLLDPPacket(const GetLLDPPacket&) = delete;
+    GetLLDPPacket(GetLLDPPacket&&) = default;
+    GetLLDPPacket& operator=(const GetLLDPPacket&) = delete;
+    GetLLDPPacket& operator=(GetLLDPPacket&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetLLDPPacket(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto g = app->add_option_group("Required",
+                                       "Get LLDP Packet (Type 1 cmd 0x16)");
+        g->add_option("-p,--portNum", portNumber,
+                      "Port index on the network port (0-based)");
+        g->add_option(
+            "-d,--direction", direction,
+            "Direction (0 = TX, 1 = RX); accepts decimal or 0x-prefixed hex");
+        g->require_option(2);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        if (direction != NSM_LLDP_DIRECTION_TX &&
+            direction != NSM_LLDP_DIRECTION_RX)
+        {
+            std::cerr << "Invalid direction "
+                      << static_cast<unsigned>(direction)
+                      << " (expected 0=TX or 1=RX)\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req), 0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_lldp_packet_req(instanceId, portNumber, direction,
+                                             request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        std::vector<uint8_t> data(NSM_LLDP_PACKET_MAX_DATA_SIZE, 0);
+        uint16_t dataSize = NSM_LLDP_PACKET_MAX_DATA_SIZE;
+
+        auto rc = decode_get_lldp_packet_resp(responsePtr, payloadLength, &cc,
+                                              &reasonCode, data.data(),
+                                              &dataSize);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr
+                << "Response message error: decode_get_lldp_packet_resp failed "
+                << "rc=" << rc << ", cc=" << static_cast<int>(cc)
+                << ", reasonCode=" << static_cast<int>(reasonCode) << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Port Number"] = portNumber;
+        if (direction == NSM_LLDP_DIRECTION_RX)
+        {
+            result["Direction"] = "RX";
+        }
+        else if (direction == NSM_LLDP_DIRECTION_TX)
+        {
+            result["Direction"] = "TX";
+        }
+        else
+        {
+            result["Direction"] = static_cast<unsigned>(direction);
+        }
+        result["Data Size"] = dataSize;
+        ordered_json bytes = ordered_json::array();
+        for (uint16_t i = 0; i < dataSize; ++i)
+        {
+            bytes.push_back(static_cast<uint8_t>(data[i]));
+        }
+        result["Data"] = std::move(bytes);
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint16_t portNumber{0};
+    uint8_t direction{0};
+};
+
 class QueryPortCharacteristics : public CommandInterface
 {
   public:
@@ -6831,6 +6927,12 @@ void registerCommand(CLI::App& app)
         std::make_unique<GetPowerSmoothingPresetProfileInformationV2>(
             "telemetry", "GetPowerSmoothingPresetProfileInformationV2",
             getPowerSmoothingPresetProfileInformationV2));
+
+    auto getLldpPacket = telemetry->add_subcommand(
+        "GetLLDPPacket",
+        "Get raw LLDP frame for a (port, direction) on a PCIe Bridge device (Type 0 NSM_DEV_ID_PCIE_BRIDGE; Type 1 cmd 0x16)");
+    commands.push_back(std::make_unique<GetLLDPPacket>(
+        "telemetry", "GetLLDPPacket", getLldpPacket));
 }
 
 } // namespace telemetry

@@ -380,7 +380,7 @@ option(
 option(
     'nsm-port-include',
     type: 'array',
-    description: 'List of nsmPort sources to include (retimer, fpga, gpu-pcie, nvlink-port, pcie-port, zone, endpoint, port-disable)',
+    description: 'List of nsmPort sources to include (retimer, fpga, gpu-pcie, nvlink-port, pcie-port, zone, endpoint, port-disable); lldp is built from nsmLLDPLib when listed here',
     value: [],
 )
 

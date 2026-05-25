@@ -71,6 +71,7 @@ subdir('nsmSetAsync')
 subdir('nsmCommon')
 subdir('nsmProgressCounters')
 subdir('nsmAsioInterface')
+subdir('nsmLLDPLib')
 
 # Conditional subdirectories - controlled by nsmd-subdirs-all/nsmd-subdirs-include
 nsmd_subdirs_all = get_option('nsmd-subdirs-all')

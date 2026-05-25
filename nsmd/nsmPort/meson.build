@@ -16,6 +16,7 @@ valid_ports = [
     'zone',
     'endpoint',
     'port-disable',
+    'lldp',
 ]
 foreach name : include_port_list
     if not valid_ports.contains(name)

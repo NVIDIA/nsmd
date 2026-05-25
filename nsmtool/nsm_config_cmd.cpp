@@ -1866,6 +1866,148 @@ class GetDeviceConfig : public CommandInterface
     std::string queryHex;
 };
 
+/* OOB Miswiring Detection: convenience nsmtool
+ * subcommands targeting NSM Type 5 DEVICE_MODE_LLDP (index 24) LLDP mode
+ * bitfield on devices reporting NSM_DEV_ID_PCIE_BRIDGE via Type 0
+ * GetDeviceIdentification. */
+class GetLLDPMode : public CommandInterface
+{
+  public:
+    ~GetLLDPMode() = default;
+    GetLLDPMode() = delete;
+    GetLLDPMode(const GetLLDPMode&) = delete;
+    GetLLDPMode(GetLLDPMode&&) = default;
+    GetLLDPMode& operator=(const GetLLDPMode&) = delete;
+    GetLLDPMode& operator=(GetLLDPMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetLLDPMode(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {}
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req),
+            0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_device_mode_settings_v2_req(
+            instanceId, static_cast<uint32_t>(DEVICE_MODE_LLDP), request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        constexpr size_t maxModeBytes = 16;
+        uint8_t currentData[maxModeBytes] = {};
+        uint8_t pendingData[maxModeBytes] = {};
+        uint16_t currentLength = 0;
+        uint16_t pendingLength = 0;
+
+        auto rc = decode_get_device_mode_settings_v2_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, currentData,
+            &currentLength, pendingData, &pendingLength);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+        if (currentLength != sizeof(nsm_lldp_mode_bitfield))
+        {
+            std::cerr << "Invalid current-mode payload length " << currentLength
+                      << " (expected 1 byte)\n";
+            return;
+        }
+        struct nsm_lldp_mode_bitfield view = {};
+        memcpy(&view, &currentData[0], sizeof(view));
+        ordered_json result;
+        result["TX Mode"] = static_cast<uint8_t>(view.tx_mode);
+        result["RX Mode"] = static_cast<uint8_t>(view.rx_mode);
+        result["DCBX Mode"] = static_cast<uint8_t>(view.dcbx_mode);
+        result["Raw Byte"] = currentData[0];
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
+class SetLLDPMode : public CommandInterface
+{
+  public:
+    ~SetLLDPMode() = default;
+    SetLLDPMode() = delete;
+    SetLLDPMode(const SetLLDPMode&) = delete;
+    SetLLDPMode(SetLLDPMode&&) = default;
+    SetLLDPMode& operator=(const SetLLDPMode&) = delete;
+    SetLLDPMode& operator=(SetLLDPMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetLLDPMode(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto g = app->add_option_group(
+            "Required",
+            "Set LLDP Mode (NSM Type 5 idx 24): tx/rx 0=Off 1=Mandatory 2=All; dcbx 0=Disabled 1=Enabled");
+        g->add_option("--tx", txMode, "TX mode (0/1/2)");
+        g->add_option("--rx", rxMode, "RX mode (0/1/2)");
+        g->add_option("--dcbx", dcbxMode, "DCBX mode (0/1)");
+        g->require_option(3);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        if (txMode > NSM_LLDP_DIR_MODE_ALL || rxMode > NSM_LLDP_DIR_MODE_ALL ||
+            dcbxMode > NSM_LLDP_DCBX_ENABLED)
+        {
+            std::cerr << "Invalid LLDP bitfield values\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        struct nsm_lldp_mode_bitfield view = {};
+        view.tx_mode = txMode;
+        view.rx_mode = rxMode;
+        view.dcbx_mode = dcbxMode;
+        uint8_t encoded = 0;
+        memcpy(&encoded, &view, sizeof(encoded));
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req),
+            0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_device_mode_settings_v2_req(
+            instanceId, static_cast<uint32_t>(DEVICE_MODE_LLDP), &encoded,
+            sizeof(encoded), request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        auto rc = decode_set_device_mode_settings_v2_resp(
+            responsePtr, payloadLength, &cc, &reasonCode);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response error: rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t txMode{0};
+    uint8_t rxMode{0};
+    uint8_t dcbxMode{0};
+};
+
 void registerCommand(CLI::App& app)
 {
     auto config = app.add_subcommand("config",
@@ -1986,6 +2128,17 @@ void registerCommand(CLI::App& app)
         "GetDeviceConfig", "Get Device Config Type 5 command 0x11 (V2)");
     commands.push_back(std::make_unique<GetDeviceConfig>(
         "config", "GetDeviceConfig", getDeviceConfig));
+
+    // OOB Miswiring Detection
+    auto getLldpMode = config->add_subcommand(
+        "GetLLDPMode", "Get LLDP mode bitfield (NSM Type 5 idx 24)");
+    commands.push_back(
+        std::make_unique<GetLLDPMode>("config", "GetLLDPMode", getLldpMode));
+
+    auto setLldpMode = config->add_subcommand(
+        "SetLLDPMode", "Set LLDP mode bitfield (NSM Type 5 idx 24)");
+    commands.push_back(
+        std::make_unique<SetLLDPMode>("config", "SetLLDPMode", setLldpMode));
 }
 
 } // namespace config

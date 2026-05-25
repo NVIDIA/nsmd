@@ -36,6 +36,7 @@ extern "C" {
 // defined MAC address length
 #define MAC_ADDRESS_LENGTH 8
 #define RAW_ERRORS_PER_LANE_COUNT 4
+#define NSM_LLDP_PACKET_MAX_DATA_SIZE 1024U
 
 /** @brief NSM Type1 network port telemetry commands
  */
@@ -59,6 +60,7 @@ enum nsm_network_port_commands {
 	NSM_GET_ETH_PORT_TELEMETRY_COUNTER = 0x0f,
 	NSM_GET_PORT_ECC_COUNTERS = 0x10,
 	NSM_GET_NETWORK_ADDRESSES = 0x11,
+	NSM_GET_LLDP_PACKET = 0x16,
 	NSM_QUERY_PORTS_AVAILABLE = 0x41,
 	NSM_QUERY_PORT_CHARACTERISTICS = 0x42,
 	NSM_QUERY_PORT_STATUS = 0x43,
@@ -190,6 +192,37 @@ enum nsm_ecc_counters_tag {
 	NSM_TAG_ECC_RAW_ERRORS_LANE_2 = 4,
 	NSM_TAG_ECC_RAW_ERRORS_LANE_3 = 5
 };
+
+/** @brief Direction byte values for NSM_GET_LLDP_PACKET request (cmd 0x16).
+ */
+enum nsm_lldp_direction {
+	NSM_LLDP_DIRECTION_TX = 0,
+	NSM_LLDP_DIRECTION_RX = 1,
+};
+
+/** @struct nsm_get_lldp_packet_req
+ *
+ *  Request payload for NSM Type 1 Command 0x16 Get LLDP Packet.
+ */
+struct nsm_get_lldp_packet_req {
+	struct nsm_common_req hdr;
+	uint16_t port_number;
+	uint16_t reserved;
+	uint8_t direction;
+	uint8_t reserved2;
+	uint16_t reserved3;
+} __attribute__((packed));
+
+/** @struct nsm_get_lldp_packet_resp
+ *
+ *  Response payload for NSM Type 1 Command 0x16 Get LLDP Packet. The
+ *  trailing data[] is variable-length: 0..NSM_LLDP_PACKET_MAX_DATA_SIZE
+ *  bytes carrying the raw LLDP frame.
+ */
+struct nsm_get_lldp_packet_resp {
+	struct nsm_common_resp hdr;
+	uint8_t data[1];
+} __attribute__((packed));
 
 struct nsm_supported_port_counter {
 	uint8_t port_rcv_pkts : 1;
@@ -1385,6 +1418,76 @@ int decode_aggregate_port_ecc_counter_data(uint8_t tag, const uint8_t *data,
  */
 int encode_aggregate_port_ecc_counter_data(uint8_t tag, uint64_t counter_value,
 					   uint8_t *data, size_t *data_len);
+
+/*
+ * NSM Type 1 Command 0x16 — Get LLDP Packet.
+ *
+ *   Request   : v1-header + uint16 port_number + uint16 reserved +
+ *                 uint8 direction + uint8 reserved2 + uint16 reserved3
+ *                 (direction: 0 = TX, 1 = RX)
+ *   Response  : v1-header + raw LLDP frame bytes (IEEE 802.1AB), 0..1024 bytes
+ *                 (response data_size in nsm_common_resp.data_size is the
+ *                  byte count; empty buffer reported as CC=0x00 + size=0
+ *                  per OMD-REQ-05 working assumption).
+ */
+
+/** @brief Encode a Get LLDP Packet (cmd 0x16) request message.
+ *
+ *  @param[in]  instance_id - NSM instance ID
+ *  @param[in]  port_number - Port index on the network port (0-based)
+ *  @param[in]  direction   - enum nsm_lldp_direction (0 = TX, 1 = RX)
+ *  @param[out] msg         - Message will be written here
+ *  @return nsm_completion_codes
+ */
+int encode_get_lldp_packet_req(uint8_t instance_id, uint16_t port_number,
+			       uint8_t direction, struct nsm_msg *msg);
+
+/** @brief Decode a Get LLDP Packet (cmd 0x16) request message.
+ *
+ *  @param[in]  msg         - request message
+ *  @param[in]  msg_len     - Length of request message
+ *  @param[out] port_number - Port index parsed from the request
+ *  @param[out] direction   - Direction byte parsed from the request
+ *  @return nsm_completion_codes
+ */
+int decode_get_lldp_packet_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint16_t *port_number, uint8_t *direction);
+
+/** @brief Encode a Get LLDP Packet (cmd 0x16) response message.
+ *
+ *  @param[in]  instance_id - NSM instance ID
+ *  @param[in]  cc          - response completion code
+ *  @param[in]  reason_code - reason code (only meaningful when cc != 0)
+ *  @param[in]  data        - raw LLDP frame bytes (may be NULL iff data_size ==
+ * 0)
+ *  @param[in]  data_size   - byte count, 0..NSM_LLDP_PACKET_MAX_DATA_SIZE
+ *  @param[out] msg         - Message will be written here
+ *  @param[in]  msg_len     - size of msg buffer in bytes
+ *  @return nsm_completion_codes
+ */
+int encode_get_lldp_packet_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, const uint8_t *data,
+				uint16_t data_size, struct nsm_msg *msg,
+				size_t msg_len);
+
+/** @brief Decode a Get LLDP Packet (cmd 0x16) response message.
+ *
+ *  @param[in]  msg         - response message
+ *  @param[in]  msg_len     - Length of response message
+ *  @param[out] cc          - response completion code
+ *  @param[out] reason_code - reason code (only meaningful when *cc != 0)
+ *  @param[out] data        - caller-provided buffer of at least
+ *                             NSM_LLDP_PACKET_MAX_DATA_SIZE bytes; on success
+ *                             the raw LLDP frame is copied here
+ *  @param[in,out] data_size - on input: capacity of data[] (must be >=
+ *                              NSM_LLDP_PACKET_MAX_DATA_SIZE);
+ *                              on output: number of bytes written
+ *  @return nsm_completion_codes; NSM_SW_SUCCESS with *data_size == 0 indicates
+ *          the working-assumption empty-buffer case (OMD-REQ-05).
+ */
+int decode_get_lldp_packet_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
+				uint8_t *data, uint16_t *data_size);
 
 #ifdef __cplusplus
 }

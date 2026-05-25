@@ -4154,3 +4154,348 @@ TEST(NetworkPortsNullBranch, EncodeAggregatePortEccCounterData_NullDataLen)
 	auto rc = encode_aggregate_port_ecc_counter_data(0, 0, data, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
+
+// ===========================================================================
+// NSM Type 1 cmd 0x16 – Get LLDP Packet (OOB Miswiring Detection)
+// ===========================================================================
+
+TEST(getLldpPacket, testGoodEncodeRequestTx)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	auto rc = encode_get_lldp_packet_req(0, 3, NSM_LLDP_DIRECTION_TX, msg);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_NETWORK_PORT);
+
+	auto *req = reinterpret_cast<nsm_get_lldp_packet_req *>(msg->payload);
+	EXPECT_EQ(req->hdr.command, NSM_GET_LLDP_PACKET);
+	/* data_size covers all fields after nsm_common_req */
+	EXPECT_EQ(req->hdr.data_size,
+		  sizeof(nsm_get_lldp_packet_req) - sizeof(nsm_common_req));
+	EXPECT_EQ(le16toh(req->port_number), 3);
+	EXPECT_EQ(req->direction, NSM_LLDP_DIRECTION_TX);
+	EXPECT_EQ(req->reserved, 0);
+}
+
+TEST(getLldpPacket, testGoodEncodeRequestRx)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	auto rc =
+	    encode_get_lldp_packet_req(0, 255, NSM_LLDP_DIRECTION_RX, msg);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto *req = reinterpret_cast<nsm_get_lldp_packet_req *>(msg->payload);
+	EXPECT_EQ(le16toh(req->port_number), 255);
+	EXPECT_EQ(req->direction, NSM_LLDP_DIRECTION_RX);
+}
+
+TEST(getLldpPacket, testBadEncodeRequestNullMsg)
+{
+	auto rc =
+	    encode_get_lldp_packet_req(0, 0, NSM_LLDP_DIRECTION_TX, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getLldpPacket, testBadEncodeRequestInvalidDirection)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	auto rc = encode_get_lldp_packet_req(0, 0, 0xFF, msg);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getLldpPacket, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	encode_get_lldp_packet_req(0, 42, NSM_LLDP_DIRECTION_RX, msg);
+
+	uint16_t port = 0xFFFF;
+	uint8_t dir = 0xFF;
+	auto rc = decode_get_lldp_packet_req(
+	    reinterpret_cast<const nsm_msg *>(msg), buf.size(), &port, &dir);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(port, 42);
+	EXPECT_EQ(dir, NSM_LLDP_DIRECTION_RX);
+}
+
+TEST(getLldpPacket, testBadDecodeRequestNullArgs)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req), 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint16_t port = 0;
+	uint8_t dir = 0;
+
+	EXPECT_EQ(decode_get_lldp_packet_req(nullptr, buf.size(), &port, &dir),
+		  NSM_SW_ERROR_NULL);
+	EXPECT_EQ(decode_get_lldp_packet_req(msg, buf.size(), nullptr, &dir),
+		  NSM_SW_ERROR_NULL);
+	EXPECT_EQ(decode_get_lldp_packet_req(msg, buf.size(), &port, nullptr),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(getLldpPacket, testBadDecodeRequestTooShort)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req), 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint16_t port = 0;
+	uint8_t dir = 0;
+	size_t short_len =
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req) - 1;
+
+	EXPECT_EQ(decode_get_lldp_packet_req(msg, short_len, &port, &dir),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getLldpPacket, testBadDecodeRequestDataSizeTooSmall)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	encode_get_lldp_packet_req(0, 0, NSM_LLDP_DIRECTION_TX, msg);
+
+	/* Force data_size to 0 to trigger the data-size guard. */
+	auto *req = reinterpret_cast<nsm_get_lldp_packet_req *>(msg->payload);
+	req->hdr.data_size = 0;
+
+	uint16_t port = 0;
+	uint8_t dir = 0;
+	EXPECT_EQ(
+	    decode_get_lldp_packet_req(reinterpret_cast<const nsm_msg *>(msg),
+				       buf.size(), &port, &dir),
+	    NSM_SW_ERROR_DATA);
+}
+
+TEST(getLldpPacket, testGoodEncodeResponseWithData)
+{
+	const uint8_t frame[] = {0x01, 0x02, 0x03, 0x04};
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				     sizeof(nsm_get_lldp_packet_resp) +
+				     sizeof(frame),
+				 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	auto rc = encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, frame,
+					      sizeof(frame), msg, buf.size());
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto *resp = reinterpret_cast<nsm_get_lldp_packet_resp *>(msg->payload);
+	EXPECT_EQ(resp->hdr.command, NSM_GET_LLDP_PACKET);
+	EXPECT_EQ(resp->hdr.completion_code, NSM_SUCCESS);
+	EXPECT_EQ(le16toh(resp->hdr.data_size), sizeof(frame));
+	EXPECT_EQ(memcmp(&resp->data[0], frame, sizeof(frame)), 0);
+}
+
+TEST(getLldpPacket, testGoodEncodeResponseEmpty)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_resp), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	auto rc = encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, nullptr, 0,
+					      msg, buf.size());
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto *resp = reinterpret_cast<nsm_get_lldp_packet_resp *>(msg->payload);
+	EXPECT_EQ(le16toh(resp->hdr.data_size), 0);
+}
+
+TEST(getLldpPacket, testBadEncodeResponseNullMsg)
+{
+	const uint8_t frame[] = {0xAA};
+	EXPECT_EQ(encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, frame, 1,
+					      nullptr, 0),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(getLldpPacket, testBadEncodeResponseNullDataNonZeroSize)
+{
+	std::vector<uint8_t> buf(4096, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	EXPECT_EQ(encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, nullptr, 1,
+					      msg, buf.size()),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(getLldpPacket, testBadEncodeResponseDataTooLarge)
+{
+	std::vector<uint8_t> buf(4096, 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	std::vector<uint8_t> frame(NSM_LLDP_PACKET_MAX_DATA_SIZE + 1, 0xBB);
+
+	EXPECT_EQ(encode_get_lldp_packet_resp(
+		      0, NSM_SUCCESS, 0, frame.data(),
+		      static_cast<uint16_t>(frame.size()), msg, buf.size()),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getLldpPacket, testBadEncodeResponseCallerBufferTooSmall)
+{
+	const uint8_t frame[] = {0xAA, 0xBB, 0xCC};
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_resp), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	EXPECT_EQ(encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, frame,
+					      sizeof(frame), msg, buf.size()),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getLldpPacket, testGoodDecodeResponseWithData)
+{
+	const uint8_t frame[] = {0xAA, 0xBB, 0xCC};
+	std::vector<uint8_t> enc_buf(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_get_lldp_packet_resp) +
+					 sizeof(frame),
+				     0);
+	auto *enc = reinterpret_cast<nsm_msg *>(enc_buf.data());
+	encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, frame, sizeof(frame),
+				    enc, enc_buf.size());
+
+	uint8_t cc = 0xFF;
+	uint16_t reason = 0xFFFF;
+	uint8_t out[NSM_LLDP_PACKET_MAX_DATA_SIZE] = {};
+	uint16_t out_size = NSM_LLDP_PACKET_MAX_DATA_SIZE;
+
+	auto rc = decode_get_lldp_packet_resp(
+	    reinterpret_cast<const nsm_msg *>(enc), enc_buf.size(), &cc,
+	    &reason, out, &out_size);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(out_size, sizeof(frame));
+	EXPECT_EQ(memcmp(out, frame, sizeof(frame)), 0);
+}
+
+TEST(getLldpPacket, testGoodDecodeResponseEmpty)
+{
+	std::vector<uint8_t> enc_buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_resp), 0);
+	auto *enc = reinterpret_cast<nsm_msg *>(enc_buf.data());
+	encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, nullptr, 0, enc,
+				    enc_buf.size());
+
+	uint8_t cc = 0xFF;
+	uint16_t reason = 0xFFFF;
+	uint16_t out_size = NSM_LLDP_PACKET_MAX_DATA_SIZE;
+
+	auto rc = decode_get_lldp_packet_resp(
+	    reinterpret_cast<const nsm_msg *>(enc), enc_buf.size(), &cc,
+	    &reason, nullptr, &out_size);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(out_size, 0);
+}
+
+TEST(getLldpPacket, testBadDecodeResponseNullDataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + 32, 0);
+	auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	uint8_t out[16] = {};
+
+	EXPECT_EQ(decode_get_lldp_packet_resp(msg, buf.size(), &cc, &reason,
+					      out, nullptr),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(getLldpPacket, testBadDecodeResponseDataSizeExceedsMax)
+{
+	/* Build a response whose hdr.data_size exceeds the protocol max. */
+	std::vector<uint8_t> enc_buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_resp) + 4, 0);
+	auto *enc = reinterpret_cast<nsm_msg *>(enc_buf.data());
+	const uint8_t tmp[] = {0x01, 0x02, 0x03, 0x04};
+	encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, tmp, 4, enc,
+				    enc_buf.size());
+
+	auto *resp = reinterpret_cast<nsm_get_lldp_packet_resp *>(enc->payload);
+	resp->hdr.data_size = htole16(NSM_LLDP_PACKET_MAX_DATA_SIZE + 1);
+
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	uint8_t out[NSM_LLDP_PACKET_MAX_DATA_SIZE] = {};
+	uint16_t out_size = NSM_LLDP_PACKET_MAX_DATA_SIZE;
+
+	EXPECT_EQ(decode_get_lldp_packet_resp(
+		      reinterpret_cast<const nsm_msg *>(enc), enc_buf.size(),
+		      &cc, &reason, out, &out_size),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getLldpPacket, testBadDecodeResponseNullDataWithNonZeroReported)
+{
+	const uint8_t frame[] = {0xDE, 0xAD};
+	std::vector<uint8_t> enc_buf(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_get_lldp_packet_resp) +
+					 sizeof(frame),
+				     0);
+	auto *enc = reinterpret_cast<nsm_msg *>(enc_buf.data());
+	encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, frame, sizeof(frame),
+				    enc, enc_buf.size());
+
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	uint16_t out_size = NSM_LLDP_PACKET_MAX_DATA_SIZE;
+
+	EXPECT_EQ(decode_get_lldp_packet_resp(
+		      reinterpret_cast<const nsm_msg *>(enc), enc_buf.size(),
+		      &cc, &reason, nullptr /* data = NULL */, &out_size),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(getLldpPacket, testBadDecodeResponseCallerBufferTooSmall)
+{
+	const uint8_t frame[] = {0xAA, 0xBB, 0xCC};
+	std::vector<uint8_t> enc_buf(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_get_lldp_packet_resp) +
+					 sizeof(frame),
+				     0);
+	auto *enc = reinterpret_cast<nsm_msg *>(enc_buf.data());
+	encode_get_lldp_packet_resp(0, NSM_SUCCESS, 0, frame, sizeof(frame),
+				    enc, enc_buf.size());
+
+	uint8_t cc = 0;
+	uint16_t reason = 0;
+	uint8_t out[2] = {};
+	uint16_t out_size = sizeof(out);
+
+	EXPECT_EQ(decode_get_lldp_packet_resp(
+		      reinterpret_cast<const nsm_msg *>(enc), enc_buf.size(),
+		      &cc, &reason, out, &out_size),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getLldpPacket, testEncodeDecodeErrorResponse)
+{
+	/* decode_reason_code_and_cc requires msg_len == sizeof(nsm_msg_hdr) +
+	 * sizeof(nsm_common_non_success_resp) when CC != NSM_SUCCESS. */
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	auto rc = encode_get_lldp_packet_resp(0, NSM_ERROR, 0x1234, nullptr, 0,
+					      msg, buf.size());
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason = 0;
+	uint16_t out_size = NSM_LLDP_PACKET_MAX_DATA_SIZE;
+
+	rc = decode_get_lldp_packet_resp(reinterpret_cast<const nsm_msg *>(msg),
+					 buf.size(), &cc, &reason, nullptr,
+					 &out_size);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_NE(cc, NSM_SUCCESS);
+}

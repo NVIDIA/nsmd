@@ -3735,3 +3735,108 @@ TEST(getSupportedDeviceModesV2, testBadDecodeResponse)
 	    &decoded_mode_count, decoded_mode_list);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+TEST(lldpModeBitfield, wireLayout)
+{
+	EXPECT_EQ(sizeof(nsm_lldp_mode_bitfield), 1U);
+
+	auto toByte = [](const nsm_lldp_mode_bitfield &view) {
+		uint8_t byte = 0;
+		memcpy(&byte, &view, sizeof(byte));
+		return byte;
+	};
+
+	auto fromByte = [](uint8_t byte) {
+		nsm_lldp_mode_bitfield view = {};
+		memcpy(&view, &byte, sizeof(byte));
+		return view;
+	};
+
+	/* bits 0:1 – TX mode */
+	nsm_lldp_mode_bitfield txOnly = {};
+	txOnly.tx_mode = 3;
+	EXPECT_EQ(toByte(txOnly), 0x03U);
+
+	/* bits 2:3 – RX mode */
+	nsm_lldp_mode_bitfield rxOnly = {};
+	rxOnly.rx_mode = 3;
+	EXPECT_EQ(toByte(rxOnly), 0x0CU);
+
+	/* bit 4 – DCBX mode */
+	nsm_lldp_mode_bitfield dcbxOnly = {};
+	dcbxOnly.dcbx_mode = 1;
+	EXPECT_EQ(toByte(dcbxOnly), 0x10U);
+
+	/* bits 5:7 – reserved */
+	nsm_lldp_mode_bitfield reservedOnly = {};
+	reservedOnly.reserved = 7;
+	EXPECT_EQ(toByte(reservedOnly), 0xE0U);
+
+	/* combined: TX=All, RX=All, DCBX=Disabled */
+	nsm_lldp_mode_bitfield allModes = {};
+	allModes.tx_mode = NSM_LLDP_DIR_MODE_ALL;
+	allModes.rx_mode = NSM_LLDP_DIR_MODE_ALL;
+	allModes.dcbx_mode = NSM_LLDP_DCBX_DISABLED;
+	EXPECT_EQ(toByte(allModes), 0x0AU);
+
+	/* round-trip decode */
+	auto decoded = fromByte(0x0AU);
+	EXPECT_EQ(decoded.tx_mode, NSM_LLDP_DIR_MODE_ALL);
+	EXPECT_EQ(decoded.rx_mode, NSM_LLDP_DIR_MODE_ALL);
+	EXPECT_EQ(decoded.dcbx_mode, NSM_LLDP_DCBX_DISABLED);
+	EXPECT_EQ(decoded.reserved, 0U);
+}
+
+TEST(lldpModeBitfield, EncodeDecodeRoundTripMemcpy)
+{
+	/* The bitfield struct maps directly to the wire byte via memcpy —
+	 * verify all valid field combinations round-trip correctly. */
+	struct {
+		uint8_t tx;
+		uint8_t rx;
+		uint8_t dcbx;
+		uint8_t expected_byte;
+	} cases[] = {
+	    {NSM_LLDP_DIR_MODE_OFF, NSM_LLDP_DIR_MODE_OFF,
+	     NSM_LLDP_DCBX_DISABLED, 0x00},
+	    {NSM_LLDP_DIR_MODE_MANDATORY, NSM_LLDP_DIR_MODE_OFF,
+	     NSM_LLDP_DCBX_DISABLED, 0x01},
+	    {NSM_LLDP_DIR_MODE_OFF, NSM_LLDP_DIR_MODE_MANDATORY,
+	     NSM_LLDP_DCBX_DISABLED, 0x04},
+	    {NSM_LLDP_DIR_MODE_ALL, NSM_LLDP_DIR_MODE_ALL,
+	     NSM_LLDP_DCBX_DISABLED, 0x0A},
+	    {NSM_LLDP_DIR_MODE_ALL, NSM_LLDP_DIR_MODE_ALL,
+	     NSM_LLDP_DCBX_ENABLED, 0x1A},
+	};
+
+	for (const auto &c : cases) {
+		nsm_lldp_mode_bitfield view = {};
+		view.tx_mode = c.tx;
+		view.rx_mode = c.rx;
+		view.dcbx_mode = c.dcbx;
+
+		uint8_t byte = 0xFF;
+		memcpy(&byte, &view, sizeof(byte));
+		EXPECT_EQ(byte, c.expected_byte);
+
+		nsm_lldp_mode_bitfield decoded = {};
+		memcpy(&decoded, &byte, sizeof(byte));
+		EXPECT_EQ(decoded.tx_mode, c.tx);
+		EXPECT_EQ(decoded.rx_mode, c.rx);
+		EXPECT_EQ(decoded.dcbx_mode, c.dcbx);
+		EXPECT_EQ(decoded.reserved, 0U);
+	}
+}
+
+TEST(lldpModeBitfield, ReservedBitsRoundTrip)
+{
+	/* Bytes with bits 5:7 set must survive a memcpy round-trip: the
+	 * reserved field captures them and they don't corrupt tx/rx/dcbx. */
+	uint8_t byte = 0xEA; /* 0x0A | 0xE0 (reserved bits 5:7 all set) */
+	nsm_lldp_mode_bitfield view = {};
+	memcpy(&view, &byte, sizeof(byte));
+	EXPECT_EQ(view.tx_mode, NSM_LLDP_DIR_MODE_ALL);
+	EXPECT_EQ(view.rx_mode, NSM_LLDP_DIR_MODE_ALL);
+	EXPECT_EQ(view.dcbx_mode, NSM_LLDP_DCBX_DISABLED);
+	EXPECT_EQ(view.reserved, 7U);
+}

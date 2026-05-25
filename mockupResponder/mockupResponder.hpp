@@ -180,6 +180,13 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getPortTelemetryCounterHandler(const nsm_msg* requestMsg,
                                        size_t requestLen);
+    /* OOB Miswiring Detection: mock-up
+     * responder for Type 1 cmd 0x16 GetLLDPPacket. Returns a synthetic
+     * IEEE 802.1AB frame for direction RX (port 0), or an empty buffer
+     * (CC=0x00, data_size=0) otherwise — exercises the OMD-REQ-05
+     * working-assumption path through nsmLldpPacket.cpp. */
+    std::optional<std::vector<uint8_t>>
+        getLldpPacketHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         queryPortCharacteristicsHandler(const nsm_msg* requestMsg,
                                         size_t requestLen);
