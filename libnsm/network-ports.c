@@ -2069,3 +2069,147 @@ int encode_aggregate_port_ecc_counter_data(uint8_t tag, uint64_t counter_value,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_get_lldp_packet_req(uint8_t instance_id, uint16_t port_number,
+			       uint8_t direction, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (direction != NSM_LLDP_DIRECTION_RX &&
+	    direction != NSM_LLDP_DIRECTION_TX) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_lldp_packet_req *request =
+	    (struct nsm_get_lldp_packet_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_LLDP_PACKET;
+	request->hdr.data_size = sizeof(struct nsm_get_lldp_packet_req) -
+				 sizeof(struct nsm_common_req);
+	request->port_number = htole16(port_number);
+	request->reserved = 0;
+	request->direction = direction;
+	request->reserved2 = 0;
+	request->reserved3 = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_lldp_packet_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint16_t *port_number, uint8_t *direction)
+{
+	if (msg == NULL || port_number == NULL || direction == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_lldp_packet_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_get_lldp_packet_req *request =
+	    (struct nsm_get_lldp_packet_req *)msg->payload;
+	if (request->hdr.data_size < sizeof(struct nsm_get_lldp_packet_req) -
+					 sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*port_number = le16toh(request->port_number);
+	*direction = request->direction;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_lldp_packet_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, const uint8_t *data,
+				uint16_t data_size, struct nsm_msg *msg,
+				size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (data == NULL && data_size != 0) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (data_size > NSM_LLDP_PACKET_MAX_DATA_SIZE) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_GET_LLDP_PACKET,
+					  msg);
+	}
+
+	size_t header_bytes =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp);
+	if (msg_len < header_bytes + data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_lldp_packet_resp *response =
+	    (struct nsm_get_lldp_packet_resp *)msg->payload;
+	response->hdr.command = NSM_GET_LLDP_PACKET;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(data_size);
+	if (data_size > 0) {
+		memcpy(&(response->data[0]), data, data_size);
+	}
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_lldp_packet_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
+				uint8_t *data, uint16_t *data_size)
+{
+	if (data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_get_lldp_packet_resp *resp =
+	    (struct nsm_get_lldp_packet_resp *)msg->payload;
+	uint16_t reported_size = le16toh(resp->hdr.data_size);
+	if (reported_size > NSM_LLDP_PACKET_MAX_DATA_SIZE) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	size_t header_bytes =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp);
+	if (msg_len < header_bytes + reported_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (data == NULL && reported_size != 0) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (data != NULL && reported_size > *data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (reported_size > 0) {
+		memcpy(data, &(resp->data[0]), reported_size);
+	}
+	*data_size = reported_size;
+	return NSM_SW_SUCCESS;
+}

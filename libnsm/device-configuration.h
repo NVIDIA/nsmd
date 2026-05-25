@@ -604,7 +604,43 @@ enum device_mode_index {
 	DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY = 14,
 	DEVICE_MODE_ONE_SHOT_GPU_COPY_SWITCH_POWER_LIMIT = 15,
 	DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT = 16,
+	DEVICE_MODE_LLDP = 24,
 };
+
+/** @brief LLDP TX/RX sub-mode values per NSM Type 5 Device Mode Index 24
+ *         Bits 0:1 (TX) and 2:3 (RX) of the data byte.
+ */
+enum nsm_lldp_direction_mode {
+	NSM_LLDP_DIR_MODE_OFF = 0,
+	NSM_LLDP_DIR_MODE_MANDATORY = 1,
+	NSM_LLDP_DIR_MODE_ALL = 2,
+};
+
+/** @brief DCBX sub-mode value per NSM Type 5 Device Mode Index 24
+ *         Bit 4 of the data byte. Effective only when both
+ *         TX and RX are NSM_LLDP_DIR_MODE_ALL.
+ */
+enum nsm_lldp_dcbx_mode {
+	NSM_LLDP_DCBX_DISABLED = 0,
+	NSM_LLDP_DCBX_ENABLED = 1,
+};
+
+/** @brief NSM Type 5 idx 24 LLDP-mode data byte.
+ *  Wire bit layout (single byte):
+ *    bits 0:1 – LLDP TX mode (enum nsm_lldp_direction_mode)
+ *    bits 2:3 – LLDP RX mode (enum nsm_lldp_direction_mode)
+ *    bit  4   – LLDP DCBX mode (enum nsm_lldp_dcbx_mode)
+ *    bits 5:7 – reserved (must be 0 on transmit)
+ *
+ *  Field order matches the wire layout on GCC/Clang targets used by OpenBMC.
+ *  Use memcpy to convert between this struct and the wire-format byte.
+ */
+struct nsm_lldp_mode_bitfield {
+	uint8_t tx_mode : 2;
+	uint8_t rx_mode : 2;
+	uint8_t dcbx_mode : 1;
+	uint8_t reserved : 3;
+} __attribute__((packed));
 
 enum device_sub_mode_offset {
 	SUB_MODE_DPU_OPERATION = 0,

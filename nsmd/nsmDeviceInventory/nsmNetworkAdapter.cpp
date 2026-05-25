@@ -32,6 +32,11 @@
 #endif
 #include "libnsm/device-configuration.h"
 
+#include "asyncOperationManager.hpp"
+#if defined(ENABLE_LLDP)
+#include "nsmLLDPLib/nsmLldpPort.hpp"
+#endif
+
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -1034,6 +1039,15 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
                                 networkAdapterObjPath, dpuSupported,
                                 dpuPatchability, pcieSupported,
                                 pciePatchability, networkAdapterPath);
+
+        // OOB Miswiring Detection
+#if defined(ENABLE_LLDP)
+        if (isModeSupported(DEVICE_MODE_LLDP))
+        {
+            createLldpModeSensor(bus, nsmDevice, name, type,
+                                 networkAdapterPath);
+        }
+#endif
     }
 
     // coverity[missing_return]

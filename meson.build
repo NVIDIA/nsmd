@@ -273,6 +273,15 @@ else
     add_project_arguments('-DFILTER_MCTP_EID=false', language: ['cpp', 'c'])
 endif
 
+nsm_port_all = get_option('nsm-port-all')
+nsm_port_include = get_option('nsm-port-include')
+if cx8_features
+    nsm_port_all = false
+endif
+if nsm_port_all or nsm_port_include.contains('lldp')
+    add_project_arguments('-DENABLE_LLDP', language: ['cpp'])
+endif
+
 conf_data.set('MCTP_EID_TO_FILTER', get_option('mctp-eid-to-filter'))
 
 configure_file(output: 'config.h', configuration: conf_data)

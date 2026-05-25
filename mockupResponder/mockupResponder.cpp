@@ -536,6 +536,8 @@ std::optional<Response>
                     return getPortNetworkAddressesHandler(request, requestLen);
                 case NSM_GET_PORT_ECC_COUNTERS:
                     return getPortEccCountersHandler(request, requestLen);
+                case NSM_GET_LLDP_PACKET:
+                    return getLldpPacketHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -1022,7 +1024,8 @@ std::optional<std::vector<uint8_t>>
                  {0, {0, 1, 2, 5, 6, 7, 9, 10, NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1,
                   {1, NSM_GET_ETH_PORT_TELEMETRY_COUNTER,
-                   NSM_GET_NETWORK_ADDRESSES, NSM_GET_PORT_ECC_COUNTERS}},
+                   NSM_GET_NETWORK_ADDRESSES, NSM_GET_PORT_ECC_COUNTERS,
+                   NSM_GET_LLDP_PACKET}},
                  {NSM_TYPE_PCI_LINK,
                   {
                       NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
@@ -1357,6 +1360,68 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("encode_get_port_telemetry_counter_resp failed: rc={RC}",
                    "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getLldpPacketHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getLldpPacketHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint16_t portNumber = 0;
+    uint8_t direction = 0;
+    auto rc = decode_get_lldp_packet_req(requestMsg, requestLen, &portNumber,
+                                         &direction);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_lldp_packet_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    /* Mock payload: produce a synthetic IEEE 802.1AB frame on (port 0,
+     * direction RX) so an operator can validate the TLV decode path
+     * through nsmd. Every other (port, direction) tuple returns the
+     * working-assumption empty buffer (CC=0x00 + data_size=0) per
+     * OMD-REQ-05 ARCH GAP. */
+    std::vector<uint8_t> data;
+    if (portNumber == 0 && direction == NSM_LLDP_DIRECTION_RX)
+    {
+        /* Chassis ID TLV (type 1, length 7): subtype MAC + 6 MAC bytes. */
+        data.insert(data.end(),
+                    {0x02, 0x07, 0x04, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55});
+        /* Port ID TLV (type 2, length 7): subtype MAC + 6 MAC bytes. */
+        data.insert(data.end(),
+                    {0x04, 0x07, 0x03, 0x00, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE});
+        /* TTL TLV (type 3, length 2): 120 seconds (0x0078). */
+        data.insert(data.end(), {0x06, 0x02, 0x00, 0x78});
+        /* System Name TLV (type 5) — "mock-cx9-peer". */
+        const char* sn = "mock-cx9-peer";
+        size_t snLen = strlen(sn);
+        data.push_back(static_cast<uint8_t>((5u << 1) | ((snLen >> 8) & 1u)));
+        data.push_back(static_cast<uint8_t>(snLen & 0xFFu));
+        data.insert(data.end(), sn, sn + snLen);
+        /* End-of-LLDPDU (type 0, length 0). */
+        data.insert(data.end(), {0x00, 0x00});
+    }
+
+    uint16_t reason_code = ERR_NULL;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + data.size(), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_lldp_packet_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data.data(),
+        static_cast<uint16_t>(data.size()), responseMsg, response.size());
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_lldp_packet_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
     return response;
@@ -8298,6 +8363,21 @@ std::vector<uint8_t>
             data[0] = 1;
             break;
         }
+        case DEVICE_MODE_LLDP:
+        {
+            /* OOB Miswiring Detection (NVBug 6136040): default mockup
+             * LLDP mode = TX:All, RX:All, DCBX:Disabled — exercises the
+             * Off → non-Off cold-start spawn path through nsmd. */
+            struct nsm_lldp_mode_bitfield view = {
+                .tx_mode = NSM_LLDP_DIR_MODE_ALL,
+                .rx_mode = NSM_LLDP_DIR_MODE_ALL,
+                .dcbx_mode = NSM_LLDP_DCBX_DISABLED,
+                .reserved = 0,
+            };
+            data.resize(1);
+            memcpy(data.data(), &view, sizeof(view));
+            break;
+        }
         default:
         {
             uint32_t defaultValue = htole32(0);
@@ -8421,6 +8501,10 @@ std::optional<std::vector<uint8_t>>
             expectedLen = sizeof(uint8_t);
             break;
         case DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX:
+            expectedLen = sizeof(uint8_t);
+            break;
+        case DEVICE_MODE_LLDP:
+            /* OOB Miswiring Detection (NVBug 6136040): 1-byte bitfield. */
             expectedLen = sizeof(uint8_t);
             break;
         default:
