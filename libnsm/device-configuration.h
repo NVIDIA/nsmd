@@ -616,6 +616,8 @@ enum device_sub_mode_offset {
 #define DEVICE_MODE_NOT_SUPPORTED (-1)
 #define PCIE_DEVICE_MODE_SINGLE_SOCKET 1
 #define PCIE_DEVICE_MODE_NO_BIFURCATION 1
+#define DPU_DEVICE_MODE_DATA_SIZE 1
+#define PCIE_DEVICE_MODE_DATA_SIZE 8
 
 /** @struct nsm_get_device_mode_setting_req
  *

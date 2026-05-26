@@ -81,7 +81,9 @@ static NsmGPMAggregated
     static boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/inventory/gpm_branch/" + suffix,
+        systemBus,
+        sdbusplus::object_path("/xyz/openbmc_project/inventory/gpm_branch/" +
+                               suffix),
         "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     const std::string nvlinkPath =
@@ -173,7 +175,7 @@ TEST(NsmGPMAggregatedBranch, HandleSample_DecodeFailure_SetsReturnCode)
     const std::string decObjPath =
         "/xyz/openbmc_project/inventory/gpm_branch/dec_err2";
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, decObjPath, "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path(decObjPath), "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf2 = std::make_shared<NVLinkMetricsIntf>(bus,
                                                            decObjPath.c_str());
@@ -1158,7 +1160,7 @@ TEST(NsmGPMAggregatedBranch, HandleSample_GPMMetric_SameValue_SkipsUpdate)
     const std::string path =
         "/xyz/openbmc_project/inventory/gpm_branch/same_val";
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, path, "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path(path), "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(bus, path.c_str());
 
