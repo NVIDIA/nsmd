@@ -203,7 +203,6 @@ class NsmDPUOperationModeDeviceModeSettingsV2Set :
   public:
     static constexpr enum device_mode_index modeIndex =
         DEVICE_MODE_DPU_OPERATION_MODE;
-    static constexpr uint8_t dpuOperationSubMode = SUB_MODE_DPU_OPERATION;
 
     NsmDPUOperationModeDeviceModeSettingsV2Set(
         const std::string& name, const std::string& type,
@@ -215,6 +214,8 @@ class NsmDPUOperationModeDeviceModeSettingsV2Set :
                                         std::shared_ptr<NsmDevice> nsmDevice);
 
   private:
+    static std::vector<uint8_t> buildDpuOperationModeData(OperationMode mode);
+
     std::shared_ptr<DPUOperationModeIntf> deviceModeIntf;
 };
 
@@ -246,10 +247,6 @@ class NsmPCIeDeviceModeDeviceModeSettingsV2Set :
   public:
     static constexpr enum device_mode_index modeIndex =
         DEVICE_MODE_PCIE_DEVICE_MODE;
-    static constexpr uint8_t multiSocketSubMode = SUB_MODE_PCIE_MULTI_SOCKET;
-    static constexpr uint8_t controlledEWSubMode =
-        SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC;
-    static constexpr uint8_t bifurcationSubMode = SUB_MODE_PCIE_BIFURCATION;
 
     NsmPCIeDeviceModeDeviceModeSettingsV2Set(
         const std::string& name, const std::string& type,
@@ -262,6 +259,11 @@ class NsmPCIeDeviceModeDeviceModeSettingsV2Set :
                         std::shared_ptr<NsmDevice> nsmDevice);
 
   private:
+    static std::vector<uint8_t>
+        buildPcieDeviceModeData(uint8_t multiSocketsMode,
+                                uint8_t controlledEWMode,
+                                uint8_t bifurcationRawMode);
+
     std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf;
 };
 

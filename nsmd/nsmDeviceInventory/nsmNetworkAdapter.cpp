@@ -479,6 +479,15 @@ static uint8_t dpuOperationModeToRawByte(OperationMode mode)
     return mode == OperationMode::DPU ? 0 : 1;
 }
 
+std::vector<uint8_t>
+    NsmDPUOperationModeDeviceModeSettingsV2Set::buildDpuOperationModeData(
+        OperationMode mode)
+{
+    std::vector<uint8_t> modeData(DPU_DEVICE_MODE_DATA_SIZE, 0);
+    modeData[SUB_MODE_DPU_OPERATION] = dpuOperationModeToRawByte(mode);
+    return modeData;
+}
+
 requester::Coroutine NsmDPUOperationModeDeviceModeSettingsV2Set::setPendingMode(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> nsmDevice)
@@ -514,15 +523,14 @@ requester::Coroutine NsmDPUOperationModeDeviceModeSettingsV2Set::setPendingMode(
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    if (!isSubDeviceModePatchable(dpuOperationSubMode))
+    if (!isSubDeviceModePatchable(SUB_MODE_DPU_OPERATION))
     {
         *status = AsyncOperationStatusType::Unavailable;
         asyncPatchInProgress = false;
         throw sdbusplus::error::xyz::openbmc_project::common::NotAllowed{};
     }
 
-    uint8_t rawByte = dpuOperationModeToRawByte(requestedMode);
-    std::vector<uint8_t> modeData{rawByte};
+    auto modeData = buildDpuOperationModeData(requestedMode);
     auto request = createSetRequestMsg(0, modeData);
     if (!request)
     {
@@ -641,6 +649,18 @@ NsmPCIeDeviceModeDeviceModeSettingsV2Set::
     pcieDeviceModeIntf(std::move(pcieDeviceModeIntf))
 {}
 
+std::vector<uint8_t>
+    NsmPCIeDeviceModeDeviceModeSettingsV2Set::buildPcieDeviceModeData(
+        uint8_t multiSocketsMode, uint8_t controlledEWMode,
+        uint8_t bifurcationRawMode)
+{
+    std::vector<uint8_t> modeData(PCIE_DEVICE_MODE_DATA_SIZE, 0);
+    modeData[SUB_MODE_PCIE_MULTI_SOCKET] = multiSocketsMode;
+    modeData[SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC] = controlledEWMode;
+    modeData[SUB_MODE_PCIE_BIFURCATION] = bifurcationRawMode;
+    return modeData;
+}
+
 requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> nsmDevice)
@@ -670,7 +690,7 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
     {
         if (key == "PCIeMultiSockets")
         {
-            if (!isSubDeviceModePatchable(multiSocketSubMode))
+            if (!isSubDeviceModePatchable(SUB_MODE_PCIE_MULTI_SOCKET))
             {
                 *status = AsyncOperationStatusType::Unavailable;
                 asyncPatchInProgress = false;
@@ -681,7 +701,7 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
         }
         else if (key == "PCIeControlledEWTraffic")
         {
-            if (!isSubDeviceModePatchable(controlledEWSubMode))
+            if (!isSubDeviceModePatchable(SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC))
             {
                 *status = AsyncOperationStatusType::Unavailable;
                 asyncPatchInProgress = false;
@@ -692,7 +712,7 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
         }
         else if (key == "PCIeBifurcation")
         {
-            if (!isSubDeviceModePatchable(bifurcationSubMode))
+            if (!isSubDeviceModePatchable(SUB_MODE_PCIE_BIFURCATION))
             {
                 *status = AsyncOperationStatusType::Unavailable;
                 asyncPatchInProgress = false;
@@ -703,8 +723,8 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
         }
     }
 
-    std::vector<uint8_t> modeData{multiSocketsMode, controlledEWMode,
-                                  bifurcationRawMode};
+    auto modeData = buildPcieDeviceModeData(multiSocketsMode, controlledEWMode,
+                                            bifurcationRawMode);
     auto request = createSetRequestMsg(0, modeData);
     if (!request)
     {
