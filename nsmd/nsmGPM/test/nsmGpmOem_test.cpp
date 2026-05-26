@@ -78,7 +78,7 @@ TEST(nsmGPMAggregated, GoodGenReq)
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     sdbusplus::asio::object_server objServer(systemBus);
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/inventory/gpm",
+        systemBus, sdbusplus::object_path{"/xyz/openbmc_project/inventory/gpm"},
         "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(
@@ -123,7 +123,8 @@ TEST(nsmGPMAggregated, BadGenReq_InvalidInstanceId_ReturnsNullopt)
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     sdbusplus::asio::object_server objServer(systemBus);
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/inventory/gpm_bad",
+        systemBus,
+        sdbusplus::object_path{"/xyz/openbmc_project/inventory/gpm_bad"},
         "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(
@@ -153,7 +154,7 @@ TEST(nsmGPMAggregated, GoodHandleResp)
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     sdbusplus::asio::object_server objServer(systemBus);
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/inventory/gpm",
+        systemBus, sdbusplus::object_path{"/xyz/openbmc_project/inventory/gpm"},
         "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(
@@ -221,7 +222,7 @@ TEST(nsmGPMPerIntance, GoodGenReq)
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     sdbusplus::asio::object_server objServer(systemBus);
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/inventory/gpm",
+        systemBus, sdbusplus::object_path{"/xyz/openbmc_project/inventory/gpm"},
         "com.nvidia.GPMMetrics");
 
     nsm::NsmGPMPerInstance gpm{
@@ -267,7 +268,8 @@ TEST(nsmGPMPerIntance, BadGenReq_InvalidInstanceId_ReturnsNullopt)
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     sdbusplus::asio::object_server objServer(systemBus);
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/inventory/gpm_bad2",
+        systemBus,
+        sdbusplus::object_path{"/xyz/openbmc_project/inventory/gpm_bad2"},
         "com.nvidia.GPMMetrics");
 
     nsm::NsmGPMPerInstance gpm{"sensor_bad",
@@ -299,7 +301,7 @@ TEST(nsmGPMPerIntance, GoodHandleResp)
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     sdbusplus::asio::object_server objServer(systemBus);
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/inventory/gpm",
+        systemBus, sdbusplus::object_path{"/xyz/openbmc_project/inventory/gpm"},
         "com.nvidia.GPMMetrics");
 
     nsm::NsmGPMPerInstance gpm{
@@ -490,7 +492,8 @@ TEST_F(NsmGPMMetricsTestFixture, testGPMAggregatedUpdate)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/inventory/gpm_update",
+        systemBus,
+        sdbusplus::object_path{"/xyz/openbmc_project/inventory/gpm_update"},
         "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
@@ -565,7 +568,8 @@ TEST_F(NsmGPMMetricsTestFixture, testGPMAggregatedUpdateError)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/inventory/gpm_error",
+        systemBus,
+        sdbusplus::object_path{"/xyz/openbmc_project/inventory/gpm_error"},
         "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
@@ -621,7 +625,8 @@ TEST_F(NsmGPMMetricsTestFixture, badTestCreateGPMMetricsMissingFields)
     using namespace nsm;
 
     dbus::PropertyMap properties = {
-        {"Name", std::string("GPM_Incomplete")}, {"UUID", gpuUuid},
+        {"Name", std::string("GPM_Incomplete")},
+        {"UUID", gpuUuid},
         // Missing required fields
     };
 
@@ -725,7 +730,8 @@ TEST(NsmGPMAggregated, testConstructorMultipleMetrics)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
                                                                "/test/gpm");
@@ -745,7 +751,8 @@ TEST(NsmGPMAggregated, testConstructorSingleMetric)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
                                                                "/test/gpm");
@@ -764,7 +771,8 @@ TEST(NsmGPMAggregated, testHandleSampleInvalidTag)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
                                                                "/test/gpm");
@@ -788,7 +796,8 @@ TEST(NsmGPMAggregated, testHandleSampleNullDecodeFunc)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
                                                                "/test/gpm");
@@ -814,7 +823,8 @@ TEST(NsmGPMAggregated, testHandleSampleNullUpdater)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
                                                                "/test/gpm");
@@ -844,7 +854,8 @@ TEST(NsmGPMPerInstance, testHandleResponseMsgCompletionCodeError)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
 
     std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
 
@@ -872,7 +883,8 @@ TEST(NsmGPMPerInstance, HandleResponseMsg_DecodeFail_ReturnsError)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm/decode_fail", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm/decode_fail"},
+        "com.nvidia.GPMMetrics");
 
     std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
 
@@ -899,7 +911,8 @@ TEST(NsmGPMPerInstance, testHandleResponseMsgZeroTelemetryCount)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
 
     std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
 
@@ -930,7 +943,8 @@ TEST(NsmGPMPerInstance, testHandleResponseMsgInvalidSample)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
 
     std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
 
@@ -972,7 +986,8 @@ TEST(NsmGPMPerInstance, testHandleResponseMsgTagTooLarge)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
 
     std::vector<bitfield8_t> instanceBitfield{{.byte = 0x01}};
 
@@ -1014,7 +1029,8 @@ TEST(NsmGPMPerInstance, testHandleResponseMsgResizeMetrics)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
 
     std::vector<bitfield8_t> instanceBitfield{{.byte = 0xFF}};
 
@@ -1062,7 +1078,8 @@ TEST(MakeUpdators, testMakeGPMPerInstanceUpdator)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm"},
+        "com.nvidia.GPMMetrics");
 
     auto updator = nsm::makeGPMPerInstanceUpdator("TestProperty", "/test/gpm",
                                                   gpmIntf);
@@ -1190,7 +1207,8 @@ TEST(NsmGPMAggregated, testHandleSampleNVLinkTag10TriggersNVLinkUpdator)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm_nvlink10", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm_nvlink10"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf =
         std::make_shared<nsm::NVLinkMetricsIntf>(bus, "/test/gpm_nvlink10");
@@ -1281,7 +1299,8 @@ TEST(NsmGPMAggregated, testHandleSampleDecodeFail)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm_df", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm_df"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(bus,
                                                                "/test/gpm_df");
@@ -1313,7 +1332,8 @@ TEST(MakeUpdators, testGPMPerInstanceUpdatorUpdateMetricValidIntf)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/gpm_vi", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/gpm_vi"},
+        "com.nvidia.GPMMetrics");
 
     auto updator = nsm::makeGPMPerInstanceUpdator("TestPropVI", "/test/gpm_vi",
                                                   gpmIntf);

@@ -81,15 +81,14 @@ requester::Coroutine
             device->addStaticSensor(associationsObject);
         }
 
-        diagnostics_enable_disable_wp_data_index dataIndex{};
+        uint64_t dataIndexRaw = 0;
         if (allBaseIfaceProperties.count("DataIndex"))
         {
-            dataIndex =
-                (diagnostics_enable_disable_wp_data_index)std::get<uint64_t>(
-                    allBaseIfaceProperties.at("DataIndex"));
+            dataIndexRaw =
+                std::get<uint64_t>(allBaseIfaceProperties.at("DataIndex"));
         }
 
-        switch (dataIndex)
+        switch (dataIndexRaw)
         {
             case RETIMER_EEPROM:
             case BASEBOARD_FRU_EEPROM:
@@ -133,6 +132,10 @@ requester::Coroutine
                 throw std::out_of_range("Invalid data index");
                 break;
         }
+        // Cast only after the switch validates dataIndexRaw so we never
+        // load an out-of-range value into the enum (UBSan-clean).
+        auto dataIndex =
+            static_cast<diagnostics_enable_disable_wp_data_index>(dataIndexRaw);
 
         auto pdiObjPath = (firmwareInventoryBasePath / name).string();
         auto settingsIntf = std::make_shared<NsmSetWriteProtected>(

@@ -868,7 +868,12 @@ int encode_nsm_query_token_resp(uint8_t instance_id, uint8_t cc,
 	response->hdr.command = NSM_QUERY_TOKEN;
 	response->hdr.completion_code = cc;
 	response->hdr.data_size = htole16(tlv_payload_len);
-	memcpy(response->tlv_payload, tlv_payload, tlv_payload_len);
+	if (tlv_payload_len > 0) {
+		if (tlv_payload == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		memcpy(response->tlv_payload, tlv_payload, tlv_payload_len);
+	}
 
 	return NSM_SW_SUCCESS;
 }

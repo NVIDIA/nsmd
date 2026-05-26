@@ -102,7 +102,8 @@ TEST_F(NsmNVSwitchChassisTest, badTestMissingUUID)
 {
     // Single map for basicIntfName: Name and Type present, UUID missing
     dbus::PropertyMap props = {
-        {"Name", name}, {"Type", std::string("NSM_NVSwitch_Chassis")},
+        {"Name", name},
+        {"Type", std::string("NSM_NVSwitch_Chassis")},
         // Missing UUID
     };
 

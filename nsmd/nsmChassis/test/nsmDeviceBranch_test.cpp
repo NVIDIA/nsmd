@@ -573,20 +573,19 @@ TEST_F(NsmProcessorBatch9Test,
 
 TEST_F(NsmProcessorBatch9Test, DISABLED_CreateNSMProcessor_BaseType)
 {
-    // Arrange - Type = "NSM_Processor" (the main processor type)
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
+    const std::string uniquePath =
+        std::string(processorsInventoryBasePath / "GPU_SXM_BaseType");
+    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
                                                               basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-    basePropertyMap["InventoryObjPath"] = basic["InventoryObjPath"];
-    basePropertyMap["DEVICE_UUID"] = basic["DEVICE_UUID"];
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap["Type"] = std::string("NSM_Processor");
+    basePropertyMap["Name"] = std::string("GPU_SXM_BaseType");
+    basePropertyMap["UUID"] = gpuUuid;
+    basePropertyMap["InventoryObjPath"] = uniquePath;
+    basePropertyMap["DEVICE_UUID"] =
+        std::string("12345678-abcd-abcd-abcd-123456789abc");
+    basePropertyMap["Type"] = std::string("NSM_Processor");
 
     // Act
-    createNsmProcessorSensor(mockManager, basicIntfName, objPath);
+    createNsmProcessorSensor(mockManager, basicIntfName, uniquePath);
 
     // Assert - many sensors should be created for NSM_Processor type:
     // associationSensor, uuidSensor, debugInfoObject, eraseTraceObject,

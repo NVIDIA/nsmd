@@ -147,7 +147,8 @@ TEST(NsmGpmOemBranch8, GPMMetricInstanceUpdator_UpdateMetric_SuccessPath)
 
     // Create a real dbus_interface and register the vector<double> property
     auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/openbmc_project/test/gpm_branch8e",
+        systemBus,
+        sdbusplus::object_path{"/xyz/openbmc_project/test/gpm_branch8e"},
         "com.nvidia.GPMMetrics");
     gpmAsioIntf->register_property("TestMetric", std::vector<double>{});
     gpmAsioIntf->initialize();

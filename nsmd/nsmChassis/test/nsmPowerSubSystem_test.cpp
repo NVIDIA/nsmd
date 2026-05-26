@@ -207,7 +207,9 @@ TEST_F(NsmPowerPowerSupplyTest, testcreatePowerSubSystemMissingPowerSupplyType)
     auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
                                                           interfaceName);
     dbus::PropertyMap props = {
-        {"Name", std::string("PSU_notype")}, {"Type", type}, {"UUID", fpgaUuid},
+        {"Name", std::string("PSU_notype")},
+        {"Type", type},
+        {"UUID", fpgaUuid},
         // "PowerSupplyType" intentionally omitted → FALSE branch → empty string
     };
     propertyMap = props;

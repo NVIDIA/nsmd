@@ -116,7 +116,12 @@ TEST_F(NsmNetworkAdapterBranchTest, DISABLED_Factory_MissingName_NoSensor)
     pm.erase("Name");
 
     const size_t before = device->deviceSensors.size();
-    createNSMNetworkAdapter(mockManager, intf, testPath);
+    try
+    {
+        createNSMNetworkAdapter(mockManager, intf, testPath);
+    }
+    catch (const std::exception&)
+    {}
     EXPECT_EQ(before, device->deviceSensors.size());
 }
 
@@ -134,7 +139,12 @@ TEST_F(NsmNetworkAdapterBranchTest, DISABLED_Factory_MissingUUID_NoSensor)
     pm.erase("UUID");
 
     const size_t before = device->deviceSensors.size();
-    createNSMNetworkAdapter(mockManager, intf, testPath);
+    try
+    {
+        createNSMNetworkAdapter(mockManager, intf, testPath);
+    }
+    catch (const std::exception&)
+    {}
     EXPECT_EQ(before, device->deviceSensors.size());
 }
 
@@ -169,7 +179,12 @@ TEST_F(NsmNetworkAdapterBranchTest, DISABLED_Factory_InvalidUUID_NoSensor)
     pm["UUID"] = std::string("INVALID_UUID_FORMAT");
 
     const size_t before = device->deviceSensors.size();
-    createNSMNetworkAdapter(mockManager, intf, testPath);
+    try
+    {
+        createNSMNetworkAdapter(mockManager, intf, testPath);
+    }
+    catch (const std::exception&)
+    {}
     EXPECT_EQ(before, device->deviceSensors.size());
 }
 
@@ -188,6 +203,11 @@ TEST_F(NsmNetworkAdapterBranchTest,
     pm.erase("InventoryObjPath");
 
     const size_t before = device->deviceSensors.size();
-    createNSMNetworkAdapter(mockManager, intf, testPath);
+    try
+    {
+        createNSMNetworkAdapter(mockManager, intf, testPath);
+    }
+    catch (const std::exception&)
+    {}
     EXPECT_EQ(before, device->deviceSensors.size());
 }

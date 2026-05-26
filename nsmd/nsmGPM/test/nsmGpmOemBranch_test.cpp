@@ -673,7 +673,7 @@ struct NsmGetSupportedGPMMetricsTest : public Test
         std::make_shared<sdbusplus::asio::connection>(io)};
     std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf{
         std::make_shared<sdbusplus::asio::dbus_interface>(
-            systemBus, "/xyz/test/gpm_supported_test",
+            systemBus, sdbusplus::object_path{"/xyz/test/gpm_supported_test"},
             "com.nvidia.GPMMetrics")};
     sdbusplus::bus::bus bus{sdbusplus::bus::new_default()};
     std::shared_ptr<NVLinkMetricsIntf> nvlinkIntf{
@@ -1048,7 +1048,8 @@ TEST(NsmGetSupportedGPMMetricsDRAM, HandleResponseMsg_DramMetric_UpdaterSetup)
     static boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_dram", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_dram"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(bus,
                                                           "/xyz/test/gpm_dram");
@@ -1115,7 +1116,8 @@ TEST(NsmGetSupportedGPMMetricsNoDimm,
     static boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_nodimm", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_nodimm"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf =
         std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/gpm_nodimm");

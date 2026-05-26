@@ -300,6 +300,13 @@ TEST_F(WPPBranch3Test, PageCollection_AddPage_Duplicate)
     pageCol->addPage(0, page2);
     // Still only one page
     EXPECT_TRUE(pageCol->hasPageId(0));
+
+    pageCol->supportedPages.clear();
+    gpu->deviceSensors.clear();
+    for (auto& [_, queue] : gpu->sensors)
+    {
+        queue.clear();
+    }
 }
 
 // ============================================================================

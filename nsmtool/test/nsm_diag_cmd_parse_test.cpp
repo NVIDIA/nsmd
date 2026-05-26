@@ -190,35 +190,31 @@ TEST(NsmDiagCmdParse, DisableTokens_ParseResponseSuccess)
 
 TEST(NsmDiagCmdParse, QueryTokenStatus_ParseResponseSuccess_AllStatuses)
 {
-    const nsm_debug_token_status statuses[] = {
-        NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ENDED,
-        NSM_DEBUG_TOKEN_STATUS_OPERATION_FAILURE,
-        NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ACTIVE,
-        NSM_DEBUG_TOKEN_STATUS_NO_TOKEN_APPLIED,
-        NSM_DEBUG_TOKEN_STATUS_CHALLENGE_PROVIDED,
-        NSM_DEBUG_TOKEN_STATUS_INSTALLATION_TIMEOUT,
-        NSM_DEBUG_TOKEN_STATUS_TOKEN_TIMEOUT,
-        static_cast<nsm_debug_token_status>(0xFF) // default
-    };
-    const nsm_debug_token_status_additional_info addInfos[] = {
+    const int statuses[] = {NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ENDED,
+                            NSM_DEBUG_TOKEN_STATUS_OPERATION_FAILURE,
+                            NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ACTIVE,
+                            NSM_DEBUG_TOKEN_STATUS_NO_TOKEN_APPLIED,
+                            NSM_DEBUG_TOKEN_STATUS_CHALLENGE_PROVIDED,
+                            NSM_DEBUG_TOKEN_STATUS_INSTALLATION_TIMEOUT,
+                            NSM_DEBUG_TOKEN_STATUS_TOKEN_TIMEOUT,
+                            0xFF};
+    const int addInfos[] = {
         NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE,
         NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NO_DEBUG_SESSION,
         NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_FIRMWARE_NOT_SECURED,
         NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_END_REQUEST_NOT_ACCEPTED,
         NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_QUERY_DISALLOWED,
         NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_ACTIVE,
-        static_cast<nsm_debug_token_status_additional_info>(0xFF), // default
-        NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE                // padding
-    };
-    const nsm_debug_token_type tokenTypes[] = {
-        NSM_DEBUG_TOKEN_TYPE_FRC,
-        NSM_DEBUG_TOKEN_TYPE_CRCS,
-        NSM_DEBUG_TOKEN_TYPE_CRDT,
-        NSM_DEBUG_TOKEN_TYPE_DEBUG_FIRMWARE,
-        static_cast<nsm_debug_token_type>(0xFF), // default
-        NSM_DEBUG_TOKEN_TYPE_FRC,
-        NSM_DEBUG_TOKEN_TYPE_FRC,
-        NSM_DEBUG_TOKEN_TYPE_FRC};
+        0xFF,
+        NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE};
+    const int tokenTypes[] = {NSM_DEBUG_TOKEN_TYPE_FRC,
+                              NSM_DEBUG_TOKEN_TYPE_CRCS,
+                              NSM_DEBUG_TOKEN_TYPE_CRDT,
+                              NSM_DEBUG_TOKEN_TYPE_DEBUG_FIRMWARE,
+                              0xFF,
+                              NSM_DEBUG_TOKEN_TYPE_FRC,
+                              NSM_DEBUG_TOKEN_TYPE_FRC,
+                              NSM_DEBUG_TOKEN_TYPE_FRC};
 
     for (size_t i = 0; i < 8; i++)
     {
@@ -229,9 +225,11 @@ TEST(NsmDiagCmdParse, QueryTokenStatus_ParseResponseSuccess_AllStatuses)
         std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_query_token_status_resp));
         auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-        encode_nsm_query_token_status_resp(0, NSM_SUCCESS, ERR_NULL,
-                                           statuses[i], addInfos[i],
-                                           tokenTypes[i], 0, msg);
+        encode_nsm_query_token_status_resp(
+            0, NSM_SUCCESS, ERR_NULL,
+            static_cast<nsm_debug_token_status>(statuses[i]),
+            static_cast<nsm_debug_token_status_additional_info>(addInfos[i]),
+            static_cast<nsm_debug_token_type>(tokenTypes[i]), 0, msg);
         EXPECT_NO_THROW(commands[3]->parseResponseMsg(msg, buf.size()));
     }
 }

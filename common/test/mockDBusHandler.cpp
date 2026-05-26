@@ -221,7 +221,7 @@ bool coGetDbusPropertyBase::await_ready() noexcept
 bool coGetDbusPropertyBase::await_suspend(
     std::coroutine_handle<> /*handle*/) noexcept
 {
-    return true;
+    return false;
 }
 
 bool coGetServiceMap::await_ready() noexcept
@@ -255,7 +255,7 @@ bool coGetAllDbusProperty::await_ready() noexcept
 bool coGetAllDbusProperty::await_suspend(
     std::coroutine_handle<> /*handle*/) noexcept
 {
-    return true;
+    return false;
 }
 
 bool coLogEvent::await_ready() noexcept

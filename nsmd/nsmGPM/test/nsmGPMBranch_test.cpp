@@ -141,7 +141,8 @@ TEST(NsmGPMBranch, Aggregated_GenRequest_Success)
     static boost::asio::io_context ioCtxAgg;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioCtxAgg);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_branch_gen", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_branch_gen"},
+        "com.nvidia.GPMMetrics");
 
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
         utils::DBusHandler::getBus(), "/xyz/test/nvlink_branch_gen");
@@ -165,7 +166,8 @@ TEST(NsmGPMBranch, GetSupportedGPMMetrics_GenRequest_Success)
     static boost::asio::io_context ioCtxSupp;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioCtxSupp);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_branch_supp", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_branch_supp"},
+        "com.nvidia.GPMMetrics");
 
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
         utils::DBusHandler::getBus(), "/xyz/test/nvlink_branch_supp");
@@ -190,7 +192,8 @@ TEST(NsmGPMBranch, GetSupportedGPMMetrics_HandleResp_AlreadyReceived)
     static boost::asio::io_context ioCtxGuard;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioCtxGuard);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_branch_guard", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_branch_guard"},
+        "com.nvidia.GPMMetrics");
 
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
         utils::DBusHandler::getBus(), "/xyz/test/nvlink_branch_guard");
@@ -222,7 +225,8 @@ TEST(NsmGPMBranch, GetSupportedGPMMetrics_HandleResp_DecodeFail)
     static boost::asio::io_context ioCtxDecF;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioCtxDecF);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_branch_decf", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_branch_decf"},
+        "com.nvidia.GPMMetrics");
 
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
         utils::DBusHandler::getBus(), "/xyz/test/nvlink_branch_decf");
@@ -312,7 +316,8 @@ TEST(NsmGPMBranch, SplitMetricsBitfield_MaxZero)
     static boost::asio::io_context ioCtxSplit;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioCtxSplit);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_branch_split", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_branch_split"},
+        "com.nvidia.GPMMetrics");
 
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
         utils::DBusHandler::getBus(), "/xyz/test/nvlink_branch_split");
@@ -340,7 +345,8 @@ TEST(NsmGPMBranch, SplitMetricsBitfield_Normal)
     static boost::asio::io_context ioCtxSplitN;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioCtxSplitN);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_branch_splitn", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_branch_splitn"},
+        "com.nvidia.GPMMetrics");
 
     auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
         utils::DBusHandler::getBus(), "/xyz/test/nvlink_branch_splitn");

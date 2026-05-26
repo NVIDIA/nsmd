@@ -117,14 +117,16 @@ TEST(NsmGpmOemBranch4, GPMMetricUpdator_ValueChange_And_NoChange)
     static boost::asio::io_context ioGpm;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioGpm);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_upd", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_upd"},
+        "com.nvidia.GPMMetrics");
 
     gpmIntf->register_property(
         "TestProp", double{std::numeric_limits<double>::quiet_NaN()});
     gpmIntf->initialize();
 
-    NsmGPMAggregated gpm("TestUpdator", "TestType", "/xyz/test/gpm_b4_upd", 2,
-                         0, 0, {0x01}, gpmIntf, nullptr);
+    NsmGPMAggregated gpm("TestUpdator", "TestType",
+                         sdbusplus::object_path{"/xyz/test/gpm_b4_upd"}, 2, 0,
+                         0, {0x01}, gpmIntf, nullptr);
 
     auto infos = gpm.getMetricInfo(0);
     ASSERT_GT(infos.size(), 0u);
@@ -165,13 +167,15 @@ TEST(NsmGpmOemBranch4, NVLinkMetricUpdator_ValueChange_And_NoChange)
     static boost::asio::io_context ioNvl;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioNvl);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_nvl", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_nvl"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
-    auto nvlinkIntf =
-        std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/gpm_b4_nvl");
+    auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
+        bus, sdbusplus::object_path{"/xyz/test/gpm_b4_nvl"});
 
-    NsmGPMAggregated gpm("TestNVLUpdator", "TestType", "/xyz/test/gpm_b4_nvl",
-                         2, 0, 0, {0x00, 0x3C}, gpmIntf, nvlinkIntf);
+    NsmGPMAggregated gpm("TestNVLUpdator", "TestType",
+                         sdbusplus::object_path{"/xyz/test/gpm_b4_nvl"}, 2, 0,
+                         0, {0x00, 0x3C}, gpmIntf, nvlinkIntf);
 
     auto infos10 = gpm.getMetricInfo(10);
     ASSERT_GT(infos10.size(), 0u);
@@ -274,10 +278,12 @@ TEST(NsmGpmOemBranch4, GPMAggregated_HandleSample_TagTooLarge)
     static boost::asio::io_context ioTag;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioTag);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_tag", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_tag"},
+        "com.nvidia.GPMMetrics");
 
-    NsmGPMAggregated gpm("TestTagLarge", "TestType", "/xyz/test/gpm_b4_tag", 2,
-                         0, 0, {0x01}, gpmIntf, nullptr);
+    NsmGPMAggregated gpm("TestTagLarge", "TestType",
+                         sdbusplus::object_path{"/xyz/test/gpm_b4_tag"}, 2, 0,
+                         0, {0x01}, gpmIntf, nullptr);
 
     NsmSensorAggregator::TelemetrySample sample;
     sample.tag = 255;
@@ -297,10 +303,12 @@ TEST(NsmGpmOemBranch4, GPMAggregated_HandleSample_NoUpdater)
     static boost::asio::io_context ioNoUpd;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioNoUpd);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_noupd", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_noupd"},
+        "com.nvidia.GPMMetrics");
 
-    NsmGPMAggregated gpm("TestNoUpd", "TestType", "/xyz/test/gpm_b4_noupd", 2,
-                         0, 0, {0x01}, gpmIntf, nullptr);
+    NsmGPMAggregated gpm("TestNoUpd", "TestType",
+                         sdbusplus::object_path{"/xyz/test/gpm_b4_noupd"}, 2, 0,
+                         0, {0x01}, gpmIntf, nullptr);
 
     NsmSensorAggregator::TelemetrySample sample;
     sample.tag = 4;
@@ -321,15 +329,17 @@ TEST(NsmGpmOemBranch4, GPMAggregated_HandleSample_DecodeSuccess)
     static boost::asio::io_context ioDecOk;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioDecOk);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_decok", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_decok"},
+        "com.nvidia.GPMMetrics");
 
     gpmIntf->register_property(
         "GraphicsEngineActivityPercent",
         double{std::numeric_limits<double>::quiet_NaN()});
     gpmIntf->initialize();
 
-    NsmGPMAggregated gpm("TestDecOk", "TestType", "/xyz/test/gpm_b4_decok", 2,
-                         0, 0, {0x01}, gpmIntf, nullptr);
+    NsmGPMAggregated gpm("TestDecOk", "TestType",
+                         sdbusplus::object_path{"/xyz/test/gpm_b4_decok"}, 2, 0,
+                         0, {0x01}, gpmIntf, nullptr);
 
     NsmSensorAggregator::TelemetrySample sample;
     sample.tag = 0;
@@ -350,15 +360,17 @@ TEST(NsmGpmOemBranch4, GPMAggregated_HandleSample_DecodeFail)
     static boost::asio::io_context ioDecFl;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioDecFl);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_decfail", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_decfail"},
+        "com.nvidia.GPMMetrics");
 
     gpmIntf->register_property(
         "GraphicsEngineActivityPercent",
         double{std::numeric_limits<double>::quiet_NaN()});
     gpmIntf->initialize();
 
-    NsmGPMAggregated gpm("TestDecFail", "TestType", "/xyz/test/gpm_b4_decfail",
-                         2, 0, 0, {0x01}, gpmIntf, nullptr);
+    NsmGPMAggregated gpm("TestDecFail", "TestType",
+                         sdbusplus::object_path{"/xyz/test/gpm_b4_decfail"}, 2,
+                         0, 0, {0x01}, gpmIntf, nullptr);
 
     NsmSensorAggregator::TelemetrySample sample;
     sample.tag = 0;
@@ -379,21 +391,23 @@ TEST(NsmGpmOemBranch4, GetSupportedGPMMetrics_GenRequestMsg_EncodeFail)
     static boost::asio::io_context ioSgpFail;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioSgpFail);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_sgp_fail", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_sgp_fail"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 20, "NSM_DEVICE_INSTANCE_NUMBER", "20", 0);
 
-    NsmGetSupportedGPMMetrics sensor{"TestB4SgpFail",
-                                     "TestType",
-                                     GPM_METRIC_TYPE_AGGREGATE,
-                                     nsmDevice,
-                                     "/xyz/test/gpm_b4_sgp_fail",
-                                     2,
-                                     0,
-                                     0,
-                                     {0xFF},
-                                     gpmIntf,
-                                     nullptr};
+    NsmGetSupportedGPMMetrics sensor{
+        "TestB4SgpFail",
+        "TestType",
+        GPM_METRIC_TYPE_AGGREGATE,
+        nsmDevice,
+        sdbusplus::object_path{"/xyz/test/gpm_b4_sgp_fail"},
+        2,
+        0,
+        0,
+        {0xFF},
+        gpmIntf,
+        nullptr};
 
     auto req = sensor.genRequestMsg(12, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(req.has_value());
@@ -404,21 +418,23 @@ TEST(NsmGpmOemBranch4, GetSupportedGPMMetrics_GenRequestMsg_Success)
     static boost::asio::io_context ioSgpOk;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioSgpOk);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_sgp_ok", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_sgp_ok"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 21, "NSM_DEVICE_INSTANCE_NUMBER", "21", 0);
 
-    NsmGetSupportedGPMMetrics sensor{"TestB4SgpOk",
-                                     "TestType",
-                                     GPM_METRIC_TYPE_AGGREGATE,
-                                     nsmDevice,
-                                     "/xyz/test/gpm_b4_sgp_ok",
-                                     2,
-                                     0,
-                                     0,
-                                     {0xFF},
-                                     gpmIntf,
-                                     nullptr};
+    NsmGetSupportedGPMMetrics sensor{
+        "TestB4SgpOk",
+        "TestType",
+        GPM_METRIC_TYPE_AGGREGATE,
+        nsmDevice,
+        sdbusplus::object_path{"/xyz/test/gpm_b4_sgp_ok"},
+        2,
+        0,
+        0,
+        {0xFF},
+        gpmIntf,
+        nullptr};
 
     auto req = sensor.genRequestMsg(12, 0);
     EXPECT_TRUE(req.has_value());
@@ -433,21 +449,23 @@ TEST(NsmGpmOemBranch4, GetSupportedGPMMetrics_HandleResponse_AlreadyReceived)
     static boost::asio::io_context ioAlready;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioAlready);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_already", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_already"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 22, "NSM_DEVICE_INSTANCE_NUMBER", "22", 0);
 
-    NsmGetSupportedGPMMetrics sensor{"TestB4Already",
-                                     "TestType",
-                                     GPM_METRIC_TYPE_AGGREGATE,
-                                     nsmDevice,
-                                     "/xyz/test/gpm_b4_already",
-                                     2,
-                                     0,
-                                     0,
-                                     {0xFF},
-                                     gpmIntf,
-                                     nullptr};
+    NsmGetSupportedGPMMetrics sensor{
+        "TestB4Already",
+        "TestType",
+        GPM_METRIC_TYPE_AGGREGATE,
+        nsmDevice,
+        sdbusplus::object_path{"/xyz/test/gpm_b4_already"},
+        2,
+        0,
+        0,
+        {0xFF},
+        gpmIntf,
+        nullptr};
 
     sensor.responseReceived = true;
 
@@ -467,21 +485,23 @@ TEST(NsmGpmOemBranch4, GetSupportedGPMMetrics_HandleResponse_DecodeFail)
     auto systemBus =
         std::make_shared<sdbusplus::asio::connection>(ioDecFailSgp);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_sgp_decfail", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_sgp_decfail"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 23, "NSM_DEVICE_INSTANCE_NUMBER", "23", 0);
 
-    NsmGetSupportedGPMMetrics sensor{"TestB4SgpDecFail",
-                                     "TestType",
-                                     GPM_METRIC_TYPE_AGGREGATE,
-                                     nsmDevice,
-                                     "/xyz/test/gpm_b4_sgp_decfail",
-                                     2,
-                                     0,
-                                     0,
-                                     {0xFF},
-                                     gpmIntf,
-                                     nullptr};
+    NsmGetSupportedGPMMetrics sensor{
+        "TestB4SgpDecFail",
+        "TestType",
+        GPM_METRIC_TYPE_AGGREGATE,
+        nsmDevice,
+        sdbusplus::object_path{"/xyz/test/gpm_b4_sgp_decfail"},
+        2,
+        0,
+        0,
+        {0xFF},
+        gpmIntf,
+        nullptr};
 
     size_t bufSize = sizeof(nsm_msg_hdr) +
                      sizeof(nsm_get_supported_gpm_metrics_resp);
@@ -503,21 +523,23 @@ TEST(NsmGpmOemBranch4, GetSupportedGPMMetrics_SplitBitfield_MaxZero)
     static boost::asio::io_context ioMaxZero;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioMaxZero);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_maxzero", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_maxzero"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 24, "NSM_DEVICE_INSTANCE_NUMBER", "24", 0);
 
-    NsmGetSupportedGPMMetrics sensor{"TestB4MaxZero",
-                                     "TestType",
-                                     GPM_METRIC_TYPE_AGGREGATE,
-                                     nsmDevice,
-                                     "/xyz/test/gpm_b4_maxzero",
-                                     2,
-                                     0,
-                                     0,
-                                     {0xFF},
-                                     gpmIntf,
-                                     nullptr};
+    NsmGetSupportedGPMMetrics sensor{
+        "TestB4MaxZero",
+        "TestType",
+        GPM_METRIC_TYPE_AGGREGATE,
+        nsmDevice,
+        sdbusplus::object_path{"/xyz/test/gpm_b4_maxzero"},
+        2,
+        0,
+        0,
+        {0xFF},
+        gpmIntf,
+        nullptr};
 
     sensor.maxMetricsPerCommand = 0;
     sensor.maskSize = 1;
@@ -535,21 +557,23 @@ TEST(NsmGpmOemBranch4, GetSupportedGPMMetrics_SplitBitfield_MaskSizeZero)
     static boost::asio::io_context ioMaskZero;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioMaskZero);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_maskzero", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_maskzero"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 32, "NSM_DEVICE_INSTANCE_NUMBER", "32", 0);
 
-    NsmGetSupportedGPMMetrics sensor{"TestB4MaskZero",
-                                     "TestType",
-                                     GPM_METRIC_TYPE_AGGREGATE,
-                                     nsmDevice,
-                                     "/xyz/test/gpm_b4_maskzero",
-                                     2,
-                                     0,
-                                     0,
-                                     {0xFF},
-                                     gpmIntf,
-                                     nullptr};
+    NsmGetSupportedGPMMetrics sensor{
+        "TestB4MaskZero",
+        "TestType",
+        GPM_METRIC_TYPE_AGGREGATE,
+        nsmDevice,
+        sdbusplus::object_path{"/xyz/test/gpm_b4_maskzero"},
+        2,
+        0,
+        0,
+        {0xFF},
+        gpmIntf,
+        nullptr};
 
     sensor.maxMetricsPerCommand = 8;
     sensor.maskSize = 0;
@@ -784,21 +808,23 @@ TEST(NsmGpmOemBranch4, GetSupportedGPMMetrics_HandleResponse_EmptyChunks)
     auto systemBus =
         std::make_shared<sdbusplus::asio::connection>(ioEmptyChunk);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b4_empty_chunk", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b4_empty_chunk"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 30, "NSM_DEVICE_INSTANCE_NUMBER", "30", 0);
 
-    NsmGetSupportedGPMMetrics sensor{"TestB4EmptyChunk",
-                                     "TestType",
-                                     GPM_METRIC_TYPE_AGGREGATE,
-                                     nsmDevice,
-                                     "/xyz/test/gpm_b4_empty_chunk",
-                                     2,
-                                     0,
-                                     0,
-                                     {0x00},
-                                     gpmIntf,
-                                     nullptr};
+    NsmGetSupportedGPMMetrics sensor{
+        "TestB4EmptyChunk",
+        "TestType",
+        GPM_METRIC_TYPE_AGGREGATE,
+        nsmDevice,
+        sdbusplus::object_path{"/xyz/test/gpm_b4_empty_chunk"},
+        2,
+        0,
+        0,
+        {0x00},
+        gpmIntf,
+        nullptr};
 
     size_t bufSize = sizeof(nsm_msg_hdr) +
                      sizeof(nsm_get_supported_gpm_metrics_resp);

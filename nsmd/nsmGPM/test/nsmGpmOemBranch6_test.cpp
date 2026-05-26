@@ -112,7 +112,8 @@ TEST(NsmGpmOemBranch6, NsmGPMAggregated_HandleSample_SpecialTag)
     static boost::asio::io_context ioSpecial;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioSpecial);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_special", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_special"},
+        "com.nvidia.GPMMetrics");
 
     NsmGPMAggregated gpm("TestSpecialTag", "TestType",
                          "/xyz/test/gpm_b6_special", 2, 0, 0, {0x01}, gpmIntf,
@@ -136,7 +137,8 @@ TEST(NsmGpmOemBranch6, NsmGPMAggregated_HandleSample_NullDecodeFunc)
     static boost::asio::io_context ioNullDec;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioNullDec);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_nulldec", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_nulldec"},
+        "com.nvidia.GPMMetrics");
 
     NsmGPMAggregated gpm("TestNullDec", "TestType", "/xyz/test/gpm_b6_nulldec",
                          2, 0, 0, {0x01}, gpmIntf, nullptr);
@@ -161,7 +163,8 @@ TEST(NsmGpmOemBranch6, NsmGPMAggregated_HandleSample_DecodeSuccess)
     static boost::asio::io_context ioDecOk;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioDecOk);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_decok", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_decok"},
+        "com.nvidia.GPMMetrics");
 
     gpmIntf->register_property(
         "GraphicsEngineActivityPercent",
@@ -194,7 +197,8 @@ TEST(NsmGpmOemBranch6, NsmGPMAggregated_HandleSample_DecodeFail)
     static boost::asio::io_context ioDecFail;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioDecFail);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_decfail", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_decfail"},
+        "com.nvidia.GPMMetrics");
 
     gpmIntf->register_property(
         "GraphicsEngineActivityPercent",
@@ -224,7 +228,8 @@ TEST(NsmGpmOemBranch6, NsmGPMAggregated_Constructor_NVLinkMetrics)
     static boost::asio::io_context ioNVLink;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioNVLink);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_nvlink", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_nvlink"},
+        "com.nvidia.GPMMetrics");
 
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf =
@@ -418,7 +423,8 @@ TEST(NsmGpmOemBranch6, GetSupportedGPMMetrics_GenRequestMsg_Success)
     static boost::asio::io_context ioGenOk;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioGenOk);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_gen_ok", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_gen_ok"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 60, "NSM_DEVICE_INSTANCE_NUMBER", "60", 0);
 
@@ -443,7 +449,8 @@ TEST(NsmGpmOemBranch6, GetSupportedGPMMetrics_GenRequestMsg_Fail)
     static boost::asio::io_context ioGenFail;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioGenFail);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_gen_fail", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_gen_fail"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 61, "NSM_DEVICE_INSTANCE_NUMBER", "61", 0);
 
@@ -472,7 +479,8 @@ TEST(NsmGpmOemBranch6, GetSupportedGPMMetrics_HandleResponse_AlreadyReceived)
     static boost::asio::io_context ioRecv;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioRecv);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_recv", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_recv"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 62, "NSM_DEVICE_INSTANCE_NUMBER", "62", 0);
 
@@ -506,7 +514,8 @@ TEST(NsmGpmOemBranch6, GetSupportedGPMMetrics_HandleResponse_CCNonZero)
     static boost::asio::io_context ioCCNZ;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioCCNZ);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_ccnz", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_ccnz"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 63, "NSM_DEVICE_INSTANCE_NUMBER", "63", 0);
 
@@ -540,7 +549,8 @@ TEST(NsmGpmOemBranch6, GetSupportedGPMMetrics_HandleResponse_EmptyChunkSkip)
     static boost::asio::io_context ioEmpty;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioEmpty);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_emptyck", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_emptyck"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 64, "NSM_DEVICE_INSTANCE_NUMBER", "64", 0);
 
@@ -677,7 +687,8 @@ TEST(NsmGpmOemBranch6, SplitMetricsBitfield_MaxMetricsZero)
     static boost::asio::io_context ioSplitZero;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioSplitZero);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_splitz", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_splitz"},
+        "com.nvidia.GPMMetrics");
     auto nsmDevice = std::make_shared<MockNsmDevice>(
         NSM_DEV_ID_GPU, 69, "NSM_DEVICE_INSTANCE_NUMBER", "69", 0);
 
@@ -787,7 +798,8 @@ TEST(NsmGpmOemBranch6, NsmGPMAggregated_HandleSample_BandwidthMetric)
     static boost::asio::io_context ioBW;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioBW);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b6_bw", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b6_bw"},
+        "com.nvidia.GPMMetrics");
 
     gpmIntf->register_property(
         "PCIeRawTxBandwidthGbps",

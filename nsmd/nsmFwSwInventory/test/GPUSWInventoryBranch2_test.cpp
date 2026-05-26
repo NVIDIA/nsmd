@@ -239,7 +239,8 @@ TEST_F(GPUSWInventoryBranch2Test, Factory_MissingManufacturer_Created)
         "/xyz/openbmc_project/inventory/system/gpu_br2_nomfr";
 
     dbus::PropertyMap properties = {
-        {"Name", std::string("GPU_Driver_Br2_NoMfr")}, {"UUID", gpuUuid},
+        {"Name", std::string("GPU_Driver_Br2_NoMfr")},
+        {"UUID", gpuUuid},
         // Manufacturer intentionally omitted
     };
 

@@ -117,8 +117,17 @@ struct SensorManagerTest : public ::testing::Test
         {
             if (dev)
             {
-                dev->task.detach();
-                dev->longRunningTask.detach();
+                if (dev->task.handle && !dev->task.handle.done())
+                {
+                    dev->task.handle.destroy();
+                }
+                dev->task.handle = nullptr;
+                if (dev->longRunningTask.handle &&
+                    !dev->longRunningTask.handle.done())
+                {
+                    dev->longRunningTask.handle.destroy();
+                }
+                dev->longRunningTask.handle = nullptr;
                 dev->deviceSensors.clear();
                 dev->prioritySensors.clear();
                 dev->roundRobinSensors.clear();
@@ -135,6 +144,17 @@ struct SensorManagerTest : public ::testing::Test
 static auto immediateCoroutine()
 {
     return [](auto...) -> requester::Coroutine { co_return NSM_SW_SUCCESS; };
+}
+
+// Force-destroy a coroutine frame suspended on Sleep (the mocked event
+// loop never resumes it, so detach() alone would leak the frame).
+static void destroyCoroutine(requester::Coroutine&& co)
+{
+    if (co.handle && !co.handle.done())
+    {
+        co.handle.destroy();
+    }
+    co.handle = nullptr;
 }
 
 // ============================================================================
@@ -178,10 +198,7 @@ TEST_F(SensorManagerTest, DeviceTask_InactiveDevice_SleepsWithPriority)
     }),
                         Return(0)));
 
-    auto cr = mgr->deviceTask(nsmDevice);
-    // In non-coverage mode the coroutine suspends at Sleep, so
-    // cr.data() is uninitialized. We only verify the mock expectations.
-    (void)cr;
+    destroyCoroutine(mgr->deviceTask(nsmDevice));
 }
 
 /**
@@ -204,8 +221,7 @@ TEST_F(SensorManagerTest,
         co_return NSM_SW_SUCCESS;
     });
 
-    auto cr = mgr->deviceTask(nsmDevice);
-    (void)cr;
+    destroyCoroutine(mgr->deviceTask(nsmDevice));
 }
 
 /**
@@ -230,8 +246,7 @@ TEST_F(SensorManagerTest,
         co_return NSM_SW_SUCCESS;
     });
 
-    auto cr = mgr->deviceTask(nsmDevice);
-    (void)cr;
+    destroyCoroutine(mgr->deviceTask(nsmDevice));
 }
 
 /**
@@ -258,8 +273,7 @@ TEST_F(SensorManagerTest,
         co_return NSM_SW_SUCCESS;
     });
 
-    auto cr = mgr->deviceTask(nsmDevice);
-    (void)cr;
+    destroyCoroutine(mgr->deviceTask(nsmDevice));
 }
 
 // ============================================================================
@@ -413,8 +427,7 @@ TEST_F(SensorManagerTest,
     EXPECT_CALL(*mgr, pollPrioritySensors(_, _)).Times(0);
     EXPECT_CALL(*mgr, pollNonPrioritySensors(_, _)).Times(0);
 
-    auto cr = mgr->deviceTask(nsmDevice);
-    (void)cr;
+    destroyCoroutine(mgr->deviceTask(nsmDevice));
 }
 
 /**
@@ -443,8 +456,7 @@ TEST_F(SensorManagerTest, DeviceTask_PollingTimeExceeded_SleepsAllowedBuffer)
         co_return NSM_SW_SUCCESS;
     });
 
-    auto cr = mgr->deviceTask(nsmDevice);
-    (void)cr;
+    destroyCoroutine(mgr->deviceTask(nsmDevice));
 }
 
 /**

@@ -29,7 +29,8 @@ tests = [
     'libnsm_pci_links_test',
     'libnsm_powersmoothing_v2_test',
     'libnsm_remaining_coverage_test',
-    'libnsm_mctp_requester_test',
+    # libnsm_mctp_requester_test is built separately below with --wrap
+    # so mock interposition wins against ASan's runtime interceptors.
     'libnsm_firmware_utils_dot_test',
     'libnsm_firmware_utils_branch_test',
     'libnsm_device_capability_discovery_branch_test',
@@ -71,3 +72,27 @@ foreach t : tests
         workdir: meson.current_source_dir(),
     )
 endforeach
+
+# Built with -Wl,--wrap so mock interposition wins against ASan's
+# runtime poll/recv/recvmsg interceptors.  Companion __wrap_* symbols
+# live in common/test/mockSocketIo.cpp.
+test(
+    'libnsm_mctp_requester_test',
+    executable(
+        'libnsm_mctp_requester_test'.underscorify(),
+        ['libnsm_mctp_requester_test.cpp', test_common_sources],
+        implicit_include_directories: false,
+        include_directories: ['.', '..'],
+        link_args: dynamic_linker + [
+            '-Wl,--wrap=poll',
+            '-Wl,--wrap=recv',
+            '-Wl,--wrap=recvmsg',
+            '-Wl,--wrap=sendmsg',
+            '-Wl,--wrap=__poll_chk',
+            '-Wl,--wrap=__recv_chk',
+        ],
+        build_rpath: '',
+        dependencies: [tests_deps, libnsm_dep],
+    ),
+    workdir: meson.current_source_dir(),
+)

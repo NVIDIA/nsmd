@@ -552,7 +552,8 @@ TEST_F(NsmGPUSWInventoryTestFixture,
        testCreateGPUDriverSensorMissingManufacturer)
 {
     dbus::PropertyMap properties = {
-        {"Name", std::string("GPU_Driver_NoMfr")}, {"UUID", gpuUuid},
+        {"Name", std::string("GPU_Driver_NoMfr")},
+        {"UUID", gpuUuid},
         // "Manufacturer" intentionally absent → manufacturer=""
     };
 

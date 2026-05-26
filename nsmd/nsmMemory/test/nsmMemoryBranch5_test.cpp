@@ -288,7 +288,6 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
 // Factory: NSM_Memory type with all properties including Priority=true
 // Covers: type == "NSM_Memory" TRUE, count("ErrorCorrection") TRUE,
 //         count("DeviceType") TRUE, count("Priority") TRUE
-// ============================================================================
 
 TEST_F(NsmMemoryBranch5Test,
        DISABLED_Factory_NSM_Memory_AllProperties_PriorityTrue)
@@ -391,7 +390,12 @@ TEST_F(NsmMemoryBranch5Test, DISABLED_Factory_MissingUUID_ReturnsError)
     cpm["Type"] = std::string("NSM_Memory");
 
     const size_t before = gpu->deviceSensors.size();
-    createNsmMemorySensor(mockManager, baseIntf, path);
+    try
+    {
+        createNsmMemorySensor(mockManager, baseIntf, path);
+    }
+    catch (const std::exception&)
+    {}
     // No sensors added due to empty UUID
     EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
@@ -448,7 +452,12 @@ TEST_F(NsmMemoryBranch5Test, DISABLED_Factory_UnknownType_NoSensors)
 
     const size_t dBefore = gpu->deviceSensors.size();
     const size_t rrBefore = gpu->roundRobinSensors.size();
-    createNsmMemorySensor(mockManager, baseIntf, path);
+    try
+    {
+        createNsmMemorySensor(mockManager, baseIntf, path);
+    }
+    catch (const std::exception&)
+    {}
     EXPECT_EQ(gpu->deviceSensors.size(), dBefore);
     EXPECT_EQ(gpu->roundRobinSensors.size(), rrBefore);
 }

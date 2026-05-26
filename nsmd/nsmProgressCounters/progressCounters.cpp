@@ -163,9 +163,11 @@ DiscoveryEvents::DiscoveryEvents(eid_t eid) :
         progressCountersObjectBasePath / "discovery" / std::to_string(eid),
         "Discovery Progress Counters for device EID=" + std::to_string(eid),
         {
-            "InterfaceAdded_Signal", "InterfaceRemoved_Signal",
+            "InterfaceAdded_Signal",
+            "InterfaceRemoved_Signal",
             "Connectivity_Available", // 1: available, 0: not available
-            "Online_coSetdeviceStateOnlineTask_RC", "Online_ping_RC",
+            "Online_coSetdeviceStateOnlineTask_RC",
+            "Online_ping_RC",
             "Online_getQueryDeviceIdentification_RC",
             "Online_mapNsmDeviceUsingEid_Success", // 1: success, 0:
                                                    // failed
@@ -176,7 +178,8 @@ DiscoveryEvents::DiscoveryEvents(eid_t eid) :
             "Online_getSupportedCommandCodes3_RC",
             "Online_getSupportedCommandCodes4_RC",
             "Online_getSupportedCommandCodes5_RC",
-            "Online_getSupportedCommandCodes6_RC", "Online_getFRU_RC",
+            "Online_getSupportedCommandCodes6_RC",
+            "Online_getFRU_RC",
             "Offline_coSetdeviceStateOfflineTask_RC",
             "Offline_mapNsmDeviceUsingEid_Success", // 1: success, 0:
                                                     // failed

@@ -353,6 +353,11 @@ TEST_F(PageCollectionTest, AddPage_NewAndExisting)
     // Break circular reference before leaving scope:
     // pageCollection → page → pageCollection
     pageCollection->supportedPages.clear();
+    device->deviceSensors.clear();
+    for (auto& [_, queue] : device->sensors)
+    {
+        queue.clear();
+    }
 }
 
 // ============================================================================

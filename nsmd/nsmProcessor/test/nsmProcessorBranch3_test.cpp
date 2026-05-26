@@ -87,13 +87,11 @@ struct NsmProcessorBranch3Test :
         return utils::DBusHandler::getBus();
     }
 
-    // Build an event-response buffer for sensors that use
-    // encode_long_running_resp (decode_*_event_resp).
-    // The layout is: nsm_msg_hdr | nsm_long_running_resp | <payload bytes>
+    // Layout: hdr | event-hdr (NSM_EVENT_MIN_LEN) | long_running_resp | payload
     template <typename PayloadStruct>
     std::vector<uint8_t> makeEventRespBuf()
     {
-        return std::vector<uint8_t>(sizeof(nsm_msg_hdr) +
+        return std::vector<uint8_t>(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
                                         sizeof(nsm_long_running_resp) +
                                         sizeof(PayloadStruct),
                                     0);

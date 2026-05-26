@@ -21,6 +21,7 @@
 
 #include "utils.hpp"
 
+#include <cstring>
 #include <tuple>
 #include <unordered_map>
 namespace nsm
@@ -133,7 +134,7 @@ class StateChangeLogger
     }
 
     template <typename T>
-    StateChangeArg initializeArg(T)
+    StateChangeArg initializeArg(T&&)
     {
         if constexpr (std::is_same_v<std::decay_t<T>, nsm_reason_codes> ||
                       std::is_same_v<std::decay_t<T>, nsm_sw_codes> ||
@@ -152,16 +153,23 @@ class StateChangeLogger
     {
         if constexpr (std::is_same_v<std::decay_t<T>, nsm_reason_codes>)
         {
-            return arg == ERR_NULL;
+            // memcpy avoids UBSan enum-load when wire value is out of range.
+            std::underlying_type_t<nsm_reason_codes> raw{};
+            std::memcpy(&raw, &arg, sizeof(raw));
+            return raw == ERR_NULL;
         }
         else if constexpr (std::is_same_v<std::decay_t<T>, nsm_sw_codes>)
         {
-            return arg == NSM_SW_SUCCESS;
+            std::underlying_type_t<nsm_sw_codes> raw{};
+            std::memcpy(&raw, &arg, sizeof(raw));
+            return raw == NSM_SW_SUCCESS;
         }
         else if constexpr (std::is_same_v<std::decay_t<T>,
                                           nsm_completion_codes>)
         {
-            return arg == NSM_SUCCESS || arg == NSM_ACCEPTED;
+            std::underlying_type_t<nsm_completion_codes> raw{};
+            std::memcpy(&raw, &arg, sizeof(raw));
+            return raw == NSM_SUCCESS || raw == NSM_ACCEPTED;
         }
         else if constexpr (std::is_same_v<std::decay_t<T>, bool>)
         {
@@ -189,7 +197,22 @@ class StateChangeLogger
 
             if constexpr (std::is_same_v<StoredType, utils::Bitfield256>)
             {
-                return !isSuccess(arg) && value.setBit(arg);
+                if (isSuccess(arg))
+                {
+                    return false;
+                }
+                if constexpr (std::is_enum_v<std::decay_t<T>>)
+                {
+                    // memcpy avoids UBSan enum-load when wire value is
+                    // outside the declared enumerator range.
+                    std::underlying_type_t<std::decay_t<T>> raw{};
+                    std::memcpy(&raw, &arg, sizeof(raw));
+                    return value.setBit(static_cast<uint8_t>(raw));
+                }
+                else
+                {
+                    return value.setBit(static_cast<uint8_t>(arg));
+                }
             }
             else if constexpr (std::is_same_v<StoredType, bool>)
             {

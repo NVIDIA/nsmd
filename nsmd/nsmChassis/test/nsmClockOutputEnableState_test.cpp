@@ -361,11 +361,12 @@ TEST_F(NsmClockOutputEnableStateBaseTest, HandleResponseMsgMultipleTimes)
     TestNsmClockOutputEnableState state(provider, PCIE_CLKBUF_INDEX,
                                         NSM_DEV_ID_GPU, 0, false);
 
-    nsm_msg response{};
+    std::vector<uint8_t> responseData(16, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
 
-    uint8_t result1 = state.handleResponseMsg(&response, sizeof(response));
-    uint8_t result2 = state.handleResponseMsg(&response, sizeof(response));
-    uint8_t result3 = state.handleResponseMsg(&response, sizeof(response));
+    uint8_t result1 = state.handleResponseMsg(response, responseData.size());
+    uint8_t result2 = state.handleResponseMsg(response, responseData.size());
+    uint8_t result3 = state.handleResponseMsg(response, responseData.size());
 
     EXPECT_GE(result1, 0);
     EXPECT_GE(result2, 0);
@@ -378,8 +379,9 @@ TEST_F(NsmClockOutputEnableStateBaseTest, HandleResponseMsgWithSmallResponse)
     TestNsmClockOutputEnableState state(provider, PCIE_CLKBUF_INDEX,
                                         NSM_DEV_ID_GPU, 0, false);
 
-    nsm_msg response{};
-    uint8_t result = state.handleResponseMsg(&response, 10);
+    std::vector<uint8_t> responseData(16, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+    uint8_t result = state.handleResponseMsg(response, 10);
 
     EXPECT_GE(result, 0);
 }
@@ -390,8 +392,9 @@ TEST_F(NsmClockOutputEnableStateBaseTest, HandleResponseMsgWithLargeResponse)
     TestNsmClockOutputEnableState state(provider, PCIE_CLKBUF_INDEX,
                                         NSM_DEV_ID_GPU, 0, false);
 
-    nsm_msg response{};
-    uint8_t result = state.handleResponseMsg(&response, 1000);
+    std::vector<uint8_t> responseData(1024, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
+    uint8_t result = state.handleResponseMsg(response, 1000);
 
     EXPECT_GE(result, 0);
 }
@@ -400,7 +403,8 @@ TEST_F(NsmClockOutputEnableStateBaseTest,
        HandleResponseMsgWithDifferentDeviceTypes)
 {
     NsmObject provider("test", "test");
-    nsm_msg response{};
+    std::vector<uint8_t> responseData(16, 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseData.data());
 
     TestNsmClockOutputEnableState gpu(provider, PCIE_CLKBUF_INDEX,
                                       NSM_DEV_ID_GPU, 0, false);
@@ -409,9 +413,9 @@ TEST_F(NsmClockOutputEnableStateBaseTest,
     TestNsmClockOutputEnableState bridge(provider, PCIE_CLKBUF_INDEX,
                                          NSM_DEV_ID_PCIE_BRIDGE, 0, false);
 
-    uint8_t result1 = gpu.handleResponseMsg(&response, sizeof(response));
-    uint8_t result2 = sw.handleResponseMsg(&response, sizeof(response));
-    uint8_t result3 = bridge.handleResponseMsg(&response, sizeof(response));
+    uint8_t result1 = gpu.handleResponseMsg(response, responseData.size());
+    uint8_t result2 = sw.handleResponseMsg(response, responseData.size());
+    uint8_t result3 = bridge.handleResponseMsg(response, responseData.size());
 
     EXPECT_GE(result1, 0);
     EXPECT_GE(result2, 0);
@@ -422,14 +426,15 @@ TEST_F(NsmClockOutputEnableStateBaseTest,
        HandleResponseMsgWithDifferentInstanceNumbers)
 {
     NsmObject provider("test", "test");
-    nsm_msg response{};
+    std::vector<uint8_t> responseData(16, 0);
+    auto* response = reinterpret_cast<nsm_msg*>(responseData.data());
 
     for (uint8_t i = 0; i < 8; i++)
     {
         TestNsmClockOutputEnableState state(provider, PCIE_CLKBUF_INDEX,
                                             NSM_DEV_ID_GPU, i, false);
 
-        uint8_t result = state.handleResponseMsg(&response, sizeof(response));
+        uint8_t result = state.handleResponseMsg(response, responseData.size());
         EXPECT_GE(result, 0);
     }
 }

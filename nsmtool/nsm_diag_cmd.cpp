@@ -35,6 +35,7 @@
 #include <CLI/CLI.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <ctime>
 
 namespace nsmtool
@@ -562,7 +563,9 @@ class QueryTokenStatus : public CommandInterface
         nlohmann::ordered_json result;
         result["Completion code"] = cc;
         result["Reason code"] = reason_code;
-        switch (status)
+        uint8_t statusRaw;
+        std::memcpy(&statusRaw, &status, sizeof(statusRaw));
+        switch (statusRaw)
         {
             case NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ENDED:
                 result["Status"] = "Debug session ended";
@@ -586,10 +589,13 @@ class QueryTokenStatus : public CommandInterface
                 result["Status"] = "Token timeout";
                 break;
             default:
-                result["Status"] = "Invalid value: " + std::to_string(status);
+                result["Status"] = "Invalid value: " +
+                                   std::to_string(statusRaw);
                 break;
         }
-        switch (additionalInfo)
+        uint8_t addInfoRaw;
+        std::memcpy(&addInfoRaw, &additionalInfo, sizeof(addInfoRaw));
+        switch (addInfoRaw)
         {
             case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE:
                 result["Additional info"] = "None";
@@ -612,10 +618,12 @@ class QueryTokenStatus : public CommandInterface
                 break;
             default:
                 result["Additional info"] = "Invalid value: " +
-                                            std::to_string(additionalInfo);
+                                            std::to_string(addInfoRaw);
                 break;
         }
-        switch (tokenType)
+        uint8_t tokenTypeRaw;
+        std::memcpy(&tokenTypeRaw, &tokenType, sizeof(tokenTypeRaw));
+        switch (tokenTypeRaw)
         {
             case NSM_DEBUG_TOKEN_TYPE_FRC:
                 result["Token type"] = "FRC";
@@ -631,7 +639,7 @@ class QueryTokenStatus : public CommandInterface
                 break;
             default:
                 result["Token type"] = "Invalid value: " +
-                                       std::to_string(tokenType);
+                                       std::to_string(tokenTypeRaw);
                 break;
         }
         result["Time left"] = timeLeft;

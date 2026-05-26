@@ -43,6 +43,17 @@ using namespace requester::retry;
 // correct. Only sd_event_add_time/sd_event_now are mocked (via
 // mockSdEvent.cpp) to prevent actual timer scheduling.
 
+// Force-destroy a coroutine frame suspended on the mocked Sleep awaitable
+// (mockSdEvent never fires the timer, so the frame would otherwise leak).
+static void destroyCoroutine(requester::Coroutine&& co)
+{
+    if (co.handle && !co.handle.done())
+    {
+        co.handle.destroy();
+    }
+    co.handle = nullptr;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers (same as mctpEndpointProberBranch_test.cpp)
 // ---------------------------------------------------------------------------
@@ -153,7 +164,7 @@ TEST_F(MctpProberRetryTest, Ping_NotReady_ThenSuccess)
         {buildPingResp(NSM_SUCCESS), 0},
     });
     auto prober = makeProber(std::move(fn), cfg);
-    (void)prober.ping(60);
+    destroyCoroutine(prober.ping(60));
     // Retry loop executed — coverage is the goal
 }
 
@@ -166,7 +177,7 @@ TEST_F(MctpProberRetryTest, Ping_NotReady_AllRetriesExhausted)
         {buildPingResp(NSM_ERR_NOT_READY), 0},
     });
     auto prober = makeProber(std::move(fn), cfg);
-    (void)prober.ping(61);
+    destroyCoroutine(prober.ping(61));
 }
 
 TEST_F(MctpProberRetryTest, Ping_NotReady_TransportFailDuringRetry)
@@ -177,7 +188,7 @@ TEST_F(MctpProberRetryTest, Ping_NotReady_TransportFailDuringRetry)
         {{}, NSM_SW_ERROR},
     });
     auto prober = makeProber(std::move(fn), cfg);
-    (void)prober.ping(62);
+    destroyCoroutine(prober.ping(62));
 }
 
 TEST_F(MctpProberRetryTest, Ping_NotReady_NonRetryableCcDuringRetry)
@@ -188,7 +199,7 @@ TEST_F(MctpProberRetryTest, Ping_NotReady_NonRetryableCcDuringRetry)
         {buildPingResp(NSM_ERROR), 0},
     });
     auto prober = makeProber(std::move(fn), cfg);
-    (void)prober.ping(63);
+    destroyCoroutine(prober.ping(63));
 }
 
 // ============================================================================
@@ -204,7 +215,7 @@ TEST_F(MctpProberRetryTest, QueryDevId_NotReady_ThenSuccess)
     });
     auto prober = makeProber(std::move(fn), cfg);
     uint8_t devId = 0, devInst = 0;
-    (void)prober.getQueryDeviceIdentification(70, devId, devInst);
+    destroyCoroutine(prober.getQueryDeviceIdentification(70, devId, devInst));
 }
 
 TEST_F(MctpProberRetryTest, QueryDevId_NotReady_AllRetriesExhausted)
@@ -217,7 +228,7 @@ TEST_F(MctpProberRetryTest, QueryDevId_NotReady_AllRetriesExhausted)
     });
     auto prober = makeProber(std::move(fn), cfg);
     uint8_t devId = 0, devInst = 0;
-    (void)prober.getQueryDeviceIdentification(71, devId, devInst);
+    destroyCoroutine(prober.getQueryDeviceIdentification(71, devId, devInst));
 }
 
 TEST_F(MctpProberRetryTest, QueryDevId_NotReady_TransportFail)
@@ -229,7 +240,7 @@ TEST_F(MctpProberRetryTest, QueryDevId_NotReady_TransportFail)
     });
     auto prober = makeProber(std::move(fn), cfg);
     uint8_t devId = 0, devInst = 0;
-    (void)prober.getQueryDeviceIdentification(72, devId, devInst);
+    destroyCoroutine(prober.getQueryDeviceIdentification(72, devId, devInst));
 }
 
 TEST_F(MctpProberRetryTest, QueryDevId_NotReady_NonRetryableCc)
@@ -241,5 +252,5 @@ TEST_F(MctpProberRetryTest, QueryDevId_NotReady_NonRetryableCc)
     });
     auto prober = makeProber(std::move(fn), cfg);
     uint8_t devId = 0, devInst = 0;
-    (void)prober.getQueryDeviceIdentification(73, devId, devInst);
+    destroyCoroutine(prober.getQueryDeviceIdentification(73, devId, devInst));
 }

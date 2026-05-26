@@ -996,37 +996,33 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
     uint8_t dataId;
 };
 
-const std::map<reconfiguration_permissions_v1_index, std::string>
-    settingsDictionary = {{
-        {RP_IN_SYSTEM_TEST, "In system test"},
-        {RP_FUSING_MODE, "Fusing Mode"},
-        {RP_CONFIDENTIAL_COMPUTE, "Confidential compute"},
-        {RP_BAR0_FIREWALL, "BAR0 Firewall"},
-        {RP_CONFIDENTIAL_COMPUTE_DEV_MODE, "Confidential compute dev-mode"},
-        {RP_TOTAL_GPU_POWER_CURRENT_LIMIT,
-         "Total GPU Power (TGP) current limit"},
-        {RP_TOTAL_GPU_POWER_RATED_LIMIT, "Total GPU Power (TGP) rated limit"},
-        {RP_TOTAL_GPU_POWER_MAX_LIMIT, "Total GPU Power (TGP) max limit"},
-        {RP_TOTAL_GPU_POWER_MIN_LIMIT, "Total GPU Power (TGP) min limit"},
-        {RP_CLOCK_LIMIT, "Clock limit"},
-        {RP_NVLINK_DISABLE, "NVLink disable"},
-        {RP_ECC_ENABLE, "ECC enable"},
-        {RP_PCIE_VF_CONFIGURATION, "PCIe VF configuration"},
-        {RP_ROW_REMAPPING_ALLOWED, "Row remapping allowed"},
-        {RP_ROW_REMAPPING_FEATURE, "Row remapping feature"},
-        {RP_HBM_FREQUENCY_CHANGE, "HBM frequency change"},
-        {RP_HULK_LICENSE_UPDATE, "HULK license update"},
-        {RP_FORCE_TEST_COUPLING, "Force test coupling"},
-        {RP_BAR0_TYPE_CONFIG, "BAR0 type config"},
-        {RP_EDPP_SCALING_FACTOR, "EDPp scaling factor"},
-        {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1,
-         "Power Smoothing Privilege Level 1"},
-        {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2,
-         "Power Smoothing Privilege Level 2"},
-        {RP_EGM_MODE, "Extend GPU Memory Mode"},
-        {RP_INFOROM_RECREATE_ALLOW_INB, "InfoROM filesystem recreate"},
-        {RP_RUNTIME_IN_SYSTEM_TEST, "Runtime in system test"},
-    }};
+const std::map<int, std::string> settingsDictionary = {{
+    {RP_IN_SYSTEM_TEST, "In system test"},
+    {RP_FUSING_MODE, "Fusing Mode"},
+    {RP_CONFIDENTIAL_COMPUTE, "Confidential compute"},
+    {RP_BAR0_FIREWALL, "BAR0 Firewall"},
+    {RP_CONFIDENTIAL_COMPUTE_DEV_MODE, "Confidential compute dev-mode"},
+    {RP_TOTAL_GPU_POWER_CURRENT_LIMIT, "Total GPU Power (TGP) current limit"},
+    {RP_TOTAL_GPU_POWER_RATED_LIMIT, "Total GPU Power (TGP) rated limit"},
+    {RP_TOTAL_GPU_POWER_MAX_LIMIT, "Total GPU Power (TGP) max limit"},
+    {RP_TOTAL_GPU_POWER_MIN_LIMIT, "Total GPU Power (TGP) min limit"},
+    {RP_CLOCK_LIMIT, "Clock limit"},
+    {RP_NVLINK_DISABLE, "NVLink disable"},
+    {RP_ECC_ENABLE, "ECC enable"},
+    {RP_PCIE_VF_CONFIGURATION, "PCIe VF configuration"},
+    {RP_ROW_REMAPPING_ALLOWED, "Row remapping allowed"},
+    {RP_ROW_REMAPPING_FEATURE, "Row remapping feature"},
+    {RP_HBM_FREQUENCY_CHANGE, "HBM frequency change"},
+    {RP_HULK_LICENSE_UPDATE, "HULK license update"},
+    {RP_FORCE_TEST_COUPLING, "Force test coupling"},
+    {RP_BAR0_TYPE_CONFIG, "BAR0 type config"},
+    {RP_EDPP_SCALING_FACTOR, "EDPp scaling factor"},
+    {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1, "Power Smoothing Privilege Level 1"},
+    {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2, "Power Smoothing Privilege Level 2"},
+    {RP_EGM_MODE, "Extend GPU Memory Mode"},
+    {RP_INFOROM_RECREATE_ALLOW_INB, "InfoROM filesystem recreate"},
+    {RP_RUNTIME_IN_SYSTEM_TEST, "Runtime in system test"},
+}};
 class GetReconfigurationPermissionsV1 : public CommandInterface
 {
   public:
@@ -1045,8 +1041,7 @@ class GetReconfigurationPermissionsV1 : public CommandInterface
 
     explicit GetReconfigurationPermissionsV1(const char* type, const char* name,
                                              CLI::App* app) :
-        CommandInterface(type, name, app),
-        settingIndex((reconfiguration_permissions_v1_index)-1)
+        CommandInterface(type, name, app), settingIndex(-1)
     {
         auto getReconfigurationPermissionsV1Group = app->add_option_group(
             "Required",
@@ -1112,7 +1107,7 @@ class GetReconfigurationPermissionsV1 : public CommandInterface
     }
 
   private:
-    reconfiguration_permissions_v1_index settingIndex;
+    int settingIndex;
 };
 
 class SetReconfigurationPermissionsV1 : public CommandInterface
@@ -1133,9 +1128,8 @@ class SetReconfigurationPermissionsV1 : public CommandInterface
 
     explicit SetReconfigurationPermissionsV1(const char* type, const char* name,
                                              CLI::App* app) :
-        CommandInterface(type, name, app),
-        settingIndex((reconfiguration_permissions_v1_index)-1),
-        configuration((reconfiguration_permissions_v1_setting)-1), permission()
+        CommandInterface(type, name, app), settingIndex(-1), configuration(-1),
+        permission()
     {
         std::string settingsList;
         for (auto [id, setting] : settingsDictionary)
@@ -1176,7 +1170,9 @@ class SetReconfigurationPermissionsV1 : public CommandInterface
             sizeof(nsm_set_reconfiguration_permissions_v1_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
         auto rc = encode_set_reconfiguration_permissions_v1_req(
-            instanceId, settingIndex, configuration, permission, request);
+            instanceId, (reconfiguration_permissions_v1_index)settingIndex,
+            (reconfiguration_permissions_v1_setting)configuration, permission,
+            request);
         return {rc, requestMsg};
     }
 
@@ -1210,8 +1206,8 @@ class SetReconfigurationPermissionsV1 : public CommandInterface
     }
 
   private:
-    reconfiguration_permissions_v1_index settingIndex;
-    reconfiguration_permissions_v1_setting configuration;
+    int settingIndex;
+    int configuration;
     uint8_t permission;
 };
 

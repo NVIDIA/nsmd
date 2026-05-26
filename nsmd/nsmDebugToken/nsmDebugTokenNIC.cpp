@@ -249,8 +249,10 @@ requester::Coroutine NsmDebugTokenNICObject::getStatusAsyncHandler(
         // coverity[missing_return]
         co_return decodeRc;
     }
+    std::underlying_type_t<nsm_debug_token_type> tokenTypeRaw{};
+    std::memcpy(&tokenTypeRaw, &tokenType, sizeof(tokenTypeRaw));
     DebugToken::TokenTypes dbusTokenType;
-    switch (tokenType)
+    switch (tokenTypeRaw)
     {
         case NSM_DEBUG_TOKEN_TYPE_FRC:
             dbusTokenType = DebugToken::TokenTypes::FRC;
@@ -267,13 +269,15 @@ requester::Coroutine NsmDebugTokenNICObject::getStatusAsyncHandler(
         default:
             lg2::error("DebugToken: invalid token type received: "
                        "eid={EID} type={TYPE}",
-                       "TYPE", tokenType);
+                       "TYPE", tokenTypeRaw);
             statusIntf->status(AsyncOperationStatusType::InternalFailure);
             // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
     }
+    std::underlying_type_t<nsm_debug_token_status> statusRaw{};
+    std::memcpy(&statusRaw, &status, sizeof(statusRaw));
     DebugToken::TokenStatus dbusStatus;
-    switch (status)
+    switch (statusRaw)
     {
         case NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ENDED:
             dbusStatus = DebugToken::TokenStatus::DebugSessionEnded;
@@ -299,13 +303,15 @@ requester::Coroutine NsmDebugTokenNICObject::getStatusAsyncHandler(
         default:
             lg2::error("DebugToken: invalid token status received: "
                        "eid={EID} status={STAT}",
-                       "EID", eid, "STAT", status);
+                       "EID", eid, "STAT", statusRaw);
             statusIntf->status(AsyncOperationStatusType::InternalFailure);
             // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
     }
+    std::underlying_type_t<nsm_debug_token_status_additional_info> addInfoRaw{};
+    std::memcpy(&addInfoRaw, &additionalInfo, sizeof(addInfoRaw));
     DebugToken::AdditionalInfo dbusAdditionalInfo;
-    switch (additionalInfo)
+    switch (addInfoRaw)
     {
         case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE:
             dbusAdditionalInfo = DebugToken::AdditionalInfo::None;
@@ -330,7 +336,7 @@ requester::Coroutine NsmDebugTokenNICObject::getStatusAsyncHandler(
         default:
             lg2::error("DebugToken: invalid additional info received: "
                        "eid={EID} info={INFO}",
-                       "EID", eid, "INFO", additionalInfo);
+                       "EID", eid, "INFO", addInfoRaw);
             statusIntf->status(AsyncOperationStatusType::InternalFailure);
             // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;

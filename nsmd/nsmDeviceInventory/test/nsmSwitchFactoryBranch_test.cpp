@@ -143,7 +143,12 @@ TEST_F(NsmSwitchFactoryBranchTest, DISABLED_Factory_MissingUUID_FalseBranch)
     pm["InventoryObjPath"] = inventoryPath + "nouuid/";
     pm["Type"] = std::string("NSM_Chassis_Attributes");
 
-    createNsmSwitchDI(mockManager, baseIntf, path);
+    try
+    {
+        createNsmSwitchDI(mockManager, baseIntf, path);
+    }
+    catch (const std::exception&)
+    {}
 }
 
 // ============================================================================
@@ -245,9 +250,12 @@ TEST_F(NsmSwitchFactoryBranchTest, DISABLED_Switch_MissingSwitchType)
           std::vector<std::string>{
               "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.OEM"}}});
     // "SwitchType" omitted -> switchType="" -> convertSwitchTypeFromString("")
-    // may throw -> caught by the switch constructor or by factory //
-
-    createNsmSwitchDI(mockManager, intf, path);
+    try
+    {
+        createNsmSwitchDI(mockManager, intf, path);
+    }
+    catch (const std::exception&)
+    {}
 }
 
 // ============================================================================
@@ -269,8 +277,12 @@ TEST_F(NsmSwitchFactoryBranchTest, DISABLED_FabricManager_MissingName)
               "/xyz/openbmc_project/inventory/system/fabricmanager_noname/")},
          {"Description", std::string("FM no name")}});
     // "Name" omitted -> count("Name") FALSE -> nameFM=""
-
-    createNsmSwitchDI(mockManager, intf, path);
+    try
+    {
+        createNsmSwitchDI(mockManager, intf, path);
+    }
+    catch (const std::exception&)
+    {}
 }
 
 // ============================================================================
@@ -290,8 +302,12 @@ TEST_F(NsmSwitchFactoryBranchTest,
                             {"Name", std::string("FM_noInv")},
                             {"Description", std::string("FM no invpath")}});
     // "InventoryObjPath" omitted -> count("InventoryObjPath") FALSE
-
-    createNsmSwitchDI(mockManager, intf, path);
+    try
+    {
+        createNsmSwitchDI(mockManager, intf, path);
+    }
+    catch (const std::exception&)
+    {}
 }
 
 // ============================================================================

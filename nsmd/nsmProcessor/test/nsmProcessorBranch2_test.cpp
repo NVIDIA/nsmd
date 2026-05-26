@@ -154,8 +154,11 @@ TEST_F(NsmProcessorBranch2Test, DISABLED_MigMode_HandleResp_LongRunning_Success)
 {
     NsmMigMode sensor(bus(), sensorName, sensorType, inventoryObjPath, gpu,
                       true);
-    std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_MIG_mode_resp), 0);
+    // Layout: hdr | event-hdr (NSM_EVENT_MIN_LEN) | long_running_resp | payload
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                         sizeof(nsm_long_running_resp) +
+                                         sizeof(bitfield8_t),
+                                     0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     bitfield8_t flags{};
     flags.byte = 1;
@@ -170,8 +173,10 @@ TEST_F(NsmProcessorBranch2Test, DISABLED_MigMode_HandleResp_LongRunning_ErrorCC)
 {
     NsmMigMode sensor(bus(), sensorName, sensorType, inventoryObjPath, gpu,
                       true);
-    std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_MIG_mode_resp), 0);
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                         sizeof(nsm_long_running_resp) +
+                                         sizeof(bitfield8_t),
+                                     0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     bitfield8_t flags{};
     uint8_t rc = encode_get_MIG_mode_event_resp(0, NSM_ERROR, ERR_NULL, &flags,
@@ -260,8 +265,10 @@ TEST_F(NsmProcessorBranch2Test, DISABLED_EccMode_HandleResp_LongRunning_Success)
                                                  inventoryObjPath.c_str());
     NsmEccMode sensor(sensorName, sensorType, eccIntf, inventoryObjPath, true,
                       gpu);
-    std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_ECC_mode_resp), 0);
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                         sizeof(nsm_long_running_resp) +
+                                         sizeof(bitfield8_t),
+                                     0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     bitfield8_t flags{};
     flags.byte = 2; // pendingECCState=1, eccModeEnabled=0
@@ -280,8 +287,10 @@ TEST_F(NsmProcessorBranch2Test, DISABLED_EccMode_HandleResp_LongRunning_ErrorCC)
                                                  inventoryObjPath.c_str());
     NsmEccMode sensor(sensorName, sensorType, eccIntf, inventoryObjPath, true,
                       gpu);
-    std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_ECC_mode_resp), 0);
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                         sizeof(nsm_long_running_resp) +
+                                         sizeof(bitfield8_t),
+                                     0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     bitfield8_t flags{};
     uint8_t rc = encode_get_ECC_mode_event_resp(0, NSM_ERROR, ERR_NULL, &flags,
@@ -714,7 +723,10 @@ TEST_F(NsmProcessorBranch2Test,
     data.gpu_utilization = 42;
     data.memory_utilization = 33;
     std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_utilization_resp), 0);
+        sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+            sizeof(nsm_long_running_resp) +
+            sizeof(nsm_get_current_utilization_data),
+        0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     uint8_t rc = encode_get_current_utilization_event_resp(
         0, NSM_SUCCESS, ERR_NULL, &data, response);
@@ -1356,8 +1368,10 @@ TEST_F(NsmProcessorBranch2Test,
     data.thermal_violation_duration = 6000;
     data.hw_violation_duration = 7000;
     data.global_sw_violation_duration = 8000;
-    std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_violation_duration_resp), 0);
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                         sizeof(nsm_long_running_resp) +
+                                         sizeof(nsm_violation_duration),
+                                     0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     uint8_t rc = encode_get_violation_duration_event_resp(
         0, NSM_SUCCESS, ERR_NULL, &data, response);

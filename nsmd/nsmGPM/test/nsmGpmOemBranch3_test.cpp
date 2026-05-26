@@ -227,7 +227,8 @@ TEST(NsmGetSupportedGPMMetricsBranch3,
     static boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b3_split", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b3_split"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf =
         std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/gpm_b3_split");
@@ -302,7 +303,8 @@ TEST(NsmGetSupportedGPMMetricsBranch3,
     static boost::asio::io_context io2;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io2);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b3_nodram", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b3_nodram"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf =
         std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/gpm_b3_nodram");
@@ -416,7 +418,8 @@ TEST(NsmGPMAggregatedBranch3, GenRequestMsg_EncodeFail_ReturnsNullopt)
     static boost::asio::io_context ioGenFail;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioGenFail);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b3_genfail", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b3_genfail"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf =
         std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/gpm_b3_genfail");
@@ -438,7 +441,8 @@ TEST(NsmGPMAggregatedBranch3, GenRequestMsg_Success_ReturnsRequest)
     static boost::asio::io_context ioGenOk;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioGenOk);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b3_genok", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b3_genok"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf =
         std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/gpm_b3_genok");
@@ -540,7 +544,8 @@ TEST(NsmGetSupportedGPMMetricsBranch3,
     static boost::asio::io_context ioDram;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioDram);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b3_dram", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b3_dram"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf =
         std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/gpm_b3_dram");
@@ -621,7 +626,8 @@ TEST(NsmGetSupportedGPMMetricsBranch3,
     static boost::asio::io_context ioEmpty;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioEmpty);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b3_empty_bf", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b3_empty_bf"},
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
     auto nvlinkIntf =
         std::make_shared<NVLinkMetricsIntf>(bus, "/xyz/test/gpm_b3_empty_bf");
@@ -698,7 +704,8 @@ TEST(NsmGPMPerInstanceBranch3, GPMMetricInstanceUpdator_NanMerging)
     static boost::asio::io_context ioMerge;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(ioMerge);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/xyz/test/gpm_b3_merge", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/xyz/test/gpm_b3_merge"},
+        "com.nvidia.GPMMetrics");
 
     auto updator = makeGPMPerInstanceUpdator("TestMerge",
                                              "/xyz/test/gpm_b3_merge", gpmIntf);

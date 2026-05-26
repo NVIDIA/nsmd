@@ -106,6 +106,12 @@ TEST(SleepMock, NonPriority_Success_CoroutineSuspends)
 
     // Coroutine is suspended: await_suspend returned true, no timeout fires
     EXPECT_FALSE(cr.done());
+
+    if (cr.handle)
+    {
+        cr.handle.destroy();
+        cr.handle = nullptr;
+    }
 }
 
 /**
@@ -124,6 +130,12 @@ TEST(SleepMock, Priority_Success_CoroutineSuspends)
 
     // Coroutine is suspended
     EXPECT_FALSE(cr.done());
+
+    if (cr.handle)
+    {
+        cr.handle.destroy();
+        cr.handle = nullptr;
+    }
 }
 
 // ============================================================================
@@ -193,4 +205,10 @@ TEST(CoroutineSemaphoreMock, Contended_DeferFails_WaiterNotResumed)
 
     // Waiter was NOT resumed because defer failed
     EXPECT_FALSE(waiter.done());
+
+    if (waiter.handle)
+    {
+        waiter.handle.destroy();
+        waiter.handle = nullptr;
+    }
 }

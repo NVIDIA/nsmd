@@ -398,16 +398,17 @@ TEST(NsmGPMAggregatedB12F, HandleSample_DecodeFailure_ReturnsNonZero)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/b12f/gpm_decode_fail", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/b12f/gpm_decode_fail"},
+        "com.nvidia.GPMMetrics");
     auto dbus = sdbusplus::bus::new_default();
-    auto nvlinkIntf =
-        std::make_shared<NVLinkMetricsIntf>(dbus, "/test/b12f/gpm_decode_fail");
+    auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
+        dbus, sdbusplus::object_path{"/test/b12f/gpm_decode_fail"});
 
     std::vector<uint8_t> metricsBitfield{0x01};
 
     NsmGPMAggregated gpm("b12f_decode_fail", "AggregatedGPMMetrics",
-                         "/test/b12f/gpm_decode_fail", 1, 0, 0, metricsBitfield,
-                         gpmIntf, nvlinkIntf);
+                         sdbusplus::object_path{"/test/b12f/gpm_decode_fail"},
+                         1, 0, 0, metricsBitfield, gpmIntf, nvlinkIntf);
 
     // Add a metric with a real decode function but supply bad data
     auto updator = std::make_unique<MockMetricUpdatorB12F>();
@@ -438,16 +439,17 @@ TEST(NsmGPMAggregatedB12F, HandleSample_ValidDecode_UpdaterCalledWithValue)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/b12f/gpm_valid", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/b12f/gpm_valid"},
+        "com.nvidia.GPMMetrics");
     auto dbus = sdbusplus::bus::new_default();
-    auto nvlinkIntf =
-        std::make_shared<NVLinkMetricsIntf>(dbus, "/test/b12f/gpm_valid");
+    auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
+        dbus, sdbusplus::object_path{"/test/b12f/gpm_valid"});
 
     std::vector<uint8_t> metricsBitfield{0x01};
 
     NsmGPMAggregated gpm("b12f_valid_decode", "AggregatedGPMMetrics",
-                         "/test/b12f/gpm_valid", 1, 0, 0, metricsBitfield,
-                         gpmIntf, nvlinkIntf);
+                         sdbusplus::object_path{"/test/b12f/gpm_valid"}, 1, 0,
+                         0, metricsBitfield, gpmIntf, nvlinkIntf);
 
     // Add a mock updater for a metric with valid encoded data
     auto updator = std::make_unique<MockMetricUpdatorB12F>();
@@ -483,16 +485,17 @@ TEST(NsmGPMAggregatedB12F, HandleSample_BandwidthDecode_ConvertsCorrectly)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/b12f/gpm_bw", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/b12f/gpm_bw"},
+        "com.nvidia.GPMMetrics");
     auto dbus = sdbusplus::bus::new_default();
-    auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(dbus,
-                                                          "/test/b12f/gpm_bw");
+    auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
+        dbus, sdbusplus::object_path{"/test/b12f/gpm_bw"});
 
     std::vector<uint8_t> metricsBitfield{0x01};
 
     NsmGPMAggregated gpm("b12f_bw_decode", "AggregatedGPMMetrics",
-                         "/test/b12f/gpm_bw", 1, 0, 0, metricsBitfield, gpmIntf,
-                         nvlinkIntf);
+                         sdbusplus::object_path{"/test/b12f/gpm_bw"}, 1, 0, 0,
+                         metricsBitfield, gpmIntf, nvlinkIntf);
 
     auto updator = std::make_unique<MockMetricUpdatorB12F>();
     auto* rawUpdator = updator.get();
@@ -1453,7 +1456,8 @@ TEST(NsmGPMPerInstanceB12F, Constructor_BandwidthUnit_SetsDecodeFunc)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/b12f/gpm_pi_bw", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/b12f/gpm_pi_bw"},
+        "com.nvidia.GPMMetrics");
 
     auto updator = std::make_shared<MockMetricPerInstanceUpdatorB12F>();
     std::vector<bitfield8_t> instanceBitfield{{.byte = 0xFF}};
@@ -1474,7 +1478,8 @@ TEST(NsmGPMPerInstanceB12F, Constructor_PercentageUnit_SetsDecodeFunc)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/b12f/gpm_pi_pct", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/b12f/gpm_pi_pct"},
+        "com.nvidia.GPMMetrics");
 
     auto updator = std::make_shared<MockMetricPerInstanceUpdatorB12F>();
     std::vector<bitfield8_t> instanceBitfield{{.byte = 0x0F}};
@@ -1520,10 +1525,11 @@ TEST(NsmGPMAggregatedGenReqB12F, GenRequestMsg_ValidParams_CorrectEncoding)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/b12f/gpm_genreq", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/b12f/gpm_genreq"},
+        "com.nvidia.GPMMetrics");
     auto dbus = sdbusplus::bus::new_default();
-    auto nvlinkIntf =
-        std::make_shared<NVLinkMetricsIntf>(dbus, "/test/b12f/gpm_genreq");
+    auto nvlinkIntf = std::make_shared<NVLinkMetricsIntf>(
+        dbus, sdbusplus::object_path{"/test/b12f/gpm_genreq"});
 
     const uint8_t retrievalSource = 2;
     const uint8_t gpuInstance = 1;
@@ -1531,8 +1537,9 @@ TEST(NsmGPMAggregatedGenReqB12F, GenRequestMsg_ValidParams_CorrectEncoding)
     std::vector<uint8_t> metricsBitfield{0xFF, 0x0F};
 
     NsmGPMAggregated gpm("B12F_GenReq", "AggregatedGPMMetrics",
-                         "/test/b12f/gpm_genreq", retrievalSource, gpuInstance,
-                         computeInstance, metricsBitfield, gpmIntf, nvlinkIntf);
+                         sdbusplus::object_path{"/test/b12f/gpm_genreq"},
+                         retrievalSource, gpuInstance, computeInstance,
+                         metricsBitfield, gpmIntf, nvlinkIntf);
 
     // Act
     auto request = gpm.genRequestMsg(10, 5);
@@ -1829,10 +1836,11 @@ TEST(MakeUpdatorsB12F, MakeGPMPerInstance_ReturnsNonNull)
     boost::asio::io_context io;
     auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
     auto gpmIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
-        systemBus, "/test/b12f/gpm_mk", "com.nvidia.GPMMetrics");
+        systemBus, sdbusplus::object_path{"/test/b12f/gpm_mk"},
+        "com.nvidia.GPMMetrics");
 
-    auto updator = makeGPMPerInstanceUpdator("TestProp", "/test/b12f/gpm_mk",
-                                             gpmIntf);
+    auto updator = makeGPMPerInstanceUpdator(
+        "TestProp", sdbusplus::object_path{"/test/b12f/gpm_mk"}, gpmIntf);
     EXPECT_NE(updator, nullptr);
 }
 

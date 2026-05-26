@@ -71,7 +71,7 @@ class Error
      */
     std::string to_string() const noexcept
     {
-        static const std::map<ErrorCode, std::string> errorMessages{
+        static const std::map<uint16_t, std::string> errorMessages{
             {InternalError, "Internal error"},
             {InvalidFormat, "Invalid format"},
             {SignatureVerificationFailed, "Signature verification failed"},
@@ -91,7 +91,7 @@ class Error
             {TokenHashVerificationFailed, "Token hash verification failed"},
             {DebugFirmwareActive,
              "Token erase not permitted while debug firmware is active"}};
-        auto it = errorMessages.find(static_cast<ErrorCode>(code));
+        auto it = errorMessages.find(code);
         if (it != errorMessages.end())
         {
             return it->second;

@@ -8747,7 +8747,9 @@ TEST_F(MockupResponderTest, testSetPciePortConfigHandlerNotValidSample)
     // flags byte = 0x00: valid=0 (bit 0=0), length=0 (bits 1-3=0)
     // → data_len=1<<0=1 byte → decode sets valid=false → if(valid) false path
     std::vector<uint8_t> sampleData = {
-        0x00, 0x00, 0x12, // tag=0, valid=0, length=0, data=0x12
+        0x00,
+        0x00,
+        0x12, // tag=0, valid=0, length=0, data=0x12
     };
     Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_set_port_config_aggregate_req) - 1 +

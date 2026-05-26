@@ -201,7 +201,8 @@ TEST_F(NsmEventSettingTestFixture, Factory_MissingEventGenSetting_SensorCreated)
     const std::string uniquePath =
         "/xyz/openbmc_project/inventory/system/test_noeventgen";
     dbus::PropertyMap properties = {
-        {"Name", std::string("EventSetting_NoGen")}, {"UUID", gpuUuid},
+        {"Name", std::string("EventSetting_NoGen")},
+        {"UUID", gpuUuid},
         // "EventGenerationSetting" deliberately absent → default 0 used
     };
     auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,

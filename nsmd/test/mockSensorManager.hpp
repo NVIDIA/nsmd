@@ -258,6 +258,8 @@ class SensorManagerTest
                 device->longRunningSensors.clear();
                 device->prioritySensors.clear();
                 device->roundRobinSensors.clear();
+                device->dumpCollectionSensors.clear();
+                device->gpmSensors.clear();
                 device->capabilityRefreshSensors.clear();
                 device->standByToDcRefreshSensors.clear();
                 device->deviceEvents.clear();
@@ -282,6 +284,9 @@ class SensorManagerTest
         // which prevents sensor/D-Bus interface destruction between tests.
         // Access via #define private public in this header.
         AsyncOperationManager::getInstance()->dispatchers.clear();
+        AsyncOperationManager::getInstance()->statusInterfaces.clear();
+        AsyncOperationManager::getInstance()->valueInterfaces.clear();
+        AsyncOperationManager::getInstance()->objectPathTimers.clear();
     }
 
     SensorManagerTest() = delete;
@@ -291,6 +296,13 @@ class SensorManagerTest
     }
     virtual ~SensorManagerTest()
     {
+        // Drop SensorManager-owned shared_ptrs so LSan doesn't flag them.
+        mockManager.processorModuleToDeviceMap.clear();
+        mockManager.deviceToPortMap.clear();
+        mockManager.defaultPowerCapList.clear();
+        mockManager.maxPowerCapList.clear();
+        mockManager.minPowerCapList.clear();
+        mockManager.debugTokenList.clear();
         sensorManagerInstance.release();
     }
 };
