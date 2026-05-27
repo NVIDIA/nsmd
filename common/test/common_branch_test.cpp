@@ -7,9 +7,13 @@
  * Branch coverage tests for common/ files:
  *   - common/utils.cpp  (uncovered error paths, edge cases)
  *   - common/utils.hpp  (template branches, IDBusHandler)
- *   - common/nsmPropertySupport.hpp (uncovered branches)
+ *   - common/nsmPropertySupport.hpp (getUnsupportedAssetProperties,
+ *     markAssetPropertiesNotSupported)
  */
 
+#include "globals.hpp"
+#include "mockDBusHandler.hpp"
+#include "nsmAssetIntf.hpp"
 #include "nsmPropertySupport.hpp"
 #include "utils.hpp"
 
@@ -23,6 +27,69 @@
 #include <gtest/gtest.h>
 
 using ::testing::ElementsAre;
+
+using namespace nsm;
+
+struct MarkAssetPropertySupportTest :
+    public ::testing::Test,
+    public utils::DBusTest
+{
+    const std::string assetName = "PropertySupportTestAsset";
+};
+
+// ============================================================================
+// markAssetPropertiesNotSupported — switch branches
+// ============================================================================
+
+TEST_F(MarkAssetPropertySupportTest, FruPartNumber_SetNotSupported)
+{
+    NsmInterfaceProvider<NsmAssetIntf> asset(assetName, "Test",
+                                             chassisInventoryBasePath);
+    markAssetPropertiesNotSupported(asset, {FRU_PART_NUMBER});
+    EXPECT_EQ(propertyNotSupported, asset.invoke(pdiMethod(partNumber)));
+}
+
+TEST_F(MarkAssetPropertySupportTest, SerialNumber_SetNotSupported)
+{
+    NsmInterfaceProvider<NsmAssetIntf> asset(assetName, "Test",
+                                             chassisInventoryBasePath);
+    markAssetPropertiesNotSupported(asset, {SERIAL_NUMBER});
+    EXPECT_EQ(propertyNotSupported, asset.invoke(pdiMethod(serialNumber)));
+}
+
+TEST_F(MarkAssetPropertySupportTest, MarketingName_SetNotSupported)
+{
+    NsmInterfaceProvider<NsmAssetIntf> asset(assetName, "Test",
+                                             chassisInventoryBasePath);
+    markAssetPropertiesNotSupported(asset, {MARKETING_NAME});
+    EXPECT_EQ(propertyNotSupported, asset.invoke(pdiMethod(model)));
+}
+
+TEST_F(MarkAssetPropertySupportTest, ProductName_SetNotSupported)
+{
+    NsmInterfaceProvider<NsmAssetIntf> asset(assetName, "Test",
+                                             chassisInventoryBasePath);
+    markAssetPropertiesNotSupported(asset, {PRODUCT_NAME});
+    EXPECT_EQ(propertyNotSupported, asset.invoke(pdiMethod(model)));
+}
+
+TEST_F(MarkAssetPropertySupportTest, UnrecognizedProperty_DefaultCase)
+{
+    NsmInterfaceProvider<NsmAssetIntf> asset(assetName, "Test",
+                                             chassisInventoryBasePath);
+    EXPECT_NO_THROW(markAssetPropertiesNotSupported(asset, {PRODUCT_LENGTH}));
+}
+
+TEST_F(MarkAssetPropertySupportTest, AllSupportedProperties_SetNotSupported)
+{
+    NsmInterfaceProvider<NsmAssetIntf> asset(assetName, "Test",
+                                             chassisInventoryBasePath);
+    markAssetPropertiesNotSupported(
+        asset, {FRU_PART_NUMBER, SERIAL_NUMBER, MARKETING_NAME});
+    EXPECT_EQ(propertyNotSupported, asset.invoke(pdiMethod(partNumber)));
+    EXPECT_EQ(propertyNotSupported, asset.invoke(pdiMethod(serialNumber)));
+    EXPECT_EQ(propertyNotSupported, asset.invoke(pdiMethod(model)));
+}
 
 // ============================================================================
 // split() — branch: all tokens trimmed to empty => empty result

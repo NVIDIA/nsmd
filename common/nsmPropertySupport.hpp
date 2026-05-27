@@ -20,6 +20,9 @@
 #include "libnsm/base.h"
 #include "libnsm/platform-environmental.h"
 
+#include "nsmInterface.hpp"
+
+#include <string>
 #include <string_view>
 #include <unordered_set>
 
@@ -42,6 +45,32 @@ inline std::unordered_set<nsm_inventory_property_identifiers>
         return {FRU_PART_NUMBER, SERIAL_NUMBER, MARKETING_NAME};
     }
     return {};
+}
+
+template <typename IntfType>
+void markAssetPropertiesNotSupported(
+    NsmInterfaceProvider<IntfType>& asset,
+    const std::unordered_set<nsm_inventory_property_identifiers>& props)
+{
+    const std::string val(propertyNotSupported);
+    for (const auto& p : props)
+    {
+        switch (p)
+        {
+            case FRU_PART_NUMBER:
+                asset.invoke(pdiMethod(partNumber), val);
+                break;
+            case SERIAL_NUMBER:
+                asset.invoke(pdiMethod(serialNumber), val);
+                break;
+            case MARKETING_NAME:
+            case PRODUCT_NAME:
+                asset.invoke(pdiMethod(model), val);
+                break;
+            default:
+                break;
+        }
+    }
 }
 
 } // namespace nsm

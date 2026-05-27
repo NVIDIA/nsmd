@@ -275,9 +275,6 @@ TEST_F(NsmChassisAssemblyBranch10Test,
 // Forward-declare non-static helper functions from nsmChassis.cpp
 namespace nsm
 {
-void markAssetPropertiesNotSupported(
-    NsmChassis<NsmAssetIntf>& asset,
-    const std::unordered_set<nsm_inventory_property_identifiers>& props);
 void createAsset(
     std::shared_ptr<NsmDevice> device, const std::string& name,
     const dbus::PropertyMap& allCurrentIfaceProperties,
