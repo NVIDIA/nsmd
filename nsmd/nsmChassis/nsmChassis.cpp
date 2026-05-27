@@ -42,31 +42,6 @@
 namespace nsm
 {
 
-void markAssetPropertiesNotSupported(
-    NsmChassis<NsmAssetIntf>& asset,
-    const std::unordered_set<nsm_inventory_property_identifiers>& props)
-{
-    const std::string val(propertyNotSupported);
-    for (const auto& p : props)
-    {
-        switch (p)
-        {
-            case FRU_PART_NUMBER:
-                asset.invoke(pdiMethod(partNumber), val);
-                break;
-            case SERIAL_NUMBER:
-                asset.invoke(pdiMethod(serialNumber), val);
-                break;
-            case MARKETING_NAME:
-            case PRODUCT_NAME:
-                asset.invoke(pdiMethod(model), val);
-                break;
-            default:
-                break;
-        }
-    }
-}
-
 void createAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
                  const dbus::PropertyMap& allCurrentIfaceProperties,
                  const std::unordered_set<nsm_inventory_property_identifiers>&

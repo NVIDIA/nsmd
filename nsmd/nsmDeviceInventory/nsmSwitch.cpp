@@ -21,6 +21,7 @@
 #include "network-ports.h"
 
 #include "../../common/coroutine.hpp"
+#include "../../common/nsmPropertySupport.hpp"
 #include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
@@ -1023,7 +1024,15 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         std::string manufacturer = MANUFACTURER_NVIDIA;
         nvSwitchChassisAttributes->invoke(pdiMethod(manufacturer),
                                           manufacturer);
-        device->addStaticSensor(nvSwitchChassisAttributes);
+
+        markAssetPropertiesNotSupported(*nvSwitchChassisAttributes,
+                                        {FRU_PART_NUMBER, SERIAL_NUMBER});
+
+        const auto modelProperty = getModelInventoryProperty(
+            device->getDeviceType(), device->getDeviceRole());
+        device->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+                *nvSwitchChassisAttributes, modelProperty));
     }
     else if (type == "NSM_FabricManager")
     {
