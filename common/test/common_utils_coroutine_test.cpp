@@ -44,20 +44,21 @@ static Coroutine completedCoroutine()
 /**
  * Test: destructor must destroy a suspended (not-done) coroutine handle.
  *
- * DISABLED: The ~Coroutine() fix (removing handle.done() check) was reverted
- * because destroying a suspended coroutine whose handle is also held by an
- * async callback (e.g. MCTP response handler) causes use-after-free when
- * the callback later tries to resume the destroyed handle. The old code
- * leaks the frame, which is safer than crashing. A proper fix requires a
- * cancellation mechanism or shared ownership of the coroutine handle.
- *
- * Original regression test for the bug where ~Coroutine() used
+ * Regression test for the bug where ~Coroutine() used
  *   if (handle && handle.done())
  * which skipped handle.destroy() for suspended coroutines, leaking the
  * heap-allocated coroutine frame. Valgrind reports this as "definitely
  * lost" bytes when the old (buggy) condition is used.
+ *
+ * The fix — removing the handle.done() guard — is safe because:
+ * - NsmDevice::~NsmDevice() calls task.detach() before ~Coroutine() runs,
+ *   transferring ownership to the event loop (handle set to nullptr).
+ * - deviceTask holds shared_ptr<NsmDevice> by value, so ~NsmDevice() is
+ *   only entered when use_count drops to zero, which cannot happen while
+ *   the coroutine frame is live.
  */
-TEST(CoroutineDestructorTest, DISABLED_DestroySuspendedHandle_NoMemoryLeak)
+#ifndef COVERAGE_DISABLE_COROUTINES
+TEST(CoroutineDestructorTest, DestroySuspendedHandle_NoMemoryLeak)
 {
     {
         auto coro = suspendedCoroutine();
@@ -69,6 +70,7 @@ TEST(CoroutineDestructorTest, DISABLED_DestroySuspendedHandle_NoMemoryLeak)
     // If the destructor used `if (handle && handle.done())`, valgrind would
     // report the coroutine frame as definitely lost at this point.
 }
+#endif // COVERAGE_DISABLE_COROUTINES
 
 /**
  * Test: destructor must also destroy a completed coroutine handle.
@@ -116,5 +118,76 @@ TEST(CoroutineDestructorTest,
     coro = completedCoroutine();
     EXPECT_TRUE(coro.done());
 }
+
+/**
+ * Tests for Coroutine::assign().
+ *
+ * Regression coverage for bug 5749651: assign() called with a task that has
+ * no co_await (completes immediately) caused a double-destroy crash:
+ *   1. assign() called co.handle.destroy() on the done frame.
+ *   2. co.handle was not nulled → dangling pointer.
+ *   3. ~Coroutine() checked handle.done() on freed memory (UB).
+ *   4. If UB returned true → second handle.destroy() → SIGABRT (double-free).
+ * Fix: co.handle = nullptr after every explicit destroy inside assign().
+ */
+
+// Immediate task (no co_await): verifies no double-free (bug 5749651).
+// If assign() omits `co.handle = nullptr` after destroy, this crashes with
+// SIGABRT under ASAN/valgrind or sporadically in production.
+TEST(CoroutineAssignTest, ImmediateTask_NoCrashAndHandleNull)
+{
+    std::coroutine_handle<> handle{};
+    bool result = Coroutine::assign(handle, []() -> Coroutine { co_return 0; });
+    EXPECT_TRUE(result);
+    // Immediately-done frame is destroyed inside assign(); handle stays null.
+    EXPECT_EQ(handle, nullptr);
+}
+
+// Two consecutive immediate tasks: no accumulated state between calls.
+TEST(CoroutineAssignTest, ImmediateTaskTwice_BothSucceed)
+{
+    std::coroutine_handle<> handle{};
+    EXPECT_TRUE(Coroutine::assign(handle, []() -> Coroutine { co_return 0; }));
+    EXPECT_EQ(handle, nullptr);
+    EXPECT_TRUE(Coroutine::assign(handle, []() -> Coroutine { co_return 0; }));
+    EXPECT_EQ(handle, nullptr);
+}
+
+#ifndef COVERAGE_DISABLE_COROUTINES
+// Suspended task: handle transferred to caller, not done.
+TEST(CoroutineAssignTest, SuspendedTask_HandleSetAndNotDone)
+{
+    std::coroutine_handle<> handle{};
+    bool result = Coroutine::assign(handle, []() -> Coroutine {
+        co_await SuspendForever{};
+        co_return 0;
+    });
+    EXPECT_TRUE(result);
+    EXPECT_NE(handle, nullptr);
+    EXPECT_FALSE(handle.done());
+    handle.destroy();
+}
+
+// assign() while a coroutine is still suspended must return false and leave
+// the existing handle untouched.
+TEST(CoroutineAssignTest, AssignWhileRunning_ReturnsFalse)
+{
+    std::coroutine_handle<> handle{};
+    Coroutine::assign(handle, []() -> Coroutine {
+        co_await SuspendForever{};
+        co_return 0;
+    });
+    ASSERT_NE(handle, nullptr);
+    ASSERT_FALSE(handle.done());
+
+    bool result = Coroutine::assign(handle, []() -> Coroutine { co_return 0; });
+    EXPECT_FALSE(result);
+    // Original handle must be unchanged.
+    EXPECT_NE(handle, nullptr);
+    EXPECT_FALSE(handle.done());
+
+    handle.destroy();
+}
+#endif // COVERAGE_DISABLE_COROUTINES
 
 } // namespace requester
