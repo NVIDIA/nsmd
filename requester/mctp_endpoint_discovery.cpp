@@ -994,7 +994,25 @@ requester::Coroutine MctpDiscovery::discoverNsmDeviceTask(eid_t eid)
                     event,
                     static_cast<uint64_t>(DiscoveryTimeoutRetryDelayMs) * 1000,
                     common::NonPriority);
-                perEidQueuedMctpInfos[eid].emplace(mctpInfo);
+                // A newer transition for this EID may have been queued while we
+                // slept (e.g. InterfacesRemoved or Connectivity=Unavailable).
+                // The snapshot we just processed is still at the front (popped
+                // below), so size() > 1 means a fresher state is already
+                // pending. Re-queueing the stale active snapshot would re-probe
+                // the EID after that newer (possibly offline) transition runs,
+                // clobbering it. Only retry while this snapshot is still the
+                // latest known state for the EID.
+                if (perEidQueuedMctpInfos[eid].size() == 1)
+                {
+                    perEidQueuedMctpInfos[eid].emplace(mctpInfo);
+                }
+                else
+                {
+                    lg2::info(
+                        "discoverNsmDeviceTask: newer transition queued during retry sleep, dropping stale retry eid={EID}",
+                        "EID", eid);
+                    perEidDiscoveryTimeoutRetries.erase(eid);
+                }
             }
             else
             {
