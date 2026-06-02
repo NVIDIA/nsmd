@@ -145,8 +145,14 @@ if get_option('shmem').enabled() and not cx8_features
     conf_data.set('NVIDIA_SHMEM', 0)
 endif
 
-if get_option('enable-histogram').enabled() and not cx8_features
-    conf_data.set('NVIDIA_HISTOGRAM', 1)
+if get_option('enable-histogram').enabled()
+    # FEC histogram is supported on CX devices (CX9+, and CX8 per-platform), so it
+    # must be available even on cx8-features builds. The heavier histograms stay
+    # gated behind NVIDIA_HISTOGRAM (disabled under cx8-features to keep the image slim).
+    conf_data.set('NVIDIA_FEC_HISTOGRAM', 1)
+    if not cx8_features
+        conf_data.set('NVIDIA_HISTOGRAM', 1)
+    endif
 endif
 
 if get_option('enable-debug-token').enabled() and not cx8_features

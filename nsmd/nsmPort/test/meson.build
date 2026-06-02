@@ -34,6 +34,7 @@ tests = [
     'nsmFpgaPortBranch4_test',
     'nsmPortBranch6_test',
     'nsmRetimerPortBranch4_test',
+    'nsmPortBranch7_test',
 ]
 
 foreach t : tests

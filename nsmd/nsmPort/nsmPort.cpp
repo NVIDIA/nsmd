@@ -1756,6 +1756,15 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
     {
         uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
     }
+    // Optional per-platform override for FEC histogram support. When present it
+    // takes priority over the default device-type heuristic (irrespective of
+    // device type); when absent the previous behaviour is preserved.
+    std::optional<bool> supportFECHistogram;
+    if (allCurrentIfaceProperties.count("SupportFECHistogram"))
+    {
+        supportFECHistogram =
+            std::get<bool>(allCurrentIfaceProperties.at("SupportFECHistogram"));
+    }
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
@@ -1940,8 +1949,25 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
         }
 #endif
 
-#ifdef NVIDIA_HISTOGRAM
-        if (deviceType != NSM_DEV_ID_PCIE_BRIDGE)
+#ifdef NVIDIA_FEC_HISTOGRAM
+        // FEC histogram applicability:
+        //  - if the EM config override (SupportFECHistogram) is present, honour
+        //  its
+        //    value (true/false) irrespective of device type.
+        //  - otherwise fall back to the default behaviour of adding it for
+        //  every
+        //    non-PCIe-bridge device.
+        bool fecHistogramApplicable;
+        if (supportFECHistogram.has_value())
+        {
+            fecHistogramApplicable = supportFECHistogram.value();
+        }
+        else
+        {
+            fecHistogramApplicable = (deviceType != NSM_DEV_ID_PCIE_BRIDGE);
+        }
+
+        if (fecHistogramApplicable)
         {
             // add FEC histogram
             std::string histoObjName = "FEC_0";
