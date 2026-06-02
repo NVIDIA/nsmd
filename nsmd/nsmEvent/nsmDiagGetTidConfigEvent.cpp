@@ -75,7 +75,7 @@ int NsmDiagGetTidConfigEvent::handle(eid_t eid, NsmType /*type*/,
     payload["Tid"] = static_cast<int>(tid);
     payload["Eid"] = static_cast<int>(eid);
     postStateUpdate(preBootDiagState::tidConfigRequested, payload.dump());
-    lg2::info("PreBootDiag: TIDConfigRequested TID=0x{TID} EID={EID}", "TID",
+    lg2::info("PreBootDiag: TIDConfigRequested TID={TID} EID={EID}", "TID",
               lg2::hex, tid, "EID", eid);
     return NSM_SW_SUCCESS;
 }

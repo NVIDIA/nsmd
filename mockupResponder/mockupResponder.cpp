@@ -9659,7 +9659,7 @@ void MockupResponder::advanceDiagSession()
             {
                 auto tid = pendingTidRequests.front();
                 pendingTidRequests.pop();
-                lg2::info("Mock CPU: Requesting TID config for TID=0x{TID}",
+                lg2::info("Mock CPU: Requesting TID config for TID={TID}",
                           "TID", lg2::hex, tid);
                 sendDiagGetTidConfigEvent(eventReceiverEid, true, tid);
                 return;
@@ -9710,7 +9710,7 @@ void MockupResponder::advanceDiagSession()
 
                 auto [errorCode, resultMask] = generateResultForTid(tid);
                 lg2::info(
-                    "Mock CPU: Reporting TID=0x{TID} result=0x{ERR} maskSize={MS}",
+                    "Mock CPU: Reporting TID={TID} result={ERR} maskSize={MS}",
                     "TID", lg2::hex, tid, "ERR", lg2::hex, errorCode, "MS",
                     resultMask.size());
                 sendDiagSetTestResultEvent(eventReceiverEid, true, tid,

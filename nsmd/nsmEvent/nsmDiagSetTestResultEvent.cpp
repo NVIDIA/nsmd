@@ -79,9 +79,8 @@ int NsmDiagSetTestResultEvent::handle(eid_t eid, NsmType /*type*/,
     result["ResultMask"] = maskArray;
 
     postStateUpdate(preBootDiagState::resultReceived, result.dump());
-    lg2::info(
-        "PreBootDiag: ResultReceived TID=0x{TID} errorCode=0x{ERR} EID={EID}",
-        "TID", lg2::hex, tid, "ERR", lg2::hex, testErrorCode, "EID", eid);
+    lg2::info("PreBootDiag: ResultReceived TID={TID} errorCode={ERR} EID={EID}",
+              "TID", lg2::hex, tid, "ERR", lg2::hex, testErrorCode, "EID", eid);
     return NSM_SW_SUCCESS;
 }
 

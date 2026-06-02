@@ -22,6 +22,7 @@
 #include "asyncOperationManager.hpp"
 #include "nsmDevice.hpp"
 #include "sensorManager.hpp"
+#include "utils.hpp"
 
 #include <com/nvidia/PreBootDiag/Config/System/server.hpp>
 #include <com/nvidia/PreBootDiag/Config/TID/server.hpp>
@@ -131,7 +132,7 @@ inline requester::Coroutine sendSystemConfig(std::shared_ptr<NsmDevice> dev,
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("PreBootDiag: encode SystemConfig failed rc={RC} EID={EID}",
-                   "RC", rc, "EID", eid);
+                   "RC", utils::nsmSwCodeToString(rc), "EID", eid);
         co_return rc;
     }
 
@@ -143,7 +144,7 @@ inline requester::Coroutine sendSystemConfig(std::shared_ptr<NsmDevice> dev,
     {
         lg2::error(
             "PreBootDiag: SystemConfig postPatchIO failed EID={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
         co_return rc_;
     }
 
@@ -210,7 +211,7 @@ inline requester::Coroutine sendTidConfigs(std::shared_ptr<NsmDevice> dev,
             if (!ddNode.is_array())
             {
                 lg2::error(
-                    "PreBootDiag: DynamicData is not an array TID=0x{TID} EID={EID}",
+                    "PreBootDiag: DynamicData is not an array TID={TID} EID={EID}",
                     "TID", lg2::hex, tid, "EID", eid);
                 ++failures;
                 continue;
@@ -218,7 +219,7 @@ inline requester::Coroutine sendTidConfigs(std::shared_ptr<NsmDevice> dev,
             if (ddNode.size() > NSM_DIAG_MAX_TID_DYNAMIC_DATA_SIZE)
             {
                 lg2::error(
-                    "PreBootDiag: DynamicData too large ({SZ} > {MAX}) for TID=0x{TID} EID={EID}",
+                    "PreBootDiag: DynamicData too large ({SZ} > {MAX}) for TID={TID} EID={EID}",
                     "SZ", ddNode.size(), "MAX",
                     NSM_DIAG_MAX_TID_DYNAMIC_DATA_SIZE, "TID", lg2::hex, tid,
                     "EID", eid);
@@ -240,8 +241,9 @@ inline requester::Coroutine sendTidConfigs(std::shared_ptr<NsmDevice> dev,
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::error(
-                "PreBootDiag: encode TIDConfig failed rc={RC} TID=0x{TID} EID={EID}",
-                "RC", rc, "TID", lg2::hex, tid, "EID", eid);
+                "PreBootDiag: encode TIDConfig failed rc={RC} TID={TID} EID={EID}",
+                "RC", utils::nsmSwCodeToString(rc), "TID", lg2::hex, tid, "EID",
+                eid);
             ++failures;
             continue;
         }
@@ -253,14 +255,15 @@ inline requester::Coroutine sendTidConfigs(std::shared_ptr<NsmDevice> dev,
         if (rc_)
         {
             lg2::error(
-                "PreBootDiag: TIDConfig postPatchIO failed TID=0x{TID} EID={EID} rc={RC}",
-                "TID", lg2::hex, tid, "EID", eid, "RC", rc_);
+                "PreBootDiag: TIDConfig postPatchIO failed TID={TID} EID={EID} rc={RC}",
+                "TID", lg2::hex, tid, "EID", eid, "RC",
+                utils::nsmSwCodeToString(rc_));
             ++failures;
             continue;
         }
 
         lg2::info(
-            "PreBootDiag: TIDConfig sent to EID={EID} TID=0x{TID} duration={DUR} loops={LOOPS}",
+            "PreBootDiag: TIDConfig sent to EID={EID} TID={TID} duration={DUR} loops={LOOPS}",
             "EID", eid, "TID", lg2::hex, tid, "DUR", testDuration, "LOOPS",
             loops);
     }
