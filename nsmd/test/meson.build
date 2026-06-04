@@ -94,6 +94,24 @@ test(
     workdir: meson.current_source_dir(),
 )
 
+# unify_mctp_regression_test: pins observable behaviour of
+# requester/mctp_endpoint_discovery.cpp BEFORE the unify-mctp refactor.
+# Uses mctpDiscoveryBranch2Helper.cpp to reach private members through the
+# MctpDiscoveryTestAccess friend class (same pattern as Branch2/Branch3).
+test(
+    'unify_mctp_regression_test',
+    executable(
+        'unify_mctp_regression_test',
+        'unify_mctp_regression_test.cpp',
+        'mctpDiscoveryBranch2Helper.cpp',
+        implicit_include_directories: false,
+        include_directories: ['.', '..'],
+        link_args: dynamic_linker,
+        dependencies: tests_deps,
+    ),
+    workdir: meson.current_source_dir(),
+)
+
 # Test that links against mockSdEvent to enable retry-loop coverage
 test(
     'mctpProberRetryBranch_test',
