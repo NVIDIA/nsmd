@@ -186,6 +186,12 @@ class MctpDiscoveryTestAccess
     {
         return inst().resolvedMctpServices;
     }
+
+    // unify-mctp Commit 2 (N2) — initEnumerateTaskHandle accessor
+    static std::coroutine_handle<>& getInitEnumerateTaskHandle()
+    {
+        return inst().initEnumerateTaskHandle;
+    }
 };
 
 // ============================================================================
@@ -258,6 +264,11 @@ nsm::NsmDeviceTable& testGetNsmDevices()
 std::set<std::string>& testGetResolvedMctpServices()
 {
     return MctpDiscoveryTestAccess::getResolvedMctpServices();
+}
+
+std::coroutine_handle<>& testGetInitEnumerateTaskHandle()
+{
+    return MctpDiscoveryTestAccess::getInitEnumerateTaskHandle();
 }
 
 } // namespace mctp

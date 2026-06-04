@@ -131,6 +131,21 @@ class MctpDiscovery
     std::map<std::string, std::coroutine_handle<>> deviceStateChangeTaskHandles;
     requester::Coroutine deviceStateChangeTask(const std::string path);
 
+    /** @brief Handle for the post-construction enumeration coroutine spawned
+     *         by init(). The constructor returns before this runs so the
+     *         event loop is unblocked during daemon startup (unify-mctp
+     *         guideline § 2.2 mandatory item 2 — startup uses async fetch,
+     *         never blocks the event loop). */
+    std::coroutine_handle<> initEnumerateTaskHandle;
+
+    /** @brief Coroutine that performs the bus-owner-keyed
+     *         GetManagedObjects round per service, dispatches each
+     *         endpoint through the same populateMctpInfo path as the
+     *         runtime InterfacesAdded handler, and installs the per-endpoint
+     *         PropertiesChanged matches. Sets mctpDiscoveryComplete (added
+     *         in Commit 3 / N3) on success of any service round. */
+    requester::Coroutine initEnumerateTask();
+
     requester::Coroutine readMctpProperties(const std::string& objPath,
                                             MctpInfos& mctpInfos);
 

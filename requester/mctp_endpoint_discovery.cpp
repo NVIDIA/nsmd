@@ -103,21 +103,28 @@ MctpDiscovery::MctpDiscovery(
 
 void MctpDiscovery::init()
 {
-    dbus::ObjectValueTree objects;
-    std::set<dbus::Service> mctpCtrlServices;
-    MctpInfos mctpInfos;
-
     // Phase 1.A — resolve the bus-owner BEFORE installing the runtime match
     // rules so the cached service name(s) can be substituted into the
     // arg0path + sender= filters (guideline § 2.1 Phase 1.A + § 2.3 item 11).
     // Resolve failures here fall through to the catch block below where the
     // legacy unfiltered subscription is installed as a safety net — bounded
     // retry on top is added by Commit 4 (N4).
+    //
+    // NOTE — Commit 2 (N2) deviation from work order § 5: nsmd's
+    // utils::DBusHandler does NOT currently expose a coroutine wrapper for
+    // mapper.GetSubTree. Adding one would touch common/utils.{hpp,cpp}
+    // (forbidden by the work order's no-cross-cut rule + escalation row 2).
+    // Instead we keep the sync getSubtree primitive but move the per-service
+    // GetManagedObjects + endpoint dispatch work OFF the synchronous init()
+    // path into the initEnumerateTask coroutine spawned at the end of this
+    // function. The constructor + initialize() entry point therefore return
+    // immediately; enumeration runs on the next event-loop tick.
     try
     {
         const dbus::Interfaces ifaceList{"xyz.openbmc_project.MCTP.Endpoint"};
         auto getSubTreeResponse = utils::DBusHandler().getSubtree(
             "/au/com/codeconstruct/mctp1", 0, ifaceList);
+        std::set<std::string> mctpCtrlServices;
         for (const auto& [objPath, mapperServiceMap] : getSubTreeResponse)
         {
             for (const auto& [serviceName, interfaces] : mapperServiceMap)
@@ -199,11 +206,30 @@ void MctpDiscovery::init()
                 "MctpDiscovery::init: fallback match install also failed; daemon will not receive runtime MCTP signals. {ERR}",
                 "ERR", fallbackErr);
         }
-        discoverNsmDevice(mctpInfos);
-        return;
+        // No GetManagedObjects round can succeed without a resolved service
+        // set. Spawn the coroutine anyway so Commit 4 (N4)'s bounded retry
+        // layer can pick up here when added.
     }
 
-    for (const auto& service : mctpCtrlServices)
+    // Spawn the post-construction enumeration on the event loop and return
+    // immediately. The MctpDiscovery instance is owned by the unique_ptr in
+    // mctpDiscoveryInstance which outlives every coroutine here (the daemon
+    // process lifetime exceeds discovery enumeration by design).
+    requester::Coroutine::assign(initEnumerateTaskHandle,
+                                 [this]() -> requester::Coroutine {
+        // coverity[missing_return]
+        co_return co_await initEnumerateTask();
+    });
+}
+
+requester::Coroutine MctpDiscovery::initEnumerateTask()
+{
+    MctpInfos mctpInfos;
+    // resolvedMctpServices was populated synchronously in init() above
+    // (under the same try-block as the subscription install). If empty, this
+    // loop is a no-op; the catch-block above already invoked the degraded-
+    // fallback path. Commit 4 (N4) will layer bounded retry on this site.
+    for (const auto& service : resolvedMctpServices)
     {
         dbus::ObjectValueTree objects{};
         try
@@ -235,11 +261,15 @@ void MctpDiscovery::init()
         }
         catch (const std::exception& e)
         {
+            lg2::error(
+                "initEnumerateTask: GetManagedObjects failed for service={SVC}, continuing. {ERR}",
+                "SVC", service, "ERR", e);
             continue;
         }
     }
 
     discoverNsmDevice(mctpInfos);
+    co_return NSM_SW_SUCCESS;
 }
 
 void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,

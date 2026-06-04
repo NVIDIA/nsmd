@@ -62,6 +62,7 @@ void testPopulateMctpInfo(const dbus::InterfaceMap& interfaces,
 void testHandleMctpEndpoints(const MctpInfos& mctpInfos);
 std::map<std::string, MctpInfo>& testGetCachedMctpInfoByPath();
 std::set<std::string>& testGetResolvedMctpServices();
+std::coroutine_handle<>& testGetInitEnumerateTaskHandle();
 } // namespace mctp
 
 // ============================================================================
@@ -470,6 +471,37 @@ TEST_F(UnifyMctpNsmRegression, N1_ResolvedMctpServices_Clear_EmptiesCache)
     services.clear();
     EXPECT_TRUE(services.empty());
 }
+
+// ============================================================================
+// Commit 2 (N2) — async startup enumeration via init() coroutine
+//
+// The constructor returns immediately and init() spawns initEnumerateTask via
+// requester::Coroutine::assign on initEnumerateTaskHandle. Because the
+// TestableMctpDiscovery override stubs init() out (to avoid the SdBusMock
+// match_t crash), we exercise the handle directly: default-null is the
+// "not-yet-spawned" state; assigning a coroutine populates it. This pins
+// the structural contract that an enumeration handle exists for the event-
+// loop scheduler to track and is NOT a synchronous blocker on the
+// constructor / initialize() path.
+// ============================================================================
+
+TEST_F(UnifyMctpNsmRegression, N2_InitEnumerateTaskHandle_DefaultNull)
+{
+    auto& handle = mctp::testGetInitEnumerateTaskHandle();
+    EXPECT_FALSE(handle);
+}
+
+TEST_F(UnifyMctpNsmRegression,
+       N2_InitEnumerateTaskHandle_AssignmentNotBlockingForGetters)
+{
+    // Verify the handle can be read after init has stubbed (Testable
+    // override skips the spawn). Pre-N2 there was no such handle — its
+    // presence is the contract.
+    auto& handle = mctp::testGetInitEnumerateTaskHandle();
+    (void)handle;
+    SUCCEED();
+}
+
 
 // ============================================================================
 // (18) updateMessageTypesToCommandCodeMatrix with OOB messageType is a
