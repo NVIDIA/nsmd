@@ -225,6 +225,7 @@ void MctpDiscovery::init()
 requester::Coroutine MctpDiscovery::initEnumerateTask()
 {
     MctpInfos mctpInfos;
+    bool anyServiceRoundSucceeded = false;
     // resolvedMctpServices was populated synchronously in init() above
     // (under the same try-block as the subscription install). If empty, this
     // loop is a no-op; the catch-block above already invoked the degraded-
@@ -239,6 +240,10 @@ requester::Coroutine MctpDiscovery::initEnumerateTask()
                 "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
             auto reply = bus.call(method);
             reply.read(objects);
+            // A successful GetManagedObjects round — even with zero objects —
+            // counts as a truthful enumeration per guideline § 2.2 mandatory
+            // item 6. Mapper-failed states never reach this point.
+            anyServiceRoundSucceeded = true;
             for (const auto& [objectPath, interfaces] : objects)
             {
                 populateMctpInfo(interfaces, objectPath.str, mctpInfos);
@@ -268,7 +273,30 @@ requester::Coroutine MctpDiscovery::initEnumerateTask()
         }
     }
 
-    discoverNsmDevice(mctpInfos);
+    // Readiness gate (guideline § 2.2 mandatory item 6) — only flip the
+    // flag once at least one service round succeeded. An all-failed round
+    // (mapper unhealthy, resolvedMctpServices empty due to upstream
+    // resolve failure) keeps mctpDiscoveryComplete=false so external
+    // consumers do not treat nsmd as "0 endpoints, ready". Bounded retry
+    // from Commit 4 (N4) is what unsticks this state.
+    if (anyServiceRoundSucceeded)
+    {
+        mctpDiscoveryComplete = true;
+    }
+    else
+    {
+        lg2::error(
+            "initEnumerateTask: no service round succeeded; mctpDiscoveryComplete stays false");
+    }
+
+    // Suppress the legacy empty-list discoverNsmDevice publication when no
+    // round succeeded — that is the "0 endpoints, ready" anti-pattern. When
+    // at least one round succeeded (even with an empty endpoint set — the
+    // legitimate "mapper healthy, no peers connected" state), publish.
+    if (anyServiceRoundSucceeded || !mctpInfos.empty())
+    {
+        discoverNsmDevice(mctpInfos);
+    }
     co_return NSM_SW_SUCCESS;
 }
 

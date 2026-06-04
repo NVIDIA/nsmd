@@ -63,6 +63,8 @@ void testHandleMctpEndpoints(const MctpInfos& mctpInfos);
 std::map<std::string, MctpInfo>& testGetCachedMctpInfoByPath();
 std::set<std::string>& testGetResolvedMctpServices();
 std::coroutine_handle<>& testGetInitEnumerateTaskHandle();
+bool& testGetMctpDiscoveryComplete();
+bool testIsMctpDiscoveryComplete();
 } // namespace mctp
 
 // ============================================================================
@@ -500,6 +502,57 @@ TEST_F(UnifyMctpNsmRegression,
     auto& handle = mctp::testGetInitEnumerateTaskHandle();
     (void)handle;
     SUCCEED();
+}
+
+// ============================================================================
+// Commit 3 (N3) — mctpDiscoveryComplete readiness gate
+//
+// At construction time the flag is false. After a successful per-service
+// GetManagedObjects round in initEnumerateTask the flag is set to true.
+// All-failed rounds leave the flag false until a future bounded-retry
+// round succeeds (Commit 4 / N4).
+//
+// Since TestableMctpDiscovery's init() override skips the spawn, we exercise
+// the flag directly via the helper. Behavioural integration is integration-
+// test scope (SADD § 5.2 T2 ObjectMapper-unhealthy-at-boot).
+// ============================================================================
+
+TEST_F(UnifyMctpNsmRegression, N3_MctpDiscoveryComplete_DefaultFalse)
+{
+    EXPECT_FALSE(mctp::testIsMctpDiscoveryComplete());
+    EXPECT_FALSE(mctp::testGetMctpDiscoveryComplete());
+}
+
+TEST_F(UnifyMctpNsmRegression,
+       N3_MctpDiscoveryComplete_PublicGetter_ReflectsFlag)
+{
+    auto& flag = mctp::testGetMctpDiscoveryComplete();
+    flag = true;
+    EXPECT_TRUE(mctp::testIsMctpDiscoveryComplete());
+    flag = false;
+    EXPECT_FALSE(mctp::testIsMctpDiscoveryComplete());
+}
+
+TEST_F(UnifyMctpNsmRegression,
+       N3_MctpDiscoveryComplete_TruthfulEmptyEnumeration_AllowedAsTrue)
+{
+    // Mapper healthy + no peers connected — legitimate state where the
+    // flag goes true with an empty endpoint set. The flag is the readiness
+    // signal; the endpoint set is separate.
+    auto& flag = mctp::testGetMctpDiscoveryComplete();
+    flag = true;
+    EXPECT_TRUE(mctp::testIsMctpDiscoveryComplete());
+}
+
+TEST_F(UnifyMctpNsmRegression,
+       N3_MctpDiscoveryComplete_AllMapperFailed_StaysFalse)
+{
+    // All-mapper-failed posture — resolvedMctpServices empty, no rounds
+    // succeeded, flag stays false. This is the bug 5533307 nsm-side path
+    // the readiness gate prevents from masquerading as "ready".
+    auto& flag = mctp::testGetMctpDiscoveryComplete();
+    EXPECT_FALSE(flag);
+    EXPECT_FALSE(mctp::testIsMctpDiscoveryComplete());
 }
 
 

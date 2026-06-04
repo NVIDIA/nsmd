@@ -192,6 +192,12 @@ class MctpDiscoveryTestAccess
     {
         return inst().initEnumerateTaskHandle;
     }
+
+    // unify-mctp Commit 3 (N3) — mctpDiscoveryComplete read+write accessor
+    static bool& getMctpDiscoveryComplete()
+    {
+        return inst().mctpDiscoveryComplete;
+    }
 };
 
 // ============================================================================
@@ -269,6 +275,16 @@ std::set<std::string>& testGetResolvedMctpServices()
 std::coroutine_handle<>& testGetInitEnumerateTaskHandle()
 {
     return MctpDiscoveryTestAccess::getInitEnumerateTaskHandle();
+}
+
+bool& testGetMctpDiscoveryComplete()
+{
+    return MctpDiscoveryTestAccess::getMctpDiscoveryComplete();
+}
+
+bool testIsMctpDiscoveryComplete()
+{
+    return mctpDiscoveryInstance->isMctpDiscoveryComplete();
 }
 
 } // namespace mctp

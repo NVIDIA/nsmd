@@ -82,6 +82,29 @@ class MctpDiscovery
     virtual nsm::DiscoveryEvents& discoveryEvents(eid_t eid);
     virtual requester::Coroutine dumpPingInfoTask(eid_t eid);
 
+    /** @brief True once at least one per-service GetManagedObjects round
+     *         has succeeded in initEnumerateTask. Downstream consumers
+     *         (sensor manager, NSM device manager, redfish handlers that
+     *         enumerate NSM devices) should consult this getter before
+     *         treating nsmd as having a truthful view of the MCTP topology.
+     *
+     *  Per unify-mctp guideline § 2.2 mandatory item 6 — "Daemon does not
+     *  publish an empty / partial inventory before at least one
+     *  GetManagedObjects round succeeds." There is no separate D-Bus
+     *  readiness signal; the contract is just "don't expose an empty view
+     *  and call it the truth".
+     *
+     *  An empty truthful enumeration (mapper healthy, no peers connected)
+     *  IS a legitimate state — the flag becomes true with an empty
+     *  endpoint set in that case. The flag only stays false when EVERY
+     *  service's GetManagedObjects round failed (mapper unhealthy / bus
+     *  owner mis-resolved). Bounded retry from Commit 4 (N4) layers on top.
+     */
+    [[nodiscard]] bool isMctpDiscoveryComplete() const noexcept
+    {
+        return mctpDiscoveryComplete;
+    }
+
     static void logProberSummaries();
 
   protected:
@@ -137,6 +160,10 @@ class MctpDiscovery
      *         guideline § 2.2 mandatory item 2 — startup uses async fetch,
      *         never blocks the event loop). */
     std::coroutine_handle<> initEnumerateTaskHandle;
+
+    /** @brief Backing field for isMctpDiscoveryComplete(). See the getter's
+     *         doc for the readiness contract. */
+    bool mctpDiscoveryComplete{false};
 
     /** @brief Coroutine that performs the bus-owner-keyed
      *         GetManagedObjects round per service, dispatches each
