@@ -222,54 +222,144 @@ void MctpDiscovery::init()
     });
 }
 
-requester::Coroutine MctpDiscovery::initEnumerateTask()
+requester::Coroutine MctpDiscovery::retryResolveBusOwner()
 {
-    MctpInfos mctpInfos;
-    bool anyServiceRoundSucceeded = false;
-    // resolvedMctpServices was populated synchronously in init() above
-    // (under the same try-block as the subscription install). If empty, this
-    // loop is a no-op; the catch-block above already invoked the degraded-
-    // fallback path. Commit 4 (N4) will layer bounded retry on this site.
-    for (const auto& service : resolvedMctpServices)
+    const auto backoff = getMapperRetryBackoff();
+    auto event = sdeventplus::Event::get_default();
+    const dbus::Interfaces ifaceList{"xyz.openbmc_project.MCTP.Endpoint"};
+    for (size_t attempt = 0; attempt < backoff.size(); ++attempt)
     {
-        dbus::ObjectValueTree objects{};
+        try
+        {
+            auto resp = utils::DBusHandler().getSubtree(
+                "/au/com/codeconstruct/mctp1", 0, ifaceList);
+            if (!resp.empty())
+            {
+                std::set<std::string> newServices;
+                for (const auto& [objPath, mapperServiceMap] : resp)
+                {
+                    for (const auto& [serviceName, ifaces] : mapperServiceMap)
+                    {
+                        newServices.emplace(serviceName);
+                    }
+                }
+                if (!newServices.empty())
+                {
+                    resolvedMctpServices = newServices;
+                    lg2::info(
+                        "retryResolveBusOwner: resolved {N} service(s) on attempt {ATTEMPT}",
+                        "N", static_cast<int>(newServices.size()), "ATTEMPT",
+                        static_cast<int>(attempt + 1));
+                    co_return NSM_SW_SUCCESS;
+                }
+            }
+            lg2::error(
+                "retryResolveBusOwner: empty mapper response attempt={ATTEMPT}",
+                "ATTEMPT", static_cast<int>(attempt + 1));
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error(
+                "retryResolveBusOwner: attempt {ATTEMPT} threw, sleeping then retrying. {ERR}",
+                "ATTEMPT", static_cast<int>(attempt + 1), "ERR", e);
+        }
+        co_await common::Sleep(event,
+                               static_cast<uint64_t>(backoff[attempt].count()) *
+                                   1000,
+                               common::NonPriority);
+    }
+    lg2::error(
+        "retryResolveBusOwner: exhausted {N} attempts; resolvedMctpServices stays empty",
+        "N", static_cast<int>(backoff.size()));
+    co_return NSM_SW_ERROR;
+}
+
+requester::Coroutine MctpDiscovery::retryGetManagedObjects(
+    std::string service, dbus::ObjectValueTree& outObjects)
+{
+    const auto backoff = getMapperRetryBackoff();
+    auto event = sdeventplus::Event::get_default();
+    for (size_t attempt = 0; attempt < backoff.size(); ++attempt)
+    {
         try
         {
             auto method = bus.new_method_call(
                 service.c_str(), "/au/com/codeconstruct/mctp1",
                 "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
             auto reply = bus.call(method);
-            reply.read(objects);
-            // A successful GetManagedObjects round — even with zero objects —
-            // counts as a truthful enumeration per guideline § 2.2 mandatory
-            // item 6. Mapper-failed states never reach this point.
-            anyServiceRoundSucceeded = true;
-            for (const auto& [objectPath, interfaces] : objects)
-            {
-                populateMctpInfo(interfaces, objectPath.str, mctpInfos);
-
-                // watch PropertiesChanged signal from
-                // au.com.codeconstruct.MCTP.Endpoint1 PDI
-                if (enableMatches.find(objectPath.str) == enableMatches.end())
-                {
-                    enableMatches.emplace(
-                        objectPath.str,
-                        sdbusplus::bus::match_t(
-                            bus,
-                            sdbusplus::bus::match::rules::propertiesChanged(
-                                objectPath.str,
-                                "au.com.codeconstruct.MCTP.Endpoint1"),
-                            std::bind_front(&MctpDiscovery::refreshEndpoints,
-                                            this)));
-                }
-            }
+            reply.read(outObjects);
+            co_return NSM_SW_SUCCESS;
         }
         catch (const std::exception& e)
         {
             lg2::error(
-                "initEnumerateTask: GetManagedObjects failed for service={SVC}, continuing. {ERR}",
-                "SVC", service, "ERR", e);
+                "retryGetManagedObjects: attempt {ATTEMPT} for service={SVC} threw, sleeping then retrying. {ERR}",
+                "ATTEMPT", static_cast<int>(attempt + 1), "SVC", service, "ERR",
+                e);
+        }
+        co_await common::Sleep(event,
+                               static_cast<uint64_t>(backoff[attempt].count()) *
+                                   1000,
+                               common::NonPriority);
+    }
+    lg2::error(
+        "retryGetManagedObjects: exhausted {N} attempts for service={SVC}",
+        "N", static_cast<int>(backoff.size()), "SVC", service);
+    co_return NSM_SW_ERROR;
+}
+
+requester::Coroutine MctpDiscovery::initEnumerateTask()
+{
+    MctpInfos mctpInfos;
+    bool anyServiceRoundSucceeded = false;
+
+    // If init()'s initial sync resolve produced no services (mapper was
+    // unhealthy at boot), retry with bounded backoff before giving up.
+    // This closes the bug 5533307 nsm-side / 5922299 path — guideline
+    // § 2.2 mandatory item 7.
+    if (resolvedMctpServices.empty())
+    {
+        lg2::info(
+            "initEnumerateTask: resolvedMctpServices empty after init() — invoking bounded retry");
+        co_await retryResolveBusOwner();
+    }
+
+    // resolvedMctpServices was populated synchronously in init() above
+    // (under the same try-block as the subscription install). If still
+    // empty here, the bounded retry exhausted — the catch-block in init()
+    // already invoked the degraded subscription-only fallback, and
+    // mctpDiscoveryComplete stays false below.
+    for (const auto& service : resolvedMctpServices)
+    {
+        dbus::ObjectValueTree objects{};
+        auto rc = co_await retryGetManagedObjects(service, objects);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            // Bounded retry exhausted for this service — skip it.
             continue;
+        }
+        // A successful GetManagedObjects round — even with zero objects —
+        // counts as a truthful enumeration per guideline § 2.2 mandatory
+        // item 6. Mapper-failed states never reach this point.
+        anyServiceRoundSucceeded = true;
+        for (const auto& [objectPath, interfaces] : objects)
+        {
+            populateMctpInfo(interfaces, objectPath.str, mctpInfos);
+
+            // watch PropertiesChanged signal from
+            // au.com.codeconstruct.MCTP.Endpoint1 PDI
+            if (enableMatches.find(objectPath.str) == enableMatches.end())
+            {
+                enableMatches.emplace(
+                    objectPath.str,
+                    sdbusplus::bus::match_t(
+                        bus,
+                        sdbusplus::bus::match::rules::propertiesChanged(
+                            objectPath.str,
+                            "au.com.codeconstruct.MCTP.Endpoint1"),
+                        std::bind_front(&MctpDiscovery::refreshEndpoints,
+                                        this)));
+            }
         }
     }
 
@@ -277,8 +367,7 @@ requester::Coroutine MctpDiscovery::initEnumerateTask()
     // flag once at least one service round succeeded. An all-failed round
     // (mapper unhealthy, resolvedMctpServices empty due to upstream
     // resolve failure) keeps mctpDiscoveryComplete=false so external
-    // consumers do not treat nsmd as "0 endpoints, ready". Bounded retry
-    // from Commit 4 (N4) is what unsticks this state.
+    // consumers do not treat nsmd as "0 endpoints, ready".
     if (anyServiceRoundSucceeded)
     {
         mctpDiscoveryComplete = true;

@@ -28,10 +28,13 @@
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus/match.hpp>
 
+#include <array>
+#include <chrono>
 #include <filesystem>
 #include <initializer_list>
 #include <map>
 #include <optional>
+#include <set>
 #include <vector>
 // # define ENABLE_ASSOCIATION_DISCOVERY
 namespace mctp
@@ -170,8 +173,43 @@ class MctpDiscovery
      *         endpoint through the same populateMctpInfo path as the
      *         runtime InterfacesAdded handler, and installs the per-endpoint
      *         PropertiesChanged matches. Sets mctpDiscoveryComplete (added
-     *         in Commit 3 / N3) on success of any service round. */
+     *         in Commit 3 / N3) on success of any service round.
+     *
+     *  Bounded retry per Commit 4 (N4) wraps both the bus-owner-resolve
+     *  step (when invoked from this path; init() already resolved once)
+     *  and the per-service GetManagedObjects round itself. */
     requester::Coroutine initEnumerateTask();
+
+    /** @brief Bounded async retry schedule for mapper / GetManagedObjects
+     *         recovery. Production default 50 / 200 / 1000 / 3000 / 5000 ms
+     *         (5 steps). Test fixtures override via the virtual getter to
+     *         use 1ms-each so retry tests stay fast. Matches the pldm + spdm
+     *         precedent. */
+    virtual std::array<std::chrono::milliseconds, 5>
+        getMapperRetryBackoff() const noexcept
+    {
+        return {std::chrono::milliseconds{50},
+                std::chrono::milliseconds{200},
+                std::chrono::milliseconds{1000},
+                std::chrono::milliseconds{3000},
+                std::chrono::milliseconds{5000}};
+    }
+
+    /** @brief Bounded retry helper invoked when the initial getSubtree
+     *         resolve in init() returned empty / threw. Used by
+     *         initEnumerateTask to recover the resolvedMctpServices cache
+     *         before retrying GetManagedObjects.
+     *         Returns true if resolve succeeded within the backoff
+     *         schedule, false otherwise. Empty service set is treated as
+     *         "no mapper view yet" (retry). */
+    requester::Coroutine retryResolveBusOwner();
+
+    /** @brief Bounded retry helper invoked when a per-service
+     *         GetManagedObjects call fails. Returns the response tree on
+     *         success; throws on terminal exhaustion (caller catches and
+     *         skips the service). */
+    requester::Coroutine retryGetManagedObjects(std::string service,
+                                                dbus::ObjectValueTree& outObjects);
 
     requester::Coroutine readMctpProperties(const std::string& objPath,
                                             MctpInfos& mctpInfos);

@@ -198,6 +198,12 @@ class MctpDiscoveryTestAccess
     {
         return inst().mctpDiscoveryComplete;
     }
+
+    // unify-mctp Commit 4 (N4) — production retry backoff schedule accessor
+    static auto getMapperRetryBackoff()
+    {
+        return inst().getMapperRetryBackoff();
+    }
 };
 
 // ============================================================================
@@ -285,6 +291,11 @@ bool& testGetMctpDiscoveryComplete()
 bool testIsMctpDiscoveryComplete()
 {
     return mctpDiscoveryInstance->isMctpDiscoveryComplete();
+}
+
+std::array<std::chrono::milliseconds, 5> testGetMapperRetryBackoff()
+{
+    return MctpDiscoveryTestAccess::getMapperRetryBackoff();
 }
 
 } // namespace mctp
