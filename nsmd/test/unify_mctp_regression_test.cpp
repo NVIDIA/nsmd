@@ -61,6 +61,7 @@ void testPopulateMctpInfo(const dbus::InterfaceMap& interfaces,
                           const std::string& objPath, MctpInfos& mctpInfos);
 void testHandleMctpEndpoints(const MctpInfos& mctpInfos);
 std::map<std::string, MctpInfo>& testGetCachedMctpInfoByPath();
+std::set<std::string>& testGetResolvedMctpServices();
 } // namespace mctp
 
 // ============================================================================
@@ -426,6 +427,48 @@ TEST_F(UnifyMctpNsmRegression,
     EXPECT_FALSE(dev.isCommandSupported(3, 2));
     EXPECT_TRUE(dev.isCommandSupported(3, 3));
     EXPECT_TRUE(dev.isCommandSupported(3, 7));
+}
+
+// ============================================================================
+// Commit 1 (N1) — arg0path + sender narrowing
+//
+// The init() match-rule narrowing relies on a resolved bus-owner cache.
+// Since TestableMctpDiscovery overrides init() as a no-op, we exercise the
+// member directly: write to the cache and read back; this pins the contract
+// that the discovery class exposes a cached service set distinct from any
+// hardcoded constant. Behavioural verification (sender= actually applied
+// in the live rule string) is best done via integration test SADD § 5.2 T3.
+// ============================================================================
+
+TEST_F(UnifyMctpNsmRegression, N1_ResolvedMctpServices_DefaultEmpty)
+{
+    auto& services = mctp::testGetResolvedMctpServices();
+    EXPECT_TRUE(services.empty());
+}
+
+TEST_F(UnifyMctpNsmRegression, N1_ResolvedMctpServices_SingleEntry_Stored)
+{
+    auto& services = mctp::testGetResolvedMctpServices();
+    services.insert("au.com.codeconstruct.MCTP1");
+    EXPECT_EQ(services.size(), 1u);
+    EXPECT_NE(services.find("au.com.codeconstruct.MCTP1"), services.end());
+}
+
+TEST_F(UnifyMctpNsmRegression, N1_ResolvedMctpServices_MultiOwner_AllStored)
+{
+    auto& services = mctp::testGetResolvedMctpServices();
+    services.insert("au.com.codeconstruct.MCTP1");
+    services.insert("com.nvidia.MCTP.Override");
+    EXPECT_EQ(services.size(), 2u);
+}
+
+TEST_F(UnifyMctpNsmRegression, N1_ResolvedMctpServices_Clear_EmptiesCache)
+{
+    auto& services = mctp::testGetResolvedMctpServices();
+    services.insert("svc-a");
+    services.insert("svc-b");
+    services.clear();
+    EXPECT_TRUE(services.empty());
 }
 
 // ============================================================================

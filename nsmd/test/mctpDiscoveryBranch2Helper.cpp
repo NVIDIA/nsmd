@@ -180,6 +180,12 @@ class MctpDiscoveryTestAccess
     {
         return inst().nsmDevices;
     }
+
+    // unify-mctp Commit 1 (N1) — resolvedMctpServices accessor
+    static std::set<std::string>& getResolvedMctpServices()
+    {
+        return inst().resolvedMctpServices;
+    }
 };
 
 // ============================================================================
@@ -247,6 +253,11 @@ EidTable& testGetEidTable()
 nsm::NsmDeviceTable& testGetNsmDevices()
 {
     return MctpDiscoveryTestAccess::getNsmDevices();
+}
+
+std::set<std::string>& testGetResolvedMctpServices()
+{
+    return MctpDiscoveryTestAccess::getResolvedMctpServices();
 }
 
 } // namespace mctp

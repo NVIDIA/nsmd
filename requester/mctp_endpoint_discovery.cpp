@@ -107,18 +107,14 @@ void MctpDiscovery::init()
     std::set<dbus::Service> mctpCtrlServices;
     MctpInfos mctpInfos;
 
+    // Phase 1.A — resolve the bus-owner BEFORE installing the runtime match
+    // rules so the cached service name(s) can be substituted into the
+    // arg0path + sender= filters (guideline § 2.1 Phase 1.A + § 2.3 item 11).
+    // Resolve failures here fall through to the catch block below where the
+    // legacy unfiltered subscription is installed as a safety net — bounded
+    // retry on top is added by Commit 4 (N4).
     try
     {
-        mctpEndpointAddedSignal.emplace(
-            bus,
-            sdbusplus::bus::match::rules::interfacesAdded(
-                "/au/com/codeconstruct/mctp1"),
-            std::bind_front(&MctpDiscovery::discoverEndpoints, this));
-        mctpEndpointRemovedSignal.emplace(
-            bus,
-            sdbusplus::bus::match::rules::interfacesRemoved(
-                "/au/com/codeconstruct/mctp1"),
-            std::bind_front(&MctpDiscovery::cleanEndpoints, this));
         const dbus::Interfaces ifaceList{"xyz.openbmc_project.MCTP.Endpoint"};
         auto getSubTreeResponse = utils::DBusHandler().getSubtree(
             "/au/com/codeconstruct/mctp1", 0, ifaceList);
@@ -129,9 +125,80 @@ void MctpDiscovery::init()
                 mctpCtrlServices.emplace(serviceName);
             }
         }
+        resolvedMctpServices = mctpCtrlServices;
+
+        // arg0path narrows the match to the MCTP networks subtree so signals
+        // for any other object under /au/com/codeconstruct/mctp1 (network /
+        // interface children) do NOT wake the daemon. sender= further
+        // narrows to the cached bus-owner so unrelated bus members publishing
+        // under the same path namespace cannot trigger the callback.
+        // Same shape as pldm's commit 8e693a40, but with the cached service
+        // name from GetSubTree rather than a hardcoded constant.
+        const std::string mctpNetworksPath =
+            "/au/com/codeconstruct/mctp1/networks/";
+
+        auto addedRule = sdbusplus::bus::match::rules::interfacesAddedAtPath(
+            mctpNetworksPath);
+        auto removedRule = sdbusplus::bus::match::rules::interfacesRemovedAtPath(
+            mctpNetworksPath);
+        if (resolvedMctpServices.size() == 1)
+        {
+            // Single bus-owner — add sender= narrowing. This is the common
+            // case (au.com.codeconstruct.MCTP1 is the canonical owner today).
+            const auto& service = *resolvedMctpServices.begin();
+            addedRule += sdbusplus::bus::match::rules::sender(service);
+            removedRule += sdbusplus::bus::match::rules::sender(service);
+            lg2::info(
+                "MctpDiscovery: subscribing with arg0path={PATH} sender={SVC}",
+                "PATH", mctpNetworksPath, "SVC", service);
+        }
+        else
+        {
+            // Zero or >1 bus owners — skip sender= narrowing. With 0 we let
+            // bounded retry from N4 cover the empty-resolve case; with >1 we
+            // accept the slightly broader match rather than installing a
+            // per-service rule explosion. arg0path narrowing still applies.
+            lg2::info(
+                "MctpDiscovery: subscribing with arg0path={PATH} (sender unset, services={N})",
+                "PATH", mctpNetworksPath, "N",
+                static_cast<int>(resolvedMctpServices.size()));
+        }
+        mctpEndpointAddedSignal.emplace(
+            bus, addedRule,
+            std::bind_front(&MctpDiscovery::discoverEndpoints, this));
+        mctpEndpointRemovedSignal.emplace(
+            bus, removedRule,
+            std::bind_front(&MctpDiscovery::cleanEndpoints, this));
     }
     catch (const std::exception& e)
     {
+        lg2::error(
+            "MctpDiscovery::init: bus-owner resolve / match install failed; "
+            "falling back to unfiltered match (degraded fallback). {ERR}",
+            "ERR", e);
+        // Fall back to the legacy unfiltered subscription shape so we still
+        // receive subsequent runtime signals even if the initial mapper
+        // round-trip failed. Bounded retry from Commit 4 (N4) will layer
+        // recovery on top of this path.
+        try
+        {
+            mctpEndpointAddedSignal.emplace(
+                bus,
+                sdbusplus::bus::match::rules::interfacesAdded(
+                    "/au/com/codeconstruct/mctp1"),
+                std::bind_front(&MctpDiscovery::discoverEndpoints, this));
+            mctpEndpointRemovedSignal.emplace(
+                bus,
+                sdbusplus::bus::match::rules::interfacesRemoved(
+                    "/au/com/codeconstruct/mctp1"),
+                std::bind_front(&MctpDiscovery::cleanEndpoints, this));
+        }
+        catch (const std::exception& fallbackErr)
+        {
+            lg2::error(
+                "MctpDiscovery::init: fallback match install also failed; daemon will not receive runtime MCTP signals. {ERR}",
+                "ERR", fallbackErr);
+        }
         discoverNsmDevice(mctpInfos);
         return;
     }

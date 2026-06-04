@@ -110,6 +110,13 @@ class MctpDiscovery
     sdbusplus::asio::object_server& objServer;
     // Dedicated prober to handle ping/query with backoff
     requester::MctpEndpointProber prober;
+    /** @brief Resolved MCTP bus-owner service name(s), cached at init() from
+     *         ObjectMapper.GetSubTree. Used to build the sender= filter on
+     *         InterfacesAdded/Removed matches per unify-mctp guideline § 2.1
+     *         Phase 1.A. Empty if mapper resolve failed — match rules then
+     *         fall back to unfiltered (current pre-N1 behaviour) until
+     *         Commit 4 (N4)'s bounded retry layers retry on top. */
+    std::set<std::string> resolvedMctpServices;
     /** @brief Used to watch for new MCTP endpoints */
     std::optional<sdbusplus::bus::match_t> mctpEndpointAddedSignal;
 
