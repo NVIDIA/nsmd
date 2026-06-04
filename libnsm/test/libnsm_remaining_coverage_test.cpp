@@ -440,16 +440,33 @@ TEST(AggregateRespSample, EncodeNullParams)
 	    NSM_SW_ERROR_NULL);
 }
 
-TEST(AggregateRespSample, EncodeBadDataLen)
+TEST(AggregateRespSample, EncodeByteLengthEncoding)
 {
 	uint8_t data[5] = {1, 2, 3, 4, 5};
+	uint8_t sampleBuf[sizeof(nsm_aggregate_resp_sample) + 5] = {};
+	auto sample = reinterpret_cast<nsm_aggregate_resp_sample *>(sampleBuf);
+	size_t sample_len = 0;
+
+	// len_encoding=1 requests byte length encoding, so data_len=5 is stored
+	// directly
+	EXPECT_EQ(encode_aggregate_resp_sample(0, true, data, 5, sample,
+					       &sample_len, 1),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(sample->len_encoding, 1);
+	EXPECT_EQ(sample->length, 5);
+}
+
+TEST(AggregateRespSample, EncodeBadDataLen)
+{
+	uint8_t data[9] = {};
 	nsm_aggregate_resp_sample sample = {};
 	size_t sample_len = 0;
 
-	// data_len=5 is not a power of 2, should fail
-	EXPECT_EQ(encode_aggregate_resp_sample(0, true, data, 5, &sample,
-					       &sample_len),
-		  NSM_SW_ERROR_DATA);
+	// data_len=9 does not fit the 3-bit length field of byte length
+	// encoding
+	EXPECT_EQ(encode_aggregate_resp_sample(0, true, data, 9, &sample,
+					       &sample_len, 1),
+		  NSM_SW_ERROR_LENGTH);
 }
 
 TEST(AggregateRespSample, DecodeNullParams)

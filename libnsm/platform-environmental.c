@@ -1611,7 +1611,7 @@ int decode_aggregate_resp(const struct nsm_msg *msg, size_t msg_len,
 int encode_aggregate_resp_sample(uint8_t tag, bool valid, const uint8_t *data,
 				 size_t data_len,
 				 struct nsm_aggregate_resp_sample *sample,
-				 size_t *sample_len)
+				 size_t *sample_len, uint8_t len_encoding)
 {
 	if (data == NULL || sample == NULL || sample_len == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -1620,11 +1620,42 @@ int encode_aggregate_resp_sample(uint8_t tag, bool valid, const uint8_t *data,
 	sample->tag = tag;
 	sample->reserved = 0;
 	sample->valid = valid;
+	sample->len_encoding = len_encoding ? 1 : 0;
 
-	for (int i = 0; i <= NSM_AGGREGATE_MAX_SAMPLE_SIZE_AS_POWER_OF_2; ++i) {
-		size_t valid_size = 1 << i;
-		if (data_len == valid_size) {
-			sample->length = i;
+	if (sample->len_encoding == 0) {
+		/* Compact encoding: the length field is a power-of-2 exponent,
+		 * so the payload occupies the smallest power-of-2 sized field
+		 * that can hold data_len (e.g. 5 bytes -> 2^3 = 8). The field
+		 * is zero-padded; the caller must size the buffer for
+		 * valid_size.
+		 */
+		for (int i = 0;
+		     i <= NSM_AGGREGATE_MAX_SAMPLE_SIZE_AS_POWER_OF_2; ++i) {
+			size_t valid_size = 1 << i;
+			if (data_len <= valid_size) {
+				sample->length = i;
+
+				memcpy(sample->data, data, data_len);
+				if (valid_size > data_len) {
+					memset(sample->data + data_len, 0,
+					       valid_size - data_len);
+				}
+				*sample_len =
+				    valid_size +
+				    sizeof(struct nsm_aggregate_resp_sample) -
+				    1;
+
+				return NSM_SW_SUCCESS;
+			}
+		}
+
+		return NSM_SW_ERROR_LENGTH;
+	} else {
+		/* Byte length encoding: the length field holds the actual byte
+		 * count, so it must fit in the 3-bit length field (1-7 bytes).
+		 */
+		if (data_len > 0 && data_len < (1u << 3)) {
+			sample->length = (uint8_t)data_len;
 
 			memcpy(sample->data, data, data_len);
 			*sample_len = data_len +
@@ -1633,9 +1664,9 @@ int encode_aggregate_resp_sample(uint8_t tag, bool valid, const uint8_t *data,
 
 			return NSM_SW_SUCCESS;
 		}
-	}
 
-	return NSM_SW_ERROR_DATA;
+		return NSM_SW_ERROR_LENGTH;
+	}
 }
 
 int decode_aggregate_resp_sample(const struct nsm_aggregate_resp_sample *sample,
@@ -1652,7 +1683,11 @@ int decode_aggregate_resp_sample(const struct nsm_aggregate_resp_sample *sample,
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	*data_len = 1 << sample->length;
+	if (sample->len_encoding) {
+		*data_len = sample->length;
+	} else {
+		*data_len = 1 << sample->length;
+	}
 	*consumed_len =
 	    *data_len + sizeof(struct nsm_aggregate_resp_sample) - 1;
 

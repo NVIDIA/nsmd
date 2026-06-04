@@ -629,16 +629,36 @@ TEST(PlatEnvBranch6, EncodeAggregateRespSample_NullSampleLen)
 }
 
 // ===========================================================================
-// encode_aggregate_resp_sample: invalid data_len (not power of 2)
+// encode_aggregate_resp_sample: len_encoding=1 stores data_len directly (byte
+// length encoding)
+// ===========================================================================
+TEST(PlatEnvBranch6, EncodeAggregateRespSample_ByteLengthEncoding)
+{
+	uint8_t data[5] = {1, 2, 3, 4, 5};
+	uint8_t sampleBuf[sizeof(struct nsm_aggregate_resp_sample) + 5] = {};
+	auto sample =
+	    reinterpret_cast<struct nsm_aggregate_resp_sample *>(sampleBuf);
+	size_t sample_len = 0;
+	auto rc = encode_aggregate_resp_sample(0, true, data, 5, sample,
+					       &sample_len, 1);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(sample->len_encoding, 1);
+	EXPECT_EQ(sample->length, 5);
+	EXPECT_EQ(sample_len,
+		  5u + sizeof(struct nsm_aggregate_resp_sample) - 1);
+}
+
+// encode_aggregate_resp_sample: data_len that does not fit the 3-bit length
+// field of byte length encoding is invalid
 // ===========================================================================
 TEST(PlatEnvBranch6, EncodeAggregateRespSample_BadDataLen)
 {
-	uint8_t data[5] = {};
+	uint8_t data[9] = {};
 	struct nsm_aggregate_resp_sample sample = {};
 	size_t sample_len = 0;
-	auto rc = encode_aggregate_resp_sample(0, true, data, 5, &sample,
-					       &sample_len);
-	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	auto rc = encode_aggregate_resp_sample(0, true, data, 9, &sample,
+					       &sample_len, 1);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 // ===========================================================================
