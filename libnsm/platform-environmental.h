@@ -586,12 +586,17 @@ struct nsm_aggregate_resp {
 /** @struct nsm_aggregate_resp_sample
  *
  *  Structure representing NSM telemetry sample of aggregator variant response.
+ *  Metadata byte layout: len_encoding(bit7), reserved(bits6-4),
+ * length(bits3-1), valid(bit0). When len_encoding=0 (compact encoding): data
+ * size = 1 << length (power-of-2). When len_encoding=1 (byte length encoding):
+ * data size = length (actual byte count).
  */
 struct nsm_aggregate_resp_sample {
 	uint8_t tag;
 	uint8_t valid : 1;
 	uint8_t length : 3;
-	uint8_t reserved : 4;
+	uint8_t reserved : 3;
+	uint8_t len_encoding : 1;
 	uint8_t data[1];
 } __attribute__((packed));
 
@@ -2153,17 +2158,30 @@ int decode_aggregate_resp(const struct nsm_msg *msg, size_t msg_len,
 
 /** @brief Encode a telemetry sample of an aggregate response message
  *
+ *  The caller selects the encoding via len_encoding (defaults to compact):
+ *    - len_encoding=0 (compact): data occupies the smallest power-of-2 sized
+ *      field that can hold data_len; the field is zero-padded.
+ *    - len_encoding=1 (byte length): the length field holds the actual byte
+ *      count, so data_len must be in the range 1-7.
+ *
  *  @param[in] tag - tag of telemetry sample
+ *  @param[in] valid - valid flag of telemetry sample
  *  @param[in] data - telemetry sample data
  *  @param[in] data_len - number of bytes in telemetry sample data
- *  @param[out] msg    - telemetry sample of an aggregate response message
+ *  @param[out] sample - telemetry sample of an aggregate response message
  *  @param[out] sample_len - consumed number of bytes of message
+ *  @param[in] len_encoding - 0 for compact (power-of-2), 1 for byte length
  *  @return nsm_completion_codes
  */
 int encode_aggregate_resp_sample(uint8_t tag, bool valid, const uint8_t *data,
 				 size_t data_len,
 				 struct nsm_aggregate_resp_sample *sample,
-				 size_t *sample_len);
+				 size_t *sample_len,
+#ifdef __cplusplus
+				 uint8_t len_encoding = 0);
+#else
+				 uint8_t len_encoding);
+#endif
 
 /** @brief Decode a telemetry sample of an aggregate response message
  *
