@@ -507,23 +507,38 @@ requester::Coroutine
             "OBJ_PATH", objPath, "SIZE", mctpQueuedSignals[objPath].size());
         auto member = msg.get_member();
         sd_bus_message_rewind(msg.get(), true);
-        if (strcmp(member, "PropertiesChanged") == 0)
+        // Belt around the per-signal dispatch — any uncaught
+        // sdbusplus::exception_t / std::bad_variant_access from inside the
+        // handle*Endpoints coroutines previously escaped to the event loop
+        // and triggered std::terminate (guideline § 2.2 mandatory item 5,
+        // bug 5448615-adjacent). Log, drop the offending signal, continue
+        // pumping the queue.
+        try
         {
-            co_await handleRefreshEndpoints(msg, mctpInfos);
+            if (strcmp(member, "PropertiesChanged") == 0)
+            {
+                co_await handleRefreshEndpoints(msg, mctpInfos);
+            }
+            else if (strcmp(member, "InterfacesAdded") == 0)
+            {
+                co_await handleDiscoverEndpoints(msg, mctpInfos);
+            }
+            else if (strcmp(member, "InterfacesRemoved") == 0)
+            {
+                co_await handleCleanEndpoints(msg, mctpInfos);
+            }
+            else
+            {
+                lg2::error(
+                    "deviceStateChangeTask: unknown member={MEMBER} for PATH={OBJ_PATH}",
+                    "MEMBER", member, "OBJ_PATH", objPath);
+            }
         }
-        else if (strcmp(member, "InterfacesAdded") == 0)
-        {
-            co_await handleDiscoverEndpoints(msg, mctpInfos);
-        }
-        else if (strcmp(member, "InterfacesRemoved") == 0)
-        {
-            co_await handleCleanEndpoints(msg, mctpInfos);
-        }
-        else
+        catch (const std::exception& e)
         {
             lg2::error(
-                "deviceStateChangeTask: unknown member={MEMBER} for PATH={OBJ_PATH}",
-                "MEMBER", member, "OBJ_PATH", objPath);
+                "deviceStateChangeTask: handler threw on member={MEMBER} PATH={OBJ_PATH}, dropping signal. {ERR}",
+                "MEMBER", member, "OBJ_PATH", objPath, "ERR", e);
         }
         discoverNsmDevice(mctpInfos);
         mctpQueuedSignals[objPath].pop();
@@ -1141,14 +1156,28 @@ requester::Coroutine
                                   std::shared_ptr<const nsm_msg>& responseMsg,
                                   size_t* responseLen)
 {
-    auto rc = co_await nsmMsgHandler->SendRecvNsmMsg(eid, request, responseMsg,
-                                                     responseLen);
-    if (rc)
+    // Belt around the transport co_await — sdbusplus / mctp transport
+    // exceptions previously escaped to the spawned-coroutine caller
+    // and triggered std::terminate (guideline § 2.2 mandatory item 5).
+    try
     {
-        lg2::error("MctpDiscovery::SendRecvNsmMsg failed. eid={EID} rc={RC}",
-                   "EID", eid, "RC", utils::nsmSwCodeToString(rc));
+        auto rc = co_await nsmMsgHandler->SendRecvNsmMsg(
+            eid, request, responseMsg, responseLen);
+        if (rc)
+        {
+            lg2::error(
+                "MctpDiscovery::SendRecvNsmMsg failed. eid={EID} rc={RC}",
+                "EID", eid, "RC", utils::nsmSwCodeToString(rc));
+        }
+        co_return rc;
     }
-    co_return rc;
+    catch (const std::exception& e)
+    {
+        lg2::error(
+            "MctpDiscovery::SendRecvNsmMsg threw on eid={EID}. {ERR}",
+            "EID", eid, "ERR", e);
+        co_return NSM_SW_ERROR;
+    }
 }
 
 bool MctpDiscovery::insertIntoEidTableifNotExist(
@@ -1189,6 +1218,13 @@ requester::Coroutine MctpDiscovery::discoverNsmDeviceTask(eid_t eid)
         auto mctpInfo = perEidQueuedMctpInfos[eid].front();
         auto active = std::get<5>(mctpInfo);
         MctpInfos mctpInfos{mctpInfo};
+        // Belt around the per-iteration coSetdeviceState* dispatch — any
+        // uncaught exception from the inner transport / NSM code previously
+        // escaped to the coroutine caller and triggered std::terminate
+        // (guideline § 2.2 mandatory item 5). On throw, log, pop the stale
+        // snapshot, continue the loop — never abort the task.
+        try
+        {
         if (active)
         {
             auto rc = co_await coSetdeviceStateOnlineTask(mctpInfos);
@@ -1247,6 +1283,13 @@ requester::Coroutine MctpDiscovery::discoverNsmDeviceTask(eid_t eid)
                 nsm::DiscoveryEventType::SetDeviceStateOffline, rc);
             perEidDiscoveryTimeoutRetries.erase(eid);
         }
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error(
+                "discoverNsmDeviceTask: inner coSetdeviceState* threw for eid={EID}, dropping snapshot. {ERR}",
+                "EID", eid, "ERR", e);
+        }
         perEidQueuedMctpInfos[eid].pop();
         lg2::info("discoverNsmDeviceTask eid={EID}, size={SIZE}", "EID", eid,
                   "SIZE", perEidQueuedMctpInfos[eid].size());
@@ -1264,6 +1307,13 @@ requester::Coroutine
         // try ping
         auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding, active,
                mctpObjPath, localEid] = mctpInfo;
+        // Per-iteration belt — uncaught exceptions from ping / QDI /
+        // updateNsmDevice / setOnline previously propagated to the calling
+        // discoverNsmDeviceTask coroutine and onward to std::terminate
+        // (guideline § 2.2 mandatory item 5). Log + continue keeps the
+        // batch alive for remaining endpoints.
+        try
+        {
         auto rc = co_await ping(eid);
         discoveryEvents(eid).setValue(nsm::DiscoveryEventType::Ping, rc);
         if (rc != NSM_SW_SUCCESS)
@@ -1343,6 +1393,15 @@ requester::Coroutine
         // update eid table [from UUID from MCTP dbus property]
         insertIntoEidTableifNotExist(
             mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding));
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error(
+                "coSetdeviceStateOnlineTask: inner step threw for eid={EID}, skipping endpoint. {ERR}",
+                "EID", eid, "ERR", e);
+            overallRC = NSM_SW_ERROR;
+            continue;
+        }
     }
 
     // coverity[missing_return]
@@ -1356,6 +1415,11 @@ requester::Coroutine
     {
         std::shared_ptr<nsm::NsmDevice> nsmDevice{};
         const mctp_eid_t eid = std::get<0>(mctpInfo);
+        // Per-iteration belt — uncaught exceptions from mapNsmDeviceUsingEid
+        // and the nested setOffline coroutine previously escaped to the
+        // caller and triggered std::terminate.
+        try
+        {
         if (discoveredEIDs.find(eid) != discoveredEIDs.end())
         {
             auto& value = discoveredEIDs[eid];
@@ -1384,6 +1448,14 @@ requester::Coroutine
         {
             // coverity[missing_return]
             co_return NSM_SW_ERROR_NULL;
+        }
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error(
+                "coSetdeviceStateOfflineTask: inner step threw for eid={EID}, skipping endpoint. {ERR}",
+                "EID", eid, "ERR", e);
+            continue;
         }
     }
 
