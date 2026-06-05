@@ -126,37 +126,33 @@ static AsyncSetOperationHandler makeSuccessHandler()
     };
 }
 
-// setImpl: interface not in asyncOperations → throws UnsupportedRequest
-TEST(asyncOperationManager, SetImpl_InterfaceNotFound_ThrowsUnsupportedRequest)
+// set: interface not in asyncOperations → throws UnsupportedRequest
+// synchronously, before allocating an AsyncOperation tracking object.
+TEST(asyncOperationManager, Set_InterfaceNotFound_ThrowsUnsupportedRequest)
 {
     auto& bus = utils::DBusHandler::getBus();
     AsyncSetOperationDispatcher disp(
         bus, "/com/nvidia/nsmd/dispatch/test_ifnotfound");
-    auto resultIntf = std::make_shared<AsyncStatusIntf>(
-        bus, "/com/nvidia/nsmd/result/test_ifnotfound");
 
-    EXPECT_THROW_COROUTINE(
-        disp.setImpl("NoSuchInterface", "SomeProp",
-                     AsyncSetOperationValueType{false}, resultIntf),
+    EXPECT_THROW(
+        disp.set("NoSuchInterface", "SomeProp",
+                 AsyncSetOperationValueType{false}),
         sdbusplus::error::xyz::openbmc_project::common::UnsupportedRequest);
 }
 
-// setImpl: interface registered but property missing → throws
-// UnsupportedRequest
-TEST(asyncOperationManager, SetImpl_PropertyNotFound_ThrowsUnsupportedRequest)
+// set: interface registered but property missing → throws
+// UnsupportedRequest synchronously.
+TEST(asyncOperationManager, Set_PropertyNotFound_ThrowsUnsupportedRequest)
 {
     auto& bus = utils::DBusHandler::getBus();
     AsyncSetOperationDispatcher disp(
         bus, "/com/nvidia/nsmd/dispatch/test_propnotfnd");
-    auto resultIntf = std::make_shared<AsyncStatusIntf>(
-        bus, "/com/nvidia/nsmd/result/test_propnotfnd");
 
     disp.addAsyncSetOperation("TestIface", "TestProp",
                               {makeSuccessHandler(), nullptr, nullptr});
 
-    EXPECT_THROW_COROUTINE(
-        disp.setImpl("TestIface", "NoSuchProp",
-                     AsyncSetOperationValueType{false}, resultIntf),
+    EXPECT_THROW(
+        disp.set("TestIface", "NoSuchProp", AsyncSetOperationValueType{false}),
         sdbusplus::error::xyz::openbmc_project::common::UnsupportedRequest);
 }
 
