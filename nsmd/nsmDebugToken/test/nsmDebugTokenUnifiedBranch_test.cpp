@@ -579,9 +579,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
 // ============================================================================
 
 TEST_F(NsmDebugTokenUnifiedBranchTest,
-       queryTokenHandler_PostPatchIOFail_ReturnsError)
+       queryTokenHandler_SensorIOFail_ReturnsError)
 {
-    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(NSM_ERROR));
+    EXPECT_CALL(*mockDevice, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
     debugToken->queryTokenHandler(mockDevice);
 }
 
@@ -593,8 +593,8 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
 TEST_F(NsmDebugTokenUnifiedBranchTest,
        queryTokenHandler_FirstDecodeFail_ReturnsError)
 {
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillOnce(mockPostPatchIO(createDecodeFail()));
+    EXPECT_CALL(*mockDevice, sensorIO)
+        .WillOnce(mockSensorIO(createDecodeFail()));
     debugToken->queryTokenHandler(mockDevice);
 }
 
@@ -626,10 +626,10 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     // cc!=NSM_SUCCESS and return NSM_SW_ERROR at L475.
     // This is the same as FirstDecodeFail but validates shouldLog path.
     encode_nsm_query_token_resp(0, NSM_ERROR, 0x3333, nullptr, 0, msg);
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce([resp](eid_t, Request&,
                          std::shared_ptr<const nsm_msg>& responseMsg,
-                         size_t& responseLen) -> requester::Coroutine {
+                         size_t& responseLen, bool) -> requester::Coroutine {
         responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
         responseMsg = std::shared_ptr<const nsm_msg>(
             reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
@@ -649,9 +649,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
        queryTokenHandler_TLVDecodeException_ReturnsError)
 {
     std::vector<uint8_t> garbageTlv = {0xFF, 0xFE, 0xFD};
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillOnce(mockPostPatchIO(
-            createQueryTokenResponse(garbageTlv, NSM_SUCCESS, 0)));
+    EXPECT_CALL(*mockDevice, sensorIO)
+        .WillOnce(
+            mockSensorIO(createQueryTokenResponse(garbageTlv, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
 }
 
@@ -666,9 +666,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     debug_token::tlv_encoder::Structure enc;
     enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
 }
 
@@ -683,9 +683,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     debug_token::tlv_encoder::Structure enc;
     enc.add(debug_token::types::InstallationStatus, uint8_t(0));
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
     EXPECT_FALSE(debugToken->installationStatus());
     EXPECT_FALSE(debugToken->processingStatus());
@@ -703,9 +703,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     debug_token::tlv_encoder::Structure enc;
     enc.add(debug_token::types::InstallationStatus, uint8_t(1));
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
 }
 
@@ -723,9 +723,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     enc.add(debug_token::types::TokenTypeSubtypeList,
             std::vector<uint32_t>{1, 2, 3});
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
 }
 
@@ -742,9 +742,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
     // No TokenTypeSubtypeList -> get throws, tokenTypesSubtypes stays empty
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
 }
 
@@ -761,9 +761,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
     enc.add(debug_token::types::TokenTypeSubtypeList, std::vector<uint32_t>{});
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
     EXPECT_FALSE(debugToken->installationStatus());
 }
@@ -783,9 +783,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     enc.add(debug_token::types::TokenTypeSubtypeList,
             std::vector<uint32_t>{1, 0});
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
     EXPECT_TRUE(debugToken->installationStatus());
     EXPECT_TRUE(debugToken->processingStatus());
@@ -806,9 +806,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     enc.add(debug_token::types::TokenTypeSubtypeList,
             std::vector<uint32_t>{1, 0, 2, 0});
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
 }
 
@@ -826,9 +826,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
     // Intentionally omit TokenTypeSubtypeList
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->queryTokenHandler(mockDevice);
 }
 
@@ -837,10 +837,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
 // Exercises L636-644.
 // ============================================================================
 
-TEST_F(NsmDebugTokenUnifiedBranchTest,
-       deviceCapabilitiesHandler_PostPatchIOFail)
+TEST_F(NsmDebugTokenUnifiedBranchTest, deviceCapabilitiesHandler_SensorIOFail)
 {
-    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(NSM_ERROR));
+    EXPECT_CALL(*mockDevice, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
     debugToken->deviceCapabilitiesHandler(mockDevice);
     EXPECT_EQ(debugToken->installationChunkSize, 0u);
 }
@@ -856,7 +855,7 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     // cc=NSM_ERROR with valid buffer size for decode to succeed
     Response resp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
     resp.data()[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
-    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(resp));
+    EXPECT_CALL(*mockDevice, sensorIO).WillOnce(mockSensorIO(resp));
     debugToken->deviceCapabilitiesHandler(mockDevice);
     EXPECT_EQ(debugToken->installationChunkSize, 0u);
 }
@@ -869,8 +868,8 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
 TEST_F(NsmDebugTokenUnifiedBranchTest, deviceCapabilitiesHandler_Success)
 {
     uint32_t maxInputBufferSize = 8192;
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillOnce(mockPostPatchIO(
+    EXPECT_CALL(*mockDevice, sensorIO)
+        .WillOnce(mockSensorIO(
             createDeviceCapabilitiesV2Response(1, maxInputBufferSize)));
     debugToken->deviceCapabilitiesHandler(mockDevice);
     EXPECT_EQ(debugToken->installationChunkSize,
@@ -882,9 +881,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest, deviceCapabilitiesHandler_Success)
 // Exercises L688-696.
 // ============================================================================
 
-TEST_F(NsmDebugTokenUnifiedBranchTest, deviceIdHandler_PostPatchIOFail)
+TEST_F(NsmDebugTokenUnifiedBranchTest, deviceIdHandler_SensorIOFail)
 {
-    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(NSM_ERROR));
+    EXPECT_CALL(*mockDevice, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
     debugToken->deviceIdHandler(mockDevice);
 }
 
@@ -899,7 +898,7 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     std::vector<uint8_t> buf(
         sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
     buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
-    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(buf));
+    EXPECT_CALL(*mockDevice, sensorIO).WillOnce(mockSensorIO(buf));
     debugToken->deviceIdHandler(mockDevice);
 }
 
@@ -910,8 +909,8 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
 
 TEST_F(NsmDebugTokenUnifiedBranchTest, deviceIdHandler_DecodeFail_ReturnsError)
 {
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillOnce(mockPostPatchIO(createDecodeFail()));
+    EXPECT_CALL(*mockDevice, sensorIO)
+        .WillOnce(mockSensorIO(createDecodeFail()));
     debugToken->deviceIdHandler(mockDevice);
 }
 
@@ -923,8 +922,8 @@ TEST_F(NsmDebugTokenUnifiedBranchTest, deviceIdHandler_DecodeFail_ReturnsError)
 TEST_F(NsmDebugTokenUnifiedBranchTest, deviceIdHandler_Success_HexFormatted)
 {
     std::vector<uint8_t> deviceIdBytes = {0xAB, 0xCD, 0xEF, 0x01};
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillOnce(mockPostPatchIO(
+    EXPECT_CALL(*mockDevice, sensorIO)
+        .WillOnce(mockSensorIO(
             createQueryDeviceIdsResponse(deviceIdBytes, NSM_SUCCESS, 0)));
     debugToken->deviceIdHandler(mockDevice);
     EXPECT_EQ(debugToken->tokenDeviceID(), "0xABCDEF01");
@@ -938,8 +937,7 @@ TEST_F(NsmDebugTokenUnifiedBranchTest, deviceIdHandler_Success_HexFormatted)
 TEST_F(NsmDebugTokenUnifiedBranchTest, update_DeviceIdFails_ReturnsError)
 {
     debugToken->installationChunkSize = 1024; // skip capabilities
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillRepeatedly(mockPostPatchIO(NSM_ERROR));
+    EXPECT_CALL(*mockDevice, sensorIO).WillRepeatedly(mockSensorIO(NSM_ERROR));
     debugToken->update(mockDevice);
 }
 
@@ -951,8 +949,7 @@ TEST_F(NsmDebugTokenUnifiedBranchTest, update_DeviceIdFails_ReturnsError)
 TEST_F(NsmDebugTokenUnifiedBranchTest, update_CapabilitiesFails_ReturnsError)
 {
     debugToken->tokenDeviceID("0xABCD"); // skip deviceId
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillRepeatedly(mockPostPatchIO(NSM_ERROR));
+    EXPECT_CALL(*mockDevice, sensorIO).WillRepeatedly(mockSensorIO(NSM_ERROR));
     debugToken->update(mockDevice);
 }
 
@@ -965,7 +962,7 @@ TEST_F(NsmDebugTokenUnifiedBranchTest, update_QueryTokenFails_ReturnsError)
 {
     debugToken->tokenDeviceID("0xABCD");
     debugToken->installationChunkSize = 1024;
-    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(NSM_ERROR));
+    EXPECT_CALL(*mockDevice, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
     debugToken->update(mockDevice);
 }
 
@@ -983,9 +980,9 @@ TEST_F(NsmDebugTokenUnifiedBranchTest, update_AllSucceed_ReturnsSuccess)
     enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
     enc.add(debug_token::types::TokenTypeSubtypeList, std::vector<uint32_t>{});
     auto payload = enc.encode();
-    EXPECT_CALL(*mockDevice, postPatchIO)
+    EXPECT_CALL(*mockDevice, sensorIO)
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->update(mockDevice);
 }
 
@@ -1002,11 +999,11 @@ TEST_F(NsmDebugTokenUnifiedBranchTest, update_FullPath_AllSubHandlersSucceed)
     enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
     auto payload = enc.encode();
 
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillOnce(mockPostPatchIO(createQueryDeviceIdsResponse(deviceIdBytes)))
-        .WillOnce(mockPostPatchIO(createDeviceCapabilitiesV2Response(1, 4096)))
+    EXPECT_CALL(*mockDevice, sensorIO)
+        .WillOnce(mockSensorIO(createQueryDeviceIdsResponse(deviceIdBytes)))
+        .WillOnce(mockSensorIO(createDeviceCapabilitiesV2Response(1, 4096)))
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->update(mockDevice);
     EXPECT_EQ(debugToken->tokenDeviceID(), "0xDEAD");
     EXPECT_GT(debugToken->installationChunkSize, 0u);
@@ -1025,11 +1022,11 @@ TEST_F(NsmDebugTokenUnifiedBranchTest,
     enc.add(debug_token::types::ProcessingStatus, uint8_t(0));
     auto payload = enc.encode();
 
-    EXPECT_CALL(*mockDevice, postPatchIO)
-        .WillOnce(mockPostPatchIO(NSM_ERROR)) // deviceId fails
-        .WillOnce(mockPostPatchIO(createDeviceCapabilitiesV2Response(1, 4096)))
+    EXPECT_CALL(*mockDevice, sensorIO)
+        .WillOnce(mockSensorIO(NSM_ERROR)) // deviceId fails
+        .WillOnce(mockSensorIO(createDeviceCapabilitiesV2Response(1, 4096)))
         .WillOnce(
-            mockPostPatchIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
+            mockSensorIO(createQueryTokenResponse(payload, NSM_SUCCESS, 0)));
     debugToken->update(mockDevice);
 }
 
