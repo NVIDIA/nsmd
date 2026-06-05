@@ -57,7 +57,11 @@ std::optional<Response> Handler::processRxMsg(uint8_t tag, uint8_t eid,
     auto hdr = reinterpret_cast<const nsm_msg_hdr*>(nsmMsg);
     if (NSM_SUCCESS != unpack_nsm_header(hdr, &hdrFields))
     {
-        lg2::error("Empty NSM request header");
+        lg2::error(
+            "Failure in unpacking NSM request header: eid={EID} tag={TAG} "
+            "mctpType={MTYPE} msgLen={LEN}",
+            "EID", eid, "TAG", tag, "MTYPE", type, "LEN", nsmMsgSize);
+        utils::printBuffer(utils::Rx, nsmMsg, nsmMsgSize, tag, eid);
         return std::nullopt;
     }
 
