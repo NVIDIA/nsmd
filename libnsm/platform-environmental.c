@@ -480,6 +480,13 @@ int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 	    (struct nsm_get_inventory_information_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_inventory_information_resp,
+			 inventory_information) +
+		(size_t)*data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(inventory_information, resp->inventory_information, *data_size);
 
 	return NSM_SW_SUCCESS;
@@ -4145,6 +4152,13 @@ int decode_get_supported_gpm_metrics_resp(
 	}
 	*supported_metrics_bitmask_size = data_size - min_data_size;
 
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_supported_gpm_metrics_resp,
+			 supported_metrics_bitmask) +
+		(size_t)*supported_metrics_bitmask_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(supported_metrics_bitmask, resp->supported_metrics_bitmask,
 	       *supported_metrics_bitmask_size);
 

@@ -2388,3 +2388,122 @@ TEST(DebugTokenBranches, DecodeInstallTokenReq_NullData)
 					       nullptr);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
+
+// ---------------------------------------------------------------------------
+// Buffer-overflow guard regression (nvbug 6232725): each decoder must reject
+// a message whose on-wire payload length exceeds the bytes actually present
+// in msg_len, returning NSM_SW_ERROR_LENGTH instead of an out-of-bounds copy.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+// Payload offset of the data_size field inside struct nsm_common_resp
+// (command:1, completion_code:1, reserved:2, data_size:2).
+constexpr size_t kRespDataSizeOff = sizeof(nsm_msg_hdr) + 4;
+
+void putU16(std::vector<uint8_t> &buf, size_t off, uint16_t v)
+{
+	buf[off] = static_cast<uint8_t>(v & 0xFF);
+	buf[off + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+}
+
+void putU32(std::vector<uint8_t> &buf, size_t off, uint32_t v)
+{
+	buf[off] = static_cast<uint8_t>(v & 0xFF);
+	buf[off + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+	buf[off + 2] = static_cast<uint8_t>((v >> 16) & 0xFF);
+	buf[off + 3] = static_cast<uint8_t>((v >> 24) & 0xFF);
+}
+
+std::vector<uint8_t> oversizedResp(size_t structSize, uint16_t dataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + structSize, 0);
+	putU16(buf, kRespDataSizeOff, dataSize);
+	return buf;
+}
+
+const nsm_msg *asMsg(const std::vector<uint8_t> &buf)
+{
+	return reinterpret_cast<const nsm_msg *>(buf.data());
+}
+} // namespace
+
+TEST(LibnsmOverreadGuard, ProvideTokenReqValidStillDecodes)
+{
+	// The min-length check already guarantees the full token buffer is
+	// present, so the guard must never reject a well-formed request
+	// (no false positive).
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_provide_token_req), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	std::vector<uint8_t> token(32, 0xAB);
+	ASSERT_EQ(
+	    encode_nsm_provide_token_req(
+		0, token.data(), static_cast<uint16_t>(token.size()), msg),
+	    NSM_SW_SUCCESS);
+	std::vector<uint8_t> out(NSM_DEBUG_TOKEN_DATA_MAX_SIZE, 0);
+	uint8_t outLen = 0;
+	EXPECT_EQ(
+	    decode_nsm_provide_token_req(msg, buf.size(), out.data(), &outLen),
+	    NSM_SW_SUCCESS);
+	EXPECT_EQ(outLen, 32);
+}
+
+TEST(LibnsmOverreadGuard, ProvideTokenReqRejectsShortMessage)
+{
+	// nsm_provide_token_req carries a fixed-size token_data array, so the
+	// minimum-length check already mandates the full buffer; an
+	// over-declared length is therefore unreachable. A truncated message
+	// (smaller than the required fixed layout) must still be rejected with
+	// NSM_SW_ERROR_LENGTH rather than read out of bounds.
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_req_v2), 0);
+	uint8_t token[8] = {0};
+	uint8_t tokenLen = 0;
+	EXPECT_EQ(decode_nsm_provide_token_req(asMsg(buf), buf.size(), token,
+					       &tokenLen),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, QueryDeviceIdsResp)
+{
+	auto buf = oversizedResp(sizeof(nsm_query_device_ids_resp), 0xFFFF);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	uint8_t id[8] = {0};
+	size_t idLen = 0;
+	EXPECT_EQ(decode_nsm_query_device_ids_resp(asMsg(buf), buf.size(), &cc,
+						   &rc, id, &idLen),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, InstallTokenReq)
+{
+	// nsm_install_token_req: common_req_v2(6) + chunk_offset(4) +
+	// chunk_length(4) + length_remaining(4) + data[1]. Keep
+	// hdr.data_size consistent with chunk_length so the consistency
+	// check passes and the new guard is what fires.
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_install_token_req), 0);
+	putU16(buf, sizeof(nsm_msg_hdr) + 2, 1012);  // hdr.data_size
+	putU32(buf, sizeof(nsm_msg_hdr) + 10, 1000); // chunk_length
+	uint32_t off = 0;
+	uint32_t len = 0;
+	uint32_t rem = 0;
+	uint8_t data[8] = {0};
+	EXPECT_EQ(decode_nsm_install_token_req(asMsg(buf), buf.size(), &off,
+					       &len, &rem, data),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, QueryTokenResp)
+{
+	auto buf = oversizedResp(sizeof(nsm_query_token_resp), 0xFFFF);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	uint8_t tlv[8] = {0};
+	size_t tlvLen = 0;
+	EXPECT_EQ(decode_nsm_query_token_resp(asMsg(buf), buf.size(), &cc, &rc,
+					      tlv, &tlvLen),
+		  NSM_SW_ERROR_LENGTH);
+}

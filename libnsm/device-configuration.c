@@ -1275,6 +1275,12 @@ int decode_get_fpga_diagnostics_settings_resp(const struct nsm_msg *msg,
 	    (struct nsm_get_fpga_diagnostics_settings_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_fpga_diagnostics_settings_resp, data) +
+		(size_t)*data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(data, resp->data, *data_size);
 	return NSM_SW_SUCCESS;
 }
@@ -2317,6 +2323,14 @@ int decode_get_device_mode_settings_v2_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_LENGTH;
 	}
 
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_device_mode_settings_v2_resp,
+			 mode_data) +
+		(size_t)*current_mode_length + (size_t)*pending_mode_length >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	if (*current_mode_length > 0 && current_mode_data != NULL) {
 		memcpy(current_mode_data, resp->mode_data,
 		       *current_mode_length);
@@ -2391,6 +2405,14 @@ int decode_set_device_mode_settings_v2_req(const struct nsm_msg *msg,
 	*device_mode_index = le32toh(request->device_mode_index);
 	*device_mode_data_length =
 	    request->hdr.data_size - sizeof(request->device_mode_index);
+
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_set_device_mode_settings_v2_req,
+			 device_mode_data) +
+		(size_t)*device_mode_data_length >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 
 	if (*device_mode_data_length > 0 && device_mode_data != NULL) {
 		memcpy(device_mode_data, request->device_mode_data,

@@ -1413,3 +1413,64 @@ TEST(CommonRequest, DecodeRequest)
 	rc = decode_common_req(msg, msgBuf.size());
 	EXPECT_EQ(NSM_SW_SUCCESS, rc);
 }
+
+// ---------------------------------------------------------------------------
+// Buffer-overflow guard regression (nvbug 6232725): each decoder must reject
+// a message whose on-wire payload length exceeds the bytes actually present
+// in msg_len, returning NSM_SW_ERROR_LENGTH instead of an out-of-bounds copy.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+// Payload offset of the data_size field inside struct nsm_common_resp
+// (command:1, completion_code:1, reserved:2, data_size:2).
+constexpr size_t kRespDataSizeOff = sizeof(nsm_msg_hdr) + 4;
+
+void putU16(std::vector<uint8_t> &buf, size_t off, uint16_t v)
+{
+	buf[off] = static_cast<uint8_t>(v & 0xFF);
+	buf[off + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+}
+
+std::vector<uint8_t> oversizedResp(size_t structSize, uint16_t dataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + structSize, 0);
+	putU16(buf, kRespDataSizeOff, dataSize);
+	return buf;
+}
+
+const nsm_msg *asMsg(const std::vector<uint8_t> &buf)
+{
+	return reinterpret_cast<const nsm_msg *>(buf.data());
+}
+} // namespace
+
+TEST(LibnsmOverreadGuard, GetGpioStateResp)
+{
+	auto buf = oversizedResp(sizeof(nsm_get_gpio_state_resp), 0xFFFF);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	uint16_t offset = 0;
+	uint16_t length = 0;
+	uint8_t values[8] = {0};
+	uint32_t valuesSize = 0;
+	EXPECT_EQ(decode_get_gpio_state_resp(asMsg(buf), buf.size(), &cc, &rc,
+					     &offset, &length, values,
+					     &valuesSize),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, SetGpioStateResp)
+{
+	auto buf = oversizedResp(sizeof(nsm_set_gpio_state_resp), 0xFFFF);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	uint16_t offset = 0;
+	uint16_t length = 0;
+	uint8_t values[8] = {0};
+	uint32_t valuesSize = 0;
+	EXPECT_EQ(decode_set_gpio_state_resp(asMsg(buf), buf.size(), &cc, &rc,
+					     &offset, &length, values,
+					     &valuesSize),
+		  NSM_SW_ERROR_LENGTH);
+}

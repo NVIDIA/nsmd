@@ -3736,6 +3736,93 @@ TEST(getSupportedDeviceModesV2, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
+// ---------------------------------------------------------------------------
+// Buffer-overflow guard regression (nvbug 6232725): each decoder must reject
+// a message whose on-wire payload length exceeds the bytes actually present
+// in msg_len, returning NSM_SW_ERROR_LENGTH instead of an out-of-bounds copy.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+// Payload offset of the data_size field inside struct nsm_common_resp
+// (command:1, completion_code:1, reserved:2, data_size:2).
+constexpr size_t kRespDataSizeOff = sizeof(nsm_msg_hdr) + 4;
+
+void putU16(std::vector<uint8_t> &buf, size_t off, uint16_t v)
+{
+	buf[off] = static_cast<uint8_t>(v & 0xFF);
+	buf[off + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+}
+
+// Success-CC response buffer (completion_code byte stays 0 == NSM_SUCCESS)
+// sized to the struct, with hdr.data_size set far larger than the bytes the
+// buffer actually carries.
+std::vector<uint8_t> oversizedResp(size_t structSize, uint16_t dataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + structSize, 0);
+	putU16(buf, kRespDataSizeOff, dataSize);
+	return buf;
+}
+
+const nsm_msg *asMsg(const std::vector<uint8_t> &buf)
+{
+	return reinterpret_cast<const nsm_msg *>(buf.data());
+}
+} // namespace
+
+TEST(LibnsmOverreadGuard, FpgaDiagnosticsSettingsResp)
+{
+	auto buf = oversizedResp(sizeof(nsm_get_fpga_diagnostics_settings_resp),
+				 0xFFFF);
+	uint8_t cc = 0xFF;
+	uint16_t ds = 0;
+	uint16_t rc = 0;
+	uint8_t dst[8] = {0};
+	EXPECT_EQ(decode_get_fpga_diagnostics_settings_resp(
+		      asMsg(buf), buf.size(), &cc, &ds, &rc, dst),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, GetDeviceModeSettingsV2Resp)
+{
+	// current_mode_length=1000, pending=0; hdr.data_size kept
+	// consistent (2 + 2 + 1000) so the internal consistency check
+	// passes and the new length-vs-msg_len guard is what fires.
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp),
+	    0);
+	putU16(buf, kRespDataSizeOff, 1004);
+	putU16(buf, sizeof(nsm_msg_hdr) + 6, 1000); // current_mode_length
+	putU16(buf, sizeof(nsm_msg_hdr) + 8, 0);    // pending_mode_length
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	uint8_t cur[8] = {0};
+	uint8_t pend[8] = {0};
+	uint16_t curLen = 0;
+	uint16_t pendLen = 0;
+	EXPECT_EQ(
+	    decode_get_device_mode_settings_v2_resp(
+		asMsg(buf), buf.size(), &cc, &rc, cur, &curLen, pend, &pendLen),
+	    NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, SetDeviceModeSettingsV2Req)
+{
+	// nsm_common_req: command:1, data_size:1. Oversized data_size at
+	// payload offset 1.
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) -
+		1,
+	    0);
+	buf[sizeof(nsm_msg_hdr) + 1] = 0xFF; // hdr.data_size = 255
+	uint32_t idx = 0;
+	uint8_t data[8] = {0};
+	uint16_t dataLen = 0;
+	EXPECT_EQ(decode_set_device_mode_settings_v2_req(asMsg(buf), buf.size(),
+							 &idx, data, &dataLen),
+		  NSM_SW_ERROR_LENGTH);
+}
+
 TEST(lldpModeBitfield, wireLayout)
 {
 	EXPECT_EQ(sizeof(nsm_lldp_mode_bitfield), 1U);

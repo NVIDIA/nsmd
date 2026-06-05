@@ -143,6 +143,12 @@ int decode_get_device_diagnostics_resp(const struct nsm_msg *msg,
 	*seg_data_size =
 	    response->hdr.data_size - sizeof(response->next_segment_id);
 	*next_segment_id = response->next_segment_id;
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_device_diagnostics_resp, segment_data) +
+		(size_t)*seg_data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(seg_data, response->segment_data, *seg_data_size);
 	return NSM_SW_SUCCESS;
 }
@@ -682,6 +688,13 @@ int decode_get_network_device_debug_info_resp(const struct nsm_msg *msg,
 	*next_handle = le32toh(resp->next_record_handle);
 	*seg_data_size = total_data_size - sizeof(resp->next_record_handle);
 
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_network_device_debug_info_resp,
+			 segment_data) +
+		(size_t)*seg_data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(seg_data, resp->segment_data, *seg_data_size);
 
 	return NSM_SW_SUCCESS;
@@ -957,6 +970,13 @@ int decode_get_network_device_log_info_resp(
 	info.entry_suffix = le64toh(resp->log_info.entry_suffix);
 	memcpy(log_info, &info, sizeof(struct nsm_device_log_info));
 
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_network_device_log_info_resp,
+			 log_data) +
+		(size_t)*log_data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(log_data, resp->log_data, *log_data_size);
 
 	return NSM_SW_SUCCESS;
@@ -1259,6 +1279,12 @@ int decode_set_device_debug_parameters_req(
 		return rc;
 	}
 
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_set_device_debug_parameters_req, data)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	const struct nsm_set_device_debug_parameters_req *request =
 	    (const struct nsm_set_device_debug_parameters_req *)msg->payload;
 
@@ -1273,7 +1299,13 @@ int decode_set_device_debug_parameters_req(
 	parameter_id->index = request->parameter_id.index;
 	parameter_sub_id->value = le32toh(request->parameter_sub_id.value);
 	*data_size = request->data_size;
-	memcpy(data, request->data, *data_size);
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_set_device_debug_parameters_req, data) +
+		(size_t)*data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	*data = (uint8_t *)request->data;
 	return NSM_SW_SUCCESS;
 }
 
