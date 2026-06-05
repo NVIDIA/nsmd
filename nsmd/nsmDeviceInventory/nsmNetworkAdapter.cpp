@@ -408,6 +408,14 @@ uint8_t NsmDeviceModeSettingsV2SetBase::handleResponseMsg(
     return NSM_SW_SUCCESS;
 }
 
+requester::Coroutine NsmDeviceModeSettingsV2SetBase::update(
+    [[maybe_unused]] std::shared_ptr<NsmDevice> nsmDevice)
+{
+    // Nothing to poll: the device is configured on demand via the PATCH
+    // dispatch path (setPendingMode/setPendingModes)
+    co_return NSM_SW_SUCCESS;
+}
+
 std::optional<std::vector<uint8_t>>
     NsmDeviceModeSettingsV2SetBase::createSetRequestMsg(
         uint8_t instanceId, const std::vector<uint8_t>& modeData) const
@@ -869,7 +877,9 @@ static void createDpuModeSensors(sdbusplus::bus_t& bus,
         std::make_shared<NsmDPUOperationModeDeviceModeSettingsV2Set>(
             name + "_DPUOperationMode_Set", type, dpuModeBitmap,
             dpuDeviceModeIntf);
-    nsmDevice->addSensor(dpuSetSensor, false);
+    // Registered as a static sensor: tracked in deviceSensors for lifecycle,
+    // but its no-op update() drops it from the polling queue after one pass.
+    nsmDevice->addStaticSensor(dpuSetSensor);
 
     nsm::AsyncSetOperationHandler setDpuOperationModeHandler =
         std::bind(&NsmDPUOperationModeDeviceModeSettingsV2Set::setPendingMode,
@@ -902,7 +912,9 @@ static void createPcieModeSensors(sdbusplus::bus_t& bus,
         std::make_shared<NsmPCIeDeviceModeDeviceModeSettingsV2Set>(
             name + "_PCIeDeviceMode_Set", type, pcieModeBitmap,
             pcieDeviceModeIntf);
-    nsmDevice->addSensor(pcieSetSensor, false);
+    // Registered as a static sensor: tracked in deviceSensors for lifecycle,
+    // but its no-op update() drops it from the polling queue after one pass.
+    nsmDevice->addStaticSensor(pcieSetSensor);
 
     std::string pcieDeviceModeObjPath =
         getDeviceModeObjectPath(inventoryObjPath, "PCIeDeviceMode");

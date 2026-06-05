@@ -168,6 +168,11 @@ class NsmDeviceModeSettingsV2SetBase : public NsmDeviceModeSettingsV2Base
         handleResponseMsg([[maybe_unused]] const struct nsm_msg* responseMsg,
                           [[maybe_unused]] size_t responseLen) override;
 
+    // Set sensors are PATCH dispatchers, not polling sensors: registered
+    // as static sensors for device-level lifecycle tracking,
+    // update() is a no-op that returns success
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
+
   protected:
     std::optional<std::vector<uint8_t>>
         createSetRequestMsg(uint8_t instanceId,
