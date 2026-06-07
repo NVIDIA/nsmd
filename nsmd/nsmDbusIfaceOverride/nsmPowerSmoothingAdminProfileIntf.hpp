@@ -320,7 +320,7 @@ class OemAdminProfileIntf :
                 InvalidArgument{};
         }
 
-        if (resetParam(*floorPercent))
+        if (resetParam(*floorPercent) || *floorPercent == 0.0)
         {
             auto rc = co_await resetAdminProfileParam(0, status);
             // coverity[missing_return]
