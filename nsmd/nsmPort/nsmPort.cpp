@@ -1909,6 +1909,22 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
         }
 #endif
 
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+        // "OpticalModuleResetSupported": true in the port EM config entry
+        // triggers per-port optical module reset (NSM cmd 0x06, Target=5).
+        // The EM config is the source of truth — gated solely on the config
+        // flag, no device-role check.
+        if (allCurrentIfaceProperties.count("OpticalModuleResetSupported") &&
+            std::get<bool>(
+                allCurrentIfaceProperties.at("OpticalModuleResetSupported")))
+        {
+            auto opticalResetSensor = std::make_shared<NsmOpticalModuleReset>(
+                bus, portName, type, objPath, nsmDevice,
+                static_cast<uint32_t>(i));
+            nsmDevice->addDeviceSensors(opticalResetSensor);
+        }
+#endif
+
 #ifdef NVIDIA_HISTOGRAM
         if (deviceType != NSM_DEV_ID_PCIE_BRIDGE)
         {
@@ -1951,6 +1967,30 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
+
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+NsmOpticalModuleReset::NsmOpticalModuleReset(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    const std::string& portObjPath, std::shared_ptr<NsmDevice> device,
+    uint32_t port_index) : NsmObject(name, type)
+{
+    lg2::info("NsmOpticalModuleReset: create sensor:{NAME} port_index={PORT}",
+              "NAME", name.c_str(), "PORT", port_index);
+
+    objPath = portObjPath;
+
+    // com.nvidia.Reset — exposes ResetType so bmcweb can discover this port
+    // supports optical module reset via the reset_controls association.
+    resetIntf = std::make_shared<NvidiaResetIntf>(bus, objPath.c_str());
+    resetIntf->resetType(NvidiaResetTypes::OpticalModuleGracefulReset);
+
+    // Control.ResetAsync — NSM wire params stored as private members.
+    resetAsyncIntf = std::make_shared<NsmDeviceResetAsyncIntf>(
+        bus, objPath.c_str(), device,
+        NsmResetParams{NSM_RESET_TARGET_OPTICAL_MODULE,
+                       NSM_RESET_TRIGGER_IMMEDIATE, port_index});
+}
+#endif
 
 requester::Coroutine
     createNsmPortSensorWithNetworkPortAddresses(SensorManager& manager,

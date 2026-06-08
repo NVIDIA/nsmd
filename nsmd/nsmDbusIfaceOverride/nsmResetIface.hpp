@@ -155,6 +155,114 @@ class NsmResetDeviceIntf : public ResetDeviceIntf
     }
 };
 
+// NSM cmd 0x06 (Device Reset) wire parameters for one reset type. Grouped in a
+// struct so the scalar fields cannot be transposed at the call site.
+struct NsmResetParams
+{
+    uint8_t target;
+    uint8_t trigger;
+    uint32_t portIndex;
+};
+
+/** @class NsmDeviceResetAsyncIntf
+ *
+ *  Implements Control.ResetAsync for NSM Type 4 cmd 0x06 (Device Reset). One
+ *  instance is created per supported reset type. The NSM wire parameters
+ *  (target, trigger, port_index) are fixed for that reset type, passed in at
+ *  construction as an NsmResetParams value and sent verbatim when the reset is
+ *  invoked.
+ */
+class NsmDeviceResetAsyncIntf :
+    public ResetDeviceAsyncIntf,
+    public StateChangeLogger
+{
+  public:
+    NsmDeviceResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+                            std::shared_ptr<NsmDevice> device,
+                            NsmResetParams resetParams) :
+        ResetDeviceAsyncIntf(bus, path), device(device), params(resetParams)
+    {}
+
+    requester::Coroutine resetOnDevice(AsyncOperationStatusType* status)
+    {
+        auto eid = device->getEid();
+        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_device_reset_req));
+        auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+        auto rc = encode_device_reset_req(0, params.target, params.trigger,
+                                          params.portIndex, requestMsg);
+        if (rc)
+        {
+            lg2::error(
+                "NsmDeviceResetAsyncIntf: encode_device_reset_req failed."
+                " eid={EID} target={TGT} trigger={TRG} portIndex={IDX} rc={RC}",
+                "EID", eid, "TGT", params.target, "TRG", params.trigger, "IDX",
+                params.portIndex, "RC", rc);
+            *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        std::shared_ptr<const nsm_msg> responseMsg;
+        size_t responseLen = 0;
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
+        if (rc_)
+        {
+            lg2::error("NsmDeviceResetAsyncIntf: postPatchIO failed."
+                       " eid={EID} rc={RC}",
+                       "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
+            *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        rc = decode_device_reset_resp(responseMsg.get(), responseLen, &cc,
+                                      &reasonCode);
+
+        LG2_ERROR_FLT(
+            "decode_device_reset_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            *status = AsyncOperationStatusType::WriteFailure;
+        }
+        // coverity[missing_return]
+        co_return cc ? cc : rc;
+    }
+
+    requester::Coroutine
+        doResetOnDevice(std::shared_ptr<AsyncStatusIntf> statusInterface)
+    {
+        AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+        const auto rc_ = co_await resetOnDevice(&status);
+        statusInterface->status(status);
+        // coverity[missing_return]
+        co_return rc_;
+    }
+
+    sdbusplus::message::object_path reset() override
+    {
+        const auto [objectPath, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        if (objectPath.empty())
+        {
+            lg2::error("NsmDeviceResetAsyncIntf: no available result object.");
+            throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+        }
+
+        doResetOnDevice(statusInterface).detach();
+        return objectPath;
+    }
+
+  private:
+    std::shared_ptr<NsmDevice> device;
+    NsmResetParams params;
+};
+
 class NsmNetworkDeviceResetAsyncIntf :
     public ResetDeviceAsyncIntf,
     public StateChangeLogger

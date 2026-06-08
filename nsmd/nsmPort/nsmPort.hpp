@@ -3,13 +3,16 @@
 #include "libnsm/network-ports.h"
 
 #include "common/types.hpp"
+#include "nsmDbusIfaceOverride/nsmResetIface.hpp"
 #include "nsmDevice.hpp"
 #include "nsmHistograms/nsmHistogramInfo.hpp"
+#include "nsmObject.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
 #include <com/nvidia/Common/GUID/server.hpp>
+#include <com/nvidia/Reset/server.hpp>
 #include <nsmSensorAggregator.hpp>
 #include <phosphor-logging/lg2.hpp>
 #ifdef NVIDIA_SHMEM
@@ -58,6 +61,11 @@ using GuidIntf =
     sdbusplus::server::object_t<sdbusplus::server::com::nvidia::common::GUID>;
 using PortECCIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::PortECC>;
+
+using NvidiaResetIntf =
+    sdbusplus::server::object_t<sdbusplus::server::com::nvidia::Reset>;
+using NvidiaResetTypes =
+    sdbusplus::server::com::nvidia::Reset::NvidiaResetTypes;
 
 using PortType = sdbusplus::server::xyz::openbmc_project::inventory::decorator::
     PortInfo::PortType;
@@ -231,4 +239,29 @@ class NsmGetPortECCCounters : public NsmSensor
     uint16_t portNumber;
     std::unique_ptr<PortECCIntf> portECCIntf = nullptr;
 };
+
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+/** @class NsmOpticalModuleReset
+ *
+ *  One instance per CX9 port. DBUS object at .../Ports/Port_<N> exposes
+ *  com.nvidia.Reset (ResetType=OpticalModuleGracefulReset) and
+ *  Control.ResetAsync (Reset() → NSM cmd 0x06, Target=5, Trigger=0,
+ *  Index=port_index).
+ */
+class NsmOpticalModuleReset : public NsmObject
+{
+  public:
+    NsmOpticalModuleReset(sdbusplus::bus::bus& bus, const std::string& name,
+                          const std::string& type,
+                          const std::string& portObjPath,
+                          std::shared_ptr<NsmDevice> device,
+                          uint32_t port_index);
+
+  private:
+    std::shared_ptr<NvidiaResetIntf> resetIntf = nullptr;
+    std::shared_ptr<NsmDeviceResetAsyncIntf> resetAsyncIntf = nullptr;
+    std::string objPath;
+};
+#endif
+
 } // namespace nsm
