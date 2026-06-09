@@ -139,7 +139,7 @@ bool decodeHex(const std::string& input, uint8_t* output, size_t expectedSize)
     {
         const char* start = input.data() + (i * 2);
         const char* end = start + 2;
-        uint8_t byte;
+        uint8_t byte = 0;
         auto result = std::from_chars(start, end, byte, 16);
         if (result.ec != std::errc() || result.ptr != end)
         {

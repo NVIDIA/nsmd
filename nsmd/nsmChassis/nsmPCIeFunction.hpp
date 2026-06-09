@@ -52,12 +52,12 @@ class NsmPCIeFunction :
     std::optional<Request> genMultiPCIeRequestMsg(eid_t eid,
                                                   uint8_t instanceId);
 
-    uint8_t deviceIndex;
+    uint8_t deviceIndex = 0;
     const uint8_t functionId;
     bool isMultiPciePortEnabled = false;
-    uint8_t multiPortType;
-    uint8_t multiPortIndex;
-    uint8_t multiPortUpstreamPortNumber;
+    uint8_t multiPortType = 0;
+    uint8_t multiPortIndex = 0;
+    uint8_t multiPortUpstreamPortNumber = 0;
 };
 
 class NsmAsioPCIeDeviceInterface;

@@ -175,6 +175,11 @@ void NsmPciGroup2::updateReading(
 uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
+    if (responseMsg == nullptr)
+    {
+        lg2::error("handleResponseMsg called with nullptr responseMsg");
+        return NSM_SW_ERROR_NULL;
+    }
     uint8_t cc = ERR_NULL;
     struct nsm_query_scalar_group_telemetry_group_2 data;
     uint16_t data_size;
@@ -236,6 +241,11 @@ void NsmPciGroup3::updateReading(
 uint8_t NsmPciGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
+    if (responseMsg == nullptr)
+    {
+        lg2::error("handleResponseMsg called with nullptr responseMsg");
+        return NSM_SW_ERROR_NULL;
+    }
     uint8_t cc = ERR_NULL;
     struct nsm_query_scalar_group_telemetry_group_3 data;
     uint16_t data_size;
@@ -335,6 +345,11 @@ void NsmPciGroup4::updateReading(
 uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
+    if (responseMsg == nullptr)
+    {
+        lg2::error("handleResponseMsg called with nullptr responseMsg");
+        return NSM_SW_ERROR_NULL;
+    }
     uint8_t cc = ERR_NULL;
     struct nsm_query_scalar_group_telemetry_group_4 data;
     uint16_t data_size;

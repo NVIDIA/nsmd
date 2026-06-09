@@ -118,8 +118,8 @@ class InKernelHandler : public Handler
     void handleReceivedMsg(IO& io, int fd, uint32_t revents) override;
 
     std::unique_ptr<IO> io;
-    int fd;
-    int sendBufferSize;
+    int fd = -1;
+    int sendBufferSize = 0;
     bool isFdValid{false};
 
     static constexpr size_t STATIC_BUF_SIZE = 64;

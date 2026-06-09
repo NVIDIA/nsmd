@@ -71,10 +71,22 @@
     if constexpr (std::is_base_of_v<nsm::NsmObject,                            \
                                     std::decay_t<decltype(*this)>>)            \
     {                                                                          \
-        auto& nsmObject = *dynamic_cast<nsm::NsmObject*>(this);                \
-        LG2_LEVEL_FILE(level, msg ", name: {NAME}, devId: {DEVID}",            \
-                       ##__VA_ARGS__, "NAME", nsmObject.getName(), "DEVID",    \
-                       nsmObject.getDeviceIdentifier());                       \
+        /* dynamic_cast (not static_cast) is required here: the if-constexpr   \
+         * false branch is still parsed for non-deriving classes, and          \
+         * static_cast fails to compile when the relationship doesn't          \
+         * exist statically. Null-guard the result so Coverity stops           \
+         * tracking a potentially-null deref through every caller. */          \
+        auto* nsmObject = dynamic_cast<nsm::NsmObject*>(this);                 \
+        if (nsmObject != nullptr)                                              \
+        {                                                                      \
+            LG2_LEVEL_FILE(level, msg ", name: {NAME}, devId: {DEVID}",        \
+                           ##__VA_ARGS__, "NAME", nsmObject->getName(),        \
+                           "DEVID", nsmObject->getDeviceIdentifier());         \
+        }                                                                      \
+        else                                                                   \
+        {                                                                      \
+            LG2_LEVEL_FILE(level, msg, ##__VA_ARGS__);                         \
+        }                                                                      \
     }                                                                          \
     else                                                                       \
     {                                                                          \
