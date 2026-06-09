@@ -90,7 +90,7 @@ NsmLldpMode::NsmLldpMode(sdbusplus::bus::bus& bus, const std::string& name,
     intf_->rxMode(LLDPModeType::Off);
     intf_->dcbxMode(DCBXModeType::Disabled);
     intf_->associations(
-        {{"lldp_mode_settings", "network_adapter", networkAdapterPath}});
+        {{"network_adapter", "lldp_mode_settings", networkAdapterPath}});
 
     lg2::info("NsmLldpMode created: name={NAME} path={PATH}", "NAME", name,
               "PATH", objectPath_);
