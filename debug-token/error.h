@@ -69,7 +69,7 @@ class Error
      *
      * @return String representation of the error code
      */
-    std::string to_string() const noexcept
+    std::string to_string() const
     {
         static const std::map<ErrorCode, std::string> errorMessages{
             {InternalError, "Internal error"},

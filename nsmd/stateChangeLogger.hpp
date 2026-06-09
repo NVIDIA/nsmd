@@ -68,15 +68,14 @@ class StateChangeLogger
     {
         auto loggerExists = loggers.find(loggerName) != loggers.end();
         bool allSuccess = (isSuccess(args) && ...);
-        if (!loggerExists && allSuccess)
+        if (!loggerExists)
         {
-            // if all arguments are successful and logger not exists, return
-            // false
-            return false;
-        }
-        else if (!loggerExists)
-        {
-            // logger not exist, create a new logger
+            if (allSuccess)
+            {
+                // all arguments are successful and logger doesn't exist
+                return false;
+            }
+            // logger doesn't exist, create a new logger
             loggers[loggerName] = createStateArgs(args...);
         }
 

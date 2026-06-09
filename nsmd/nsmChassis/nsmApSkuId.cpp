@@ -121,7 +121,7 @@ uint8_t NsmApSkuIdObject::handleResponseMsg(const struct nsm_msg* responseMsg,
     lg2::debug("AP SKU ID received: {SKUID}", "SKUID", apSkuIdValue);
 
     free(erot_info.slot_info);
-    return cc ? cc : rc;
+    return rc;
 }
 
 } // namespace nsm

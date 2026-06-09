@@ -1218,7 +1218,7 @@ class DotCAKInstall : public CommandInterface
                 if (i < cakCryptoPcp.size() - 1)
                     std::cout << ", ";
             }
-            std::cout << std::dec << std::endl;
+            std::cout << std::dec << std::setfill(' ') << std::endl;
 
             std::cout << "LAK key authentication data (" << CRYPTO_PCP_SIZE
                       << " bytes): ";
@@ -1230,7 +1230,7 @@ class DotCAKInstall : public CommandInterface
                 if (i < lakCryptoPcp.size() - 1)
                     std::cout << ", ";
             }
-            std::cout << std::dec << std::endl;
+            std::cout << std::dec << std::setfill(' ') << std::endl;
         }
 
         std::vector<uint8_t> requestMsg(
