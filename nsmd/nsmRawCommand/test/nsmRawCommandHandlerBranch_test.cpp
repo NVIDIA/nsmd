@@ -197,17 +197,21 @@ TEST_F(NsmRawCommandBranchTest, DoSendRequest_PostPatchIOFail_WriteFailure)
               AsyncOperationStatusType::WriteFailure);
 }
 
-// doSendRequest: decode fails (short buffer) → throws runtime_error
-TEST_F(NsmRawCommandBranchTest, DoSendRequest_DecodeFail_WriteFailure)
+// doSendRequest: error CC with full-size response passes through without error
+TEST_F(NsmRawCommandBranchTest,
+       DoSendRequest_ErrorCC_FullResponse_PassesThrough)
 {
     Response resp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
     auto msg = reinterpret_cast<nsm_msg*>(resp.data());
     encode_common_resp(0, NSM_ERROR, ERR_NOT_SUPPORTED, 0, 0, msg);
     EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(resp));
 
-    const auto [statusInterface, _] = sendRequestHelper(0, 0, 0, 0, 0, 1);
-    EXPECT_EQ(statusInterface->status(),
-              AsyncOperationStatusType::WriteFailure);
+    const auto [statusInterface, valueInterface] = sendRequestHelper(0, 0, 0, 0,
+                                                                     0, 1);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    std::vector<uint8_t> data;
+    utils::readFdToBuffer(fd, data);
+    EXPECT_EQ(data[0], NSM_ERROR);
 }
 
 // doSendRequest: NSM_ERR_UNSUPPORTED_COMMAND_CODE path

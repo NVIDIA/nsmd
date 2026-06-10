@@ -155,46 +155,70 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         }
         else
         {
-            rc = decode_reason_code_and_cc(responseMsg.get(), responseLen, &cc,
-                                           &reasonCode);
-            if (rc != NSM_SW_SUCCESS)
+            // Extract CC directly — no protocol validation for raw commands.
+            // Only NSM_ACCEPTED requires special handling (long-running wait);
+            // all other CCs pass through bytes immediately, matching nsmtool
+            // raw.
+            if (responseLen < sizeof(nsm_msg_hdr) + 2)
             {
-                throw std::runtime_error(std::format(
-                    "NsmRawCommandHandler::doSendLongRunningRequest: decode_common_resp failed, rc={}",
-                    utils::nsmSwCodeToString(rc)));
-            }
-            else if (cc == NSM_SUCCESS)
-            {
+                // Too short to contain a valid CC field; synthesize 0xFF and
+                // forward any partial payload bytes for caller inspection.
+                cc = 0xFF;
+                const size_t payloadLen = responseLen > sizeof(nsm_msg_hdr)
+                                              ? responseLen -
+                                                    sizeof(nsm_msg_hdr)
+                                              : 0;
+                data.resize(1 + payloadLen, 0);
+                data[0] = cc;
+                if (payloadLen > 0)
+                {
+                    memcpy(data.data() + 1, responseMsg->payload, payloadLen);
+                }
                 longRunningHandler->isLongRunning = false;
-                data = copySuccessResponse(cc, responseMsg.get(), responseLen);
+                rc = NSM_SW_SUCCESS;
             }
             else
             {
-                auto accepted = longRunningHandler->initAcceptInstanceId(
-                    responseMsg->hdr.instance_id, cc, rc);
-                if (!accepted)
+                const auto* resp = reinterpret_cast<const nsm_common_resp*>(
+                    responseMsg->payload);
+                cc = resp->completion_code;
+                if (cc != NSM_ACCEPTED)
                 {
-                    data = copyReasonCodeResponse(cc, reasonCode);
+                    longRunningHandler->isLongRunning = false;
+                    data = copySuccessResponse(cc, responseMsg.get(),
+                                               responseLen);
+                    rc = NSM_SW_SUCCESS;
                 }
                 else
                 {
-                    rc = co_await longRunningHandler->timer;
-                    if (longRunningHandler->timer.expired())
+                    auto accepted = longRunningHandler->initAcceptInstanceId(
+                        responseMsg->hdr.instance_id, cc, NSM_SW_SUCCESS);
+                    if (!accepted)
                     {
-                        lg2::error(
-                            "NsmRawCommandHandler::doSendLongRunningRequest:: LongRunning sensor timeout, eid={EID}",
-                            "EID", eid);
-                    }
-                    else if (rc != NSM_SW_SUCCESS)
-                    {
-                        lg2::error(
-                            "NsmRawCommandHandler::doSendLongRunningRequest: LongRunning timer start failed, eid={EID}",
-                            "EID", eid);
+                        longRunningHandler->isLongRunning = false;
+                        data = copySuccessResponse(cc, responseMsg.get(),
+                                                   responseLen);
                     }
                     else
                     {
-                        data = std::move(longRunningHandler->data);
-                        rc = longRunningHandler->rc;
+                        rc = co_await longRunningHandler->timer;
+                        if (longRunningHandler->timer.expired())
+                        {
+                            lg2::error(
+                                "NsmRawCommandHandler::doSendLongRunningRequest:: LongRunning sensor timeout, eid={EID}",
+                                "EID", eid);
+                        }
+                        else if (rc != NSM_SW_SUCCESS)
+                        {
+                            lg2::error(
+                                "NsmRawCommandHandler::doSendLongRunningRequest: LongRunning timer start failed, eid={EID}",
+                                "EID", eid);
+                        }
+                        else
+                        {
+                            data = std::move(longRunningHandler->data);
+                            rc = longRunningHandler->rc;
+                        }
                     }
                 }
             }
@@ -301,38 +325,47 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
                                           responseLen);
 
         uint8_t cc;
-        uint16_t reasonCode = 0;
         if (rc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             cc = NSM_ERR_UNSUPPORTED_COMMAND_CODE;
             rc = NSM_SW_SUCCESS;
-            reasonCode = 0;
+            data = copyReasonCodeResponse(cc, 0);
         }
         else if (rc != NSM_SW_SUCCESS)
         {
             throw std::runtime_error(std::format(
-                "NsmRawCommandHandler::doSendLongRunningRequest: postPatchIO failed, rc={}",
+                "NsmRawCommandHandler::doSendRequest: postPatchIO failed, rc={}",
                 utils::nsmSwCodeToString(rc)));
         }
         else
         {
-            rc = decode_reason_code_and_cc(responseMsg.get(), responseLen, &cc,
-                                           &reasonCode);
-            if (rc != NSM_SW_SUCCESS)
+            // Pass through all response bytes without protocol validation,
+            // matching nsmtool raw pass-through behavior for all CCs and
+            // response lengths.
+            if (responseLen < sizeof(nsm_msg_hdr) + 2)
             {
-                throw std::runtime_error(
-                    std::format("decode_common_resp failed, rc={}",
-                                utils::nsmSwCodeToString(rc)));
+                // Too short to contain a valid CC field; synthesize 0xFF and
+                // forward any partial payload bytes for caller inspection.
+                cc = 0xFF;
+                const size_t payloadLen = responseLen > sizeof(nsm_msg_hdr)
+                                              ? responseLen -
+                                                    sizeof(nsm_msg_hdr)
+                                              : 0;
+                data.resize(1 + payloadLen, 0);
+                data[0] = cc;
+                if (payloadLen > 0)
+                {
+                    memcpy(data.data() + 1, responseMsg->payload, payloadLen);
+                }
             }
-        }
-
-        if (cc == NSM_SUCCESS)
-        {
-            data = copySuccessResponse(cc, responseMsg.get(), responseLen);
-        }
-        else
-        {
-            data = copyReasonCodeResponse(cc, reasonCode);
+            else
+            {
+                const auto* resp = reinterpret_cast<const nsm_common_resp*>(
+                    responseMsg->payload);
+                cc = resp->completion_code;
+                data = copySuccessResponse(cc, responseMsg.get(), responseLen);
+            }
+            rc = NSM_SW_SUCCESS;
         }
         utils::writeBufferToFd(fd, data);
         valueInterface->value(rc);
