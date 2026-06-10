@@ -70,8 +70,14 @@ requester::Coroutine
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
-            lg2::error("setCurrentEventSources failed, eid={EID} rc={RC}",
-                       "EID", nsmDevice->getEid(), "RC", rc);
+            if (shouldLog("setCurrentEventSources failed",
+                          nsm_completion_codes(rc)))
+            {
+                LG2_ERROR(
+                    "setCurrentEventSources failed, eid={EID} rc={RC} messageType={MSG_TYPE}",
+                    "EID", nsmDevice->getEid(), "RC", nsm_completion_codes(rc),
+                    "MSG_TYPE", messageType);
+            }
         }
     }
     // coverity[missing_return]

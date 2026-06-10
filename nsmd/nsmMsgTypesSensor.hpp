@@ -92,10 +92,15 @@ class NsmCommandCodes : public NsmObject
             supportedCommands);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            lg2::error(
-                "get supported command code decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
-                "EID", device->getEid(), "CC", cc, "REASONCODE", reason_code,
-                "RC", rc);
+            if (shouldLog("NsmCommandCodes decode " + getName(), reason_code,
+                          cc, rc))
+            {
+                LG2_ERROR(
+                    "get supported command code decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
+                    "EID", device->getEid(), "CC", nsm_completion_codes(cc),
+                    "REASONCODE", nsm_reason_codes(reason_code), "RC",
+                    nsm_sw_codes(rc));
+            }
             // coverity[missing_return]
             co_return cc ? cc : rc;
         }
