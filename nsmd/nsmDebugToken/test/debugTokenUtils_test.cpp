@@ -601,6 +601,27 @@ TEST(DebugTokenUtilsTest, smaCpldDebugCapabilitySubtypeMatchesPdf)
               TokenSubtypeEnum::CpldDebugEnable);
 }
 
+TEST(DebugTokenUtilsTest, smaDebugFirmwareUnlockSubtypesMatchPdf)
+{
+    EXPECT_EQ(tokenTypeToEnum(1, "SMA"), TokenTypeEnum::DebugFirmwareUnlock);
+    EXPECT_EQ(tokenSubtypeToEnum(1, 0x00000001, "SMA"), TokenSubtypeEnum::MCU);
+    EXPECT_EQ(tokenSubtypeToEnum(1, 0x00000002, "SMA"), TokenSubtypeEnum::CPLD);
+    // LPX (bit 0x04) — previously unmapped and dropped before Redfish.
+    EXPECT_EQ(tokenSubtypeToEnum(1, 0x00000004, "SMA"), TokenSubtypeEnum::LPX);
+}
+
+TEST(DebugTokenUtilsTest,
+     TokenSubtypeBitmapToEnumArray_SMA_DebugFirmwareUnlock_McuAndLpx)
+{
+    // DebugFirmwareUnlock bitmap 0x05 = MCU (0x01) | LPX (0x04); both must
+    // surface once LPX is mapped.
+    auto result = tokenSubtypeBitmapToEnumArray(1, 0x05, "SMA");
+
+    ASSERT_EQ(result.size(), 2u);
+    EXPECT_EQ(result[0], TokenSubtypeEnum::MCU);
+    EXPECT_EQ(result[1], TokenSubtypeEnum::LPX);
+}
+
 TEST(DebugTokenUtilsTest, unmappedTokenInputsReturnNone)
 {
     // SMA token type values are 0, 1, 2, and 4 — numeric 3 is not mapped.
@@ -650,6 +671,26 @@ TEST(DebugTokenUtilsTest,
     ASSERT_EQ(result.size(), 2u);
     EXPECT_EQ(result[0], TokenSubtypeEnum::VBIOS);
     EXPECT_EQ(result[1], TokenSubtypeEnum::FSPRT);
+}
+
+TEST(DebugTokenUtilsTest, TokenSubtypeToEnum_GPU_HardwareUnlock_I2cVregUnlock)
+{
+    // GPU HardwareUnlock (token type 4) bit 0x00400000 → I2cVregUnlock.
+    EXPECT_EQ(tokenSubtypeToEnum(4, 0x00400000, "GPU"),
+              TokenSubtypeEnum::I2cVregUnlock);
+}
+
+TEST(DebugTokenUtilsTest,
+     TokenSubtypeBitmapToEnumArray_GPU_HardwareUnlock_I2ccAndVreg)
+{
+    // Device-reported HardwareUnlock bitmap 0x00400080 = I2ccAccess (0x80) |
+    // I2cVregUnlock (0x00400000). Before I2cVregUnlock was mapped, the
+    // 0x00400000 bit decoded to None and was dropped; both must now surface.
+    auto result = tokenSubtypeBitmapToEnumArray(4, 0x00400080, "GPU");
+
+    ASSERT_EQ(result.size(), 2u);
+    EXPECT_EQ(result[0], TokenSubtypeEnum::I2ccAccess);
+    EXPECT_EQ(result[1], TokenSubtypeEnum::I2cVregUnlock);
 }
 
 // ============================================================================
