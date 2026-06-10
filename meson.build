@@ -155,6 +155,14 @@ endif
 if get_option('enable-debug-info').enabled() and not cx8_features
     add_project_arguments('-DENABLE_DEBUG_INFO', language: ['cpp', 'c'])
 endif
+conf_data.set10(
+    'NETIR_DUMP_ENABLED',
+    get_option('enable-netir-dump').enabled(),
+)
+conf_data.set10(
+    'DIAGNOSTIC_DUMP_ENABLED',
+    get_option('enable-diagnostic-dump').enabled(),
+)
 
 if get_option('enable-network-adapter-reset').enabled() and not cx8_features
     add_project_arguments(
