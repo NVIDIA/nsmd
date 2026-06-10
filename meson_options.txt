@@ -307,6 +307,20 @@ option(
 )
 
 option(
+    'enable-netir-dump',
+    type: 'feature',
+    description: 'Enable processor NetIR dump object registration',
+    value: 'enabled',
+)
+
+option(
+    'enable-diagnostic-dump',
+    type: 'feature',
+    description: 'Enable processor diagnostics dump object registration',
+    value: 'enabled',
+)
+
+option(
     'enable-error-injection',
     type: 'feature',
     description: 'Enable Error Injection sensors and interfaces',

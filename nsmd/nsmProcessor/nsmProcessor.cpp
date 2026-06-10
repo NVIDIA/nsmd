@@ -3521,7 +3521,6 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 #endif
 
 #if defined(ENABLE_DEBUG_INFO)
-        // NetIR dump for Processor
         size_t pos = inventoryObjPath.find_last_of('/');
         std::string basePath = inventoryObjPath;
         std::string processorName = name;
@@ -3531,9 +3530,12 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             processorName = inventoryObjPath.substr(pos + 1);
         }
 
+#if NETIR_DUMP_ENABLED
+        // NetIR dump for Processor
         auto processorDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
             bus, processorName, basePath, type, uuid, DebugDumpType::Network);
         nsmDevice->addStaticSensor(processorDebugInfoObject);
+#endif
 
         auto processorEraseTraceObject = std::make_shared<NsmEraseTraceObject>(
             bus, processorName, basePath, type, uuid);
@@ -3543,11 +3545,13 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             bus, processorName, basePath, type, uuid);
         nsmDevice->addStaticSensor(processorLogInfoObject);
 
+#if DIAGNOSTIC_DUMP_ENABLED
         // Device Diagnostics(MSE DUMP) for Processor
         auto processorDiagnosticsObject = std::make_shared<NsmDebugInfoObject>(
             bus, processorName, basePath, type, uuid,
             DebugDumpType::Diagnostics);
         nsmDevice->addStaticSensor(processorDiagnosticsObject);
+#endif
 #endif
 
         auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
