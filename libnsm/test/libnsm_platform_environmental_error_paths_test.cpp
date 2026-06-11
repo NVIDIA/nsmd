@@ -41,6 +41,7 @@
 #include "common-tests.hpp"
 #include "platform-environmental.h"
 #include <cstring>
+#include <endian.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -823,6 +824,37 @@ TEST(PlatformEnvironmentalDecoders, DecodeGetWorkloadPowerProfileInfoReq)
 							&identifier_out);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(identifier_out, identifier_in);
+}
+
+TEST(PlatformEnvironmentalDecoders,
+     GetWorkloadPowerProfileInfoReq_IdentifierEndianness)
+{
+	const uint16_t identifier_in = 0xABCD;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_get_workload_power_profile_info_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	// Encode must store the identifier on the wire in little-endian order.
+	int rc = encode_get_workload_power_profile_info_req(0x10, identifier_in,
+							    msg);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto *request =
+	    reinterpret_cast<struct nsm_get_workload_power_profile_info_req *>(
+		msg->payload);
+	uint16_t wire_identifier;
+	memcpy(&wire_identifier, &request->identifier, sizeof(wire_identifier));
+	EXPECT_EQ(wire_identifier, htole16(identifier_in));
+
+	// Decode must convert the little-endian wire value back to host order.
+	request->identifier = htole16(identifier_in);
+	uint16_t identifier_out = 0;
+	rc = decode_get_workload_power_profile_info_req(msg, requestMsg.size(),
+							&identifier_out);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(identifier_out, identifier_in);
 }
 
