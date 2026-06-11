@@ -94,6 +94,11 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
                 "ARG", messageArg, "ERROR", e, "SRC", eid, "UUID", info.uuid);
         }
     }
+    if (!formattedMessageArgs.empty())
+    {
+        formattedMessageArgs[0] =
+            replaceGpuMessageArgDeviceName(info, formattedMessageArgs[0]);
+    }
 
     std::string messageArgs{};
 
@@ -123,7 +128,9 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
     }
     if (!info.impactedComponent.empty())
     {
-        eventData["DEVICE_NAME"] = info.impactedComponent;
+        eventData["DEVICE_NAME"] = info.uuid.empty()
+                                       ? info.impactedComponent
+                                       : getGpuUuidMessageArg(info);
     }
 
     // Launch async logging without blocking the handle method

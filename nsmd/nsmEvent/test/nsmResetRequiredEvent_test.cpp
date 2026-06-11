@@ -99,6 +99,17 @@ TEST(NsmResetRequiredEvent, Constructor_MultipleMessageArgs_JoinedWithComma)
     EXPECT_EQ(event.messageArgs, "GPU_1,arg2,arg3");
 }
 
+TEST(NsmResetRequiredEvent, Constructor_GpuMessageArg_UsesUuid)
+{
+    auto info = makeResetRequiredInfo();
+    info.uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+    info.messageArgs = {"GPU_1", "ForceRestart"};
+    NsmResetRequiredEvent event("reset_event", "NSM_ResetRequired", info);
+
+    EXPECT_EQ(event.messageArgs,
+              "GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1,ForceRestart");
+}
+
 TEST(NsmResetRequiredEvent, Constructor_ErrorIdFound_AddsEventId)
 {
     auto info = makeResetRequiredInfo();
@@ -120,6 +131,18 @@ TEST(NsmResetRequiredEvent, Constructor_ImpactedComponent_AddsDeviceName)
     auto it = event.eventData.find("DEVICE_NAME");
     ASSERT_NE(it, event.eventData.end());
     EXPECT_EQ(it->second, "GPU_1_Component");
+}
+
+TEST(NsmResetRequiredEvent, Constructor_ImpactedComponentWithUuid_AddsUuid)
+{
+    auto info = makeResetRequiredInfo();
+    info.uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+    info.impactedComponent = "GPU_1_Component";
+    NsmResetRequiredEvent event("reset_event", "NSM_ResetRequired", info);
+
+    auto it = event.eventData.find("DEVICE_NAME");
+    ASSERT_NE(it, event.eventData.end());
+    EXPECT_EQ(it->second, "GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1");
 }
 
 TEST(NsmResetRequiredEvent, Constructor_NoImpactedComponent_NoDeviceName)
