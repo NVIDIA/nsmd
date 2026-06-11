@@ -6437,7 +6437,7 @@ int encode_get_workload_power_profile_info_req(uint8_t instance_id,
 
 	request->hdr.command = NSM_GET_WORKLOAD_POWER_PROFILE_INFO;
 	request->hdr.data_size = sizeof(identifier);
-	request->identifier = identifier;
+	request->identifier = htole16(identifier);
 	return NSM_SW_SUCCESS;
 }
 
@@ -6462,7 +6462,7 @@ int decode_get_workload_power_profile_info_req(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*identifier = request->identifier;
+	*identifier = le16toh(request->identifier);
 
 	return NSM_SW_SUCCESS;
 }
