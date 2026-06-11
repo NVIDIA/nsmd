@@ -58,4 +58,44 @@ inline std::string getEventErrorId(const NsmEventInfo& info,
         "EID", errorIdKey, "UUID", info.uuid);
     return "";
 }
+
+inline std::string getGpuUuidMessageArg(const NsmEventInfo& info)
+{
+    return "GPU UUID " + info.uuid;
+}
+
+inline std::string replaceGpuMessageArgDeviceName(const NsmEventInfo& info,
+                                                  const std::string& messageArg)
+{
+    if (info.uuid.empty() || !messageArg.starts_with("GPU_"))
+    {
+        return messageArg;
+    }
+
+    auto suffixPos = messageArg.find(' ');
+    if (suffixPos == std::string::npos)
+    {
+        return getGpuUuidMessageArg(info);
+    }
+
+    return getGpuUuidMessageArg(info) + messageArg.substr(suffixPos);
+}
+
+inline std::string getUuidMessageArgs(const NsmEventInfo& info)
+{
+    std::string messageArgs{};
+    if (!info.messageArgs.empty())
+    {
+        messageArgs += replaceGpuMessageArgDeviceName(info,
+                                                      info.messageArgs[0]);
+    }
+
+    for (size_t i{1}; i < info.messageArgs.size(); ++i)
+    {
+        messageArgs += ',';
+        messageArgs += info.messageArgs[i];
+    }
+
+    return messageArgs;
+}
 }; // namespace nsm

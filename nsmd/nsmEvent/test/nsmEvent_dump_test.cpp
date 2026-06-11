@@ -83,9 +83,10 @@ TEST_F(NsmRediscoveryEventTest,
 
 TEST_F(NsmRediscoveryEventTest, Constructor_SingleMessageArg_MessageArgsNoComma)
 {
-    info.messageArgs = {"OnlyArg"};
+    info.messageArgs = {"GPU_SXM_1"};
     NsmRediscoveryEvent event("Evt", "Type", info);
-    EXPECT_EQ("OnlyArg", event.messageArgs);
+    EXPECT_EQ("GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4",
+              event.messageArgs);
 }
 
 TEST_F(NsmRediscoveryEventTest, Constructor_MultipleMessageArgs_Concatenated)
@@ -206,7 +207,8 @@ TEST_F(NsmResetRequiredEventTest,
 {
     info.impactedComponent = "GPU_SXM_1";
     NsmResetRequiredEvent event("Evt", "Type", info);
-    EXPECT_EQ("GPU_SXM_1", event.eventData["DEVICE_NAME"]);
+    EXPECT_EQ("GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4",
+              event.eventData["DEVICE_NAME"]);
 }
 
 TEST_F(NsmResetRequiredEventTest,

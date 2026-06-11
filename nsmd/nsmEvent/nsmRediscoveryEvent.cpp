@@ -33,16 +33,7 @@ NsmRediscoveryEvent::NsmRediscoveryEvent(const std::string& name,
                                          const NsmEventInfo info) :
     NsmEvent(name, type), info(info)
 {
-    if (!info.messageArgs.empty())
-    {
-        messageArgs += info.messageArgs[0];
-    }
-
-    for (size_t i{1}; i < info.messageArgs.size(); ++i)
-    {
-        messageArgs += ',';
-        messageArgs += info.messageArgs[i];
-    }
+    messageArgs = getUuidMessageArgs(info);
 
     eventData = {
         {"REDFISH_ORIGIN_OF_CONDITION", info.originOfCondition},

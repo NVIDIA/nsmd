@@ -138,6 +138,17 @@ TEST_F(NsmXIDEventTest, testXIDEventConstructor)
     EXPECT_EQ(xidEvent.info.messageId, "NVIDIAGPUDiagnostics.1.0.XIDError");
 }
 
+TEST_F(NsmXIDEventTest, testGpuMessageArgUsesUuid)
+{
+    NsmEventInfo info;
+    info.uuid = gpuUuid;
+
+    EXPECT_EQ(
+        replaceGpuMessageArgDeviceName(info, "GPU_1 Driver Event Message"),
+        "GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1 Driver Event "
+        "Message");
+}
+
 TEST_F(NsmXIDEventTest, testHandleXIDEvent)
 {
     NsmEventInfo info;
