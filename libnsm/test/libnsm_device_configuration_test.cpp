@@ -751,7 +751,8 @@ TEST(getFpgaDiagnosticsSettingsWPSettings, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_fpga_diagnostics_settings_resp(
-	    response, msg_len, &cc, NULL, &reason_code, (uint8_t *)data);
+	    response, msg_len, &cc, NULL, &reason_code, (uint8_t *)data,
+	    sizeof(struct nsm_fpga_diagnostics_settings_wp));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_fpga_diagnostics_settings_wp_resp(
@@ -874,7 +875,8 @@ TEST(getFpgaDiagnosticsSettingsWPJumper, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_fpga_diagnostics_settings_resp(
-	    response, msg_len, &cc, NULL, &reason_code, (uint8_t *)data);
+	    response, msg_len, &cc, NULL, &reason_code, (uint8_t *)data,
+	    sizeof(struct nsm_fpga_diagnostics_settings_wp_jumper));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_fpga_diagnostics_settings_wp_jumper_resp(
@@ -3779,7 +3781,7 @@ TEST(LibnsmOverreadGuard, FpgaDiagnosticsSettingsResp)
 	uint16_t rc = 0;
 	uint8_t dst[8] = {0};
 	EXPECT_EQ(decode_get_fpga_diagnostics_settings_resp(
-		      asMsg(buf), buf.size(), &cc, &ds, &rc, dst),
+		      asMsg(buf), buf.size(), &cc, &ds, &rc, dst, sizeof(dst)),
 		  NSM_SW_ERROR_LENGTH);
 }
 

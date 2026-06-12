@@ -104,7 +104,8 @@ TEST(DevConfigBranch2, DecodeGetFpgaDiagSettingsResp_NullCc)
 	uint16_t data_size = 0, reason_code = 0;
 	uint8_t data[64] = {};
 	auto rc = decode_get_fpga_diagnostics_settings_resp(
-	    msg, buf.size(), nullptr, &data_size, &reason_code, data);
+	    msg, buf.size(), nullptr, &data_size, &reason_code, data,
+	    sizeof(data));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -119,7 +120,7 @@ TEST(DevConfigBranch2, DecodeGetFpgaDiagSettingsResp_CcNonSuccess)
 	uint16_t data_size = 0, reason_code = 0;
 	uint8_t data[64] = {};
 	auto rc = decode_get_fpga_diagnostics_settings_resp(
-	    msg, buf.size(), &cc, &data_size, &reason_code, data);
+	    msg, buf.size(), &cc, &data_size, &reason_code, data, sizeof(data));
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, 0xFF);
 }
@@ -137,7 +138,7 @@ TEST(DevConfigBranch2, DecodeGetFpgaDiagSettingsResp_MsgTooShort)
 	uint16_t data_size = 0, reason_code = 0;
 	uint8_t data[64] = {};
 	auto rc = decode_get_fpga_diagnostics_settings_resp(
-	    msg, buf.size(), &cc, &data_size, &reason_code, data);
+	    msg, buf.size(), &cc, &data_size, &reason_code, data, sizeof(data));
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 

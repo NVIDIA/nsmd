@@ -1311,13 +1311,13 @@ int encode_get_fpga_diagnostics_settings_resp(uint8_t instance_id, uint8_t cc,
  *  @param[out] cc - pointer to response message completion code
  *  @param[in] data_size - data size
  *  @param[out] data  - pointer to the array of data
+ *  @param[in] data_size_max - maximum size of the data buffer in bytes; the
+ *             decoded data_size must not exceed this
  *  @return nsm_completion_codes
  */
-int decode_get_fpga_diagnostics_settings_resp(const struct nsm_msg *msg,
-					      size_t msg_len, uint8_t *cc,
-					      uint16_t *data_size,
-					      uint16_t *reason_code,
-					      uint8_t *data);
+int decode_get_fpga_diagnostics_settings_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, uint8_t *data, size_t data_size_max);
 
 /** @brief Encode a Get FPGA Diagnostics Settings response msg for
  * Get WP Settings
