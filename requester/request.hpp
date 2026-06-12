@@ -190,9 +190,9 @@ class Request final : public RequestBase, public RequestRetryTimer
      *  @param[in] verbose - verbose tracing flag
      */
     explicit Request(int fd, eid_t eid, uint8_t tag, sdeventplus::Event& event,
-                     mctp_socket::Handler* handler, RequestMsg&& requestMsg,
-                     uint8_t numRetries, std::chrono::milliseconds timeout,
-                     bool verbose) :
+                     const mctp_socket::Handler* handler,
+                     RequestMsg&& requestMsg, uint8_t numRetries,
+                     std::chrono::milliseconds timeout, bool verbose) :
         RequestBase(eid, tag, std::move(requestMsg)),
         RequestRetryTimer(event, numRetries, timeout), fd(fd), verbose(verbose),
         socketHandler(handler)
@@ -213,7 +213,7 @@ class Request final : public RequestBase, public RequestRetryTimer
   private:
     int fd;       //!< file descriptor of MCTP communications socket
     bool verbose; //!< verbose tracing flag
-    mctp_socket::Handler* socketHandler; // MCTP socket handler
+    const mctp_socket::Handler* socketHandler; // MCTP socket handler
 
     /** @brief Sends the NSM request message on the socket
      *

@@ -66,8 +66,6 @@ class MockSocketIo : public SocketIoInterface
                 (override));
     MOCK_METHOD(int, setsockopt, (int, int, int, const void*, socklen_t),
                 (override));
-
-    MOCK_METHOD(int, ioctl, (int, unsigned long, void*), (override));
 };
 
 /** Returns the MockSocketIo singleton used by getSocketIo() in test binaries.

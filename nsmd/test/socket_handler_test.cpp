@@ -31,7 +31,6 @@
 #include "socket_manager.hpp"
 
 #include <linux/mctp.h>
-#include <net/if.h>
 #include <sys/un.h>
 
 #include <sdeventplus/source/io.hpp>
@@ -229,16 +228,7 @@ TEST_F(SocketHandlerTest, InKernelHandlerSendMsgSuccess)
 {
     const int fakeFd = 50;
     const uint8_t eid = 0x10;
-    const uint8_t allocatedTag = MCTP_TAG_OWNER | 0x02;
     const std::vector<uint8_t> nsmMsg = {0x80, 0x05, 0x01, 0x00, 0xAA};
-
-    EXPECT_CALL(*mockIo_, ioctl(fakeFd, SIOCMCTPALLOCTAG, _))
-        .WillOnce([=](int, unsigned long, void* argp) {
-        auto* ctl = static_cast<struct mctp_ioc_tag_ctl*>(argp);
-        EXPECT_EQ(ctl->peer_addr, eid);
-        ctl->tag = allocatedTag;
-        return 0;
-    });
 
     EXPECT_CALL(*mockIo_, sendto(fakeFd, _, nsmMsg.size(), 0, _,
                                  sizeof(struct sockaddr_mctp)))
@@ -249,7 +239,7 @@ TEST_F(SocketHandlerTest, InKernelHandlerSendMsgSuccess)
         EXPECT_EQ(mctpAddr->smctp_family, AF_MCTP);
         EXPECT_EQ(mctpAddr->smctp_network, MCTP_NET_ANY);
         EXPECT_EQ(mctpAddr->smctp_addr.s_addr, eid);
-        EXPECT_EQ(mctpAddr->smctp_tag, allocatedTag);
+        EXPECT_EQ(mctpAddr->smctp_tag, MCTP_TAG_OWNER);
         EXPECT_EQ(mctpAddr->smctp_type, 0x7E); // VDM type
         return static_cast<ssize_t>(len);
     });
@@ -257,169 +247,6 @@ TEST_F(SocketHandlerTest, InKernelHandlerSendMsgSuccess)
     int rc = inKernelHandler.sendMsg(0x01, eid, fakeFd, nsmMsg.data(),
                                      nsmMsg.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-}
-
-TEST_F(SocketHandlerTest, InKernelHandlerSendMsgAllocFallback)
-{
-    const int fakeFd = 50;
-    const uint8_t eid = 0x10;
-    const std::vector<uint8_t> nsmMsg = {0x80, 0x05, 0x01, 0x00, 0xAA};
-
-    EXPECT_CALL(*mockIo_, ioctl(fakeFd, SIOCMCTPALLOCTAG, _))
-        .WillOnce(Return(-1));
-
-    EXPECT_CALL(*mockIo_, sendto(fakeFd, _, nsmMsg.size(), 0, _,
-                                 sizeof(struct sockaddr_mctp)))
-        .WillOnce([=](int, const void*, size_t len, int,
-                      const struct sockaddr* addr, socklen_t) {
-        const auto* mctpAddr =
-            reinterpret_cast<const struct sockaddr_mctp*>(addr);
-        EXPECT_EQ(mctpAddr->smctp_tag, MCTP_TAG_OWNER);
-        return static_cast<ssize_t>(len);
-    });
-
-    int rc = inKernelHandler.sendMsg(0x01, eid, fakeFd, nsmMsg.data(),
-                                     nsmMsg.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-}
-
-TEST_F(SocketHandlerTest, InKernelHandlerSendMsgReusesTagOnRetry)
-{
-    const int fakeFd = 50;
-    const uint8_t eid = 0x10;
-    const uint8_t allocatedTag = MCTP_TAG_OWNER | 0x01;
-    const std::vector<uint8_t> nsmMsg = {0x80, 0x05, 0x01};
-
-    // Tag is allocated only once for the first send
-    EXPECT_CALL(*mockIo_, ioctl(fakeFd, SIOCMCTPALLOCTAG, _))
-        .Times(1)
-        .WillOnce([=](int, unsigned long, void* argp) {
-        auto* ctl = static_cast<struct mctp_ioc_tag_ctl*>(argp);
-        ctl->tag = allocatedTag;
-        return 0;
-    });
-
-    // Both sends use the same allocated tag
-    EXPECT_CALL(*mockIo_, sendto(fakeFd, _, nsmMsg.size(), 0, _,
-                                 sizeof(struct sockaddr_mctp)))
-        .Times(2)
-        .WillRepeatedly([=](int, const void*, size_t len, int,
-                            const struct sockaddr* addr, socklen_t) {
-        const auto* mctpAddr =
-            reinterpret_cast<const struct sockaddr_mctp*>(addr);
-        EXPECT_EQ(mctpAddr->smctp_tag, allocatedTag);
-        return static_cast<ssize_t>(len);
-    });
-
-    // First send — allocates tag
-    int rc = inKernelHandler.sendMsg(0x01, eid, fakeFd, nsmMsg.data(),
-                                     nsmMsg.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-
-    // Second send (retry) — reuses existing tag, no new ioctl alloc
-    rc = inKernelHandler.sendMsg(0x01, eid, fakeFd, nsmMsg.data(),
-                                 nsmMsg.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-}
-
-TEST_F(SocketHandlerTest, InKernelHandlerDropTagExplicit)
-{
-    const int fakeFd = 50;
-    const uint8_t eid = 0x10;
-    const uint8_t allocatedTag = MCTP_TAG_OWNER | 0x03;
-    const std::vector<uint8_t> nsmMsg = {0x80, 0x05, 0x01};
-
-    // Allocate a tag via sendMsg
-    EXPECT_CALL(*mockIo_, ioctl(fakeFd, SIOCMCTPALLOCTAG, _))
-        .WillOnce([=](int, unsigned long, void* argp) {
-        auto* ctl = static_cast<struct mctp_ioc_tag_ctl*>(argp);
-        ctl->tag = allocatedTag;
-        return 0;
-    });
-    EXPECT_CALL(*mockIo_,
-                sendto(fakeFd, _, _, 0, _, sizeof(struct sockaddr_mctp)))
-        .WillOnce([](int, const void*, size_t len, int, const struct sockaddr*,
-                     socklen_t) { return static_cast<ssize_t>(len); });
-
-    inKernelHandler.sendMsg(0x01, eid, fakeFd, nsmMsg.data(), nsmMsg.size());
-
-    // Explicitly drop the tag (simulates response/timeout cleanup)
-    EXPECT_CALL(*mockIo_, ioctl(fakeFd, SIOCMCTPDROPTAG, _))
-        .WillOnce([=](int, unsigned long, void* argp) {
-        auto* ctl = static_cast<struct mctp_ioc_tag_ctl*>(argp);
-        EXPECT_EQ(ctl->peer_addr, eid);
-        EXPECT_EQ(ctl->tag, allocatedTag);
-        return 0;
-    });
-
-    inKernelHandler.dropTag(eid, fakeFd);
-
-    // Subsequent dropTag should be a no-op (no ioctl expected)
-    inKernelHandler.dropTag(eid, fakeFd);
-}
-
-TEST_F(SocketHandlerTest, InKernelHandlerTwoTagsPerEid)
-{
-    const int fakeFd = 50;
-    const uint8_t eid = 0x10;
-    const uint8_t normalLogicalTag = 0x01;
-    const uint8_t lrcLogicalTag = 0x02;
-    const uint8_t kernelTagNormal = MCTP_TAG_OWNER | 0x01;
-    const uint8_t kernelTagLrc = MCTP_TAG_OWNER | 0x02;
-    const std::vector<uint8_t> nsmMsg = {0x80, 0x05, 0x01};
-
-    // Two separate ALLOC calls — one per logical tag for the same EID
-    EXPECT_CALL(*mockIo_, ioctl(fakeFd, SIOCMCTPALLOCTAG, _))
-        .WillOnce([=](int, unsigned long, void* argp) {
-        auto* ctl = static_cast<struct mctp_ioc_tag_ctl*>(argp);
-        EXPECT_EQ(ctl->peer_addr, eid);
-        ctl->tag = kernelTagNormal;
-        return 0;
-    }).WillOnce([=](int, unsigned long, void* argp) {
-        auto* ctl = static_cast<struct mctp_ioc_tag_ctl*>(argp);
-        EXPECT_EQ(ctl->peer_addr, eid);
-        ctl->tag = kernelTagLrc;
-        return 0;
-    });
-
-    EXPECT_CALL(*mockIo_, sendto(fakeFd, _, nsmMsg.size(), 0, _,
-                                 sizeof(struct sockaddr_mctp)))
-        .WillOnce([=](int, const void*, size_t len, int,
-                      const struct sockaddr* addr, socklen_t) {
-        const auto* a = reinterpret_cast<const struct sockaddr_mctp*>(addr);
-        EXPECT_EQ(a->smctp_tag, kernelTagNormal);
-        return static_cast<ssize_t>(len);
-    })
-        .WillOnce([=](int, const void*, size_t len, int,
-                      const struct sockaddr* addr, socklen_t) {
-        const auto* a = reinterpret_cast<const struct sockaddr_mctp*>(addr);
-        EXPECT_EQ(a->smctp_tag, kernelTagLrc);
-        return static_cast<ssize_t>(len);
-    });
-
-    // Send with normal tag — allocates first kernel tag
-    int rc = inKernelHandler.sendMsg(normalLogicalTag, eid, fakeFd,
-                                     nsmMsg.data(), nsmMsg.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-
-    // Send with LRC tag — allocates second kernel tag for same EID
-    rc = inKernelHandler.sendMsg(lrcLogicalTag, eid, fakeFd, nsmMsg.data(),
-                                 nsmMsg.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-
-    // dropTag(eid) should drop both
-    EXPECT_CALL(*mockIo_, ioctl(fakeFd, SIOCMCTPDROPTAG, _))
-        .Times(2)
-        .WillRepeatedly([=](int, unsigned long, void* argp) {
-        auto* ctl = static_cast<struct mctp_ioc_tag_ctl*>(argp);
-        EXPECT_EQ(ctl->peer_addr, eid);
-        return 0;
-    });
-
-    inKernelHandler.dropTag(eid, fakeFd);
-
-    // Subsequent dropTag is a no-op
-    inKernelHandler.dropTag(eid, fakeFd);
 }
 
 // ---------------------------------------------------------------------------
@@ -893,13 +720,6 @@ TEST_F(SocketHandlerTest, InKernelHandlerSendMsgFailure)
     const uint8_t eid = 0x10;
     const std::vector<uint8_t> nsmMsg = {0x80, 0x05, 0x01};
 
-    EXPECT_CALL(*mockIo_, ioctl(fakeFd, SIOCMCTPALLOCTAG, _))
-        .WillOnce([=](int, unsigned long, void* argp) {
-        auto* ctl = static_cast<struct mctp_ioc_tag_ctl*>(argp);
-        ctl->tag = MCTP_TAG_OWNER | 0x01;
-        return 0;
-    });
-
     EXPECT_CALL(*mockIo_, sendto(fakeFd, _, nsmMsg.size(), 0, _,
                                  sizeof(struct sockaddr_mctp)))
         .WillOnce(Return(-1));
@@ -1163,13 +983,6 @@ TEST_F(SocketHandlerTest, InKernelHandlerSendMsgVerbose)
     const int fakeFd = 65;
     const uint8_t eid = 0x10;
     const std::vector<uint8_t> nsmMsg = {0x80, 0x05, 0x01};
-
-    EXPECT_CALL(*mockIo_, ioctl(fakeFd, SIOCMCTPALLOCTAG, _))
-        .WillOnce([=](int, unsigned long, void* argp) {
-        auto* ctl = static_cast<struct mctp_ioc_tag_ctl*>(argp);
-        ctl->tag = MCTP_TAG_OWNER | 0x01;
-        return 0;
-    });
 
     EXPECT_CALL(*mockIo_, sendto(fakeFd, _, nsmMsg.size(), 0, _,
                                  sizeof(struct sockaddr_mctp)))

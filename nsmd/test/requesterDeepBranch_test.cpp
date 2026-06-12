@@ -69,14 +69,14 @@ class MockMctpHandlerDeep : public mctp_socket::Handler
     }
 
     int sendMsg(uint8_t /*tag*/, eid_t /*eid*/, int /*mctpFd*/,
-                const uint8_t* /*nsmMsg*/, size_t /*nsmMsgLen*/) override
+                const uint8_t* /*nsmMsg*/, size_t /*nsmMsgLen*/) const override
     {
         ++sendCallCount;
         return sendResult;
     }
 
-    int sendResult = 1; // positive = success (bytes sent)
-    int sendCallCount = 0;
+    mutable int sendResult = 1; // positive = success (bytes sent)
+    mutable int sendCallCount = 0;
 
   private:
     void handleReceivedMsg(sdeventplus::source::IO& /*io*/, int /*fd*/,
