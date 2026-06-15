@@ -612,6 +612,11 @@ enum nsm_dot_reason_codes {
 	DOT_RC_FUSE_INCREMENT_FAILED = 0x2010,
 	DOT_RC_RECOVERY_FAILED = 0x2011,
 	DOT_RC_INVALID_COMMAND = 0x2012,
+	DOT_CAK_INSTALL_UNSUPPORTED_IN_RUNTIME =
+	    0x2014, /* CAK install is not supported in PSCFW runtime */
+	DOT_CAK_INSTALL_VERIFY_FAILED =
+	    0x2015, /* CAK install pre-verify: current SBIOS nv_fws/oem_fws CSH
+		     * did not authenticate under the new CAK */
 	DOT_RC_UNSUPPORTED_COMMAND = 0x202E,
 	DOT_RC_INVALID_LENGTH = 0x202F,
 };

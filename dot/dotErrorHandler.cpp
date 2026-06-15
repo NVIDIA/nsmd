@@ -36,6 +36,9 @@ static const std::map<uint16_t, std::string> reasonCodeMap = {
     {DOT_RC_FUSE_INCREMENT_FAILED, "DOTFuseIncrementFailed"},
     {DOT_RC_RECOVERY_FAILED, "DOTRecoveryFailed"},
     {DOT_RC_INVALID_COMMAND, "DOTInvalidCommand"},
+    {DOT_CAK_INSTALL_UNSUPPORTED_IN_RUNTIME,
+     "DOTCakInstallUnsupportedInRuntime"},
+    {DOT_CAK_INSTALL_VERIFY_FAILED, "DOTCakInstallVerifyFailed"},
     {DOT_RC_UNSUPPORTED_COMMAND, "DOTUnsupportedCommand"},
     {DOT_RC_INVALID_LENGTH, "DOTInvalidDataLength"}};
 
