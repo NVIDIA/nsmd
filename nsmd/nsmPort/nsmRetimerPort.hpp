@@ -298,7 +298,7 @@ class NsmPCIeECCGroup10 : public NsmPcieGroup
     void updateMetricOnSharedMemory() override;
 
   private:
-    std::unique_ptr<sdbusplus::asio::dbus_interface> pcieTransactionCounterIntf;
+    std::shared_ptr<sdbusplus::asio::dbus_interface> pcieTransactionCounterIntf;
     const std::string inventoryObjPath;
     bool includeInboundCounters{false};
 

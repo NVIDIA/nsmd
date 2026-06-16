@@ -92,7 +92,7 @@ enum class PollingState
 
 struct FruInterfaceManager
 {
-    std::unique_ptr<sdbusplus::asio::dbus_interface> interface;
+    std::shared_ptr<sdbusplus::asio::dbus_interface> interface;
     std::set<std::string> supportedProperties;
     bool initialized = false;
 
@@ -100,7 +100,8 @@ struct FruInterfaceManager
     bool needsRecreation(const std::set<std::string>& newProperties) const;
     void markInitialized(const std::set<std::string>& properties);
     bool isPropertySupported(const std::string& propertyName) const;
-    void reset();
+    void reset(const std::shared_ptr<sdbusplus::asio::object_server>&
+                   objServer = nullptr);
     void createAndRegisterInterface(
         std::shared_ptr<sdbusplus::asio::object_server> objServer, uint8_t eid,
         std::shared_ptr<NsmDevice> nsmDevice,

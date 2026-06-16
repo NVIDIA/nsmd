@@ -52,11 +52,17 @@ requester::Coroutine NsmNVSwitchAndNicChassis<IntfType>::update(
         if (rc == NSM_SW_SUCCESS && !deviceUuid.empty())
         {
             this->invoke(pdiMethod(uuid), deviceUuid);
-            nsmDeviceAssociationIntf =
-                SensorManager::getInstance().getObjServer().add_unique_interface(
-                    chassisInventoryBasePath / this->getName() /
-                        "NsmDeviceAssociation",
-                    "xyz.openbmc_project.Configuration.NsmDeviceAssociation");
+            auto& objServer = SensorManager::getInstance().getObjServer();
+            if (nsmDeviceAssociationIntf)
+            {
+                objServer.remove_interface(nsmDeviceAssociationIntf);
+                nsmDeviceAssociationIntf.reset();
+            }
+
+            nsmDeviceAssociationIntf = objServer.add_interface(
+                chassisInventoryBasePath / this->getName() /
+                    "NsmDeviceAssociation",
+                "xyz.openbmc_project.Configuration.NsmDeviceAssociation");
             nsmDeviceAssociationIntf->register_property("UUID", deviceUuid);
             nsmDeviceAssociationIntf->initialize();
             co_return NSM_SUCCESS;

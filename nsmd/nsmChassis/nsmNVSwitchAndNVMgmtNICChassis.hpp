@@ -60,7 +60,7 @@ class NsmNVSwitchAndNicChassis : public NsmInterfaceProvider<IntfType>
     requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
-    std::unique_ptr<sdbusplus::asio::dbus_interface> nsmDeviceAssociationIntf;
+    std::shared_ptr<sdbusplus::asio::dbus_interface> nsmDeviceAssociationIntf;
     std::string name;
 };
 

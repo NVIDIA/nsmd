@@ -913,10 +913,15 @@ uint64_t NsmPCIeECCGroup10::convertDwordsSizeToBytes(uint64_t dwords)
 
 void NsmPCIeECCGroup10::registerProperties()
 {
-    pcieTransactionCounterIntf =
-        SensorManager::getInstance().getObjServer().add_unique_interface(
-            inventoryObjPath,
-            "xyz.openbmc_project.PCIe.PCIeTransactionCounter");
+    auto& objServer = SensorManager::getInstance().getObjServer();
+    if (pcieTransactionCounterIntf)
+    {
+        objServer.remove_interface(pcieTransactionCounterIntf);
+        pcieTransactionCounterIntf.reset();
+    }
+
+    pcieTransactionCounterIntf = objServer.add_interface(
+        inventoryObjPath, "xyz.openbmc_project.PCIe.PCIeTransactionCounter");
 
     // Common properties (available on all platforms)
     pcieTransactionCounterIntf->register_property("OutboundWritePktCount",

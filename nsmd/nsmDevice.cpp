@@ -531,7 +531,7 @@ bool NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
     {
         if (this->eid != eid && this->uuid.size() != 0)
         {
-            fruDeviceManager.reset();
+            fruDeviceManager.reset(objServer);
         }
         this->eid = eid;
         this->mctpLocalEid =
@@ -1229,9 +1229,17 @@ bool FruInterfaceManager::isPropertySupported(
     return supportedProperties.find(propertyName) != supportedProperties.end();
 }
 
-void FruInterfaceManager::reset()
+void FruInterfaceManager::reset(
+    const std::shared_ptr<sdbusplus::asio::object_server>& objServer)
 {
-    interface.reset();
+    if (interface)
+    {
+        if (objServer)
+        {
+            objServer->remove_interface(interface);
+        }
+        interface.reset();
+    }
     supportedProperties.clear();
     initialized = false;
 }
@@ -1242,8 +1250,9 @@ void FruInterfaceManager::createAndRegisterInterface(
 {
     std::string objPath = "/xyz/openbmc_project/FruDevice/" +
                           std::to_string(eid);
-    interface = objServer->add_unique_interface(
-        objPath, "xyz.openbmc_project.FruDevice");
+    reset(objServer);
+    interface = objServer->add_interface(objPath,
+                                         "xyz.openbmc_project.FruDevice");
     registerAllProperties(nsmDevice, properties);
     interface->initialize();
 }
