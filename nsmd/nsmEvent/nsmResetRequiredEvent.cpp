@@ -50,9 +50,8 @@ NsmResetRequiredEvent::NsmResetRequiredEvent(const std::string& name,
     }
     if (!info.impactedComponent.empty())
     {
-        eventData["DEVICE_NAME"] = info.uuid.empty()
-                                       ? info.impactedComponent
-                                       : getGpuUuidMessageArg(info);
+        eventData["DEVICE_NAME"] =
+            replaceGpuMessageArgDeviceName(info, info.impactedComponent);
     }
 };
 

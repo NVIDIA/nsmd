@@ -59,14 +59,18 @@ inline std::string getEventErrorId(const NsmEventInfo& info,
     return "";
 }
 
+#ifdef ENABLE_EVENT_GPU_UUID_LABEL
 inline std::string getGpuUuidMessageArg(const NsmEventInfo& info)
 {
     return "GPU UUID " + info.uuid;
 }
+#endif // ENABLE_EVENT_GPU_UUID_LABEL
 
-inline std::string replaceGpuMessageArgDeviceName(const NsmEventInfo& info,
-                                                  const std::string& messageArg)
+inline std::string
+    replaceGpuMessageArgDeviceName([[maybe_unused]] const NsmEventInfo& info,
+                                   const std::string& messageArg)
 {
+#ifdef ENABLE_EVENT_GPU_UUID_LABEL
     if (info.uuid.empty() || !messageArg.starts_with("GPU_"))
     {
         return messageArg;
@@ -79,6 +83,9 @@ inline std::string replaceGpuMessageArgDeviceName(const NsmEventInfo& info,
     }
 
     return getGpuUuidMessageArg(info) + messageArg.substr(suffixPos);
+#else
+    return messageArg;
+#endif
 }
 
 inline std::string getUuidMessageArgs(const NsmEventInfo& info)
