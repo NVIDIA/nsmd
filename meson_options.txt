@@ -523,5 +523,12 @@ option(
     'enable-association-discovery',
     type: 'feature',
     description: 'Enable support for MCTP Reactor association based discovery',
-    value: 'disabled'
+    value: 'disabled',
+)
+
+option(
+    'enable-event-gpu-uuid-label',
+    type: 'feature',
+    description: 'Replace GPU_<n> labels with "GPU UUID <uuid>" in NSM Redfish event payloads (REDFISH_MESSAGE_ARGS and DEVICE_NAME for XID, ResetRequired, and Rediscovery events) so log messages identify the physical GPU instead of only its logical index. Disable on platforms that want to keep the original GPU_<n> labels.',
+    value: 'disabled',
 )

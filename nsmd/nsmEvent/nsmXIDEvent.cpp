@@ -128,9 +128,8 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
     }
     if (!info.impactedComponent.empty())
     {
-        eventData["DEVICE_NAME"] = info.uuid.empty()
-                                       ? info.impactedComponent
-                                       : getGpuUuidMessageArg(info);
+        eventData["DEVICE_NAME"] =
+            replaceGpuMessageArgDeviceName(info, info.impactedComponent);
     }
 
     // Launch async logging without blocking the handle method

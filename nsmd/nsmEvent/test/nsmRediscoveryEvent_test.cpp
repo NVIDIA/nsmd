@@ -94,6 +94,7 @@ TEST(NsmRediscoveryEvent, Constructor_MultipleMessageArgs_JoinedWithComma)
     EXPECT_EQ(event.messageArgs, "arg1,arg2,arg3");
 }
 
+#ifdef ENABLE_EVENT_GPU_UUID_LABEL
 TEST(NsmRediscoveryEvent, Constructor_GpuMessageArg_UsesUuid)
 {
     auto info = makeRediscoveryInfo();
@@ -105,6 +106,7 @@ TEST(NsmRediscoveryEvent, Constructor_GpuMessageArg_UsesUuid)
         event.messageArgs,
         "GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1 Rediscovery,arg2");
 }
+#endif // ENABLE_EVENT_GPU_UUID_LABEL
 
 TEST(NsmRediscoveryEvent, Constructor_EventDataContainsExpectedKeys)
 {

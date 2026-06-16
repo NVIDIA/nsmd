@@ -186,6 +186,10 @@ if get_option('enable-association-discovery').enabled()
     )
 endif
 
+if get_option('enable-event-gpu-uuid-label').enabled()
+    add_project_arguments('-DENABLE_EVENT_GPU_UUID_LABEL', language: ['cpp'])
+endif
+
 if get_option('enable-pcie-aer-error').enabled() and not cx8_features
     add_project_arguments('-DENABLE_PCIE_AER_ERROR', language: ['cpp', 'c'])
 endif
