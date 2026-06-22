@@ -30,6 +30,7 @@ enum diagnostics_command {
 	NSM_GET_DEVICE_RESET_STATISTICS = 0x00,
 	NSM_GET_DEVICE_DEBUG_PARAMETERS = 0x04,
 	NSM_SET_DEVICE_DEBUG_PARAMETERS = 0x05,
+	NSM_DEVICE_RESET = 0x06,
 	NSM_GET_DEVICE_DIAGNOSTICS = 0x40,
 	NSM_GET_NETWORK_DEVICE_DEBUG_INFO = 0x50,
 	NSM_ERASE_TRACE = 0x51,
@@ -89,6 +90,52 @@ enum reset_network_device_mode {
 	ALL_HOST_PCIE_LINK_DISABLE = 2,
 	ALLOWED_BY_ALL_HOST = 3
 };
+
+/** @brief Reset target for NSM Device Reset cmd (0x06)
+ *
+ *  Identifies which subsystem to reset. Actual hardware support
+ *  is device-dependent (e.g. CX9 supports 0 and 5; BF4 supports 0-3).
+ */
+enum device_reset_target {
+	NSM_RESET_TARGET_DEVICE = 0,
+	NSM_RESET_TARGET_NETWORK = 1,
+	NSM_RESET_TARGET_COMPUTE = 2,
+	NSM_RESET_TARGET_COMPUTE_SHUTDOWN = 3,
+	NSM_RESET_TARGET_PHY_LESS = 4,
+	NSM_RESET_TARGET_OPTICAL_MODULE = 5,
+};
+
+/** @brief Reset trigger for NSM Device Reset cmd (0x06)
+ *
+ *  Defines the condition required to initiate the internal reset sequence.
+ */
+enum device_reset_trigger {
+	NSM_RESET_TRIGGER_IMMEDIATE = 0,
+	NSM_RESET_TRIGGER_HOST_PERST = 1,
+	NSM_RESET_TRIGGER_PCIE_LINK_DISABLE = 2,
+	NSM_RESET_TRIGGER_DRIVER_READY = 3,
+};
+
+/** @struct nsm_device_reset_req
+ *
+ *  Structure representing NSM Device Reset request (cmd 0x06).
+ *  Replaces legacy Reset Network Device (0x53) and adds component-level
+ *  granularity via reset_target, trigger, and port_index.
+ */
+struct nsm_device_reset_req {
+	struct nsm_common_req hdr;
+	uint8_t reset_target;
+	uint8_t trigger;
+	uint16_t reserved;
+	uint32_t port_index;
+} __attribute__((packed));
+
+/** @struct nsm_device_reset_resp
+ *
+ *  Structure representing NSM Device Reset response (cmd 0x06).
+ *  Response carries completion code only.
+ */
+typedef struct nsm_common_resp nsm_device_reset_resp;
 
 enum nsm_debug_information_type {
 	INFO_TYPE_DEVICE_INFO = 0,
@@ -718,6 +765,55 @@ int encode_reset_network_device_resp(uint8_t instance, uint16_t reason_code,
  */
 int decode_reset_network_device_resp(const struct nsm_msg *msg, size_t msgLen,
 				     uint8_t *cc, uint16_t *reason_code);
+
+/** @brief Encode a NSM Device Reset request message (cmd 0x06)
+ *
+ *  @param[in] instance_id  - NSM instance ID
+ *  @param[in] reset_target - Subsystem to reset (enum device_reset_target)
+ *  @param[in] trigger      - Reset trigger condition (enum
+ * device_reset_trigger)
+ *  @param[in] port_index   - 0-based port number; only used when
+ *                            reset_target == NSM_RESET_TARGET_OPTICAL_MODULE
+ *  @param[out] msg         - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_device_reset_req(uint8_t instance_id, uint8_t reset_target,
+			    uint8_t trigger, uint32_t port_index,
+			    struct nsm_msg *msg);
+
+/** @brief Decode a NSM Device Reset request message (cmd 0x06)
+ *
+ *  @param[in]  msg          - Request message
+ *  @param[in]  msg_len      - Length of request message
+ *  @param[out] reset_target - Subsystem to reset
+ *  @param[out] trigger      - Reset trigger condition
+ *  @param[out] port_index   - Port number (optical module reset only)
+ *  @return nsm_completion_codes
+ */
+int decode_device_reset_req(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t *reset_target, uint8_t *trigger,
+			    uint32_t *port_index);
+
+/** @brief Encode a NSM Device Reset response message (cmd 0x06)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg        - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_device_reset_resp(uint8_t instance_id, uint16_t reason_code,
+			     struct nsm_msg *msg);
+
+/** @brief Decode a NSM Device Reset response message (cmd 0x06)
+ *
+ *  @param[in]  msg         - Response message
+ *  @param[in]  msg_len     - Length of response message
+ *  @param[out] cc          - Completion code
+ *  @param[out] reason_code - Reason code
+ *  @return nsm_completion_codes
+ */
+int decode_device_reset_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *reason_code);
 
 /** @brief Decode a Diagnostics Enable/Disable WP request message
  *

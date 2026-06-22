@@ -26,6 +26,14 @@
 #include "nsmObjectFactory.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+#include "nsmDbusIfaceOverride/nsmResetIface.hpp"
+
+#include <com/nvidia/Reset/server.hpp>
+#include <xyz/openbmc_project/Association/Definitions/server.hpp>
+#endif
+
+#include <array>
 #include <unordered_map>
 
 namespace nsm
@@ -186,6 +194,112 @@ void createChassisSKU(std::shared_ptr<NsmDevice> device, std::string& name,
     device->addStaticSensor(chassisSKU);
 }
 
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+using NvidiaResetIntf =
+    sdbusplus::server::object_t<sdbusplus::server::com::nvidia::Reset>;
+using NvidiaResetTypes =
+    sdbusplus::server::com::nvidia::Reset::NvidiaResetTypes;
+using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
+
+/** @class NsmDeviceReset
+ *
+ *  One reset object under <chassis>/Reset/<Redfish-ResetType>. Owns its
+ *  com.nvidia.Reset, Control.ResetAsync, and "reset_controls"/"chassis"
+ *  association interfaces so the sensor manager manages their lifetimes — the
+ *  same pattern as every other nsmd sensor object. bmcweb identifies the reset
+ *  variant by this object's path leaf (the association endpoint's filename).
+ */
+class NsmDeviceReset : public NsmObject
+{
+  public:
+    NsmDeviceReset(sdbusplus::bus::bus& bus, const std::string& name,
+                   const std::string& type, const std::string& resetObjPath,
+                   std::shared_ptr<NsmDevice> device,
+                   NvidiaResetTypes resetType, uint8_t resetTarget,
+                   uint8_t trigger, const std::string& chassisPath) :
+        NsmObject(name, type), objPath(resetObjPath)
+    {
+        lg2::info("NsmDeviceReset: create sensor:{NAME}", "NAME", name.c_str());
+
+        // com.nvidia.Reset — advertises the generic NSM reset target. bmcweb
+        // selects the object by its path leaf (via reset_controls), not by this
+        // property, so a shared target across objects is fine.
+        resetIntf = std::make_shared<NvidiaResetIntf>(bus, objPath.c_str());
+        resetIntf->resetType(resetType);
+
+        // Control.ResetAsync — issues NSM cmd 0x06 with these wire params.
+        resetAsyncIntf = std::make_shared<NsmDeviceResetAsyncIntf>(
+            bus, objPath.c_str(), device,
+            NsmResetParams{resetTarget, trigger, /*portIndex=*/0});
+
+        // Association: <chassis>/reset_controls → this object, so bmcweb
+        // discovers it via getAssociationEndPoints(chassis +
+        // "/reset_controls").
+        assocIntf =
+            std::make_shared<AssociationDefinitionsInft>(bus, objPath.c_str());
+        assocIntf->associations({{"chassis", "reset_controls", chassisPath}});
+    }
+
+  private:
+    std::shared_ptr<NvidiaResetIntf> resetIntf;
+    std::shared_ptr<NsmDeviceResetAsyncIntf> resetAsyncIntf;
+    std::shared_ptr<AssociationDefinitionsInft> assocIntf;
+    std::string objPath;
+};
+
+/** @brief Create all device reset D-Bus objects under <chassisPath>/Reset/.
+ *
+ *  Called from createNsmChassis when the chassis EM config entry has
+ *  "DeviceResetSupported": true. The EM config is the source of truth — no
+ *  device-role gating. Each reset type gets its own NsmDeviceReset object; a
+ *  "reset_controls"/"chassis" association is registered on each so bmcweb can
+ *  discover them via getAssociationEndPoints(chassisPath + "/reset_controls").
+ */
+void createDeviceResetObjects(sdbusplus::bus::bus& bus,
+                              std::shared_ptr<NsmDevice> device,
+                              const std::string& chassisPath,
+                              const std::string& type)
+{
+    struct DeviceResetEntry
+    {
+        // Object-path leaf (…/Reset/<name>). bmcweb surfaces this verbatim as
+        // the Redfish ResetType, so it is the reset variant's Redfish name.
+        const char* name;
+        // com.nvidia.Reset.ResetType — the generic NSM reset target this object
+        // represents. Several Redfish variants can share one target (they
+        // differ only by trigger), so this is not unique across entries.
+        NvidiaResetTypes resetType;
+        uint8_t reset_target;
+        uint8_t trigger;
+    };
+
+    // NSM spec parameters per reset type (NVBug 6129734 comment #4). The leaf
+    // name is the Redfish ResetType; resetType is the generic NSM target. A
+    // single target (e.g. DeviceFullReset) backs multiple Redfish variants that
+    // differ only by trigger, so each gets its own object at a distinct path.
+    static constexpr std::array<DeviceResetEntry, 5> deviceResets{{
+        {"FullReset", NvidiaResetTypes::DeviceFullReset,
+         NSM_RESET_TARGET_DEVICE, NSM_RESET_TRIGGER_PCIE_LINK_DISABLE},
+        {"ForceDpuReset", NvidiaResetTypes::DeviceFullReset,
+         NSM_RESET_TARGET_DEVICE, NSM_RESET_TRIGGER_IMMEDIATE},
+        {"DpuReset", NvidiaResetTypes::NetworkGracefulReset,
+         NSM_RESET_TARGET_NETWORK, NSM_RESET_TRIGGER_HOST_PERST},
+        {"ArmReset", NvidiaResetTypes::ComputeGracefulReset,
+         NSM_RESET_TARGET_COMPUTE, NSM_RESET_TRIGGER_IMMEDIATE},
+        {"ArmShutdown", NvidiaResetTypes::ComputeGracefulShutDown,
+         NSM_RESET_TARGET_COMPUTE_SHUTDOWN, NSM_RESET_TRIGGER_IMMEDIATE},
+    }};
+
+    for (const auto& entry : deviceResets)
+    {
+        const std::string objPath = chassisPath + "/Reset/" + entry.name;
+        device->addDeviceSensors(std::make_shared<NsmDeviceReset>(
+            bus, entry.name, type, objPath, device, entry.resetType,
+            entry.reset_target, entry.trigger, chassisPath));
+    }
+}
+#endif
+
 requester::Coroutine createNsmChassis(SensorManager& manager,
                                       const std::string& interface,
                                       const std::string& objPath,
@@ -238,6 +352,20 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
 
         // add sensor
         device->addStaticSensor(chassisUuid);
+
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+        // "DeviceResetSupported": true on the chassis EM config entry triggers
+        // creation of the reset objects under <chassis>/Reset/<Type>. The reset
+        // controls belong to the chassis object, so they are created here.
+        if (allCurrentIfaceProperties.count("DeviceResetSupported") &&
+            std::get<bool>(
+                allCurrentIfaceProperties.at("DeviceResetSupported")))
+        {
+            createDeviceResetObjects(
+                utils::DBusHandler::getBus(), device,
+                std::string(chassisInventoryBasePath) + "/" + name, baseType);
+        }
+#endif
     }
     else if (type == "NSM_Chassis_Attributes")
     {

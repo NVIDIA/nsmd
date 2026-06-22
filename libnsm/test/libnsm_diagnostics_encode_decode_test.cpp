@@ -200,6 +200,297 @@ TEST(DiagnosticsEncodeDecodeTest, DecodeResetNetworkDeviceReqNullOutput)
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
+// Tests for encode_device_reset_req / decode_device_reset_req (cmd 0x06)
+
+TEST(DiagnosticsEncodeDecodeTest, EncodeDeviceResetReqValid)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	int rc = encode_device_reset_req(1, NSM_RESET_TARGET_DEVICE,
+					 NSM_RESET_TRIGGER_IMMEDIATE, 0, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	auto *req =
+	    reinterpret_cast<struct nsm_device_reset_req *>(msg->payload);
+	EXPECT_EQ(req->hdr.command, NSM_DEVICE_RESET);
+	EXPECT_EQ(req->hdr.data_size,
+		  sizeof(req->reset_target) + sizeof(req->trigger) +
+		      sizeof(req->reserved) + sizeof(req->port_index));
+	EXPECT_EQ(req->reset_target, NSM_RESET_TARGET_DEVICE);
+	EXPECT_EQ(req->trigger, NSM_RESET_TRIGGER_IMMEDIATE);
+	EXPECT_EQ(req->reserved, 0);
+	EXPECT_EQ(le32toh(req->port_index), 0u);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, EncodeDeviceResetReqOpticalModule)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	int rc = encode_device_reset_req(1, NSM_RESET_TARGET_OPTICAL_MODULE,
+					 NSM_RESET_TRIGGER_IMMEDIATE, 3, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	auto *req =
+	    reinterpret_cast<struct nsm_device_reset_req *>(msg->payload);
+	EXPECT_EQ(req->reset_target, NSM_RESET_TARGET_OPTICAL_MODULE);
+	EXPECT_EQ(le32toh(req->port_index), 3u);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, EncodeDeviceResetReqPcieLinkDisable)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	int rc = encode_device_reset_req(1, NSM_RESET_TARGET_DEVICE,
+					 NSM_RESET_TRIGGER_PCIE_LINK_DISABLE, 0,
+					 msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	auto *req =
+	    reinterpret_cast<struct nsm_device_reset_req *>(msg->payload);
+	EXPECT_EQ(req->reset_target, NSM_RESET_TARGET_DEVICE);
+	EXPECT_EQ(req->trigger, NSM_RESET_TRIGGER_PCIE_LINK_DISABLE);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, EncodeDeviceResetReqNullMsg)
+{
+	int rc =
+	    encode_device_reset_req(1, NSM_RESET_TARGET_DEVICE,
+				    NSM_RESET_TRIGGER_IMMEDIATE, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, EncodeDeviceResetReqArmReset)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	int rc = encode_device_reset_req(1, NSM_RESET_TARGET_COMPUTE,
+					 NSM_RESET_TRIGGER_IMMEDIATE, 0, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	auto *req =
+	    reinterpret_cast<struct nsm_device_reset_req *>(msg->payload);
+	EXPECT_EQ(req->reset_target, NSM_RESET_TARGET_COMPUTE);
+	EXPECT_EQ(req->trigger, NSM_RESET_TRIGGER_IMMEDIATE);
+	EXPECT_EQ(le32toh(req->port_index), 0u);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, EncodeDeviceResetReqArmShutdown)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	int rc = encode_device_reset_req(1, NSM_RESET_TARGET_COMPUTE_SHUTDOWN,
+					 NSM_RESET_TRIGGER_IMMEDIATE, 0, msg);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	auto *req =
+	    reinterpret_cast<struct nsm_device_reset_req *>(msg->payload);
+	EXPECT_EQ(req->reset_target, NSM_RESET_TARGET_COMPUTE_SHUTDOWN);
+	EXPECT_EQ(req->trigger, NSM_RESET_TRIGGER_IMMEDIATE);
+	EXPECT_EQ(le32toh(req->port_index), 0u);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetReqValid)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	encode_device_reset_req(1, NSM_RESET_TARGET_COMPUTE,
+				NSM_RESET_TRIGGER_IMMEDIATE, 0, msg);
+
+	uint8_t reset_target = 0xFF, trigger = 0xFF;
+	uint32_t port_index = 0xDEAD;
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_device_reset_req);
+
+	int rc = decode_device_reset_req(msg, msg_len, &reset_target, &trigger,
+					 &port_index);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(reset_target, NSM_RESET_TARGET_COMPUTE);
+	EXPECT_EQ(trigger, NSM_RESET_TRIGGER_IMMEDIATE);
+	EXPECT_EQ(port_index, 0u);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetReqPortIndex)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	encode_device_reset_req(1, NSM_RESET_TARGET_OPTICAL_MODULE,
+				NSM_RESET_TRIGGER_IMMEDIATE, 7, msg);
+
+	uint8_t reset_target = 0, trigger = 0;
+	uint32_t port_index = 0;
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_device_reset_req);
+
+	int rc = decode_device_reset_req(msg, msg_len, &reset_target, &trigger,
+					 &port_index);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(reset_target, NSM_RESET_TARGET_OPTICAL_MODULE);
+	EXPECT_EQ(port_index, 7u);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetReqNullMsg)
+{
+	uint8_t reset_target = 0, trigger = 0;
+	uint32_t port_index = 0;
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_device_reset_req);
+
+	int rc = decode_device_reset_req(nullptr, msg_len, &reset_target,
+					 &trigger, &port_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetReqNullOutputs)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_device_reset_req);
+	uint8_t trigger = 0;
+	uint32_t port_index = 0;
+
+	EXPECT_EQ(decode_device_reset_req(msg, msg_len, nullptr, &trigger,
+					  &port_index),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetReqShortMsg)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+	uint8_t reset_target = 0, trigger = 0;
+	uint32_t port_index = 0;
+
+	int rc = decode_device_reset_req(msg, sizeof(struct nsm_msg_hdr) + 1,
+					 &reset_target, &trigger, &port_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetReqBadDataSize)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	encode_device_reset_req(1, NSM_RESET_TARGET_COMPUTE,
+				NSM_RESET_TRIGGER_IMMEDIATE, 0, msg);
+
+	// Corrupt the data_size to be smaller than the expected payload.
+	auto *req =
+	    reinterpret_cast<struct nsm_device_reset_req *>(msg->payload);
+	req->hdr.data_size = 1;
+
+	uint8_t reset_target = 0xFF, trigger = 0xFF;
+	uint32_t port_index = 0xDEAD;
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_device_reset_req);
+
+	int rc = decode_device_reset_req(msg, msg_len, &reset_target, &trigger,
+					 &port_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetReqOversizedDataSize)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+
+	encode_device_reset_req(1, NSM_RESET_TARGET_COMPUTE,
+				NSM_RESET_TRIGGER_IMMEDIATE, 0, msg);
+
+	// Corrupt the data_size to be larger than the fixed payload; the
+	// Device Reset payload is fixed-size, so an oversized data_size is
+	// malformed and must be rejected.
+	auto *req =
+	    reinterpret_cast<struct nsm_device_reset_req *>(msg->payload);
+	req->hdr.data_size = sizeof(req->reset_target) + sizeof(req->trigger) +
+			     sizeof(req->reserved) + sizeof(req->port_index) +
+			     1;
+
+	uint8_t reset_target = 0xFF, trigger = 0xFF;
+	uint32_t port_index = 0xDEAD;
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_device_reset_req);
+
+	int rc = decode_device_reset_req(msg, msg_len, &reset_target, &trigger,
+					 &port_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetReqNullTrigger)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_device_reset_req);
+	uint8_t reset_target = 0;
+	uint32_t port_index = 0;
+
+	EXPECT_EQ(decode_device_reset_req(msg, msg_len, &reset_target, nullptr,
+					  &port_index),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetReqNullPortIndex)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_device_reset_req));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(requestMsg.data());
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_device_reset_req);
+	uint8_t reset_target = 0, trigger = 0;
+
+	EXPECT_EQ(decode_device_reset_req(msg, msg_len, &reset_target, &trigger,
+					  nullptr),
+		  NSM_SW_ERROR_NULL);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, EncodeDecodeDeviceResetRespValid)
+{
+	std::vector<uint8_t> respMsg(sizeof(nsm_msg_hdr) +
+				     sizeof(nsm_device_reset_resp));
+	auto *msg = reinterpret_cast<struct nsm_msg *>(respMsg.data());
+
+	int rc = encode_device_reset_resp(1, 0, msg);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc = 0xFF;
+	uint16_t reason_code = 0xFFFF;
+	rc = decode_device_reset_resp(msg, respMsg.size(), &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+}
+
+TEST(DiagnosticsEncodeDecodeTest, DecodeDeviceResetRespNullMsg)
+{
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	int rc = decode_device_reset_resp(
+	    nullptr, sizeof(nsm_msg_hdr) + sizeof(nsm_device_reset_resp), &cc,
+	    &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
 // Tests for encode_enable_disable_wp_req
 TEST(DiagnosticsEncodeDecodeTest, EncodeEnableDisableWpReqValid)
 {
