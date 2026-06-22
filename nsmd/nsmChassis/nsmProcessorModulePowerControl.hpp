@@ -47,7 +47,7 @@ using ClearPowerCapAsyncIntf =
 class NsmClearPowerCapIntf : public ClearPowerCapIntf
 {
   public:
-    NsmClearPowerCapIntf(sdbusplus::bus::bus& bus,
+    NsmClearPowerCapIntf(sdbusplus::bus_t& bus,
                          const std::string& inventoryObjPath);
     int32_t clearPowerCap() override;
 };
@@ -55,8 +55,8 @@ class NsmProcessorModulePowerControl : public NsmSensor, ClearPowerCapAsyncIntf
 {
   public:
     NsmProcessorModulePowerControl(
-        sdbusplus::bus::bus& bus, const std::string& name,
-        const std::string& type, std::shared_ptr<PowerCapIntf> powerCapIntf,
+        sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
+        std::shared_ptr<PowerCapIntf> powerCapIntf,
         std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf,
         const std::string& path,
         const std::vector<std::tuple<std::string, std::string, std::string>>&
@@ -77,7 +77,7 @@ class NsmProcessorModulePowerControl : public NsmSensor, ClearPowerCapAsyncIntf
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
-    sdbusplus::message::object_path clearPowerCap() override;
+    sdbusplus::object_path clearPowerCap() override;
 
   private:
     requester::Coroutine doClearPowerCapOnModule(

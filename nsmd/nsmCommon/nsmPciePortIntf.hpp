@@ -17,7 +17,7 @@ using PciePortIntf = sdbusplus::server::object_t<
 class NsmPciePortIntf : public NsmObject
 {
   public:
-    NsmPciePortIntf(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmPciePortIntf(sdbusplus::bus_t& bus, const std::string& name,
                     const std::string& type, std::string& inventoryObjPath);
 
   private:

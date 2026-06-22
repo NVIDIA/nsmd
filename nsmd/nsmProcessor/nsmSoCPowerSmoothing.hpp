@@ -85,7 +85,7 @@ class NsmSoCPowerSmoothing : public NsmSensor
 };
 
 void createSoCPowerSmoothing(std::shared_ptr<NsmDevice> nsmDevice,
-                             sdbusplus::bus::bus& bus, const std::string& name,
+                             sdbusplus::bus_t& bus, const std::string& name,
                              const std::string& type,
                              const std::string& inventoryObjPath,
                              SoCDeviceType deviceType, uint32_t version = 1,

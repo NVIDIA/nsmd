@@ -43,13 +43,13 @@ class NsmAERErrorStatusIntf :
     public StateChangeLogger
 {
   public:
-    NsmAERErrorStatusIntf(sdbusplus::bus::bus& bus, const char* path,
+    NsmAERErrorStatusIntf(sdbusplus::bus_t& bus, const char* path,
                           uint8_t deviceIndex,
                           std::shared_ptr<NsmDevice> device) :
         AERErrorStatusIntf(bus, path), ClearAERErrorStatusIntf(bus, path),
         deviceIndex(deviceIndex), device(device)
     {}
-    sdbusplus::message::object_path clearAERStatus() override;
+    sdbusplus::object_path clearAERStatus() override;
     requester::Coroutine clearAERError(AsyncOperationStatusType* status);
     requester::Coroutine doclearAERErrorOnDevice(
         std::shared_ptr<AsyncStatusIntf> statusInterface);

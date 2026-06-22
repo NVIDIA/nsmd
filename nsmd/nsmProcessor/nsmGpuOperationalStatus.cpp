@@ -31,7 +31,7 @@ using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::server::
     OperationalStatus::StateType;
 
 NsmGpuOperationalStatus::NsmGpuOperationalStatus(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath) :
     NsmObject(name, type), inventoryObjPath(inventoryObjPath)
 {

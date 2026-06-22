@@ -677,7 +677,7 @@ struct NsmGetSupportedGPMMetricsTest : public Test
         std::make_shared<sdbusplus::asio::dbus_interface>(
             systemBus, sdbusplus::object_path{"/xyz/test/gpm_supported_test"},
             "com.nvidia.GPMMetrics")};
-    sdbusplus::bus::bus bus{sdbusplus::bus::new_default()};
+    sdbusplus::bus_t bus{sdbusplus::bus::new_default()};
     std::shared_ptr<NVLinkMetricsIntf> nvlinkIntf{
         std::make_shared<NVLinkMetricsIntf>(bus,
                                             "/xyz/test/gpm_supported_test")};

@@ -89,7 +89,7 @@ void NsmInbandUpdatePolicy::updateProperties(
 }
 
 NsmInbandUpdatePolicyObject::NsmInbandUpdatePolicyObject(
-    sdbusplus::bus::bus& bus, const std::string& chassisName,
+    sdbusplus::bus_t& bus, const std::string& chassisName,
     uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn) :
     NsmSensor(chassisName, "NSM_ChassisRoT"), objectPath(getPath(chassisName)),
     classification(classificationIn), identifier(identifierIn), index(indexIn)
@@ -303,12 +303,9 @@ void NsmFailoverPolicy::updateProperties(
     }
 }
 
-NsmFailoverPolicyObject::NsmFailoverPolicyObject(sdbusplus::bus::bus& bus,
-                                                 const std::string& chassisName,
-                                                 const uuid_t& uuid,
-                                                 uint16_t classificationIn,
-                                                 uint16_t identifierIn,
-                                                 uint8_t indexIn) :
+NsmFailoverPolicyObject::NsmFailoverPolicyObject(
+    sdbusplus::bus_t& bus, const std::string& chassisName, const uuid_t& uuid,
+    uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn) :
     NsmSensor(chassisName, "NSM_ChassisRoT"), objectPath(getPath(chassisName)),
     classification(classificationIn), identifier(identifierIn), index(indexIn)
 {
@@ -604,7 +601,7 @@ requester::Coroutine
 }
 
 void NsmImageCopy::requestImageCopy(
-    std::vector<sdbusplus::message::object_path> objectPaths)
+    std::vector<sdbusplus::object_path> objectPaths)
 {
     // Check if an image copy operation is already in progress
     if (ImageCopyRequestStatus() == ImageCopyRequestStatus::Processing)
@@ -865,7 +862,7 @@ requester::Coroutine NsmImageCopy::imageCopyAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-NsmImageCopyObject::NsmImageCopyObject(sdbusplus::bus::bus& bus,
+NsmImageCopyObject::NsmImageCopyObject(sdbusplus::bus_t& bus,
                                        const std::string& chassisName,
                                        const uuid_t& uuid) :
     NsmObject(chassisName, "NSM_ChassisRoT"), objectPath(getPath(chassisName))
@@ -875,7 +872,7 @@ NsmImageCopyObject::NsmImageCopyObject(sdbusplus::bus::bus& bus,
     nsmImageCopy = std::make_unique<NsmImageCopy>(bus, objectPath, uuid, *this);
 }
 
-NsmImageCopyPolicy::NsmImageCopyPolicy(sdbusplus::bus::bus& bus,
+NsmImageCopyPolicy::NsmImageCopyPolicy(sdbusplus::bus_t& bus,
                                        const std::string& objPath,
                                        NsmSensor& nsmSensor) :
     ImageCopyPolicyIntf(bus, objPath.c_str()), nsmSensor(nsmSensor)
@@ -911,7 +908,7 @@ void NsmImageCopyPolicy::updateProperties(
 }
 
 NsmImageCopyPolicyObject::NsmImageCopyPolicyObject(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn) :
     NsmSensor(name, type), objectPath(getPath(name)),
     classification(classificationIn), identifier(identifierIn), index(indexIn)
@@ -1093,7 +1090,7 @@ requester::Coroutine updateImageCopyPolicyHandler(
         value, status, device, classification, identifier, index);
 }
 
-NsmImageCopyState::NsmImageCopyState(sdbusplus::bus::bus& bus,
+NsmImageCopyState::NsmImageCopyState(sdbusplus::bus_t& bus,
                                      const std::string& objPath,
                                      NsmSensor& nsmSensor) :
     ImageCopyStateIntf(bus, objPath.c_str()), nsmSensor(nsmSensor)
@@ -1164,7 +1161,7 @@ void NsmImageCopyState::updateProperties(
 }
 
 NsmImageCopyStateObject::NsmImageCopyStateObject(
-    sdbusplus::bus::bus& bus, const std::string& chassisName) :
+    sdbusplus::bus_t& bus, const std::string& chassisName) :
     NsmSensor(chassisName, "NSM_ChassisRoT"), objectPath(getPath(chassisName))
 {
     lg2::info("NsmImageCopyState: create sensor: {PATH}", "PATH",

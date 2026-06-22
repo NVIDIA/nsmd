@@ -35,10 +35,10 @@ class NsmWorkLoadProfileStatus;
 class NsmWorkloadProfileInfoAsyncIntf : public ProfileInfoAsyncIntf
 {
   public:
-    NsmWorkloadProfileInfoAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+    NsmWorkloadProfileInfoAsyncIntf(sdbusplus::bus_t& bus, const char* path,
                                     std::shared_ptr<NsmDevice> device);
 
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         enablePresetProfile(std::vector<uint8_t> bytes) override;
     requester::Coroutine
         doEnablePresetProfile(std::shared_ptr<AsyncStatusIntf> statusInterface,
@@ -47,7 +47,7 @@ class NsmWorkloadProfileInfoAsyncIntf : public ProfileInfoAsyncIntf
         requestEnablePresetProfile(AsyncOperationStatusType* status,
                                    std::vector<uint8_t>& bytes);
 
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         disablePresetProfile(std::vector<uint8_t> bytes) override;
     requester::Coroutine
         doDisablePresetProfile(std::shared_ptr<AsyncStatusIntf> statusInterface,

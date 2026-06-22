@@ -68,7 +68,7 @@ class MctpDiscovery
     static MctpDiscovery& getInstance();
 
     static void
-        initialize(sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
+        initialize(sdbusplus::bus_t& bus, mctp_socket::Handler& handler,
                    std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler,
                    EidTable& eidTable, nsm::NsmDeviceTable& nsmDevices,
                    sdbusplus::asio::object_server& objServer);
@@ -89,7 +89,7 @@ class MctpDiscovery
      *  Does NOT perform D-Bus discovery — call init() after construction.
      */
     explicit MctpDiscovery(
-        sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
+        sdbusplus::bus_t& bus, mctp_socket::Handler& handler,
         std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler,
         EidTable& eidTable, nsm::NsmDeviceTable& nsmDevices,
         sdbusplus::asio::object_server& objServer);
@@ -102,7 +102,7 @@ class MctpDiscovery
 
   private:
     /** @brief reference to the systemd bus */
-    sdbusplus::bus::bus& bus;
+    sdbusplus::bus_t& bus;
     mctp_socket::Handler& handler;
     std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler;
     EidTable& eidTable;

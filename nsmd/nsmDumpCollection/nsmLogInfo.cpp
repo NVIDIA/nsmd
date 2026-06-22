@@ -32,7 +32,7 @@
 namespace nsm
 {
 
-NsmLogInfoObject::NsmLogInfoObject(sdbusplus::bus::bus& bus,
+NsmLogInfoObject::NsmLogInfoObject(sdbusplus::bus_t& bus,
                                    const std::string& name,
                                    const std::string& inventoryPath,
                                    const std::string& type,
@@ -149,7 +149,7 @@ requester::Coroutine
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmLogInfoObject::getLogInfo(sdbusplus::message::unix_fd fd)
 {
     if (statusInterface != nullptr &&

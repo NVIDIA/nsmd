@@ -67,7 +67,7 @@ class NsmLldpPacket : public NsmSensor
      *  @param portNumber   - port index on the CX9 NIC (0-based)
      *  @param direction    - NSM_LLDP_DIRECTION_TX or NSM_LLDP_DIRECTION_RX
      */
-    NsmLldpPacket(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmLldpPacket(sdbusplus::bus_t& bus, const std::string& name,
                   const std::string& type, const std::string& objectPath,
                   uint16_t portNumber, uint8_t direction);
 

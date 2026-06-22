@@ -46,7 +46,7 @@ std::string getDumpPath(const std::string& name,
     return path(inventoryPath) / name;
 }
 
-NsmDebugInfoObject::NsmDebugInfoObject(sdbusplus::bus::bus& bus,
+NsmDebugInfoObject::NsmDebugInfoObject(sdbusplus::bus_t& bus,
                                        const std::string& name,
                                        const std::string& inventoryPath,
                                        const std::string& type,
@@ -143,7 +143,7 @@ requester::Coroutine NsmDebugInfoObject::getDebugInfoAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDebugInfoObject::getDebugInfo(DebugInformationType debugInfoType,
                                      sdbusplus::message::unix_fd fd)
 {
@@ -272,7 +272,7 @@ requester::Coroutine NsmDebugInfoObject::getDiagnosticsAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDebugInfoObject::getDiagnostics(sdbusplus::message::unix_fd fd)
 {
     if (statusInterface != nullptr &&

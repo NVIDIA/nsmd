@@ -122,7 +122,7 @@ requester::Coroutine coGetTopologyData(const std::string& topoObjPath,
 }
 
 NsmPortStatus::NsmPortStatus(
-    sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+    sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::string& inventoryObjPath) :
@@ -319,7 +319,7 @@ void NsmPortStatus::updateMetricOnSharedMemory()
 }
 
 NsmPortCharacteristics::NsmPortCharacteristics(
-    sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+    sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::shared_ptr<IBPortIntf> iBPortIntf, std::string& inventoryObjPath) :
@@ -598,7 +598,7 @@ void NsmPortCharacteristics::updateMetricOnSharedMemory()
 }
 
 NsmPortMetrics::NsmPortMetrics(
-    sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+    sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
     const std::string& type, const uint8_t deviceType,
     const std::vector<utils::Association>& associations,
     std::string& parentObjPath, std::string& inventoryObjPath,
@@ -1130,7 +1130,7 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
 }
 
 EthPortTelemetryAggregator::EthPortTelemetryAggregator(
-    sdbusplus::bus::bus& bus, std::string& portName, uint16_t portNumber,
+    sdbusplus::bus_t& bus, std::string& portName, uint16_t portNumber,
     const std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf) :
@@ -1356,7 +1356,7 @@ void EthPortTelemetryAggregator::getInterfaceName(const std::string propName,
 }
 
 NsmNetworkAddressAggregator::NsmNetworkAddressAggregator(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::string& objPath, const std::string& nodeGuidObjPath,
     const std::string& ethernetMacAddressObjPath,
     const std::string& permanentMacAddressObjPath, uint16_t portNumber) :
@@ -1541,7 +1541,7 @@ uint8_t
 }
 
 NsmGetPortECCCounters::NsmGetPortECCCounters(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath, uint8_t portNumber) :
     NsmSensor(name, type), objPath(inventoryObjPath), portNumber(portNumber)
 {
@@ -1970,7 +1970,7 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
 
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)
 NsmOpticalModuleReset::NsmOpticalModuleReset(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::string& portObjPath, std::shared_ptr<NsmDevice> device,
     uint32_t port_index) : NsmObject(name, type)
 {

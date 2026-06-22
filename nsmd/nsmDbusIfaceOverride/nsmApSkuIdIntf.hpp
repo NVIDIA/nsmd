@@ -28,7 +28,7 @@ class NsmApSkuIdIntf : public ApSkuIdIntf
 {
   public:
     NsmApSkuIdIntf() = delete;
-    NsmApSkuIdIntf(sdbusplus::bus::bus& bus, const char* path);
+    NsmApSkuIdIntf(sdbusplus::bus_t& bus, const char* path);
 };
 
 } // namespace nsm

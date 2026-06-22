@@ -45,7 +45,7 @@
 namespace nsm
 {
 NsmNetworkAdapterDI::NsmNetworkAdapterDI(
-    sdbusplus::bus::bus& bus, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
     const std::string& type, const std::string& inventoryObjPath) :
     NsmObject(name, type)
@@ -71,7 +71,7 @@ NsmNetworkAdapterDI::NsmNetworkAdapterDI(
 }
 
 NsmDeviceProtectionOptions::NsmDeviceProtectionOptions(
-    sdbusplus::bus::bus& bus, const char* path, const std::string& name,
+    sdbusplus::bus_t& bus, const char* path, const std::string& name,
     const std::string& type) : NsmSensor(name, type)
 {
     lg2::info("NsmDeviceProtectionOptions: create sensor for {NAME}", "NAME",
@@ -795,7 +795,7 @@ static std::string getDeviceModeObjectPath(const std::string& inventoryObjPath,
 }
 
 static std::shared_ptr<DPUOperationModeIntf> createDPUOperationModeInterface(
-    sdbusplus::bus::bus& bus, const std::string& inventoryObjPath,
+    sdbusplus::bus_t& bus, const std::string& inventoryObjPath,
     const std::string& networkAdapterPath, bool isModeConfigurable)
 {
     auto path = getDeviceModeObjectPath(inventoryObjPath, "DPUOperationMode");
@@ -809,7 +809,7 @@ static std::shared_ptr<DPUOperationModeIntf> createDPUOperationModeInterface(
 }
 
 static std::shared_ptr<PCIeDeviceModeIntf> createPCIeDeviceModeInterface(
-    sdbusplus::bus::bus& bus, const std::string& inventoryObjPath,
+    sdbusplus::bus_t& bus, const std::string& inventoryObjPath,
     const std::string& networkAdapterPath, uint8_t pcieModeBitmap)
 {
     auto path = getDeviceModeObjectPath(inventoryObjPath, "PCIeDeviceMode");
@@ -846,7 +846,7 @@ static void registerPendingModeHandler(
             AsyncSetOperationInfo{handler, std::move(setSensor), nsmDevice});
 }
 
-static void createDpuModeSensors(sdbusplus::bus::bus& bus,
+static void createDpuModeSensors(sdbusplus::bus_t& bus,
                                  const std::shared_ptr<NsmDevice>& nsmDevice,
                                  const std::string& name,
                                  const std::string& type,
@@ -881,7 +881,7 @@ static void createDpuModeSensors(sdbusplus::bus::bus& bus,
         setDpuOperationModeHandler, dpuSetSensor, nsmDevice);
 }
 
-static void createPcieModeSensors(sdbusplus::bus::bus& bus,
+static void createPcieModeSensors(sdbusplus::bus_t& bus,
                                   const std::shared_ptr<NsmDevice>& nsmDevice,
                                   const std::string& name,
                                   const std::string& type,
@@ -919,7 +919,7 @@ static void createPcieModeSensors(sdbusplus::bus::bus& bus,
 }
 
 static void createDeviceModeSensors(
-    sdbusplus::bus::bus& bus, const std::shared_ptr<NsmDevice>& nsmDevice,
+    sdbusplus::bus_t& bus, const std::shared_ptr<NsmDevice>& nsmDevice,
     const std::string& name, const std::string& type,
     const std::string& inventoryObjPath, bool hasDpuModeSupport,
     uint8_t dpuModeBitmap, bool hasPcieModeSupport, uint8_t pcieModeBitmap,
@@ -1056,7 +1056,7 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
 
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)
 NsmNetworkAdapterDIReset::NsmNetworkAdapterDIReset(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
     NsmObject(name, type)
 {

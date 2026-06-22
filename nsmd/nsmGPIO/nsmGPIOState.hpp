@@ -26,8 +26,8 @@ class NsmGPIOState : public NsmSensor
 {
   public:
     NsmGPIOState(
-        sdbusplus::bus::bus& bus, const std::string& type,
-        const std::string& name, std::string& inventoryObjPath,
+        sdbusplus::bus_t& bus, const std::string& type, const std::string& name,
+        std::string& inventoryObjPath,
         const std::vector<std::tuple<std::string, std::string, std::string>>&
             associations,
         std::shared_ptr<GPIOStateIntf> gpioStateIntf);

@@ -8,7 +8,7 @@ namespace nsm
 class NsmAltitudePressure : public NsmNumericSensor
 {
   public:
-    NsmAltitudePressure(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmAltitudePressure(sdbusplus::bus_t& bus, const std::string& name,
                         const std::string& type,
                         const std::vector<utils::Association>& association,
                         const std::string& physicalContext,

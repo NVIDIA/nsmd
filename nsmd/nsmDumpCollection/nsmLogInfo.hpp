@@ -36,12 +36,11 @@ using TimeSyncFrom =
 class NsmLogInfoObject : public NsmObject, public LogInfoIntf
 {
   public:
-    NsmLogInfoObject(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmLogInfoObject(sdbusplus::bus_t& bus, const std::string& name,
                      const std::string& inventoryPath, const std::string& type,
                      const uuid_t& uuid);
 
-    sdbusplus::message::object_path
-        getLogInfo(sdbusplus::message::unix_fd fd) override;
+    sdbusplus::object_path getLogInfo(sdbusplus::message::unix_fd fd) override;
 
   private:
     void finish(AsyncOperationStatusType status, uint8_t rc);

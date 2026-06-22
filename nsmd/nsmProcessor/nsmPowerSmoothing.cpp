@@ -645,7 +645,7 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
 }
 
 NsmPowerSmoothingAction::NsmPowerSmoothingAction(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     std::string& inventoryObjPath,
     std::shared_ptr<NsmCurrentPowerSmoothingProfile> currentProfile,
     std::shared_ptr<NsmDevice> device) :
@@ -727,7 +727,7 @@ requester::Coroutine NsmPowerSmoothingAction::doActivatePresetProfile(
     co_return rc_;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmPowerSmoothingAction::activatePresetProfile(uint16_t profileID)
 {
     const auto [objectPath, statusInterface, valueInterface] =
@@ -814,7 +814,7 @@ requester::Coroutine NsmPowerSmoothingAction::doApplyAdminOverride(
     co_return rc_;
 }
 
-sdbusplus::message::object_path NsmPowerSmoothingAction::applyAdminOverride()
+sdbusplus::object_path NsmPowerSmoothingAction::applyAdminOverride()
 {
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();

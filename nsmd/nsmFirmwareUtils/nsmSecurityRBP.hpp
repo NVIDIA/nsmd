@@ -51,7 +51,7 @@ class SecurityConfiguration :
     public StateChangeLogger
 {
   public:
-    SecurityConfiguration(sdbusplus::bus::bus& bus, const std::string& objPath,
+    SecurityConfiguration(sdbusplus::bus_t& bus, const std::string& objPath,
                           const uuid_t& uuidIn,
                           std::shared_ptr<ProgressIntf> progressIntfIn,
                           NsmSensor& nsmSensor);
@@ -87,7 +87,7 @@ class NsmSecurityCfgObject : public NsmSensor
     }
 
   public:
-    NsmSecurityCfgObject(sdbusplus::bus::bus& bus, const std::string& objPath,
+    NsmSecurityCfgObject(sdbusplus::bus_t& bus, const std::string& objPath,
                          const std::string& type, const uuid_t& uuid,
                          std::shared_ptr<ProgressIntf> progressIntfIn);
 
@@ -105,7 +105,7 @@ class NsmSecurityCfgObject : public NsmSensor
 class MinSecurityVersion : public MinSecVersionIntf, public StateChangeLogger
 {
   public:
-    MinSecurityVersion(sdbusplus::bus::bus& bus, const std::string& objPath,
+    MinSecurityVersion(sdbusplus::bus_t& bus, const std::string& objPath,
                        const uuid_t& uuidIn, uint16_t classificationIn,
                        uint16_t identifierIn, uint8_t indexIn,
                        std::shared_ptr<ProgressIntf> progressIntfIn,
@@ -145,7 +145,7 @@ class NsmMinSecVersionObject : public NsmSensor
     }
 
   public:
-    NsmMinSecVersionObject(sdbusplus::bus::bus& bus,
+    NsmMinSecVersionObject(sdbusplus::bus_t& bus,
                            const std::string& chassisName,
                            const std::string& type, const uuid_t& uuid,
                            uint16_t classificationIn, uint16_t identifierIn,

@@ -421,7 +421,7 @@ TEST_F(NsmDotTest, DotCAKInstallSuccess)
                                  std::string(192, '0'), // 96 bytes in hex
                                  "", false, 0, 0);
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmDotTest, DotCAKInstallInvalidCAKEcdsaKey)
@@ -545,7 +545,7 @@ TEST_F(NsmDotTest, BypassSuccess)
 
     auto path = dotObject->bypass();
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmDotTest, BypassAsyncHandlerSuccess)
@@ -872,7 +872,7 @@ TEST_F(NsmDotTest, GetInfoSuccess)
 
     auto path = dotObject->getInfo();
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmDotTest, GetInfoAsyncHandlerSuccess)
@@ -959,7 +959,7 @@ TEST_F(NsmDotTest, LockSuccess)
         DotActionIntf::UnlockMethod::StaticValue, staticChallenge,
         DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaSignature, lmsKey);
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmDotTest, UnlockChallengeSuccess)
@@ -970,7 +970,7 @@ TEST_F(NsmDotTest, UnlockChallengeSuccess)
     auto path =
         dotObject->unlockChallenge(DotActionIntf::UnlockType::OwnerUnlock);
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmDotTest, UnlockSuccess)
@@ -984,7 +984,7 @@ TEST_F(NsmDotTest, UnlockSuccess)
     auto path = dotObject->unlock(DotActionIntf::KeyAuthScheme::Ecdsa,
                                   ecdsaSignature, lmsSignature);
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmDotTest, CAKRotateSuccess)
@@ -1001,7 +1001,7 @@ TEST_F(NsmDotTest, CAKRotateSuccess)
         DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
         DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaSignature, lmsSignature);
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 // ============================================================================
@@ -1150,7 +1150,7 @@ TEST_F(NsmDotTest, DisableSuccess)
         DotActionIntf::UnlockMethod::DeviceUniqueIdentifier, "",
         DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '1'), "");
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmDotTest, DisableInvalidLAKEcdsaKey)
@@ -1266,7 +1266,7 @@ TEST_F(NsmDotTest, OverrideSuccess)
     auto path = dotObject->override(DotActionIntf::KeyAuthScheme::Ecdsa,
                                     std::string(192, '2'), "");
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmDotTest, OverrideHybridSignatureWithoutLmsSignature)
@@ -1353,7 +1353,7 @@ TEST_F(NsmDotTest, RecoverySuccess)
     auto path = dotObject->recoverDOT(unix_fd(fd));
     close(fd);
 
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmDotTest, RecoveryEmptyDotData)

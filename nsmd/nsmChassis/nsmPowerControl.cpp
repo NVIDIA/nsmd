@@ -31,7 +31,7 @@ namespace nsm
 {
 
 NsmPowerControl::NsmPowerControl(
-    sdbusplus::bus::bus& bus, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& name,
     const std::vector<utils::Association>& associations, std::string& type,
     const std::string& path, const std::string& physicalContext) :
     NsmObject(name, type), PowerCapIntf(bus, path.c_str()),
@@ -189,8 +189,7 @@ int32_t NsmPowerControl::clearPowerCap()
     return 0;
 }
 
-sdbusplus::message::object_path
-    NsmChassisClearPowerCapAsyncIntf::clearPowerCap()
+sdbusplus::object_path NsmChassisClearPowerCapAsyncIntf::clearPowerCap()
 {
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();

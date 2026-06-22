@@ -41,8 +41,7 @@ class OemAdminProfileIntfV2 : public OemAdminProfileIntf
 
 {
   public:
-    OemAdminProfileIntfV2(sdbusplus::bus::bus& bus,
-                          const std::string& parentPath,
+    OemAdminProfileIntfV2(sdbusplus::bus_t& bus, const std::string& parentPath,
                           std::shared_ptr<NsmDevice> device) :
         OemAdminProfileIntf(bus, parentPath, device)
     {}

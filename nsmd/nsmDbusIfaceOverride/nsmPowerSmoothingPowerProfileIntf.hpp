@@ -42,7 +42,7 @@ class OemPowerProfileIntf :
     uint8_t profileId;
 
   public:
-    OemPowerProfileIntf(sdbusplus::bus::bus& bus, const std::string& parentPath,
+    OemPowerProfileIntf(sdbusplus::bus_t& bus, const std::string& parentPath,
                         uint8_t profileId, std::shared_ptr<NsmDevice> device) :
         PowerProfileIntf(
             bus,

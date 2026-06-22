@@ -25,7 +25,7 @@ namespace nsm
 class NsmVoltage : public NsmNumericSensor
 {
   public:
-    NsmVoltage(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmVoltage(sdbusplus::bus_t& bus, const std::string& name,
                const std::string& type, uint8_t sensorId,
                const std::vector<utils::Association>& association,
                const std::string& physicalContext,

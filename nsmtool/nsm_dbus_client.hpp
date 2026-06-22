@@ -42,7 +42,7 @@ class NsmDbusClient
     /**
      * @brief Construct DBus client
      */
-    explicit NsmDbusClient(sdbusplus::bus::bus& bus);
+    explicit NsmDbusClient(sdbusplus::bus_t& bus);
 
     /**
      * @brief Find device by EID and get its properties
@@ -141,7 +141,7 @@ class NsmDbusClient
                        int timeoutSeconds = 30, bool verbose = false);
 
   private:
-    sdbusplus::bus::bus& bus;
+    sdbusplus::bus_t& bus;
 
     /**
      * @brief Get DBus property

@@ -57,7 +57,7 @@ class NsmClearPowerCapAsyncIntf :
 {
   public:
     NsmClearPowerCapAsyncIntf(
-        sdbusplus::bus::bus& bus, const char* path,
+        sdbusplus::bus_t& bus, const char* path,
         std::shared_ptr<NsmDevice> device,
         std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
         std::shared_ptr<ClearPowerCapIntf> clearPowerCapIntf) :
@@ -217,7 +217,7 @@ class NsmClearPowerCapAsyncIntf :
         co_return rc;
     }
 
-    sdbusplus::message::object_path clearPowerCap() override
+    sdbusplus::object_path clearPowerCap() override
     {
         const auto [objectPath, statusInterface, valueInterface] =
             AsyncOperationManager::getInstance()->getNewStatusValueInterface();

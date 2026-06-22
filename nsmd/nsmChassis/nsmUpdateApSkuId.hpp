@@ -44,7 +44,7 @@ using UpdateSKUIntf = object_t<sdbusplus::server::com::nvidia::UpdateSKU>;
 class NsmUpdateApSkuIdIntf : public NsmObject
 {
   public:
-    NsmUpdateApSkuIdIntf(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmUpdateApSkuIdIntf(sdbusplus::bus_t& bus, const std::string& name,
                          const std::string& type,
                          const std::string& inventoryObjPath) :
         NsmObject(name, type), updateSkuIntf(std::make_unique<UpdateSKUIntf>(

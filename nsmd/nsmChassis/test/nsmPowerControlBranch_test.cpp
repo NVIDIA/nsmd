@@ -849,7 +849,7 @@ TEST_F(NsmPowerControlExtTest,
 
     // Act: call clearPowerCap on the NsmChassisClearPowerCapAsyncIntf
     // AsyncOperationManager is a static singleton, it will allocate an object
-    sdbusplus::message::object_path path;
+    sdbusplus::object_path path;
     EXPECT_NO_THROW(
         path = powerControl->clearPowerCapAsyncIntf->clearPowerCap());
 

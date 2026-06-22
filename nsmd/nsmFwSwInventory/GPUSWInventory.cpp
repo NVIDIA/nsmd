@@ -16,7 +16,7 @@ namespace nsm
 {
 NsmGPUSWInventoryDriverVersionAndStatus::
     NsmGPUSWInventoryDriverVersionAndStatus(
-        sdbusplus::bus::bus& bus, const std::string& name,
+        sdbusplus::bus_t& bus, const std::string& name,
         const std::vector<utils::Association>& associations,
         const std::string& type, const std::string& manufacturer) :
     NsmObject(name, type)

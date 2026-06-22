@@ -13,7 +13,7 @@
 namespace nsm
 {
 NsmAltitudePressure::NsmAltitudePressure(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::vector<utils::Association>& association,
     const std::string& physicalContext, const std::string* implementation,
     const double maxAllowableValue, const double maxValue,

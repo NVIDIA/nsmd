@@ -35,7 +35,7 @@ using PortProtocol = sdbusplus::server::xyz::openbmc_project::inventory::
 class NsmFpgaPort : public NsmObject
 {
   public:
-    NsmFpgaPort(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmFpgaPort(sdbusplus::bus_t& bus, const std::string& name,
                 const std::string& type, const std::string& health,
                 const std::string& chasisState,
                 const std::vector<utils::Association>& associations,
@@ -63,7 +63,7 @@ class NsmFpgaPortInfo : public NsmObject
 class NsmFpgaPortState : public NsmObject
 {
   public:
-    NsmFpgaPortState(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmFpgaPortState(sdbusplus::bus_t& bus, const std::string& name,
                      const std::string& type, const std::string& linkStatus,
                      const std::string& inventoryObjPath);
 

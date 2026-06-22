@@ -127,9 +127,8 @@ class AsyncSetOperationDispatcher : public AsyncSetIntf
                                  const AsyncSetOperationValueType value,
                                  std::shared_ptr<AsyncStatusIntf> resultIntf);
 
-    sdbusplus::message::object_path
-        set(std::string interface, std::string property,
-            AsyncSetOperationValueType value) override;
+    sdbusplus::object_path set(std::string interface, std::string property,
+                               AsyncSetOperationValueType value) override;
 
     std::unordered_map<std::string,
                        std::unordered_map<std::string, AsyncSetOperationInfo>>

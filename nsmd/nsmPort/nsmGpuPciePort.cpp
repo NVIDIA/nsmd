@@ -43,7 +43,7 @@ namespace nsm
 {
 
 NsmGpuPciePort::NsmGpuPciePort(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::string& health, const std::string& chasisState,
     const std::vector<utils::Association>& associations,
     const std::string& inventoryObjPath) : NsmObject(name, type)
@@ -310,8 +310,7 @@ requester::Coroutine NsmClearPCIeIntf::doClearPCIeCountersOnDevice(
     co_return rc_;
 };
 
-sdbusplus::message::object_path
-    NsmClearPCIeIntf::clearCounter(std::string Counter)
+sdbusplus::object_path NsmClearPCIeIntf::clearCounter(std::string Counter)
 {
     lg2::info("NsmClearPCIeIntf::clearCounter, counter: {CTR}", "CTR", Counter);
     const auto [objectPath, statusInterface, valueInterface] =
@@ -355,7 +354,7 @@ std::shared_ptr<NsmPcieGroup>
 }
 
 NsmPCIePortInfoGroup1::NsmPCIePortInfoGroup1(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath,
     std::unique_ptr<NsmAsioPortInfoInterface> portInfoIntf,
     uint8_t deviceIndex) :

@@ -34,7 +34,7 @@ class OemProfileInfoIntf : public ProfileInfoIntf
     std::string inventoryObjPath;
 
   public:
-    OemProfileInfoIntf(sdbusplus::bus::bus& bus, const std::string& path,
+    OemProfileInfoIntf(sdbusplus::bus_t& bus, const std::string& path,
                        std::shared_ptr<NsmDevice> device) :
         ProfileInfoIntf(bus, path.c_str()), device(device),
         inventoryObjPath(path)
@@ -55,7 +55,7 @@ class OemWorkLoadPowerProfileIntf :
     std::string profileName;
 
   public:
-    OemWorkLoadPowerProfileIntf(sdbusplus::bus::bus& bus,
+    OemWorkLoadPowerProfileIntf(sdbusplus::bus_t& bus,
                                 const std::string& parentPath,
                                 uint16_t profileId, std::string& profileName,
                                 std::shared_ptr<NsmDevice> device) :

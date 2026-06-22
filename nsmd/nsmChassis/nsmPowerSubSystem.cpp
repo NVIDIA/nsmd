@@ -29,7 +29,7 @@ namespace nsm
 {
 
 NsmPowerPowerSupply::NsmPowerPowerSupply(
-    sdbusplus::bus::bus& bus, std::string& name,
+    sdbusplus::bus_t& bus, std::string& name,
     const std::vector<utils::Association>& associations, std::string& type,
     std::string& path, std::string& powerSupplyType) : NsmObject(name, type)
 {

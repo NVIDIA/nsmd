@@ -52,7 +52,7 @@ class NsmNumericSensorComposite : public NsmObject
 {
   public:
     NsmNumericSensorComposite(
-        sdbusplus::bus::bus& bus, const std::string& name,
+        sdbusplus::bus_t& bus, const std::string& name,
         const std::vector<utils::Association>& associations,
         const std::string& type, const std::string& path,
         const std::string& physicalContext, const std::string& implementation

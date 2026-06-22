@@ -53,7 +53,7 @@ class NsmLeakDetection : public NsmSensor
 {
   public:
     NsmLeakDetection(std::string& name, const std::string& type,
-                     sdbusplus::bus::bus& bus,
+                     sdbusplus::bus_t& bus,
                      const std::vector<uint64_t>& sensorIdMap,
                      const std::vector<std::string>& sensorNameMap,
                      const std::string& chassisPath, const double maxValue,

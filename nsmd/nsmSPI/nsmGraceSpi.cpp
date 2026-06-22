@@ -38,7 +38,7 @@ namespace nsm
 // Initialize static counter
 std::atomic<uint32_t> NsmGraceSpiObject::interfaceCounter{0};
 
-NsmGraceSpiObject::NsmGraceSpiObject(sdbusplus::bus::bus& bus,
+NsmGraceSpiObject::NsmGraceSpiObject(sdbusplus::bus_t& bus,
                                      const std::string& name,
                                      const std::string& inventoryPath,
                                      const std::string& type,
@@ -51,7 +51,7 @@ NsmGraceSpiObject::NsmGraceSpiObject(sdbusplus::bus::bus& bus,
     fdName = name + "_read_contents";
 }
 
-sdbusplus::message::object_path NsmGraceSpiObject::eraseSpi()
+sdbusplus::object_path NsmGraceSpiObject::eraseSpi()
 {
     lg2::debug("NsmGraceSpiObject: Erase SPI Requested");
 
@@ -63,12 +63,11 @@ sdbusplus::message::object_path NsmGraceSpiObject::eraseSpi()
 
     eraseSpiAsyncHandler().detach();
 
-    return sdbusplus::message::object_path(
-        std::string(NSM_SPI_PROGRESS_INTERFACE) + "_" +
-        std::to_string(interfaceCounter - 1));
+    return sdbusplus::object_path(std::string(NSM_SPI_PROGRESS_INTERFACE) +
+                                  "_" + std::to_string(interfaceCounter - 1));
 }
 
-sdbusplus::message::object_path NsmGraceSpiObject::readSpi()
+sdbusplus::object_path NsmGraceSpiObject::readSpi()
 {
     lg2::debug("NSMSPI: Starting NSM Read");
 
@@ -100,9 +99,8 @@ sdbusplus::message::object_path NsmGraceSpiObject::readSpi()
 
     readSpiAsyncHandler().detach();
 
-    return sdbusplus::message::object_path(
-        std::string(NSM_SPI_PROGRESS_INTERFACE) + "_" +
-        std::to_string(interfaceCounter - 1));
+    return sdbusplus::object_path(std::string(NSM_SPI_PROGRESS_INTERFACE) +
+                                  "_" + std::to_string(interfaceCounter - 1));
 }
 
 uint8_t NsmGraceSpiObject::startSpiOperation()

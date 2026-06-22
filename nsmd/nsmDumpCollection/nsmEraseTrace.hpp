@@ -40,7 +40,7 @@ using EraseOperationStatus =
 class NsmEraseTraceObject : public NsmObject, public EraseIntf
 {
   public:
-    NsmEraseTraceObject(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmEraseTraceObject(sdbusplus::bus_t& bus, const std::string& name,
                         const std::string& inventoryPath,
                         const std::string& type, const uuid_t& uuid);
     void eraseTrace() override;

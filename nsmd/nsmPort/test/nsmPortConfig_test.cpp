@@ -50,7 +50,7 @@ using namespace ::testing;
 
 struct PCIePortConfigInfoHelper
 {
-    sdbusplus::bus::bus& bus = utils::DBusHandler::getBus();
+    sdbusplus::bus_t& bus = utils::DBusHandler::getBus();
     std::string name{"portConfigInfo"};
     std::string type{"NSM_PCIe"};
     uint8_t portNumber = 2;
@@ -1349,7 +1349,7 @@ TEST_F(NsmPortDisableFutureTestFixture,
 
 TEST_F(NsmPCIePortConfigSetTestFixture, AddSensorNsmPCIePortConfigurationInfo)
 {
-    sdbusplus::bus::bus& testBus = utils::DBusHandler::getBus();
+    sdbusplus::bus_t& testBus = utils::DBusHandler::getBus();
     std::string invPath =
         "/xyz/openbmc_project/inventory/system/gpu/pcie_config_as";
     auto pciePortConfigInfoIntf =

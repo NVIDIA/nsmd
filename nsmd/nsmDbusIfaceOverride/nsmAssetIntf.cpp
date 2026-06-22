@@ -22,7 +22,7 @@ namespace nsm
 using AssetIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
 
-NsmAssetIntf::NsmAssetIntf(sdbusplus::bus::bus& bus, const char* path) :
+NsmAssetIntf::NsmAssetIntf(sdbusplus::bus_t& bus, const char* path) :
     AssetIntf(bus, path)
 {
     AssetIntf::name("NA");

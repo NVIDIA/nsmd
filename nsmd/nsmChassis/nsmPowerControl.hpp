@@ -57,7 +57,7 @@ class NsmChassisClearPowerCapAsyncIntf : ClearPowerCapAsyncIntf
     using ClearPowerCapAsyncIntf::ClearPowerCapAsyncIntf;
 
   private:
-    sdbusplus::message::object_path clearPowerCap() override;
+    sdbusplus::object_path clearPowerCap() override;
 };
 
 class NsmPowerControl :
@@ -66,7 +66,7 @@ class NsmPowerControl :
     public ClearPowerCapIntf
 {
   public:
-    NsmPowerControl(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmPowerControl(sdbusplus::bus_t& bus, const std::string& name,
                     const std::vector<utils::Association>& associations,
                     std::string& type, const std::string& path,
                     const std::string& physicalContext);

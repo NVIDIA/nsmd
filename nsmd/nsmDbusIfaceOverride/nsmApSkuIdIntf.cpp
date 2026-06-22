@@ -22,7 +22,7 @@ namespace nsm
 using ApSkuIdIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::SKU>;
 
-NsmApSkuIdIntf::NsmApSkuIdIntf(sdbusplus::bus::bus& bus, const char* path) :
+NsmApSkuIdIntf::NsmApSkuIdIntf(sdbusplus::bus_t& bus, const char* path) :
     ApSkuIdIntf(bus, path)
 {
     ApSkuIdIntf::sku("NA");

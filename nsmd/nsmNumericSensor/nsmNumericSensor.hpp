@@ -79,7 +79,7 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
 {
   public:
     NsmNumericSensorDbusValue(
-        sdbusplus::bus::bus& bus, const std::string& name,
+        sdbusplus::bus_t& bus, const std::string& name,
         const std::string& sensor_type, const SensorUnit unit,
         const std::vector<utils::Association>& association,
         const std::string& physicalContext, const std::string* implementation,
@@ -108,7 +108,7 @@ class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
 {
   public:
     NsmNumericSensorDbusValueTimestamp(
-        sdbusplus::bus::bus& bus, const std::string& name,
+        sdbusplus::bus_t& bus, const std::string& name,
         const std::string& sensor_type, const SensorUnit unit,
         const std::vector<utils::Association>& association,
         const std::string& physicalContext, const std::string* implementation,
@@ -124,7 +124,7 @@ class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
 class NsmNumericSensorDbusPeakValueTimestamp : public NsmNumericSensorValue
 {
   public:
-    NsmNumericSensorDbusPeakValueTimestamp(sdbusplus::bus::bus& bus,
+    NsmNumericSensorDbusPeakValueTimestamp(sdbusplus::bus_t& bus,
                                            const char* objectPath);
 
     void updateReading(double value, uint64_t timestamp = 0) final;
@@ -196,8 +196,7 @@ class NsmNumericSensorStatus
 class NsmNumericSensorDbusStatus : public NsmNumericSensorStatus
 {
   public:
-    NsmNumericSensorDbusStatus(sdbusplus::bus::bus& bus,
-                               const std::string& name,
+    NsmNumericSensorDbusStatus(sdbusplus::bus_t& bus, const std::string& name,
                                const std::string& sensor_type);
     void updateStatus(bool available, bool functional) final;
 

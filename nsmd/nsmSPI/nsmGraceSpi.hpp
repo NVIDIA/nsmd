@@ -47,12 +47,12 @@ using SpiProgress =
 class NsmGraceSpiObject : public NsmObject, public SpiIntf
 {
   public:
-    NsmGraceSpiObject(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmGraceSpiObject(sdbusplus::bus_t& bus, const std::string& name,
                       const std::string& inventoryPath, const std::string& type,
                       const uuid_t& uuid);
 
-    sdbusplus::message::object_path eraseSpi();
-    sdbusplus::message::object_path readSpi();
+    sdbusplus::object_path eraseSpi();
+    sdbusplus::object_path readSpi();
 
   private:
     uint8_t startSpiOperation();

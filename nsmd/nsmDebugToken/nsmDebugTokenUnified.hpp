@@ -65,8 +65,8 @@ class NsmDebugTokenUnifiedObject :
      * @param uuid Device UUID associated with this debug token object
      * @param debugTokenDeviceType Device type from Entity Manager configuration
      */
-    NsmDebugTokenUnifiedObject(sdbusplus::bus::bus& bus,
-                               const std::string& name, const uuid_t& uuid,
+    NsmDebugTokenUnifiedObject(sdbusplus::bus_t& bus, const std::string& name,
+                               const uuid_t& uuid,
                                const std::string& debugTokenDeviceType);
 
     /**
@@ -83,7 +83,7 @@ class NsmDebugTokenUnifiedObject :
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path eraseToken(
+    sdbusplus::object_path eraseToken(
         sdbusplus::server::com::nvidia::debug_token::Action::EraseType
             eraseType,
         sdbusplus::server::com::nvidia::debug_token::Common::Types tokenType)
@@ -103,8 +103,7 @@ class NsmDebugTokenUnifiedObject :
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path
-        installToken(sdbusplus::message::unix_fd fd);
+    sdbusplus::object_path installToken(sdbusplus::message::unix_fd fd);
 
     /**
      * @brief Installs a debug token from file descriptor for aggregation

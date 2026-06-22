@@ -43,7 +43,7 @@ namespace nsm
 {
 
 NsmLeakDetection::NsmLeakDetection(
-    std::string& name, const std::string& type, sdbusplus::bus::bus& bus,
+    std::string& name, const std::string& type, sdbusplus::bus_t& bus,
     const std::vector<uint64_t>& sensorIdMap,
     const std::vector<std::string>& sensorNameMap,
     const std::string& chassisPath, const double maxValue,

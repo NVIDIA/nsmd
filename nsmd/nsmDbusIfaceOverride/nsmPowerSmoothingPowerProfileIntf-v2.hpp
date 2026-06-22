@@ -36,8 +36,8 @@ using AssociationDefinitionsIntf = sdbusplus::server::object_t<
 class OemPowerProfileIntfV2 : public OemPowerProfileIntf
 {
   public:
-    OemPowerProfileIntfV2(sdbusplus::bus::bus& bus,
-                          const std::string& parentPath, uint8_t profileId,
+    OemPowerProfileIntfV2(sdbusplus::bus_t& bus, const std::string& parentPath,
+                          uint8_t profileId,
                           std::shared_ptr<NsmDevice> device) :
         OemPowerProfileIntf(bus, parentPath, profileId, device)
     {}

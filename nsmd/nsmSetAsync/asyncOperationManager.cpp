@@ -135,7 +135,7 @@ std::tuple<std::string, std::shared_ptr<AsyncStatusIntf>,
     return {objPath, statusIntf, valueIntf};
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     AsyncSetOperationDispatcher::set(std::string interface,
                                      std::string property,
                                      AsyncSetOperationValueType value)

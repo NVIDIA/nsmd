@@ -32,7 +32,7 @@ using ResetIntf = sdbusplus::server::object_t<
 class NsmReset : public NsmObject
 {
   public:
-    NsmReset(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmReset(sdbusplus::bus_t& bus, const std::string& name,
              const std::string& type, std::string& inventoryObjPath,
              std::shared_ptr<NsmDevice> device, const uint8_t deviceIndex);
 

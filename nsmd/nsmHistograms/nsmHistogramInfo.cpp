@@ -207,7 +207,7 @@ BucketDataTypes getDataTypeEnum(uint8_t data_type)
 }
 
 NsmHistogramFormat::NsmHistogramFormat(
-    sdbusplus::bus::bus& bus, std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, std::string& name, const std::string& type,
     std::shared_ptr<FormatIntf>& formatIntf,
     std::shared_ptr<BucketInfoIntf>& bucketInfoIntf, std::string& objPath,
     std::vector<std::tuple<std::string, std::string, std::string>>&

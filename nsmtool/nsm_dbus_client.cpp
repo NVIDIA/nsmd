@@ -19,7 +19,7 @@ namespace nsmtool
 namespace dbus
 {
 
-NsmDbusClient::NsmDbusClient(sdbusplus::bus::bus& bus) : bus(bus) {}
+NsmDbusClient::NsmDbusClient(sdbusplus::bus_t& bus) : bus(bus) {}
 
 template <typename T>
 T NsmDbusClient::getProperty(const std::string& path,
@@ -142,7 +142,7 @@ std::string NsmDbusClient::callSendRequestDbus(
                   messageType, commandCode, unixFd, msgFormatVersion);
 
     auto reply = bus.call(method);
-    sdbusplus::message::object_path asyncHandle;
+    sdbusplus::object_path asyncHandle;
     reply.read(asyncHandle);
 
     return asyncHandle.str;

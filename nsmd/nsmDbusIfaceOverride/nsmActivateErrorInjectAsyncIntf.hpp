@@ -40,7 +40,7 @@ class NsmActivateErrorInjectionPayloadIntf :
     public StateChangeLogger
 {
   public:
-    NsmActivateErrorInjectionPayloadIntf(sdbusplus::bus::bus& bus,
+    NsmActivateErrorInjectionPayloadIntf(sdbusplus::bus_t& bus,
                                          const char* path,
                                          uint16_t errorInjectionType,
                                          uint16_t errorInjectionSubtype,
@@ -108,7 +108,7 @@ class NsmActivateErrorInjectionPayloadIntf :
         co_return cc ? cc : rc;
     }
 
-    sdbusplus::message::object_path activate() override
+    sdbusplus::object_path activate() override
     {
         lg2::debug("NsmActivateErrorInjectionPayload::activate");
         const auto [objectPath, statusInterface, _] =

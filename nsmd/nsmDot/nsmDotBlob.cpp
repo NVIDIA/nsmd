@@ -49,7 +49,7 @@ using Common::File::Error::Open;
 using Common::File::Error::Read;
 using Common::File::Error::Write;
 
-NsmDotBlobObject::NsmDotBlobObject(sdbusplus::bus::bus& bus,
+NsmDotBlobObject::NsmDotBlobObject(sdbusplus::bus_t& bus,
                                    const std::string& name) :
     NsmObject(name, "NSM_DotBlob"),
     DotBlobIntf(bus, ("/xyz/openbmc_project/dot_blob/" + name).c_str()),
@@ -198,7 +198,7 @@ requester::Coroutine NsmDotBlobObject::updateBlobAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDotBlobObject::updateBlob(sdbusplus::message::unix_fd blobFd)
 {
     lg2::debug("DotBlob: UpdateBlob called for: name={NAME}", "NAME",

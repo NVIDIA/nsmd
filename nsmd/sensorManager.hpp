@@ -101,7 +101,7 @@ class SensorManagerImpl : public SensorManager
 
     // Static method to initialize the instance
     static void initialize(
-        sdbusplus::bus::bus& bus, common::Event& event,
+        sdbusplus::bus_t& bus, common::Event& event,
         requester::Handler<requester::Request>& handler,
         nsm::InstanceIdDb& instanceIdDb,
         sdbusplus::asio::object_server& objServer,
@@ -116,7 +116,7 @@ class SensorManagerImpl : public SensorManager
     }
 
     SensorManagerImpl(
-        sdbusplus::bus::bus& bus, common::Event& event,
+        sdbusplus::bus_t& bus, common::Event& event,
         requester::Handler<requester::Request>& handler,
         nsm::InstanceIdDb& instanceIdDb,
         sdbusplus::asio::object_server& objServer,
@@ -176,7 +176,7 @@ class SensorManagerImpl : public SensorManager
 
     void checkAllDevicesReady();
 
-    sdbusplus::bus::bus& bus;
+    sdbusplus::bus_t& bus;
     common::Event& event;
     requester::Handler<requester::Request>& handler;
     nsm::InstanceIdDb& instanceIdDb;

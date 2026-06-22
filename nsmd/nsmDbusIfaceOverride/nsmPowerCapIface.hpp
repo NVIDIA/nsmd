@@ -39,8 +39,8 @@ using PowerCapIntf = sdbusplus::server::object_t<
 class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
 {
   public:
-    NsmPowerCapIntf(sdbusplus::bus::bus& bus, const char* path,
-                    std::string& name, const std::vector<std::string>& parents,
+    NsmPowerCapIntf(sdbusplus::bus_t& bus, const char* path, std::string& name,
+                    const std::vector<std::string>& parents,
                     std::shared_ptr<NsmDevice> device) :
         PowerCapIntf(bus, path), name(name), parents(parents), device(device)
     {}

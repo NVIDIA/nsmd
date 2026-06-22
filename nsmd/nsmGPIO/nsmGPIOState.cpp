@@ -15,7 +15,7 @@ namespace nsm
 {
 
 NsmGPIOState::NsmGPIOState(
-    sdbusplus::bus::bus& bus, const std::string& type, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& type, const std::string& name,
     std::string& inventoryObjPath,
     const std::vector<std::tuple<std::string, std::string, std::string>>&
         associations,

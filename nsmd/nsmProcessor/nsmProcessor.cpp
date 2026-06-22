@@ -75,9 +75,9 @@ using std::filesystem::path;
 namespace nsm
 {
 
-void createMIGMode(std::shared_ptr<NsmDevice> nsmDevice,
-                   sdbusplus::bus::bus& bus, std::string& name,
-                   std::string& type, std::string& inventoryObjPath)
+void createMIGMode(std::shared_ptr<NsmDevice> nsmDevice, sdbusplus::bus_t& bus,
+                   std::string& name, std::string& type,
+                   std::string& inventoryObjPath)
 {
     bool priority = false;
     auto isLongRunning = true;
@@ -134,9 +134,9 @@ void createPortDisableFuture(std::shared_ptr<NsmDevice> nsmDevice,
                                   nvProcessorPortDisableFuture, nsmDevice});
 }
 
-void createECCMode(std::shared_ptr<NsmDevice> nsmDevice,
-                   sdbusplus::bus::bus& bus, std::string& name,
-                   std::string& type, std::string& inventoryObjPath)
+void createECCMode(std::shared_ptr<NsmDevice> nsmDevice, sdbusplus::bus_t& bus,
+                   std::string& name, std::string& type,
+                   std::string& inventoryObjPath)
 {
     bool priority = false;
     auto isLongRunning = true;
@@ -165,7 +165,7 @@ void createECCMode(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createEDPpScalingFactor(std::shared_ptr<NsmDevice> nsmDevice,
-                             sdbusplus::bus::bus& bus, std::string& name,
+                             sdbusplus::bus_t& bus, std::string& name,
                              std::string& type, std::string& inventoryObjPath)
 {
     bool priority = false;
@@ -197,7 +197,7 @@ void createEDPpScalingFactor(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createCpuOperatingConfig(std::shared_ptr<NsmDevice> nsmDevice,
-                              sdbusplus::bus::bus& bus, std::string& name,
+                              sdbusplus::bus_t& bus, std::string& name,
                               std::string& type, std::string& inventoryObjPath)
 {
     bool priority = false;
@@ -261,7 +261,7 @@ void createMemCapacityUtil(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createTotalNvLinksCount(std::shared_ptr<NsmDevice> nsmDevice,
-                             sdbusplus::bus::bus& bus, std::string& name,
+                             sdbusplus::bus_t& bus, std::string& name,
                              std::string& type, std::string& inventoryObjPath)
 {
     bool priority = false;
@@ -274,7 +274,7 @@ void createTotalNvLinksCount(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createGpuOperationalStatus(std::shared_ptr<NsmDevice> nsmDevice,
-                                sdbusplus::bus::bus& bus, std::string& name,
+                                sdbusplus::bus_t& bus, std::string& name,
                                 std::string& type,
                                 std::string& inventoryObjPath)
 {
@@ -285,9 +285,9 @@ void createGpuOperationalStatus(std::shared_ptr<NsmDevice> nsmDevice,
     nsmDevice->addSensor(gpuOpStatusSensor, priority);
 }
 
-void createEGMMode(std::shared_ptr<NsmDevice> nsmDevice,
-                   sdbusplus::bus::bus& bus, std::string& name,
-                   std::string& type, std::string& inventoryObjPath)
+void createEGMMode(std::shared_ptr<NsmDevice> nsmDevice, sdbusplus::bus_t& bus,
+                   std::string& name, std::string& type,
+                   std::string& inventoryObjPath)
 {
     bool priority = false;
 
@@ -305,7 +305,7 @@ void createEGMMode(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createPowerSmoothing(std::shared_ptr<NsmDevice> nsmDevice,
-                          sdbusplus::bus::bus& bus, std::string& name,
+                          sdbusplus::bus_t& bus, std::string& name,
                           std::string& type, std::string& inventoryObjPath)
 {
     bool priority = false;
@@ -475,7 +475,7 @@ void createPowerSmoothing(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createMNNVLTopology(std::shared_ptr<NsmDevice> nsmDevice,
-                         sdbusplus::bus::bus& bus, std::string& name,
+                         sdbusplus::bus_t& bus, std::string& name,
                          std::string& type, std::string& inventoryObjPath)
 {
     // create the interface
@@ -510,7 +510,7 @@ void createMNNVLTopology(std::shared_ptr<NsmDevice> nsmDevice,
             assetMNNVLinkTopologyObject, GPU_NVLINK_PEER_TYPE));
 }
 
-void createPCIe(std::shared_ptr<NsmDevice> nsmDevice, sdbusplus::bus::bus& bus,
+void createPCIe(std::shared_ptr<NsmDevice> nsmDevice, sdbusplus::bus_t& bus,
                 std::string& name, std::string& type,
                 std::string& inventoryObjPath,
                 dbus::PropertyMap& allCurrentIfaceProperties)
@@ -557,7 +557,7 @@ void createPCIe(std::shared_ptr<NsmDevice> nsmDevice, sdbusplus::bus::bus& bus,
 }
 
 void createProcessorPerformance(std::shared_ptr<NsmDevice> nsmDevice,
-                                sdbusplus::bus::bus& bus, std::string& name,
+                                sdbusplus::bus_t& bus, std::string& name,
                                 std::string& type,
                                 std::string& inventoryObjPath,
                                 dbus::PropertyMap& allCurrentIfaceProperties)
@@ -594,9 +594,9 @@ void createProcessorPerformance(std::shared_ptr<NsmDevice> nsmDevice,
     nsmDevice->addSensor(throttleDurationSensor, priority, isLongRunning);
 }
 
-void createPowerCap(std::shared_ptr<NsmDevice> nsmDevice,
-                    sdbusplus::bus::bus& bus, std::string& name,
-                    std::string& type, std::string& inventoryObjPath,
+void createPowerCap(std::shared_ptr<NsmDevice> nsmDevice, sdbusplus::bus_t& bus,
+                    std::string& name, std::string& type,
+                    std::string& inventoryObjPath,
                     dbus::PropertyMap& allCurrentIfaceProperties,
                     SensorManager& manager)
 {
@@ -661,7 +661,7 @@ void createPowerCap(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createReconfigPermissions(std::shared_ptr<NsmDevice> nsmDevice,
-                               sdbusplus::bus::bus& bus, std::string& name,
+                               sdbusplus::bus_t& bus, std::string& name,
                                [[maybe_unused]] std::string& type,
                                std::string& inventoryObjPath,
                                dbus::PropertyMap& allCurrentIfaceProperties)
@@ -772,7 +772,7 @@ void createReconfigPermissions(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createWorkloadPowerProfile(std::shared_ptr<NsmDevice> nsmDevice,
-                                sdbusplus::bus::bus& bus, std::string& name,
+                                sdbusplus::bus_t& bus, std::string& name,
                                 std::string& type,
                                 std::string& inventoryObjPath,
                                 dbus::PropertyMap& allCurrentIfaceProperties)
@@ -820,8 +820,8 @@ void createWorkloadPowerProfile(std::shared_ptr<NsmDevice> nsmDevice,
         workloadPowerProfilePageCollection, profileMapper, firstPageIndex);
     nsmDevice->addSensor(firstPage, priority);
 }
-NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
-                                       std::string& name, std::string& type,
+NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus_t& bus, std::string& name,
+                                       std::string& type,
                                        std::string& inventoryObjPath) :
     NsmObject(name, type)
 {
@@ -832,7 +832,7 @@ NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
 
 #ifdef NVIDIA_RESET_METRICS
 NsmResetCountersSupportedIntf::NsmResetCountersSupportedIntf(
-    sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    sdbusplus::bus_t& bus, std::string& name, std::string& type,
     std::string& inventoryObjPath) : NsmObject(name, type)
 {
     resetMetricsSupportedIntf =
@@ -841,7 +841,7 @@ NsmResetCountersSupportedIntf::NsmResetCountersSupportedIntf(
 #endif
 
 NsmProcessorAssociation::NsmProcessorAssociation(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath,
     const std::vector<utils::Association>& associations) : NsmObject(name, type)
 {
@@ -858,7 +858,7 @@ NsmProcessorAssociation::NsmProcessorAssociation(
     associationDef->associations(associations_list);
 }
 
-NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
+NsmUuidIntf::NsmUuidIntf(sdbusplus::bus_t& bus, std::string& name,
                          std::string& type, std::string& inventoryObjPath,
                          uuid_t uuid) :
     NsmObject(name, type), inventoryObjPath(inventoryObjPath)
@@ -894,7 +894,7 @@ requester::Coroutine NsmUuidIntf::update(std::shared_ptr<NsmDevice> nsmDevice)
 }
 
 #ifdef ENABLE_SYSTEM_GUID
-NsmSysGuidIntf::NsmSysGuidIntf(sdbusplus::bus::bus& bus, std::string& name,
+NsmSysGuidIntf::NsmSysGuidIntf(sdbusplus::bus_t& bus, std::string& name,
                                std::string& type,
                                std::string& inventoryObjPath) :
     NsmObject(name, type), inventoryObjPath(inventoryObjPath)
@@ -1078,7 +1078,7 @@ requester::Coroutine
 #endif
 
 NsmLocationIntfProcessor::NsmLocationIntfProcessor(
-    sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    sdbusplus::bus_t& bus, std::string& name, std::string& type,
     std::string& inventoryObjPath, std::string& locationType) :
     NsmObject(name, type)
 {
@@ -1089,7 +1089,7 @@ NsmLocationIntfProcessor::NsmLocationIntfProcessor(
 }
 
 NsmLocationCodeIntfProcessor::NsmLocationCodeIntfProcessor(
-    sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    sdbusplus::bus_t& bus, std::string& name, std::string& type,
     std::string& inventoryObjPath, std::string& locationCode) :
     NsmObject(name, type)
 {
@@ -1098,7 +1098,7 @@ NsmLocationCodeIntfProcessor::NsmLocationCodeIntfProcessor(
     locationCodeIntf->locationCode(locationCode);
 }
 
-NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
+NsmMigMode::NsmMigMode(sdbusplus::bus_t& bus, std::string& name,
                        std::string& type, std::string& inventoryObjPath,
                        [[maybe_unused]] std::shared_ptr<NsmDevice> device,
                        bool isLongRunning) :
@@ -2448,7 +2448,7 @@ uint8_t NsmTotalNvLinks::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc ? cc : rc;
 }
 
-NsmProcessorRevision::NsmProcessorRevision(sdbusplus::bus::bus& bus,
+NsmProcessorRevision::NsmProcessorRevision(sdbusplus::bus_t& bus,
                                            const std::string& name,
                                            const std::string& type,
                                            std::string& inventoryObjPath) :
@@ -2519,7 +2519,7 @@ uint8_t
     return cc ? cc : rc;
 }
 
-NsmGpuHealth::NsmGpuHealth(sdbusplus::bus::bus& bus, std::string& name,
+NsmGpuHealth::NsmGpuHealth(sdbusplus::bus_t& bus, std::string& name,
                            std::string& type, std::string& inventoryObjPath) :
     NsmObject(name, type)
 {
@@ -3355,7 +3355,7 @@ requester::Coroutine NsmConfidentialCompute::patchCCDevMode(
     co_return NSM_SW_SUCCESS;
 }
 
-NsmEgmMode::NsmEgmMode(sdbusplus::bus::bus& bus, std::string& name,
+NsmEgmMode::NsmEgmMode(sdbusplus::bus_t& bus, std::string& name,
                        std::string& type, std::string& inventoryObjPath) :
     NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 {

@@ -28,7 +28,7 @@ using namespace nsm;
 class NsmThresholdValueTest : public ::testing::Test
 {
   protected:
-    sdbusplus::bus::bus bus = sdbusplus::bus::new_default();
+    sdbusplus::bus_t bus = sdbusplus::bus::new_default();
     const std::string testName = "TestSensor";
     const std::string testType = "TestType";
 };

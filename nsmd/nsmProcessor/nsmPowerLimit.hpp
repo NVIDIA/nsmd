@@ -59,7 +59,7 @@ enum GpuPowerLimitId
 class NsmClearPowerLimitIntf : public ClearPowerLimitIntf
 {
   public:
-    NsmClearPowerLimitIntf(sdbusplus::bus::bus& bus,
+    NsmClearPowerLimitIntf(sdbusplus::bus_t& bus,
                            const std::string& inventoryObjPath);
     int32_t clearPowerCap() override;
 };
@@ -164,7 +164,7 @@ class NsmOneShotPowerLimit : public NsmSensor
 };
 
 void createGPUPowerLimit(std::shared_ptr<NsmDevice> nsmDevice,
-                         sdbusplus::bus::bus& bus, const std::string& name,
+                         sdbusplus::bus_t& bus, const std::string& name,
                          const std::string& type,
                          const std::string& inventoryObjPath);
 } // namespace nsm

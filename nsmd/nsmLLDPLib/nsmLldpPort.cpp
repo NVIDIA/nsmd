@@ -67,7 +67,7 @@ requester::Coroutine coIsLldpPacketSupported(uuid_t uuid, bool& supported)
     co_return NSM_SUCCESS;
 }
 
-void createLldpPacketSensorsForPort(sdbusplus::bus::bus& bus,
+void createLldpPacketSensorsForPort(sdbusplus::bus_t& bus,
                                     const std::shared_ptr<NsmDevice>& nsmDevice,
                                     const std::string& sensorNamePrefix,
                                     const std::string& type,
@@ -85,7 +85,7 @@ void createLldpPacketSensorsForPort(sdbusplus::bus::bus& bus,
     nsmDevice->addSensor(tx, priority);
 }
 
-void createLldpModeSensor(sdbusplus::bus::bus& bus,
+void createLldpModeSensor(sdbusplus::bus_t& bus,
                           const std::shared_ptr<NsmDevice>& nsmDevice,
                           const std::string& name, const std::string& type,
                           const std::string& networkAdapterPath)

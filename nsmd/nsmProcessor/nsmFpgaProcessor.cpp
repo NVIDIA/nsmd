@@ -12,7 +12,7 @@ namespace nsm
 {
 
 NsmFpgaProcessor::NsmFpgaProcessor(
-    sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    sdbusplus::bus_t& bus, std::string& name, std::string& type,
     std::string& inventoryObjPath,
     const std::vector<utils::Association>& associations,
     const std::string& fpgaType, const std::string& locationType,

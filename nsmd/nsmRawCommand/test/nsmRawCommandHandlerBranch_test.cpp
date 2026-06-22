@@ -281,7 +281,7 @@ TEST_F(NsmRawCommandBranchTest, SendRequest_ValidDeviceTypeBoundary_NoThrow)
     // InvalidArgument for deviceType validation
     auto path = NsmRawCommandHandler::getInstance().sendRequest(
         NSM_DEV_ID_GPU, 0, 0, false, 0, 0, unix_fd(fd), 1);
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 // sendRequest: invalid deviceType > NSM_DEV_ID_CPU → throws InvalidArgument

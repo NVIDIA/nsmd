@@ -32,13 +32,13 @@ using SwitchIntf = object_t<Inventory::Item::server::Switch>;
 class NsmPCIeRetimerSwitchDI : public NsmObject
 {
   public:
-    NsmPCIeRetimerSwitchDI(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmPCIeRetimerSwitchDI(sdbusplus::bus_t& bus, const std::string& name,
                            const std::vector<utils::Association>& associations,
                            const std::string& type,
                            std::string& inventoryObjPath, uint8_t deviceIdx);
 
     // Overloaded constructor with port variables
-    NsmPCIeRetimerSwitchDI(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmPCIeRetimerSwitchDI(sdbusplus::bus_t& bus, const std::string& name,
                            const std::vector<utils::Association>& associations,
                            const std::string& type,
                            std::string& inventoryObjPath, uint8_t deviceIdx,
@@ -62,7 +62,7 @@ class NsmPCIeRetimerSwitchDI : public NsmObject
 class NsmPCIeRetimerSwitchGetClockState : public NsmSensor
 {
   public:
-    NsmPCIeRetimerSwitchGetClockState(sdbusplus::bus::bus& bus,
+    NsmPCIeRetimerSwitchGetClockState(sdbusplus::bus_t& bus,
                                       const std::string& name,
                                       const std::string& type,
                                       const uint64_t& deviceInstance,

@@ -46,7 +46,7 @@ class NsmSWInventoryDriverVersionAndStatus : public NsmSensor
 {
   public:
     NsmSWInventoryDriverVersionAndStatus(
-        sdbusplus::bus::bus& bus, const std::string& name,
+        sdbusplus::bus_t& bus, const std::string& name,
         const std::vector<utils::Association>& associations,
         const std::string& type, const std::string& manufacturer);
 

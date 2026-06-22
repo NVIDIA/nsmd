@@ -44,7 +44,7 @@ using PowerSupplyIntf = object_t<Inventory::Item::server::PowerSupply>;
 class NsmPowerPowerSupply : public NsmObject
 {
   public:
-    NsmPowerPowerSupply(sdbusplus::bus::bus& bus, std::string& name,
+    NsmPowerPowerSupply(sdbusplus::bus_t& bus, std::string& name,
                         const std::vector<utils::Association>& associations,
                         std::string& type, std::string& path,
                         std::string& powerSupplyType);

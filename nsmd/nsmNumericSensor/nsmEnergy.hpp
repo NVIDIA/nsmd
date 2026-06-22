@@ -25,7 +25,7 @@ namespace nsm
 class NsmEnergy : public NsmNumericSensor
 {
   public:
-    NsmEnergy(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmEnergy(sdbusplus::bus_t& bus, const std::string& name,
               const std::string& type, uint8_t sensorId,
               const std::vector<utils::Association>& association,
               const std::string& chassis_association,

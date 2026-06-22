@@ -53,8 +53,8 @@ std::shared_ptr<NsmPreBootDiag>
     return instance;
 }
 
-NsmPreBootDiag::NsmPreBootDiag(sdbusplus::bus::bus& bus,
-                               const std::string& name, const std::string& type,
+NsmPreBootDiag::NsmPreBootDiag(sdbusplus::bus_t& bus, const std::string& name,
+                               const std::string& type,
                                const std::string& objPath,
                                std::shared_ptr<NsmDevice> device) :
     NsmObject(name, type)

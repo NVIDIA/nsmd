@@ -31,7 +31,7 @@ namespace nsm
 {
 
 NsmClearPowerCapIntf ::NsmClearPowerCapIntf(
-    sdbusplus::bus::bus& bus, const std::string& inventoryObjPath) :
+    sdbusplus::bus_t& bus, const std::string& inventoryObjPath) :
     ClearPowerCapIntf(bus, inventoryObjPath.c_str())
 {}
 
@@ -41,7 +41,7 @@ int32_t NsmClearPowerCapIntf::clearPowerCap()
 }
 
 NsmProcessorModulePowerControl::NsmProcessorModulePowerControl(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     std::shared_ptr<PowerCapIntf> powerCapIntf,
     std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf,
     const std::string& path,
@@ -207,7 +207,7 @@ requester::Coroutine NsmProcessorModulePowerControl::doClearPowerCapOnModule(
     co_return rc;
 }
 
-sdbusplus::message::object_path NsmProcessorModulePowerControl::clearPowerCap()
+sdbusplus::object_path NsmProcessorModulePowerControl::clearPowerCap()
 {
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();

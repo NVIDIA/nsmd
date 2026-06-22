@@ -43,7 +43,7 @@ using NvlinkLedIntf = object_t<server::NVLinkLED>;
 class NsmNvlinkLedIntf : public NsmObject
 {
   public:
-    NsmNvlinkLedIntf(sdbusplus::bus::bus& bus, std::string& name,
+    NsmNvlinkLedIntf(sdbusplus::bus_t& bus, std::string& name,
                      std::string& type, std::string& inventoryObjPath);
 
     requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;

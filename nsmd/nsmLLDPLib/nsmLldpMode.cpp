@@ -79,7 +79,7 @@ NsmLldpMode::DCBXModeType rawToDcbxModeType(uint8_t v)
 
 } // namespace
 
-NsmLldpMode::NsmLldpMode(sdbusplus::bus::bus& bus, const std::string& name,
+NsmLldpMode::NsmLldpMode(sdbusplus::bus_t& bus, const std::string& name,
                          const std::string& type, const std::string& objectPath,
                          const std::string& networkAdapterPath,
                          std::shared_ptr<NsmDevice> device) :

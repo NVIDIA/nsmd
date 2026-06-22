@@ -66,7 +66,7 @@ class NsmFirmwareSlot :
     public VersionComparisonIntf
 {
   public:
-    NsmFirmwareSlot(sdbusplus::bus::bus& bus, const std::string& chassisPath,
+    NsmFirmwareSlot(sdbusplus::bus_t& bus, const std::string& chassisPath,
                     const std::vector<utils::Association>& associations,
                     int slotNum, SlotIntf::FirmwareType fwType,
                     const std::string& chassisName);

@@ -21,7 +21,7 @@ namespace nsm
 {
 
 NsmFirmwareSlot::NsmFirmwareSlot(
-    sdbusplus::bus::bus& bus, const std::string& chassisPath,
+    sdbusplus::bus_t& bus, const std::string& chassisPath,
     const std::vector<utils::Association>& associations, int slotNum,
     SlotIntf::FirmwareType fwType, const std::string& chassisName) :
     AssociationDefinitionsIntf(

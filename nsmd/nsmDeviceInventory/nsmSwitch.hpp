@@ -60,7 +60,7 @@ class NsmSwitchDI : public NsmInterfaceProvider<IntfType>
 class NsmSwitchDIReset : public NsmObject
 {
   public:
-    NsmSwitchDIReset(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmSwitchDIReset(sdbusplus::bus_t& bus, const std::string& name,
                      const std::string& type, std::string& inventoryObjPath,
                      std::shared_ptr<NsmDevice> device);
 

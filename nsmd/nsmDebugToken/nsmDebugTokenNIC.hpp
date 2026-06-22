@@ -44,15 +44,13 @@ constexpr const auto tokenAlreadyActiveReasonCode = 1;
 class NsmDebugTokenNICObject : public NsmObject, public DebugTokenIntf
 {
   public:
-    NsmDebugTokenNICObject(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmDebugTokenNICObject(sdbusplus::bus_t& bus, const std::string& name,
                            const uuid_t& uuid);
 
-    sdbusplus::message::object_path disableTokens();
-    sdbusplus::message::object_path
-        getRequest(DebugToken::TokenOpcodes tokenOpcode);
-    sdbusplus::message::object_path getStatus(DebugToken::TokenTypes tokenType);
-    sdbusplus::message::object_path
-        installToken(std::vector<uint8_t> tokenData);
+    sdbusplus::object_path disableTokens();
+    sdbusplus::object_path getRequest(DebugToken::TokenOpcodes tokenOpcode);
+    sdbusplus::object_path getStatus(DebugToken::TokenTypes tokenType);
+    sdbusplus::object_path installToken(std::vector<uint8_t> tokenData);
 
   private:
     requester::Coroutine

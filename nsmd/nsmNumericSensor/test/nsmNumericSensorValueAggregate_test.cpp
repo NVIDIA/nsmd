@@ -55,7 +55,7 @@ class NsmNumericSensorValueAggregateTest :
     }
 
   protected:
-    sdbusplus::bus::bus& bus = utils::DBusHandler::getBus();
+    sdbusplus::bus_t& bus = utils::DBusHandler::getBus();
     std::string sensorName = "test_sensor";
     std::string sensorType = "test_type";
     std::vector<utils::Association> associations = {

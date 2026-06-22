@@ -30,7 +30,7 @@
 #endif
 namespace nsm
 {
-NsmTemp::NsmTemp(sdbusplus::bus::bus& bus, const std::string& name,
+NsmTemp::NsmTemp(sdbusplus::bus_t& bus, const std::string& name,
                  const std::string& type, uint8_t sensorId,
                  const std::vector<utils::Association>& association,
                  [[maybe_unused]] const std::string& chassis_association,
@@ -101,7 +101,7 @@ class TempSensorFactory : public NumericSensorBuilder
     std::shared_ptr<NsmNumericSensor>
         makeSensor([[maybe_unused]] const std::string& interface,
                    [[maybe_unused]] const std::string& objPath,
-                   sdbusplus::bus::bus& bus,
+                   sdbusplus::bus_t& bus,
                    const NumericSensorInfo& info) override
     {
         return std::make_shared<NsmTemp>(

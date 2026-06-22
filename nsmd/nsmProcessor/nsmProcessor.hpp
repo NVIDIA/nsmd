@@ -98,7 +98,7 @@ using resetMetricsSupported =
 class NsmAcceleratorIntf : public NsmObject
 {
   public:
-    NsmAcceleratorIntf(sdbusplus::bus::bus& bus, std::string& name,
+    NsmAcceleratorIntf(sdbusplus::bus_t& bus, std::string& name,
                        std::string& type, std::string& inventoryObjPath);
 
   private:
@@ -109,7 +109,7 @@ class NsmAcceleratorIntf : public NsmObject
 class NsmResetCountersSupportedIntf : public NsmObject
 {
   public:
-    NsmResetCountersSupportedIntf(sdbusplus::bus::bus& bus, std::string& name,
+    NsmResetCountersSupportedIntf(sdbusplus::bus_t& bus, std::string& name,
                                   std::string& type,
                                   std::string& inventoryObjPath);
 
@@ -125,8 +125,8 @@ class NsmProcessorAssociation : public NsmObject
 {
   public:
     NsmProcessorAssociation(
-        sdbusplus::bus::bus& bus, const std::string& name,
-        const std::string& type, const std::string& inventoryObjPath,
+        sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
+        const std::string& inventoryObjPath,
         const std::vector<utils::Association>& associations);
 
   private:
@@ -138,7 +138,7 @@ using UuidIntf = sdbusplus::server::object_t<
 class NsmUuidIntf : public NsmObject
 {
   public:
-    NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    NsmUuidIntf(sdbusplus::bus_t& bus, std::string& name, std::string& type,
                 std::string& inventoryObjPath, uuid_t uuid);
 
     requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
@@ -155,8 +155,8 @@ using SysGuidIntf = sdbusplus::server::object_t<
 class NsmSysGuidIntf : public NsmObject
 {
   public:
-    NsmSysGuidIntf(sdbusplus::bus::bus& bus, std::string& name,
-                   std::string& type, std::string& inventoryObjPath);
+    NsmSysGuidIntf(sdbusplus::bus_t& bus, std::string& name, std::string& type,
+                   std::string& inventoryObjPath);
 
     requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
@@ -193,7 +193,7 @@ using LocationTypes = sdbusplus::xyz::openbmc_project::Inventory::Decorator::
 class NsmLocationIntfProcessor : public NsmObject
 {
   public:
-    NsmLocationIntfProcessor(sdbusplus::bus::bus& bus, std::string& name,
+    NsmLocationIntfProcessor(sdbusplus::bus_t& bus, std::string& name,
                              std::string& type, std::string& inventoryObjPath,
                              std::string& locationType);
 
@@ -207,7 +207,7 @@ using LocationCodeIntfProcessor =
 class NsmLocationCodeIntfProcessor : public NsmObject
 {
   public:
-    NsmLocationCodeIntfProcessor(sdbusplus::bus::bus& bus, std::string& name,
+    NsmLocationCodeIntfProcessor(sdbusplus::bus_t& bus, std::string& name,
                                  std::string& type,
                                  std::string& inventoryObjPath,
                                  std::string& locationCode);
@@ -222,7 +222,7 @@ using MigModeIntf =
 class NsmMigMode : public NsmLongRunningSensor
 {
   public:
-    NsmMigMode(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    NsmMigMode(sdbusplus::bus_t& bus, std::string& name, std::string& type,
                std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device,
                bool isLongRunning);
     NsmMigMode() = delete;
@@ -292,7 +292,7 @@ using EDPpIntf =
 class EDPpLocal : public EDPpIntf
 {
   public:
-    EDPpLocal(sdbusplus::bus::bus& bus, const std::string& objPath) :
+    EDPpLocal(sdbusplus::bus_t& bus, const std::string& objPath) :
         EDPpIntf(bus, objPath.c_str(), action::emit_interface_added)
     {}
 
@@ -658,7 +658,7 @@ using RevisionIntf = sdbusplus::server::object_t<
 class NsmProcessorRevision : public NsmSensor
 {
   public:
-    NsmProcessorRevision(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmProcessorRevision(sdbusplus::bus_t& bus, const std::string& name,
                          const std::string& type,
                          std::string& inventoryObjPath);
     NsmProcessorRevision() = default;
@@ -681,7 +681,7 @@ using GpuHealthType = sdbusplus::xyz::openbmc_project::State::Decorator::
 class NsmGpuHealth : public NsmObject
 {
   public:
-    NsmGpuHealth(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    NsmGpuHealth(sdbusplus::bus_t& bus, std::string& name, std::string& type,
                  std::string& inventoryObjPath);
 
   private:
@@ -748,7 +748,7 @@ using EgmModeIntf =
 class NsmEgmMode : public NsmSensor
 {
   public:
-    NsmEgmMode(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    NsmEgmMode(sdbusplus::bus_t& bus, std::string& name, std::string& type,
                std::string& inventoryObjPath);
     NsmEgmMode() = default;
 

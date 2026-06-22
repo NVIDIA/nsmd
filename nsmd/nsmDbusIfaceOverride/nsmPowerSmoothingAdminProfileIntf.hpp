@@ -42,7 +42,7 @@ class OemAdminProfileIntf :
     std::string inventoryObjPath;
 
   public:
-    OemAdminProfileIntf(sdbusplus::bus::bus& bus, const std::string& parentPath,
+    OemAdminProfileIntf(sdbusplus::bus_t& bus, const std::string& parentPath,
                         std::shared_ptr<NsmDevice> device) :
         AdminPowerProfileIntf(bus,
                               (parentPath + "/profile/admin_profile").c_str()),

@@ -11,7 +11,7 @@
 namespace nsm
 {
 
-NsmFpgaPort::NsmFpgaPort(sdbusplus::bus::bus& bus, const std::string& name,
+NsmFpgaPort::NsmFpgaPort(sdbusplus::bus_t& bus, const std::string& name,
                          const std::string& type, const std::string& health,
                          const std::string& chasisState,
                          const std::vector<utils::Association>& associations,
@@ -55,7 +55,7 @@ NsmFpgaPortInfo::NsmFpgaPortInfo(const std::string& name,
         PortInfoIntf::convertPortProtocolFromString(portProtocol));
 }
 
-NsmFpgaPortState::NsmFpgaPortState(sdbusplus::bus::bus& bus,
+NsmFpgaPortState::NsmFpgaPortState(sdbusplus::bus_t& bus,
                                    const std::string& name,
                                    const std::string& type,
                                    const std::string& linkStatus,

@@ -30,7 +30,7 @@ using HealthIntf = sdbusplus::server::object_t<
 class NsmFpgaProcessor : public NsmObject
 {
   public:
-    NsmFpgaProcessor(sdbusplus::bus::bus& bus, std::string& name,
+    NsmFpgaProcessor(sdbusplus::bus_t& bus, std::string& name,
                      std::string& type, std::string& inventoryObjPath,
                      const std::vector<utils::Association>& associations,
                      const std::string& fpgaType,

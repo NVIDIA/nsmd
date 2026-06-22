@@ -76,7 +76,7 @@ using Value = std::variant<
 
 using PropertyMap = std::map<Property, Value>;
 using InterfaceMap = std::map<Interface, PropertyMap>;
-using ObjectValueTree = std::map<sdbusplus::message::object_path, InterfaceMap>;
+using ObjectValueTree = std::map<sdbusplus::object_path, InterfaceMap>;
 
 typedef struct _pathAssociation
 {

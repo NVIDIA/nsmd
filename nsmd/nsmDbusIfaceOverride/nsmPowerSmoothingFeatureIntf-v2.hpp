@@ -30,7 +30,7 @@ using PowerSmoothingIntf = sdbusplus::server::object_t<
 class OemPowerSmoothingFeatIntfV2 : public OemPowerSmoothingFeatIntf
 {
   public:
-    OemPowerSmoothingFeatIntfV2(sdbusplus::bus::bus& bus,
+    OemPowerSmoothingFeatIntfV2(sdbusplus::bus_t& bus,
                                 const std::string& inventoryObjPath,
                                 std::shared_ptr<NsmDevice> device) :
         OemPowerSmoothingFeatIntf(bus, inventoryObjPath, device)

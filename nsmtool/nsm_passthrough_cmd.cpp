@@ -167,7 +167,7 @@ void SendNSMCommand::getMatchingFruDeviceObjectPath(
     const std::string& targetType, uint8_t targetInstanceId,
     std::function<void(const std::string&)> callback)
 {
-    sdbusplus::bus::bus bus = sdbusplus::bus::new_default();
+    sdbusplus::bus_t bus = sdbusplus::bus::new_default();
     std::map<std::string, std::map<std::string, std::vector<std::string>>>
         subtree;
 
@@ -208,7 +208,7 @@ void SendNSMCommand::getDeviceType(
     const std::string& objectPath, const std::string& targetType,
     uint8_t targetInstanceId, std::function<void(const std::string&)> callback)
 {
-    sdbusplus::bus::bus bus = sdbusplus::bus::new_default();
+    sdbusplus::bus_t bus = sdbusplus::bus::new_default();
     auto deviceTypeMethod =
         bus.new_method_call("xyz.openbmc_project.NSM", objectPath.c_str(),
                             "org.freedesktop.DBus.Properties", "Get");
@@ -249,7 +249,7 @@ void SendNSMCommand::getInstanceNumber(
     const std::string& objectPath, uint8_t targetInstanceId,
     std::function<void(const std::string&)> callback)
 {
-    sdbusplus::bus::bus bus = sdbusplus::bus::new_default();
+    sdbusplus::bus_t bus = sdbusplus::bus::new_default();
     auto instanceNumberMethod =
         bus.new_method_call("xyz.openbmc_project.NSM", objectPath.c_str(),
                             "org.freedesktop.DBus.Properties", "Get");
@@ -283,7 +283,7 @@ void SendNSMCommand::execute(const std::string& targetType,
             return;
         }
 
-        sdbusplus::bus::bus bus = sdbusplus::bus::new_default();
+        sdbusplus::bus_t bus = sdbusplus::bus::new_default();
 
         int fd = open(filePath.c_str(), O_RDONLY);
         if (fd == -1)
@@ -301,7 +301,7 @@ void SendNSMCommand::execute(const std::string& targetType,
             method.append(messageType, commandCode, unixFd);
 
             auto reply = bus.call(method);
-            sdbusplus::message::object_path returnedObjectPath;
+            sdbusplus::object_path returnedObjectPath;
             uint8_t completionCode;
             reply.read(returnedObjectPath, completionCode);
 
@@ -329,7 +329,7 @@ GetCommandStatus::GetCommandStatus(CLI::App* app)
 
 void GetCommandStatus::execute(const std::string& objectPath)
 {
-    sdbusplus::bus::bus bus = sdbusplus::bus::new_default();
+    sdbusplus::bus_t bus = sdbusplus::bus::new_default();
 
     try
     {
@@ -365,7 +365,7 @@ void WaitCommandStatusComplete::execute(const std::string& objectPath)
     std::string status;
     do
     {
-        sdbusplus::bus::bus bus = sdbusplus::bus::new_default();
+        sdbusplus::bus_t bus = sdbusplus::bus::new_default();
         try
         {
             auto method = bus.new_method_call(
@@ -410,7 +410,7 @@ GetNSMResponse::GetNSMResponse(CLI::App* app)
 
 void GetNSMResponse::execute(const std::string& objectPath)
 {
-    sdbusplus::bus::bus bus = sdbusplus::bus::new_default();
+    sdbusplus::bus_t bus = sdbusplus::bus::new_default();
 
     try
     {

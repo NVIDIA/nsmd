@@ -65,7 +65,7 @@ class MockSensorManagerImpl : public nsm::SensorManagerImpl
 {
   public:
     MockSensorManagerImpl(
-        sdbusplus::bus::bus& bus, common::Event& event,
+        sdbusplus::bus_t& bus, common::Event& event,
         nsm::RequesterHandler& handler, nsm::InstanceIdDb& instanceIdDb,
         sdbusplus::asio::object_server& objServer,
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&

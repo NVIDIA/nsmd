@@ -102,7 +102,7 @@ class MockNumericSensorBuilderFB : public NumericSensorBuilder
 {
   public:
     MOCK_METHOD(std::shared_ptr<NsmNumericSensor>, makeSensor,
-                (const std::string&, const std::string&, sdbusplus::bus::bus&,
+                (const std::string&, const std::string&, sdbusplus::bus_t&,
                  const NumericSensorInfo&),
                 (override));
     MOCK_METHOD(std::shared_ptr<NsmNumericAggregator>, makeAggregator,

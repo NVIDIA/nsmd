@@ -11,7 +11,7 @@
 namespace nsm
 {
 
-NsmZone::NsmZone(sdbusplus::bus::bus& bus, const std::string& name,
+NsmZone::NsmZone(sdbusplus::bus_t& bus, const std::string& name,
                  const std::string& type, const std::string& fabricObjPath,
                  const std::string& zoneType) : NsmObject(name, type)
 {

@@ -40,7 +40,7 @@ class NsmResetEdppAsyncIntf :
     public StateChangeLogger
 {
   public:
-    NsmResetEdppAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+    NsmResetEdppAsyncIntf(sdbusplus::bus_t& bus, const char* path,
                           std::shared_ptr<NsmDevice> device) :
         ResetEdppAsyncIntf(bus, path), device(device) {};
 
@@ -108,7 +108,7 @@ class NsmResetEdppAsyncIntf :
         co_return rc_;
     };
 
-    sdbusplus::message::object_path reset() override
+    sdbusplus::object_path reset() override
     {
         const auto [objectPath, statusInterface, _] =
             AsyncOperationManager::getInstance()->getNewStatusValueInterface();

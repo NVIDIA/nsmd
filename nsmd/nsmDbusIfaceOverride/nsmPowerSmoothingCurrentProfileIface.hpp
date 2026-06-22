@@ -30,8 +30,7 @@ class OemCurrentPowerProfileIntf : public CurrentPowerProfileIntf
     std::string inventoryObjPath;
     //  signal emission is deferred until the initialization is complete
   public:
-    OemCurrentPowerProfileIntf(sdbusplus::bus::bus& bus,
-                               const std::string& path,
+    OemCurrentPowerProfileIntf(sdbusplus::bus_t& bus, const std::string& path,
                                std::string adminProfilePath,
                                std::shared_ptr<NsmDevice> device) :
         CurrentPowerProfileIntf(bus, path.c_str(), action::defer_emit),

@@ -58,8 +58,8 @@ using MemoryHealthType = sdbusplus::xyz::openbmc_project::State::Decorator::
 class NsmMemoryHealth : public NsmObject
 {
   public:
-    NsmMemoryHealth(sdbusplus::bus::bus& bus, std::string& name,
-                    std::string& type, std::string& inventoryObjPath);
+    NsmMemoryHealth(sdbusplus::bus_t& bus, std::string& name, std::string& type,
+                    std::string& inventoryObjPath);
 
   private:
     std::shared_ptr<MemoryHealthIntf> healthIntf;
@@ -72,7 +72,7 @@ using LocationIntfMemory = sdbusplus::server::object_t<
 class NsmLocationIntfMemory : public NsmObject
 {
   public:
-    NsmLocationIntfMemory(sdbusplus::bus::bus& bus, std::string& name,
+    NsmLocationIntfMemory(sdbusplus::bus_t& bus, std::string& name,
                           std::string& type, std::string& inventoryObjPath);
 
   private:
@@ -86,7 +86,7 @@ using AssociationDefinitionsIntf = sdbusplus::server::object_t<
 class NsmMemoryAssociation : public NsmObject
 {
   public:
-    NsmMemoryAssociation(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmMemoryAssociation(sdbusplus::bus_t& bus, const std::string& name,
                          const std::string& type,
                          const std::string& inventoryObjPath,
                          const std::vector<utils::Association>& associations);

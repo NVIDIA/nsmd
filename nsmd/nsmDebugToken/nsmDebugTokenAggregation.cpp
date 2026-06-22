@@ -56,14 +56,14 @@ DebugTokenAggregationManager::DebugTokenAggregationManager()
 }
 
 NsmDebugTokenAggregationObject::NsmDebugTokenAggregationObject(
-    sdbusplus::bus::bus& bus, const std::string& path) :
+    sdbusplus::bus_t& bus, const std::string& path) :
     DebugTokenAggregationIntf(bus, path.c_str())
 {
     lg2::info("DebugToken: Created Aggregation object at: {PATH}", "PATH",
               path);
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDebugTokenAggregationObject::installToken(sdbusplus::message::unix_fd fd)
 {
     const auto [objPath, statusIntf, valueIntf] =

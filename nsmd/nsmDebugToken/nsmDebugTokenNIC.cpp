@@ -36,7 +36,7 @@
 namespace nsm
 {
 
-NsmDebugTokenNICObject::NsmDebugTokenNICObject(sdbusplus::bus::bus& bus,
+NsmDebugTokenNICObject::NsmDebugTokenNICObject(sdbusplus::bus_t& bus,
                                                const std::string& name,
                                                const uuid_t& uuid) :
     NsmObject(name, "NSM_DebugTokenNIC"),
@@ -439,7 +439,7 @@ requester::Coroutine NsmDebugTokenNICObject::installTokenAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path NsmDebugTokenNICObject::disableTokens()
+sdbusplus::object_path NsmDebugTokenNICObject::disableTokens()
 {
     const auto [objPath, statusIntf, valueIntf] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
@@ -462,7 +462,7 @@ sdbusplus::message::object_path NsmDebugTokenNICObject::disableTokens()
     throw Common::Error::InternalFailure();
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDebugTokenNICObject::getRequest(DebugToken::TokenOpcodes tokenOpcode)
 {
     nsm_debug_token_opcode opcode;
@@ -506,7 +506,7 @@ sdbusplus::message::object_path
     throw Common::Error::InternalFailure();
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDebugTokenNICObject::getStatus(DebugToken::TokenTypes tokenType)
 {
     nsm_debug_token_type type;
@@ -556,7 +556,7 @@ sdbusplus::message::object_path
     throw Common::Error::InternalFailure();
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDebugTokenNICObject::installToken(std::vector<uint8_t> tokenData)
 {
     if (tokenData.size() == 0 ||

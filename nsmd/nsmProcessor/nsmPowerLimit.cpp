@@ -48,7 +48,7 @@ const std::unordered_map<uint32_t, std::string_view> deviceModeIndexToName = {
 };
 
 NsmClearPowerLimitIntf ::NsmClearPowerLimitIntf(
-    sdbusplus::bus::bus& bus, const std::string& inventoryObjPath) :
+    sdbusplus::bus_t& bus, const std::string& inventoryObjPath) :
     ClearPowerLimitIntf(bus, inventoryObjPath.c_str())
 {}
 
@@ -587,7 +587,7 @@ uint8_t
 }
 
 void createGPUPowerLimit(std::shared_ptr<NsmDevice> nsmDevice,
-                         sdbusplus::bus::bus& bus, const std::string& name,
+                         sdbusplus::bus_t& bus, const std::string& name,
                          const std::string& type,
                          const std::string& inventoryObjPath)
 {

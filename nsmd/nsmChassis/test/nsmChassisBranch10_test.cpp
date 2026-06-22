@@ -309,15 +309,15 @@ void createWriteProtect(std::shared_ptr<NsmDevice> device,
                         const std::string& name,
                         const dbus::PropertyMap& allBaseIfaceProperties);
 void createResetMetrics(std::shared_ptr<NsmDevice> device,
-                        const std::string& name, sdbusplus::bus::bus& bus);
+                        const std::string& name, sdbusplus::bus_t& bus);
 void createErrorInjectionPayload(
     SensorManager& manager, std::shared_ptr<NsmDevice> device,
     const std::string& name, const dbus::PropertyMap& allBaseIfaceProperties);
 void createDeviceDiagnostics(std::shared_ptr<NsmDevice> device,
                              const std::string& name, const uuid_t& uuid,
-                             sdbusplus::bus::bus& bus);
+                             sdbusplus::bus_t& bus);
 void createChassisAttributes(std::shared_ptr<NsmDevice> device,
-                             SensorManager& manager, sdbusplus::bus::bus& bus,
+                             SensorManager& manager, sdbusplus::bus_t& bus,
                              const std::string& name, const uuid_t& uuid,
                              const dbus::PropertyMap& allCurrentIfaceProperties,
                              const dbus::PropertyMap& allBaseIfaceProperties);

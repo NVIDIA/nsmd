@@ -144,7 +144,7 @@ void updateDotBlobIfChanged(const std::string& pathName,
     }
 }
 
-NsmDotObject::NsmDotObject(sdbusplus::bus::bus& bus, const std::string& name,
+NsmDotObject::NsmDotObject(sdbusplus::bus_t& bus, const std::string& name,
                            const uuid_t& uuid,
                            const std::string& blobPathName) :
     NsmObject(name, "NSM_Dot"),
@@ -624,7 +624,7 @@ requester::Coroutine NsmDotObject::bypassAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path NsmDotObject::dotCAKInstall(
+sdbusplus::object_path NsmDotObject::dotCAKInstall(
     DotActionIntf::KeyAuthScheme cakKeyAuthScheme, std::string cakEcdsaKey,
     std::string cakLmsKey, DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
     std::string lakEcdsaKey, std::string lakLmsKey, bool lockDisable,
@@ -677,7 +677,7 @@ sdbusplus::message::object_path NsmDotObject::dotCAKInstall(
     return objPath;
 }
 
-sdbusplus::message::object_path NsmDotObject::bypass()
+sdbusplus::object_path NsmDotObject::bypass()
 {
     const auto [objPath, statusIntf, valueIntf] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
@@ -834,7 +834,7 @@ requester::Coroutine
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path NsmDotObject::lock(
+sdbusplus::object_path NsmDotObject::lock(
     DotActionIntf::KeyAuthScheme cakKeyAuthScheme, std::string cakEcdsaKey,
     std::string cakLmsKey, DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
     std::string lakEcdsaKey, std::string lakLmsKey,
@@ -1021,7 +1021,7 @@ requester::Coroutine NsmDotObject::unlockChallengeAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDotObject::unlockChallenge(DotActionIntf::UnlockType unlockType)
 {
     const auto [objPath, statusIntf, valueIntf] =
@@ -1132,7 +1132,7 @@ requester::Coroutine NsmDotObject::unlockAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDotObject::unlock(DotActionIntf::KeyAuthScheme unlockSignatureAuthScheme,
                          std::string ecdsaSignature, std::string lmsSignature)
 {
@@ -1157,7 +1157,7 @@ sdbusplus::message::object_path
     return objPath;
 }
 
-sdbusplus::message::object_path NsmDotObject::getInfo()
+sdbusplus::object_path NsmDotObject::getInfo()
 {
     const auto [objPath, statusIntf, valueIntf] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
@@ -1171,7 +1171,7 @@ sdbusplus::message::object_path NsmDotObject::getInfo()
     return objPath;
 }
 
-sdbusplus::message::object_path NsmDotObject::cakRotate(
+sdbusplus::object_path NsmDotObject::cakRotate(
     DotActionIntf::KeyAuthScheme cakKeyAuthScheme, std::string cakEcdsaKey,
     std::string cakLmsKey,
     DotActionIntf::KeyAuthScheme cakRotateSignatureAuthScheme,
@@ -1437,7 +1437,7 @@ requester::Coroutine NsmDotObject::cakRotateAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path NsmDotObject::disable(
+sdbusplus::object_path NsmDotObject::disable(
     DotActionIntf::KeyAuthScheme lakKeyAuthScheme, std::string lakEcdsaKey,
     std::string lakLmsKey, DotActionIntf::UnlockMethod unlockMethod,
     std::string staticChallenge,
@@ -1653,7 +1653,7 @@ requester::Coroutine NsmDotObject::disableAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path NsmDotObject::override(
+sdbusplus::object_path NsmDotObject::override(
     DotActionIntf::KeyAuthScheme vendorSignatureAuthScheme,
     std::string ecdsaSignature, std::string lmsSignature)
 {
@@ -1811,7 +1811,7 @@ requester::Coroutine NsmDotObject::overrideAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDotObject::recoverDOT(sdbusplus::message::unix_fd dotData)
 {
     if (dotData.fd < 0)

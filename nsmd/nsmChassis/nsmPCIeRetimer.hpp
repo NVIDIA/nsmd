@@ -51,7 +51,7 @@ using HealthIntf = object_t<State::Decorator::server::Health>;
 class NsmPCIeRetimerChassis : public NsmObject
 {
   public:
-    NsmPCIeRetimerChassis(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmPCIeRetimerChassis(sdbusplus::bus_t& bus, const std::string& name,
                           const std::vector<utils::Association>& associations,
                           const std::string& type);
 

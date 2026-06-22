@@ -20,7 +20,7 @@ using EndpointIntf = sdbusplus::server::object_t<
 class NsmEndpoint : public NsmObject
 {
   public:
-    NsmEndpoint(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmEndpoint(sdbusplus::bus_t& bus, const std::string& name,
                 const std::string& type,
                 const std::vector<utils::Association>& associations,
                 const std::string& fabricObjPath);

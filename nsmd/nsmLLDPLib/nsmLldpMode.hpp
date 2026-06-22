@@ -61,7 +61,7 @@ class NsmLldpMode : public NsmSensor
     using DCBXModeType =
         sdbusplus::server::com::nvidia::network::lldp::Modes::DCBXModeType;
 
-    NsmLldpMode(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmLldpMode(sdbusplus::bus_t& bus, const std::string& name,
                 const std::string& type, const std::string& objectPath,
                 const std::string& networkAdapterPath,
                 std::shared_ptr<NsmDevice> device);

@@ -88,7 +88,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @param uuid Device UUID associated with this DOT object
      * @param blobPathName Path name for blob file storage (from EM config)
      */
-    NsmDotObject(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmDotObject(sdbusplus::bus_t& bus, const std::string& name,
                  const uuid_t& uuid, const std::string& blobPathName);
 
     /**
@@ -131,7 +131,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path dotCAKInstall(
+    sdbusplus::object_path dotCAKInstall(
         DotActionIntf::KeyAuthScheme cakKeyAuthScheme, std::string cakEcdsaKey,
         std::string cakLmsKey, DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
         std::string lakEcdsaKey, std::string lakLmsKey, bool lockDisable,
@@ -149,7 +149,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path bypass() override;
+    sdbusplus::object_path bypass() override;
 
     /**
      * @brief Lock DOT and transition from volatile to locked state
@@ -172,7 +172,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path lock(
+    sdbusplus::object_path lock(
         DotActionIntf::KeyAuthScheme cakKeyAuthScheme, std::string cakEcdsaKey,
         std::string cakLmsKey, DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
         std::string lakEcdsaKey, std::string lakLmsKey,
@@ -188,7 +188,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @param unlockType Type of unlock (OwnerUnlock or VendorUnlock)
      * @return Object path for monitoring the async operation status
      */
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         unlockChallenge(DotActionIntf::UnlockType unlockType) override;
 
     /**
@@ -208,7 +208,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @throws Common::Error::InvalidArgument if signature data is invalid
      * @throws Common::Error::Unavailable if async operation manager unavailable
      */
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         unlock(DotActionIntf::KeyAuthScheme unlockSignatureAuthScheme,
                std::string ecdsaSignature, std::string lmsSignature) override;
 
@@ -219,7 +219,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      *
      * @return Object path for monitoring the async operation status
      */
-    sdbusplus::message::object_path getInfo() override;
+    sdbusplus::object_path getInfo() override;
 
     /**
      * @brief Rotate CAK (Code Authentication Key)
@@ -240,7 +240,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         cakRotate(DotActionIntf::KeyAuthScheme cakKeyAuthScheme,
                   std::string cakEcdsaKey, std::string cakLmsKey,
                   DotActionIntf::KeyAuthScheme cakRotateSignatureAuthScheme,
@@ -265,7 +265,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         disable(DotActionIntf::KeyAuthScheme lakKeyAuthScheme,
                 std::string lakEcdsaKey, std::string lakLmsKey,
                 DotActionIntf::UnlockMethod unlockMethod,
@@ -290,7 +290,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         override(DotActionIntf::KeyAuthScheme vendorSignatureAuthScheme,
                  std::string ecdsaSignature, std::string lmsSignature) override;
 
@@ -308,7 +308,7 @@ class NsmDotObject : public NsmObject, public DotActionIntf
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         recoverDOT(sdbusplus::message::unix_fd dotData) override;
 
   private:

@@ -159,7 +159,7 @@ requester::Coroutine NsmAERErrorStatusIntf::doclearAERErrorOnDevice(
     co_return rc;
 };
 
-sdbusplus::message::object_path NsmAERErrorStatusIntf::clearAERStatus()
+sdbusplus::object_path NsmAERErrorStatusIntf::clearAERStatus()
 {
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();

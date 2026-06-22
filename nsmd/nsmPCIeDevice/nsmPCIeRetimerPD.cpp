@@ -48,7 +48,7 @@ PCIeSlotIntf::Generations convertToGeneration(uint32_t value)
 }
 
 NsmPCIeDeviceQueryScalarTelemetry::NsmPCIeDeviceQueryScalarTelemetry(
-    sdbusplus::bus::bus& bus, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
     const std::string& type, const std::string& deviceType,
     const uint8_t deviceIndex, std::string& inventoryObjPath) :
@@ -165,7 +165,7 @@ void NsmPCIeDeviceQueryScalarTelemetry::updateMetricOnSharedMemory()
 }
 
 NsmPCIeDeviceGetClockOutput::NsmPCIeDeviceGetClockOutput(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const uint64_t& deviceInstance, std::string& inventoryObjPath) :
     NsmSensor(name, type)
 {

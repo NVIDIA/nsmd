@@ -25,7 +25,7 @@ namespace nsm
 class NsmPower : public NsmNumericSensor
 {
   public:
-    NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmPower(sdbusplus::bus_t& bus, const std::string& name,
              const std::string& type, uint8_t sensorId,
              uint8_t averagingInterval,
              const std::vector<utils::Association>& association,

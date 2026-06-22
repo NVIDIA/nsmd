@@ -1613,7 +1613,7 @@ TEST_F(NsmProcessorModulePowerControlTest,
     // Ensure patchPowerLimitInProgress is false before the call
     powerControl->patchPowerLimitInProgress = false;
 
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     EXPECT_NO_THROW(objPath = powerControl->clearPowerCap());
     EXPECT_FALSE(std::string(objPath).empty());
 }

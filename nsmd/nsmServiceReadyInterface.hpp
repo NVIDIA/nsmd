@@ -46,7 +46,7 @@ class NsmServiceReadyIntf
     }
 
     // Initialization method to create and setup the singleton instance
-    static void initialize(sdbusplus::bus::bus& bus, const char* path,
+    static void initialize(sdbusplus::bus_t& bus, const char* path,
                            nsm::NsmDeviceTable& nsmDevices)
     {
         if (instance)
@@ -80,7 +80,7 @@ class NsmServiceReadyIntf
 
   private:
     // Private constructor to prevent direct instantiation
-    NsmServiceReadyIntf(sdbusplus::bus::bus& bus, const char* path,
+    NsmServiceReadyIntf(sdbusplus::bus_t& bus, const char* path,
                         nsm::NsmDeviceTable& nsmDevices) :
         nsmDevices(nsmDevices)
     {

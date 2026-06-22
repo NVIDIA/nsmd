@@ -31,14 +31,14 @@ namespace nsm
 {
 
 ApSkuIdConfiguration::ApSkuIdConfiguration(
-    sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
+    sdbusplus::bus_t& bus, const std::string& objPath, const uuid_t& uuidIn,
     std::shared_ptr<ProgressIntf> progressIntfIn, NsmSensor& nsmSensor) :
     ApSkuIdIntf(bus, objPath.c_str()), uuid(uuidIn),
     progressIntf(progressIntfIn), nsmSensor(nsmSensor)
 {}
 
 NsmApSkuIdObject::NsmApSkuIdObject(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const uuid_t& uuidIn, std::shared_ptr<ProgressIntf> progressIntfIn,
     uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn,
     const std::vector<utils::Association>& associations) :

@@ -195,7 +195,7 @@ static void showUsage(const char* programName)
 }
 
 template <typename T>
-static T getProperty(sdbusplus::bus::bus& bus, const std::string& path,
+static T getProperty(sdbusplus::bus_t& bus, const std::string& path,
                      const std::string& service,
                      const std::string& propertyName)
 {

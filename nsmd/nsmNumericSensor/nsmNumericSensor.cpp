@@ -41,7 +41,7 @@ const std::string NsmNumericSensorShmem::valueProperty{"Value"};
 using namespace std::string_literals;
 
 NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
-    sdbusplus::bus::bus& bus, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& name,
     const std::string& sensor_type, const SensorUnit unit,
     const std::vector<utils::Association>& associations,
     const std::string& physicalContext, const std::string* implementation,
@@ -139,7 +139,7 @@ void NsmNumericSensorDbusValue::calculateNextUpdateTimestamp(
 }
 
 NsmNumericSensorDbusValueTimestamp::NsmNumericSensorDbusValueTimestamp(
-    sdbusplus::bus::bus& bus, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& name,
     const std::string& sensor_type, const SensorUnit unit,
     const std::vector<utils::Association>& association,
     const std::string& physicalContext, const std::string* implementation,
@@ -163,7 +163,7 @@ void NsmNumericSensorDbusValueTimestamp::updateReading(double value,
 }
 
 NsmNumericSensorDbusPeakValueTimestamp::NsmNumericSensorDbusPeakValueTimestamp(
-    sdbusplus::bus::bus& bus, const char* objectPath) :
+    sdbusplus::bus_t& bus, const char* objectPath) :
     peakValueIntf(bus, objectPath)
 {}
 
@@ -198,7 +198,7 @@ void NsmNumericSensorValueAggregate::updateReading(double value,
 }
 
 NsmNumericSensorDbusStatus::NsmNumericSensorDbusStatus(
-    sdbusplus::bus::bus& bus, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& name,
     const std::string& sensor_type) :
     availabilityIntf(
         bus,

@@ -20,7 +20,7 @@
 namespace nsm
 {
 
-NsmMNNVLinkTopologyIntf::NsmMNNVLinkTopologyIntf(sdbusplus::bus::bus& bus,
+NsmMNNVLinkTopologyIntf::NsmMNNVLinkTopologyIntf(sdbusplus::bus_t& bus,
                                                  const char* path) :
     MNNVLinkTopologyIntf(bus, path)
 {

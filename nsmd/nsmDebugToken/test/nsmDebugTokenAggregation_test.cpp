@@ -724,7 +724,7 @@ TEST_F(NsmDebugTokenInstallWithDeviceTest, InstallToken_ValidFile_ReturnsPath)
 
     // No matching device serial → installTokensToDevices does nothing but
     // must not crash.  SensorManager is initialized by SensorManagerTest.
-    sdbusplus::message::object_path result;
+    sdbusplus::object_path result;
     EXPECT_NO_THROW(
         { result = obj.installToken(sdbusplus::message::unix_fd(fd)); });
     EXPECT_FALSE(result.str.empty());

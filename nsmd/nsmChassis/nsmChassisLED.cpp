@@ -31,7 +31,7 @@
 namespace nsm
 {
 
-NsmNvlinkLedIntf::NsmNvlinkLedIntf(sdbusplus::bus::bus& bus, std::string& name,
+NsmNvlinkLedIntf::NsmNvlinkLedIntf(sdbusplus::bus_t& bus, std::string& name,
                                    std::string& type,
                                    std::string& inventoryObjPath) :
     NsmObject(name, type), inventoryObjPath(inventoryObjPath)

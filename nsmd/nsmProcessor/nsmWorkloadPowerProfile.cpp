@@ -28,7 +28,7 @@ namespace nsm
 {
 
 NsmWorkloadProfileInfoAsyncIntf::NsmWorkloadProfileInfoAsyncIntf(
-    sdbusplus::bus::bus& bus, const char* path,
+    sdbusplus::bus_t& bus, const char* path,
     std::shared_ptr<NsmDevice> device) :
     ProfileInfoAsyncIntf(bus, path), device(device)
 {}
@@ -122,9 +122,8 @@ requester::Coroutine NsmWorkloadProfileInfoAsyncIntf::doEnablePresetProfile(
     co_return rc_;
 }
 
-sdbusplus::message::object_path
-    NsmWorkloadProfileInfoAsyncIntf::enablePresetProfile(
-        std::vector<uint8_t> bytes)
+sdbusplus::object_path NsmWorkloadProfileInfoAsyncIntf::enablePresetProfile(
+    std::vector<uint8_t> bytes)
 {
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
@@ -239,9 +238,8 @@ requester::Coroutine NsmWorkloadProfileInfoAsyncIntf::doDisablePresetProfile(
     co_return rc_;
 }
 
-sdbusplus::message::object_path
-    NsmWorkloadProfileInfoAsyncIntf::disablePresetProfile(
-        std::vector<uint8_t> bytes)
+sdbusplus::object_path NsmWorkloadProfileInfoAsyncIntf::disablePresetProfile(
+    std::vector<uint8_t> bytes)
 {
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();

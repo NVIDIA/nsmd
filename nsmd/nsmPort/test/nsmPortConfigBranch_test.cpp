@@ -56,7 +56,7 @@ struct NsmPortConfigBranchTest :
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
 
-    sdbusplus::bus::bus& bus = utils::DBusHandler::getBus();
+    sdbusplus::bus_t& bus = utils::DBusHandler::getBus();
     std::string invPath =
         "/xyz/openbmc_project/inventory/system/gpu/pcie_cfg_br";
     std::shared_ptr<PCIePortConfigurationInfoIntf> configIntf;

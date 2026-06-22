@@ -55,7 +55,7 @@ requester::Coroutine createNsmPortSensorGeneric(SensorManager& manager,
 // Helper to create NsmPortMetrics for reuse
 struct NsmPortMetricsHelper
 {
-    sdbusplus::bus::bus& bus = utils::DBusHandler::getBus();
+    sdbusplus::bus_t& bus = utils::DBusHandler::getBus();
     std::string pName{"dummy_port"};
     uint8_t portNum = 1;
     std::string type = "DummyType";

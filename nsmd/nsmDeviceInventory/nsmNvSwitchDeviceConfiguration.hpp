@@ -55,7 +55,7 @@ class NsmNvSwitchDeviceConfigurationAsync :
     public NsmNvSwitchDeviceConfigIntf
 {
   public:
-    NsmNvSwitchDeviceConfigurationAsync(sdbusplus::bus::bus& bus,
+    NsmNvSwitchDeviceConfigurationAsync(sdbusplus::bus_t& bus,
                                         const std::string& name,
                                         const std::string& type,
                                         const std::string& objPath,
@@ -63,11 +63,11 @@ class NsmNvSwitchDeviceConfigurationAsync :
 
     void emitDeviceConfigurationRequestedSignal();
 
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         setDeviceConfiguration(ConfigUpdaterConfigurationType configurationType,
                                sdbusplus::message::unix_fd data) override;
 
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         getDeviceConfiguration(ConfigUpdaterConfigurationType configurationType,
                                sdbusplus::message::unix_fd query) override;
 
@@ -89,7 +89,7 @@ class NsmNvSwitchDeviceConfigurationAsync :
  * NSM_NVSwitch, register Type 5 device configuration (0x10/0x11) on @p
  * dbusObjPath (inventoryObjPath+name). */
 void addNvSwitchDeviceConfigurationSensorIfEnabled(
-    bool supportNvSwitchDeviceConfiguration, sdbusplus::bus::bus& bus,
+    bool supportNvSwitchDeviceConfiguration, sdbusplus::bus_t& bus,
     const std::string& name, const std::string& dbusObjPath,
     std::shared_ptr<NsmDevice> device);
 

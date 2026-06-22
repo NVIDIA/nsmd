@@ -66,7 +66,7 @@ MctpDiscovery& MctpDiscovery::getInstance()
 }
 
 void MctpDiscovery::initialize(
-    sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
+    sdbusplus::bus_t& bus, mctp_socket::Handler& handler,
     std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler, EidTable& eidTable,
     nsm::NsmDeviceTable& nsmDevices, sdbusplus::asio::object_server& objServer)
 {
@@ -91,7 +91,7 @@ void MctpDiscovery::logProberSummaries()
 const std::string emptyUUID = "00000000-0000-0000-0000-000000000000";
 
 MctpDiscovery::MctpDiscovery(
-    sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
+    sdbusplus::bus_t& bus, mctp_socket::Handler& handler,
     std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler, EidTable& eidTable,
     nsm::NsmDeviceTable& nsmDevices,
     sdbusplus::asio::object_server& objServer) :
@@ -492,7 +492,7 @@ requester::Coroutine
     MctpDiscovery::handleDiscoverEndpoints(sdbusplus::message::message& msg,
                                            MctpInfos& mctpInfos)
 {
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     dbus::InterfaceMap interfaces;
     msg.read(objPath, interfaces);
     if (interfaces.find(std::string(mctpEndpointIntfName)) != interfaces.end())
@@ -529,7 +529,7 @@ requester::Coroutine
 
 void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
 {
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     dbus::InterfaceMap interfaces;
     msg.read(objPath, interfaces);
     sd_bus_message_rewind(msg.get(), true);
@@ -729,7 +729,7 @@ requester::Coroutine
     MctpDiscovery::handleDiscoverEndpoints(sdbusplus::message::message& msg,
                                            MctpInfos& mctpInfos)
 {
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     dbus::InterfaceMap interfaces;
     msg.read(objPath, interfaces);
 
@@ -759,7 +759,7 @@ requester::Coroutine
 
 void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
 {
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     dbus::InterfaceMap interfaces;
     msg.read(objPath, interfaces);
     sd_bus_message_rewind(msg.get(), true);
@@ -847,7 +847,7 @@ requester::Coroutine
     MctpDiscovery::handleCleanEndpoints(sdbusplus::message::message& msg,
                                         MctpInfos& mctpInfos)
 {
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     std::vector<std::string> interfaces;
     msg.read(objPath, interfaces);
     if (cachedMctpInfoByPath.find(objPath.str) != cachedMctpInfoByPath.end())
@@ -870,7 +870,7 @@ requester::Coroutine
 void MctpDiscovery::cleanEndpoints(
     [[maybe_unused]] sdbusplus::message::message& msg)
 {
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     std::vector<std::string> interfaces;
     msg.read(objPath, interfaces);
     sd_bus_message_rewind(msg.get(), true);
@@ -901,7 +901,7 @@ void MctpDiscovery::cleanEndpoints(
 void MctpDiscovery::cleanEndpoints(
     [[maybe_unused]] sdbusplus::message::message& msg)
 {
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     std::vector<std::string> interfaces;
     msg.read(objPath, interfaces);
     sd_bus_message_rewind(msg.get(), true);

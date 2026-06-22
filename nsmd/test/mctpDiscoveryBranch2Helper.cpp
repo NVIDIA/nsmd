@@ -29,8 +29,7 @@ extern std::unique_ptr<MctpDiscovery> mctpDiscoveryInstance;
 class TestableMctpDiscovery : public MctpDiscovery
 {
   public:
-    TestableMctpDiscovery(sdbusplus::bus::bus& bus,
-                          mctp_socket::Handler& handler,
+    TestableMctpDiscovery(sdbusplus::bus_t& bus, mctp_socket::Handler& handler,
                           std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler,
                           EidTable& eidTable, nsm::NsmDeviceTable& nsmDevices,
                           sdbusplus::asio::object_server& objServer) :
@@ -61,7 +60,7 @@ void initForTest(EidTable& eidTable, nsm::NsmDeviceTable& nsmDevices)
         throw std::logic_error(
             "Initialize called on an already initialized MctpDiscovery");
     }
-    static auto bus = sdbusplus::bus::bus(nullptr, &sdbusMock);
+    static auto bus = sdbusplus::bus_t(nullptr, &sdbusMock);
 
     alignas(sdbusplus::asio::object_server) static char
         fakeBuf[sizeof(sdbusplus::asio::object_server)]{};

@@ -40,15 +40,15 @@ using DebugDumpType = sdbusplus::common::com::nvidia::dump::DebugInfo::DumpType;
 class NsmDebugInfoObject : public NsmObject, public DebugInfoIntf
 {
   public:
-    NsmDebugInfoObject(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmDebugInfoObject(sdbusplus::bus_t& bus, const std::string& name,
                        const std::string& inventoryPath,
                        const std::string& type, const uuid_t& uuid,
                        DebugDumpType dumpType);
 
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         getDebugInfo(DebugInformationType debugInfoType,
                      sdbusplus::message::unix_fd fd) override;
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         getDiagnostics(sdbusplus::message::unix_fd fd) override;
 
   private:

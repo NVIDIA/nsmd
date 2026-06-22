@@ -55,7 +55,7 @@ class NsmDotBlobObject : public NsmObject, public DotBlobIntf
      * @param bus D-Bus bus interface for communication
      * @param name Object name from EM config (e.g., "CPU_0")
      */
-    NsmDotBlobObject(sdbusplus::bus::bus& bus, const std::string& name);
+    NsmDotBlobObject(sdbusplus::bus_t& bus, const std::string& name);
 
     /**
      * @brief Get the DOT blob from EMMC storage
@@ -82,7 +82,7 @@ class NsmDotBlobObject : public NsmObject, public DotBlobIntf
      * @return Object path implementing com.nvidia.Async.Status interface
      * @throws Common::Error::Unavailable if no async result object available
      */
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         updateBlob(sdbusplus::message::unix_fd blobFd) override;
 
   private:

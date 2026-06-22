@@ -94,7 +94,7 @@ class NsmDebugTokenAggregationObject : public DebugTokenAggregationIntf
      * @param bus D-Bus bus interface for communication
      * @param path D-Bus object path (should be base debug token path)
      */
-    NsmDebugTokenAggregationObject(sdbusplus::bus::bus& bus,
+    NsmDebugTokenAggregationObject(sdbusplus::bus_t& bus,
                                    const std::string& path);
 
     /**
@@ -111,7 +111,7 @@ class NsmDebugTokenAggregationObject : public DebugTokenAggregationIntf
      * @throws Common::Error::Unavailable if async operation manager is
      * unavailable
      */
-    sdbusplus::message::object_path
+    sdbusplus::object_path
         installToken(sdbusplus::message::unix_fd fd) override;
 
   private:

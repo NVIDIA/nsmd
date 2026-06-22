@@ -89,7 +89,7 @@ TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequest)
         .WillOnce(mockPostPatchIO(response(0, 0)));
     auto path = NsmRawCommandHandler::getInstance().sendRequest(
         0, 0, 0, false, 0, 0, unix_fd(fd), 1);
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmRawCommandHandlerTest, BadTestSendRequest)
@@ -152,7 +152,7 @@ TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequestV2Format)
         .WillOnce(mockPostPatchIO(response(0, 0)));
     auto path = NsmRawCommandHandler::getInstance().sendRequest(
         0, 0, 0, false, 0, 0, unix_fd(fd), 2);
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequestV2FormatViaDoSend)
@@ -374,7 +374,7 @@ TEST_F(NsmRawLongRunningTest, SendRequest_IsLongRunning_CoversDetachBranch)
         .WillOnce(mockPostPatchIO(response(0, 0)));
     auto path = NsmRawCommandHandler::getInstance().sendRequest(
         NSM_DEV_ID_GPU, 0, 0, true, 0, 0, unix_fd(fd), 1);
-    EXPECT_NE(path, sdbusplus::message::object_path{});
+    EXPECT_NE(path, sdbusplus::object_path{});
 }
 
 // doSendLongRunningRequest: decode succeeds with cc=NSM_ERROR

@@ -162,7 +162,7 @@ int NsmNvSwitchDeviceConfigurationRequestEvent::handle(eid_t eid,
 }
 
 NsmNvSwitchDeviceConfigurationAsync::NsmNvSwitchDeviceConfigurationAsync(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::string& objPath, std::shared_ptr<NsmDevice> device) :
     NsmObject(name, type), NsmNvSwitchDeviceConfigIntf(bus, objPath.c_str()),
     device(std::move(device)), dbusObjPath_(objPath)
@@ -243,7 +243,7 @@ requester::Coroutine NsmNvSwitchDeviceConfigurationAsync::doSet(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmNvSwitchDeviceConfigurationAsync::setDeviceConfiguration(
         ConfigUpdaterConfigurationType configurationType,
         sdbusplus::message::unix_fd data)
@@ -281,7 +281,7 @@ sdbusplus::message::object_path
         "TYPE", cfgTypeU32, "LEN", payload->size());
 
     doSet(statusInterface, configurationType, std::move(*payload)).detach();
-    return sdbusplus::message::object_path(objectPath);
+    return sdbusplus::object_path(objectPath);
 }
 
 requester::Coroutine NsmNvSwitchDeviceConfigurationAsync::doGet(
@@ -431,7 +431,7 @@ requester::Coroutine NsmNvSwitchDeviceConfigurationAsync::doGet(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmNvSwitchDeviceConfigurationAsync::getDeviceConfiguration(
         ConfigUpdaterConfigurationType configurationType,
         sdbusplus::message::unix_fd query)
@@ -457,11 +457,11 @@ sdbusplus::message::object_path
     doGet(statusInterface, valueInterface, configurationType,
           std::move(*queryBytes))
         .detach();
-    return sdbusplus::message::object_path(objectPath);
+    return sdbusplus::object_path(objectPath);
 }
 
 void addNvSwitchDeviceConfigurationSensorIfEnabled(
-    const bool supportNvSwitchDeviceConfiguration, sdbusplus::bus::bus& bus,
+    const bool supportNvSwitchDeviceConfiguration, sdbusplus::bus_t& bus,
     const std::string& name, const std::string& dbusObjPath,
     std::shared_ptr<NsmDevice> device)
 {

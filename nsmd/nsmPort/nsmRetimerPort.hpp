@@ -67,7 +67,7 @@ using ClockMode =
 class NsmPort : public NsmObject
 {
   public:
-    NsmPort(sdbusplus::bus::bus& bus, std::string& portName,
+    NsmPort(sdbusplus::bus_t& bus, std::string& portName,
             const std::string& type,
             const std::vector<utils::Association>& associations,
             const std::string& inventoryObjPath);
@@ -466,7 +466,7 @@ class NsmPCIePortDiscovery : public NsmSensor
     bool portsCreated{false};
     std::vector<UpstreamPortGroup> upstreamPortGroups;
 
-    PortSensorGroup createMultiPCIePort(sdbusplus::bus::bus& bus,
+    PortSensorGroup createMultiPCIePort(sdbusplus::bus_t& bus,
                                         const std::string& portName,
                                         const std::string& portObjPath,
                                         uint8_t portTypeVal, uint64_t portIndex,
@@ -486,7 +486,7 @@ class NsmPCIePortDiscovery : public NsmSensor
 
     /** @brief Adjust downstream port count for a surviving upstream port.
      *  @return total downstream ports */
-    uint16_t reconcileDownstreamPorts(sdbusplus::bus::bus& bus,
+    uint16_t reconcileDownstreamPorts(sdbusplus::bus_t& bus,
                                       uint16_t upstreamIndex,
                                       uint8_t newDownstreamPortsCount,
                                       uint16_t downstreamPortIndex,
@@ -495,7 +495,7 @@ class NsmPCIePortDiscovery : public NsmSensor
     /** @brief Create a new upstream port group with all associated downstream
      * ports.
      *  @return number of downstream ports created. */
-    uint16_t createUpstreamPortGroup(sdbusplus::bus::bus& bus,
+    uint16_t createUpstreamPortGroup(sdbusplus::bus_t& bus,
                                      uint16_t upstreamIndex,
                                      uint8_t downstreamPortsCount,
                                      uint16_t downstreamPortIndex,

@@ -42,7 +42,7 @@ using GpuOperationalStatusIntf =
 class NsmGpuOperationalStatus : public NsmObject
 {
   public:
-    NsmGpuOperationalStatus(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmGpuOperationalStatus(sdbusplus::bus_t& bus, const std::string& name,
                             const std::string& type,
                             const std::string& inventoryObjPath);
     NsmGpuOperationalStatus() = delete;

@@ -48,7 +48,7 @@ namespace nsm
 {
 
 NsmDebugTokenUnifiedObject::NsmDebugTokenUnifiedObject(
-    sdbusplus::bus::bus& bus, const std::string& name, const uuid_t& uuid,
+    sdbusplus::bus_t& bus, const std::string& name, const uuid_t& uuid,
     const std::string& debugTokenDeviceType) :
     NsmObject(name, "NSM_DebugTokenUnified"),
     DebugTokenActionIntf(bus, (debugTokenObjectBasePath / name).c_str()),
@@ -418,7 +418,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path NsmDebugTokenUnifiedObject::eraseToken(
+sdbusplus::object_path NsmDebugTokenUnifiedObject::eraseToken(
     sdbusplus::server::com::nvidia::debug_token::Action::EraseType eraseType,
     sdbusplus::server::com::nvidia::debug_token::Common::Types tokenType)
 {
@@ -464,7 +464,7 @@ sdbusplus::message::object_path NsmDebugTokenUnifiedObject::eraseToken(
     return objPath;
 }
 
-sdbusplus::message::object_path
+sdbusplus::object_path
     NsmDebugTokenUnifiedObject::installToken(sdbusplus::message::unix_fd fd)
 {
     auto dupFd = dup(fd);

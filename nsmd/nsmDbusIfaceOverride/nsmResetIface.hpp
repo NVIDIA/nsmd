@@ -44,7 +44,7 @@ class NsmResetIntf : public ResetIntf
 class NsmResetAsyncIntf : public ResetAsyncIntf, public StateChangeLogger
 {
   public:
-    NsmResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+    NsmResetAsyncIntf(sdbusplus::bus_t& bus, const char* path,
                       std::shared_ptr<NsmDevice> device, uint8_t deviceIndex) :
         ResetAsyncIntf(bus, path), device(device), deviceIndex(deviceIndex)
     {}
@@ -122,7 +122,7 @@ class NsmResetAsyncIntf : public ResetAsyncIntf, public StateChangeLogger
         co_return NSM_SW_SUCCESS;
     }
 
-    sdbusplus::message::object_path reset() override
+    sdbusplus::object_path reset() override
     {
         const auto [objectPath, statusInterface, _] =
             AsyncOperationManager::getInstance()->getNewStatusValueInterface();
@@ -177,7 +177,7 @@ class NsmDeviceResetAsyncIntf :
     public StateChangeLogger
 {
   public:
-    NsmDeviceResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+    NsmDeviceResetAsyncIntf(sdbusplus::bus_t& bus, const char* path,
                             std::shared_ptr<NsmDevice> device,
                             NsmResetParams resetParams) :
         ResetDeviceAsyncIntf(bus, path), device(device), params(resetParams)
@@ -243,7 +243,7 @@ class NsmDeviceResetAsyncIntf :
         co_return rc_;
     }
 
-    sdbusplus::message::object_path reset() override
+    sdbusplus::object_path reset() override
     {
         const auto [objectPath, statusInterface, valueInterface] =
             AsyncOperationManager::getInstance()->getNewStatusValueInterface();
@@ -268,7 +268,7 @@ class NsmNetworkDeviceResetAsyncIntf :
     public StateChangeLogger
 {
   public:
-    NsmNetworkDeviceResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+    NsmNetworkDeviceResetAsyncIntf(sdbusplus::bus_t& bus, const char* path,
                                    std::shared_ptr<NsmDevice> device) :
         ResetDeviceAsyncIntf(bus, path), device(device)
     {}
@@ -333,7 +333,7 @@ class NsmNetworkDeviceResetAsyncIntf :
         co_return rc_;
     }
 
-    sdbusplus::message::object_path reset() override
+    sdbusplus::object_path reset() override
     {
         const auto [objectPath, statusInterface, valueInterface] =
             AsyncOperationManager::getInstance()->getNewStatusValueInterface();

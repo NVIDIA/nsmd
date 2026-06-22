@@ -28,7 +28,7 @@ class NsmAssetIntf : public AssetIntf
 {
   public:
     NsmAssetIntf() = delete;
-    NsmAssetIntf(sdbusplus::bus::bus& bus, const char* path);
+    NsmAssetIntf(sdbusplus::bus_t& bus, const char* path);
 };
 
 } // namespace nsm

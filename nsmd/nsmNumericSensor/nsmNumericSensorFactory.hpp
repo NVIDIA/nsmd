@@ -64,7 +64,7 @@ class NumericSensorBuilder : public NumericSensorAggregatorBuilder
 
     virtual std::shared_ptr<NsmNumericSensor>
         makeSensor(const std::string& interface, const std::string& objPath,
-                   sdbusplus::bus::bus& bus, const NumericSensorInfo& info) = 0;
+                   sdbusplus::bus_t& bus, const NumericSensorInfo& info) = 0;
 
     virtual std::shared_ptr<NsmNumericAggregator>
         makeAggregator(const NumericSensorInfo& info) = 0;

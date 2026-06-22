@@ -46,7 +46,7 @@ class NsmRawCommandHandler : public NsmRawIntf
 {
   private:
     static NsmRawCommandHandler* instance;
-    NsmRawCommandHandler(sdbusplus::bus::bus& bus, const char* path);
+    NsmRawCommandHandler(sdbusplus::bus_t& bus, const char* path);
     requester::Coroutine
         doSendRequest(uint8_t deviceType, uint8_t instanceId,
                       uint8_t deviceRole, uint8_t messageType,
@@ -62,13 +62,13 @@ class NsmRawCommandHandler : public NsmRawIntf
         uint8_t msgFormatVersion);
 
   public:
-    sdbusplus::message::object_path
-        sendRequest(uint8_t deviceType, uint8_t deviceRole, uint8_t instanceId,
-                    bool isLongRunning, uint8_t messageType,
-                    uint8_t commandCode, sdbusplus::message::unix_fd fd,
-                    uint8_t msgFormatVersion) override;
+    sdbusplus::object_path sendRequest(uint8_t deviceType, uint8_t deviceRole,
+                                       uint8_t instanceId, bool isLongRunning,
+                                       uint8_t messageType, uint8_t commandCode,
+                                       sdbusplus::message::unix_fd fd,
+                                       uint8_t msgFormatVersion) override;
 
-    static void initialize(sdbusplus::bus::bus& bus, const char* path);
+    static void initialize(sdbusplus::bus_t& bus, const char* path);
     static NsmRawCommandHandler& getInstance();
 };
 

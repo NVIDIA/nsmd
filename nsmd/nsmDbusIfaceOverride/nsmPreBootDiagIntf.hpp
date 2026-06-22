@@ -340,7 +340,7 @@ inline requester::Coroutine handleConfigSet(
 class NsmPreBootDiagConfigSystemIntf : public PreBootDiagConfigSystemIntf
 {
   public:
-    NsmPreBootDiagConfigSystemIntf(sdbusplus::bus::bus& bus, const char* path) :
+    NsmPreBootDiagConfigSystemIntf(sdbusplus::bus_t& bus, const char* path) :
         PreBootDiagConfigSystemIntf(bus, path)
     {}
 
@@ -368,7 +368,7 @@ class NsmPreBootDiagConfigSystemIntf : public PreBootDiagConfigSystemIntf
 class NsmPreBootDiagConfigTIDIntf : public PreBootDiagConfigTIDIntf
 {
   public:
-    NsmPreBootDiagConfigTIDIntf(sdbusplus::bus::bus& bus, const char* path) :
+    NsmPreBootDiagConfigTIDIntf(sdbusplus::bus_t& bus, const char* path) :
         PreBootDiagConfigTIDIntf(bus, path)
     {}
 

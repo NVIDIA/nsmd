@@ -56,7 +56,7 @@ class MockNumericSensorBuilder : public NumericSensorBuilder
 {
   public:
     MOCK_METHOD(std::shared_ptr<NsmNumericSensor>, makeSensor,
-                (const std::string&, const std::string&, sdbusplus::bus::bus&,
+                (const std::string&, const std::string&, sdbusplus::bus_t&,
                  const NumericSensorInfo&),
                 (override));
     MOCK_METHOD(std::shared_ptr<NsmNumericAggregator>, makeAggregator,
@@ -334,8 +334,8 @@ TEST_F(NumericSensorFactoryMakeTest, NSMTemp_SensorId0_PrimaryTempAssocAdded)
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TempSensor", 0);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
     EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
-        .WillOnce([&](const std::string&, const std::string&,
-                      sdbusplus::bus::bus&, const NumericSensorInfo& info) {
+        .WillOnce([&](const std::string&, const std::string&, sdbusplus::bus_t&,
+                      const NumericSensorInfo& info) {
         capturedAssociations = info.associations;
         return stubSensor;
     });
@@ -381,8 +381,8 @@ TEST_F(NumericSensorFactoryMakeTest, NSMTemp_NonZeroSensorId_NoPrimaryTempAdded)
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TempSensor2", 1);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
     EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
-        .WillOnce([&](const std::string&, const std::string&,
-                      sdbusplus::bus::bus&, const NumericSensorInfo& info) {
+        .WillOnce([&](const std::string&, const std::string&, sdbusplus::bus_t&,
+                      const NumericSensorInfo& info) {
         capturedAssociations = info.associations;
         return stubSensor;
     });
@@ -427,8 +427,8 @@ TEST_F(NumericSensorFactoryMakeTest,
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TempSensor3", 0);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
     EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
-        .WillOnce([&](const std::string&, const std::string&,
-                      sdbusplus::bus::bus&, const NumericSensorInfo& info) {
+        .WillOnce([&](const std::string&, const std::string&, sdbusplus::bus_t&,
+                      const NumericSensorInfo& info) {
         capturedAssociations = info.associations;
         return stubSensor;
     });

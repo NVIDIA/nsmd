@@ -28,7 +28,7 @@ class NsmMNNVLinkTopologyIntf : public MNNVLinkTopologyIntf
 {
   public:
     NsmMNNVLinkTopologyIntf() = delete;
-    NsmMNNVLinkTopologyIntf(sdbusplus::bus::bus& bus, const char* path);
+    NsmMNNVLinkTopologyIntf(sdbusplus::bus_t& bus, const char* path);
 };
 
 } // namespace nsm

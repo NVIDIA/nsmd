@@ -11,7 +11,7 @@ namespace nsm
 {
 
 NsmPCIeRetimerSwitchDI::NsmPCIeRetimerSwitchDI(
-    sdbusplus::bus::bus& bus, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
     const std::string& type, std::string& inventoryObjPath, uint8_t deviceIdx) :
     NsmObject(name, type), deviceIndex(deviceIdx)
@@ -44,7 +44,7 @@ NsmPCIeRetimerSwitchDI::NsmPCIeRetimerSwitchDI(
 
 // Overloaded constructor with port variables
 NsmPCIeRetimerSwitchDI::NsmPCIeRetimerSwitchDI(
-    sdbusplus::bus::bus& bus, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
     const std::string& type, std::string& inventoryObjPath, uint8_t deviceIdx,
     uint8_t multiPortType, uint8_t multiPortIndex,
@@ -156,7 +156,7 @@ requester::Coroutine
 
 #if defined(ENABLE_CLOCK_OUTPUT_STATE)
 NsmPCIeRetimerSwitchGetClockState::NsmPCIeRetimerSwitchGetClockState(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const uint64_t& deviceInstance, std::string& inventoryObjPath) :
     NsmSensor(name, type)
 {

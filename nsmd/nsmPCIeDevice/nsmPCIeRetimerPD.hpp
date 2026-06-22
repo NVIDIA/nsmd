@@ -56,7 +56,7 @@ class NsmPCIeDeviceQueryScalarTelemetry : public NsmSensor
 {
   public:
     NsmPCIeDeviceQueryScalarTelemetry(
-        sdbusplus::bus::bus& bus, const std::string& name,
+        sdbusplus::bus_t& bus, const std::string& name,
         const std::vector<utils::Association>& associations,
         const std::string& type, const std::string& deviceType,
         const uint8_t deviceIndex, std::string& inventoryObjPath);
@@ -78,8 +78,7 @@ class NsmPCIeDeviceQueryScalarTelemetry : public NsmSensor
 class NsmPCIeDeviceGetClockOutput : public NsmSensor
 {
   public:
-    NsmPCIeDeviceGetClockOutput(sdbusplus::bus::bus& bus,
-                                const std::string& name,
+    NsmPCIeDeviceGetClockOutput(sdbusplus::bus_t& bus, const std::string& name,
                                 const std::string& type,
                                 const uint64_t& deviceInstance,
                                 std::string& inventoryObjPath);

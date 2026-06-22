@@ -57,7 +57,7 @@ SensorManager& SensorManager::getInstance()
 }
 
 void SensorManagerImpl::initialize(
-    sdbusplus::bus::bus& bus, common::Event& event,
+    sdbusplus::bus_t& bus, common::Event& event,
     requester::Handler<requester::Request>& handler,
     nsm::InstanceIdDb& instanceIdDb, sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
@@ -80,7 +80,7 @@ std::map<std::string, std::string> SensorManagerImpl::readynessFailureMap = {};
 // Ensuring the constructor remains private and defined here if not
 // explicitly declared in the header
 SensorManagerImpl::SensorManagerImpl(
-    sdbusplus::bus::bus& bus, common::Event& event,
+    sdbusplus::bus_t& bus, common::Event& event,
     requester::Handler<requester::Request>& handler, InstanceIdDb& instanceIdDb,
     sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
@@ -185,7 +185,7 @@ void SensorManagerImpl::scanInventory()
 
 void SensorManagerImpl::interfaceAddedHandler(sdbusplus::message::message& msg)
 {
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     dbus::InterfaceMap interfaces;
 
     msg.read(objPath, interfaces);

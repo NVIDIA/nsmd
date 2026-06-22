@@ -28,13 +28,12 @@ namespace nsm
 
 NsmRawCommandHandler* NsmRawCommandHandler::instance = nullptr;
 
-NsmRawCommandHandler::NsmRawCommandHandler(sdbusplus::bus::bus& bus,
+NsmRawCommandHandler::NsmRawCommandHandler(sdbusplus::bus_t& bus,
                                            const char* path) :
     NsmRawIntf(bus, path)
 {}
 
-void NsmRawCommandHandler::initialize(sdbusplus::bus::bus& bus,
-                                      const char* path)
+void NsmRawCommandHandler::initialize(sdbusplus::bus_t& bus, const char* path)
 {
     static NsmRawCommandHandler instance(bus, path);
     NsmRawCommandHandler::instance = &instance;
@@ -358,7 +357,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
     co_return rc;
 }
 
-sdbusplus::message::object_path NsmRawCommandHandler::sendRequest(
+sdbusplus::object_path NsmRawCommandHandler::sendRequest(
     uint8_t deviceType, uint8_t deviceRole, uint8_t instanceId,
     bool isLongRunning, uint8_t messageType, uint8_t commandCode,
     sdbusplus::message::unix_fd fd, uint8_t msgFormatVersion)

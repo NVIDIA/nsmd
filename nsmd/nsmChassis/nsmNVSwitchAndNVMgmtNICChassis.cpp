@@ -218,7 +218,7 @@ using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 class NsmDeviceReset : public NsmObject
 {
   public:
-    NsmDeviceReset(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmDeviceReset(sdbusplus::bus_t& bus, const std::string& name,
                    const std::string& type, const std::string& resetObjPath,
                    std::shared_ptr<NsmDevice> device,
                    NvidiaResetTypes resetType, uint8_t resetTarget,
@@ -261,7 +261,7 @@ class NsmDeviceReset : public NsmObject
  *  "reset_controls"/"chassis" association is registered on each so bmcweb can
  *  discover them via getAssociationEndPoints(chassisPath + "/reset_controls").
  */
-void createDeviceResetObjects(sdbusplus::bus::bus& bus,
+void createDeviceResetObjects(sdbusplus::bus_t& bus,
                               std::shared_ptr<NsmDevice> device,
                               const std::string& chassisPath,
                               const std::string& type)

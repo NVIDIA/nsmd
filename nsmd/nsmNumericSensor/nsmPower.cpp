@@ -34,7 +34,7 @@
 #endif
 namespace nsm
 {
-NsmPower::NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
+NsmPower::NsmPower(sdbusplus::bus_t& bus, const std::string& name,
                    const std::string& type, uint8_t sensorId,
                    uint8_t averagingInterval,
                    const std::vector<utils::Association>& association,
@@ -108,7 +108,7 @@ class PowerSensorFactory : public NumericSensorBuilder
     std::shared_ptr<NsmNumericSensor>
         makeSensor([[maybe_unused]] const std::string& interface,
                    [[maybe_unused]] const std::string& objPath,
-                   sdbusplus::bus::bus& bus,
+                   sdbusplus::bus_t& bus,
                    const NumericSensorInfo& info) override
     {
         auto averagingInterval = utils::DBusHandler().getDbusProperty<uint64_t>(

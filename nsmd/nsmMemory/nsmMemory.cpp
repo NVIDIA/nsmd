@@ -71,7 +71,7 @@ void NsmMemoryDeviceType::updateMetricOnSharedMemory()
 #endif
 }
 
-NsmLocationIntfMemory::NsmLocationIntfMemory(sdbusplus::bus::bus& bus,
+NsmLocationIntfMemory::NsmLocationIntfMemory(sdbusplus::bus_t& bus,
                                              std::string& name,
                                              std::string& type,
                                              std::string& inventoryObjPath) :
@@ -83,7 +83,7 @@ NsmLocationIntfMemory::NsmLocationIntfMemory(sdbusplus::bus::bus& bus,
     locationIntf->locationType(LocationTypesMemory::Embedded);
 }
 
-NsmMemoryHealth::NsmMemoryHealth(sdbusplus::bus::bus& bus, std::string& name,
+NsmMemoryHealth::NsmMemoryHealth(sdbusplus::bus_t& bus, std::string& name,
                                  std::string& type,
                                  std::string& inventoryObjPath) :
     NsmObject(name, type)
@@ -94,7 +94,7 @@ NsmMemoryHealth::NsmMemoryHealth(sdbusplus::bus::bus& bus, std::string& name,
 }
 
 NsmMemoryAssociation::NsmMemoryAssociation(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath,
     const std::vector<utils::Association>& associations) : NsmObject(name, type)
 {
@@ -686,7 +686,7 @@ void NsmMemCapacity::updateReading(
 }
 
 void createNSMMemory(std::shared_ptr<NsmDevice> nsmDevice,
-                     SensorManager& manager, sdbusplus::bus::bus& bus,
+                     SensorManager& manager, sdbusplus::bus_t& bus,
                      std::string& name, std::string& type,
                      std::string& inventoryObjPath,
                      const dbus::PropertyMap& allCurrentIfaceProperties,
@@ -752,7 +752,7 @@ void createNSMMemory(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createMemoryRowRemapping(std::shared_ptr<NsmDevice> nsmDevice,
-                              sdbusplus::bus::bus& bus, std::string& name,
+                              sdbusplus::bus_t& bus, std::string& name,
                               std::string& type, std::string& inventoryObjPath)
 {
     auto rowRemapIntf =
@@ -773,7 +773,7 @@ void createMemoryRowRemapping(std::shared_ptr<NsmDevice> nsmDevice,
 }
 
 void createMemoryECCMode(std::shared_ptr<NsmDevice> nsmDevice,
-                         sdbusplus::bus::bus& bus, std::string& name,
+                         sdbusplus::bus_t& bus, std::string& name,
                          std::string& type, std::string& inventoryObjPath)
 {
     bool priority = false;

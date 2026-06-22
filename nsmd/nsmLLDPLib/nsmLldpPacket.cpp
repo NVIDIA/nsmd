@@ -188,7 +188,7 @@ enum class MandatoryPhase : uint8_t
 
 } // namespace
 
-NsmLldpPacket::NsmLldpPacket(sdbusplus::bus::bus& bus, const std::string& name,
+NsmLldpPacket::NsmLldpPacket(sdbusplus::bus_t& bus, const std::string& name,
                              const std::string& type,
                              const std::string& objectPath, uint16_t portNumber,
                              uint8_t direction) :

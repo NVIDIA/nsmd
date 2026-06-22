@@ -17,7 +17,7 @@ using ZoneIntf = sdbusplus::server::object_t<
 class NsmZone : public NsmObject
 {
   public:
-    NsmZone(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmZone(sdbusplus::bus_t& bus, const std::string& name,
             const std::string& type, const std::string& fabricObjPath,
             const std::string& zoneType);
 

@@ -61,7 +61,7 @@ using PCIeBifurcationServer =
 class NsmDeviceProtectionOptions : public NsmSensor
 {
   public:
-    NsmDeviceProtectionOptions(sdbusplus::bus::bus& bus, const char* path,
+    NsmDeviceProtectionOptions(sdbusplus::bus_t& bus, const char* path,
                                const std::string& name,
                                const std::string& type);
     NsmDeviceProtectionOptions() = delete;
@@ -86,7 +86,7 @@ class NsmDeviceProtectionOptions : public NsmSensor
 class NsmNetworkAdapterDI : public NsmObject
 {
   public:
-    NsmNetworkAdapterDI(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmNetworkAdapterDI(sdbusplus::bus_t& bus, const std::string& name,
                         const std::vector<utils::Association>& associations,
                         const std::string& type,
                         const std::string& inventoryObjPath);
@@ -101,7 +101,7 @@ class NsmNetworkAdapterDI : public NsmObject
 class NsmNetworkAdapterDIReset : public NsmObject
 {
   public:
-    NsmNetworkAdapterDIReset(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmNetworkAdapterDIReset(sdbusplus::bus_t& bus, const std::string& name,
                              const std::string& type,
                              std::string& inventoryObjPath,
                              std::shared_ptr<NsmDevice> device);

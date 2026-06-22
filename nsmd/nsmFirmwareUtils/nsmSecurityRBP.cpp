@@ -28,7 +28,7 @@ namespace nsm
 {
 
 SecurityConfiguration::SecurityConfiguration(
-    sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
+    sdbusplus::bus_t& bus, const std::string& objPath, const uuid_t& uuidIn,
     std::shared_ptr<ProgressIntf> progressIntfIn, NsmSensor& nsmSensor) :
     SecurityConfigIntf(bus, objPath.c_str()), uuid(uuidIn),
     progressIntf(progressIntfIn), nsmSensor(nsmSensor)
@@ -176,7 +176,7 @@ void SecurityConfiguration::finishOperation(Progress::OperationStatus status)
 }
 
 NsmSecurityCfgObject::NsmSecurityCfgObject(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
     const uuid_t& uuid, std::shared_ptr<ProgressIntf> progressIntfIn) :
     NsmSensor(name, type), objectPath(getPath(name))
 {
@@ -226,7 +226,7 @@ uint8_t NsmSecurityCfgObject::handleResponseMsg(const nsm_msg* responseMsg,
 }
 
 MinSecurityVersion::MinSecurityVersion(
-    sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
+    sdbusplus::bus_t& bus, const std::string& objPath, const uuid_t& uuidIn,
     uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn,
     std::shared_ptr<ProgressIntf> progressIntfIn, NsmSensor& nsmSensor) :
     MinSecVersionIntf(bus, objPath.c_str()), uuid(uuidIn),
@@ -372,7 +372,7 @@ void MinSecurityVersion::finishOperation(Progress::OperationStatus status)
 }
 
 NsmMinSecVersionObject::NsmMinSecVersionObject(
-    sdbusplus::bus::bus& bus, const std::string& chassisName,
+    sdbusplus::bus_t& bus, const std::string& chassisName,
     const std::string& type, const uuid_t& uuid, uint16_t classificationIn,
     uint16_t identifierIn, uint8_t indexIn,
     std::shared_ptr<ProgressIntf> progressIntfIn) :

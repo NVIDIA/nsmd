@@ -28,7 +28,7 @@ using FabricIntf = object_t<Inventory::Item::server::Fabric>;
 class NsmPCIeRetimerFabricDI : public NsmObject
 {
   public:
-    NsmPCIeRetimerFabricDI(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmPCIeRetimerFabricDI(sdbusplus::bus_t& bus, const std::string& name,
                            const std::vector<utils::Association>& associations,
                            const std::string& type,
                            const std::string& fabricsType);

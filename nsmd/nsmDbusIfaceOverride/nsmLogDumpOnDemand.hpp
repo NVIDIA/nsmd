@@ -34,7 +34,7 @@ using LogDumpIntf = sdbusplus::server::object_t<
 class NsmLogDumpIntf : public LogDumpIntf
 {
   public:
-    NsmLogDumpIntf(sdbusplus::bus::bus& bus, const char* path) :
+    NsmLogDumpIntf(sdbusplus::bus_t& bus, const char* path) :
         LogDumpIntf(bus, path)
     {}
 
@@ -62,7 +62,7 @@ class NsmLogDumpTracker
     }
 
     // Initialization method to create and setup the singleton instance
-    static void initialize(sdbusplus::bus::bus& bus, const char* path)
+    static void initialize(sdbusplus::bus_t& bus, const char* path)
     {
         if (instance)
         {
@@ -80,7 +80,7 @@ class NsmLogDumpTracker
 
   private:
     // Private constructor to prevent direct instantiation
-    NsmLogDumpTracker(sdbusplus::bus::bus& bus, const char* path)
+    NsmLogDumpTracker(sdbusplus::bus_t& bus, const char* path)
 
     {
         dumpIntf = std::make_unique<NsmLogDumpIntf>(bus, path);

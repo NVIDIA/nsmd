@@ -23,7 +23,7 @@ requester::Coroutine coIsLldpPacketSupported(uuid_t uuid, bool& supported);
 
 /** Register per-port RX/TX GetLLDPPacket poll sensors on the round-robin
  *  queue. portNumber is the 0-based NSM port index. */
-void createLldpPacketSensorsForPort(sdbusplus::bus::bus& bus,
+void createLldpPacketSensorsForPort(sdbusplus::bus_t& bus,
                                     const std::shared_ptr<NsmDevice>& nsmDevice,
                                     const std::string& sensorNamePrefix,
                                     const std::string& type,
@@ -32,7 +32,7 @@ void createLldpPacketSensorsForPort(sdbusplus::bus::bus& bus,
 
 /** Register the adapter-level LLDP mode sensor and async set handlers for
  *  TXMode, RXMode, and DCBXMode. */
-void createLldpModeSensor(sdbusplus::bus::bus& bus,
+void createLldpModeSensor(sdbusplus::bus_t& bus,
                           const std::shared_ptr<NsmDevice>& nsmDevice,
                           const std::string& name, const std::string& type,
                           const std::string& networkAdapterPath);

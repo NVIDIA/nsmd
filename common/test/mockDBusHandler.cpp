@@ -103,8 +103,7 @@ PropertyValue convertToPropertyValue(const dbus::Value& value)
         using T = std::decay_t<decltype(arg)>;
         // Special case: convert std::vector<object_path> to
         // std::vector<string>
-        if constexpr (std::is_same_v<
-                          T, std::vector<sdbusplus::message::object_path>>)
+        if constexpr (std::is_same_v<T, std::vector<sdbusplus::object_path>>)
         {
             std::vector<std::string> result;
             result.reserve(arg.size());

@@ -84,8 +84,8 @@ using LinkDownReasonCodes =
 class NsmPortStatus : public NsmObject
 {
   public:
-    NsmPortStatus(sdbusplus::bus::bus& bus, std::string& portName,
-                  uint8_t portNum, const std::string& type,
+    NsmPortStatus(sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
+                  const std::string& type,
                   std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Intf,
                   std::string& inventoryObjPath);
     NsmPortStatus() = default;
@@ -107,7 +107,7 @@ class NsmPortCharacteristics : public NsmSensor
 {
   public:
     NsmPortCharacteristics(
-        sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+        sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
         const std::string& type,
         std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Intf,
         std::shared_ptr<IBPortIntf> iBPortIntf, std::string& inventoryObjPath);
@@ -133,7 +133,7 @@ class NsmPortMetrics : public NsmSensor
 {
   public:
     NsmPortMetrics(
-        sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+        sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
         const std::string& type, const uint8_t deviceType,
         const std::vector<utils::Association>& associations,
         std::string& parentObjPath, std::string& inventoryObjPath,
@@ -168,7 +168,7 @@ class EthPortTelemetryAggregator : public NsmSensorAggregator
 {
   public:
     EthPortTelemetryAggregator(
-        sdbusplus::bus::bus& bus, std::string& portName, uint16_t portNumber,
+        sdbusplus::bus_t& bus, std::string& portName, uint16_t portNumber,
         const std::string& type, std::string& inventoryObjPath,
         std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
         std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf);
@@ -195,8 +195,7 @@ class EthPortTelemetryAggregator : public NsmSensorAggregator
 class NsmNetworkAddressAggregator : public NsmSensor
 {
   public:
-    NsmNetworkAddressAggregator(sdbusplus::bus::bus& bus,
-                                const std::string& name,
+    NsmNetworkAddressAggregator(sdbusplus::bus_t& bus, const std::string& name,
                                 const std::string& type,
                                 const std::string& objPath,
                                 const std::string& nodeGuidObjPath,
@@ -223,7 +222,7 @@ class NsmNetworkAddressAggregator : public NsmSensor
 class NsmGetPortECCCounters : public NsmSensor
 {
   public:
-    NsmGetPortECCCounters(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmGetPortECCCounters(sdbusplus::bus_t& bus, const std::string& name,
                           const std::string& type,
                           const std::string& inventoryObjPath,
                           uint8_t portNumber);
@@ -251,7 +250,7 @@ class NsmGetPortECCCounters : public NsmSensor
 class NsmOpticalModuleReset : public NsmObject
 {
   public:
-    NsmOpticalModuleReset(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmOpticalModuleReset(sdbusplus::bus_t& bus, const std::string& name,
                           const std::string& type,
                           const std::string& portObjPath,
                           std::shared_ptr<NsmDevice> device,

@@ -92,7 +92,7 @@ bool dbusPropertyMapAsBool(const dbus::PropertyMap& map,
 }
 } // namespace
 
-NsmSwitchDIReset::NsmSwitchDIReset(sdbusplus::bus::bus& bus,
+NsmSwitchDIReset::NsmSwitchDIReset(sdbusplus::bus_t& bus,
                                    const std::string& name,
                                    const std::string& type,
                                    std::string& inventoryObjPath,
@@ -677,7 +677,7 @@ requester::Coroutine NsmSwitchL1PredictionMode::setL1PredictionMode(
 }
 
 inline void createNsmSwitchL1PredictionMode(std::shared_ptr<NsmDevice> device,
-                                            sdbusplus::bus::bus& bus,
+                                            sdbusplus::bus_t& bus,
                                             const std::string& objPath,
                                             const std::string& type,
                                             const std::string& name)

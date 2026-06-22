@@ -161,14 +161,13 @@ class NsmPowerSmoothingAction : public NsmObject, public ProfileActionAsyncIntf
 {
   public:
     NsmPowerSmoothingAction(
-        sdbusplus::bus::bus& bus, const std::string& name,
-        const std::string& type, std::string& inventoryObjPath,
+        sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
+        std::string& inventoryObjPath,
         std::shared_ptr<NsmCurrentPowerSmoothingProfile> currentProfile,
         std::shared_ptr<NsmDevice> device);
 
     // dbus method override for ProfileActionAsyncIntf
-    sdbusplus::message::object_path
-        activatePresetProfile(uint16_t profileID) override;
+    sdbusplus::object_path activatePresetProfile(uint16_t profileID) override;
     // method to support post operation
     requester::Coroutine doActivatePresetProfile(
         std::shared_ptr<AsyncStatusIntf> statusInterface, uint16_t& profileID);
@@ -177,7 +176,7 @@ class NsmPowerSmoothingAction : public NsmObject, public ProfileActionAsyncIntf
                                      uint16_t& profileID);
 
     // dbus method override for ProfileActionAsyncIntf
-    sdbusplus::message::object_path applyAdminOverride() override;
+    sdbusplus::object_path applyAdminOverride() override;
     // method to support post operation
     requester::Coroutine
         doApplyAdminOverride(std::shared_ptr<AsyncStatusIntf> statusInterface);

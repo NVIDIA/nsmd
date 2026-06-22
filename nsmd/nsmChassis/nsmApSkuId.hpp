@@ -42,7 +42,7 @@ using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
 class ApSkuIdConfiguration : public ApSkuIdIntf
 {
   public:
-    ApSkuIdConfiguration(sdbusplus::bus::bus& bus, const std::string& objPath,
+    ApSkuIdConfiguration(sdbusplus::bus_t& bus, const std::string& objPath,
                          const uuid_t& uuidIn,
                          std::shared_ptr<ProgressIntf> progressIntfIn,
                          NsmSensor& nsmSensor);
@@ -65,7 +65,7 @@ class NsmApSkuIdObject : public NsmSensor
     }
 
   public:
-    NsmApSkuIdObject(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmApSkuIdObject(sdbusplus::bus_t& bus, const std::string& name,
                      const std::string& type, const uuid_t& uuid,
                      std::shared_ptr<ProgressIntf> progressIntfIn,
                      uint16_t classificationIn, uint16_t identifierIn,

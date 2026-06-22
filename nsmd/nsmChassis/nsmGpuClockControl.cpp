@@ -41,7 +41,7 @@ enum class clockLimitFlag
 };
 
 NsmClearClockLimAsyncIntf::NsmClearClockLimAsyncIntf(
-    sdbusplus::bus::bus& bus, const char* path,
+    sdbusplus::bus_t& bus, const char* path,
     std::shared_ptr<NsmDevice> device) :
     ClearClockLimAsyncIntf(bus, path), device(device) {};
 
@@ -107,7 +107,7 @@ requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
     co_return cc ? cc : rc;
 }
 
-sdbusplus::message::object_path NsmClearClockLimAsyncIntf::clearClockLimit()
+sdbusplus::object_path NsmClearClockLimAsyncIntf::clearClockLimit()
 {
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
@@ -125,7 +125,7 @@ sdbusplus::message::object_path NsmClearClockLimAsyncIntf::clearClockLimit()
 }
 
 NsmChassisClockControl::NsmChassisClockControl(
-    sdbusplus::bus::bus& bus, const std::string& name,
+    sdbusplus::bus_t& bus, const std::string& name,
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf,
     std::shared_ptr<NsmClearClockLimAsyncIntf> nsmClearClockLimAsyncIntf,
     const std::vector<utils::Association>& associations, std::string& type,

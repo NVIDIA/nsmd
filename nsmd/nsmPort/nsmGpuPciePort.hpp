@@ -73,7 +73,7 @@ inline std::map<std::string, std::tuple<uint8_t, uint8_t>> counterToGroupIdMap =
 class NsmGpuPciePort : public NsmObject
 {
   public:
-    NsmGpuPciePort(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmGpuPciePort(sdbusplus::bus_t& bus, const std::string& name,
                    const std::string& type, const std::string& health,
                    const std::string& chasisState,
                    const std::vector<utils::Association>& associations,
@@ -103,13 +103,13 @@ class NsmClearPCIeCounters; // forward declaration
 class NsmClearPCIeIntf : public ClearPCIeIntf
 {
   public:
-    NsmClearPCIeIntf(sdbusplus::bus::bus& bus, const char* path,
+    NsmClearPCIeIntf(sdbusplus::bus_t& bus, const char* path,
                      const uint8_t deviceIndex,
                      std::shared_ptr<NsmDevice> device) :
         ClearPCIeIntf(bus, path), deviceIndex(deviceIndex), device(device)
     {}
 
-    sdbusplus::message::object_path clearCounter(std::string Counter) override;
+    sdbusplus::object_path clearCounter(std::string Counter) override;
     requester::Coroutine clearPCIeErrorCounter(AsyncOperationStatusType* status,
                                                const uint8_t deviceIndex,
                                                const uint8_t groupId,
@@ -158,8 +158,8 @@ class NsmPCIePortInfoGroup1 : public NsmPcieGroup
 {
   public:
     NsmPCIePortInfoGroup1(
-        sdbusplus::bus::bus& bus, const std::string& name,
-        const std::string& type, const std::string& inventoryObjPath,
+        sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
+        const std::string& inventoryObjPath,
         std::unique_ptr<NsmAsioPortInfoInterface> portInfoIntf,
         uint8_t deviceIndex);
 

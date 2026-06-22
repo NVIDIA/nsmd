@@ -34,7 +34,7 @@ namespace nsm
 {
 using namespace std::string_literals;
 
-NsmPeakPower::NsmPeakPower(sdbusplus::bus::bus& bus, const std::string& name,
+NsmPeakPower::NsmPeakPower(sdbusplus::bus_t& bus, const std::string& name,
                            const std::string& type, uint8_t sensorId,
                            uint8_t averagingInterval) :
     NsmNumericSensor(
@@ -90,7 +90,7 @@ uint8_t NsmPeakPower::handleResponseMsg(const struct nsm_msg* responseMsg,
 
 std::shared_ptr<NsmNumericSensor> PeakPowerSensorBuilder::makeSensor(
     [[maybe_unused]] const std::string& interface,
-    [[maybe_unused]] const std::string& objPath, sdbusplus::bus::bus& bus,
+    [[maybe_unused]] const std::string& objPath, sdbusplus::bus_t& bus,
     const NumericSensorInfo& info)
 {
     auto averagingInterval = utils::DBusHandler().getDbusProperty<uint64_t>(

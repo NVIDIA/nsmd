@@ -273,7 +273,7 @@ TEST(asyncOperationManager, Set_ValidInterfaceAndProperty_ReturnsObjectPath)
     disp.addAsyncSetOperation("TestIface", "TestProp",
                               {makeSuccessHandler(), nullptr, nullptr});
 
-    sdbusplus::message::object_path resultPath;
+    sdbusplus::object_path resultPath;
     EXPECT_NO_THROW(resultPath = disp.set("TestIface", "TestProp",
                                           AsyncSetOperationValueType{false}));
     EXPECT_FALSE(resultPath.str.empty());

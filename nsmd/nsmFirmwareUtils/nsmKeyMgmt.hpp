@@ -45,7 +45,7 @@ class NsmKeyMgmt :
     public SecSigningConfigIntf
 {
   public:
-    NsmKeyMgmt(sdbusplus::bus::bus& bus, const std::string& chassisName,
+    NsmKeyMgmt(sdbusplus::bus_t& bus, const std::string& chassisName,
                const std::string& type, const uuid_t& uuid,
                std::shared_ptr<ProgressIntf> progressIntf,
                uint16_t componentClassification, uint16_t componentIdentifier,

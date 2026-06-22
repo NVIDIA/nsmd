@@ -125,8 +125,8 @@ void DBusHandler::setDbusProperty(const DBusMapping& dBusMap,
     }
     else if (dBusMap.propertyType == "array[object_path]")
     {
-        std::variant<std::vector<sdbusplus::message::object_path>> v =
-            std::get<std::vector<sdbusplus::message::object_path>>(value);
+        std::variant<std::vector<sdbusplus::object_path>> v =
+            std::get<std::vector<sdbusplus::object_path>>(value);
         setDbusValue(v);
     }
     else

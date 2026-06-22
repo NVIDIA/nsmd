@@ -12,7 +12,7 @@
 namespace nsm
 {
 
-NsmEndpoint::NsmEndpoint(sdbusplus::bus::bus& bus, const std::string& name,
+NsmEndpoint::NsmEndpoint(sdbusplus::bus_t& bus, const std::string& name,
                          const std::string& type,
                          const std::vector<utils::Association>& associations,
                          const std::string& fabricObjPath) :

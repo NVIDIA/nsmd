@@ -55,7 +55,7 @@ class NsmInbandUpdatePolicy :
     public StateChangeLogger
 {
   public:
-    NsmInbandUpdatePolicy(sdbusplus::bus::bus& bus, const std::string& objPath,
+    NsmInbandUpdatePolicy(sdbusplus::bus_t& bus, const std::string& objPath,
                           uint16_t classificationIn, uint16_t identifierIn,
                           uint8_t indexIn, NsmSensor& nsmSensor) :
         InbandUpdatePolicyIntf(bus, objPath.c_str()),
@@ -90,7 +90,7 @@ class NsmInbandUpdatePolicyObject : public NsmSensor
     }
 
   public:
-    NsmInbandUpdatePolicyObject(sdbusplus::bus::bus& bus,
+    NsmInbandUpdatePolicyObject(sdbusplus::bus_t& bus,
                                 const std::string& chassisName,
                                 uint16_t classificationIn,
                                 uint16_t identifierIn, uint8_t indexIn);
@@ -143,7 +143,7 @@ requester::Coroutine updateInbandUpdatePolicyHandler(
 class NsmFailoverPolicy : public FailoverPolicyIntf, public StateChangeLogger
 {
   public:
-    NsmFailoverPolicy(sdbusplus::bus::bus& bus, const std::string& objPath,
+    NsmFailoverPolicy(sdbusplus::bus_t& bus, const std::string& objPath,
                       const uuid_t& uuidIn, uint16_t classificationIn,
                       uint16_t identifierIn, uint8_t indexIn,
                       NsmSensor& nsmSensor) :
@@ -177,7 +177,7 @@ class NsmFailoverPolicyObject : public NsmSensor
     }
 
   public:
-    NsmFailoverPolicyObject(sdbusplus::bus::bus& bus,
+    NsmFailoverPolicyObject(sdbusplus::bus_t& bus,
                             const std::string& chassisName, const uuid_t& uuid,
                             uint16_t classificationIn, uint16_t identifierIn,
                             uint8_t indexIn);
@@ -240,7 +240,7 @@ struct ComponentInfo
 class NsmImageCopy : public ImageCopyIntf, public StateChangeLogger
 {
   public:
-    NsmImageCopy(sdbusplus::bus::bus& bus, const std::string& objPath,
+    NsmImageCopy(sdbusplus::bus_t& bus, const std::string& objPath,
                  const uuid_t& uuidIn, NsmObject& nsmObject) :
         ImageCopyIntf(bus, objPath.c_str()), uuid(uuidIn), nsmObject(nsmObject)
     {
@@ -251,7 +251,7 @@ class NsmImageCopy : public ImageCopyIntf, public StateChangeLogger
     virtual ~NsmImageCopy() = default;
 
     void requestImageCopy(
-        std::vector<sdbusplus::message::object_path> objectPaths) override;
+        std::vector<sdbusplus::object_path> objectPaths) override;
 
   private:
     requester::Coroutine
@@ -289,7 +289,7 @@ class NsmImageCopyObject : public NsmObject
     }
 
   public:
-    NsmImageCopyObject(sdbusplus::bus::bus& bus, const std::string& chassisName,
+    NsmImageCopyObject(sdbusplus::bus_t& bus, const std::string& chassisName,
                        const uuid_t& uuid);
     NsmImageCopyObject() = delete;
 
@@ -309,7 +309,7 @@ class NsmImageCopyObject : public NsmObject
 class NsmImageCopyPolicy : public ImageCopyPolicyIntf, public StateChangeLogger
 {
   public:
-    NsmImageCopyPolicy(sdbusplus::bus::bus& bus, const std::string& objPath,
+    NsmImageCopyPolicy(sdbusplus::bus_t& bus, const std::string& objPath,
                        NsmSensor& nsmSensor);
 
     virtual ~NsmImageCopyPolicy() = default;
@@ -339,7 +339,7 @@ class NsmImageCopyPolicyObject : public NsmSensor
     }
 
   public:
-    NsmImageCopyPolicyObject(sdbusplus::bus::bus& bus, const std::string& name,
+    NsmImageCopyPolicyObject(sdbusplus::bus_t& bus, const std::string& name,
                              const std::string& type, uint16_t classificationIn,
                              uint16_t identifierIn, uint8_t indexIn);
 
@@ -397,7 +397,7 @@ class NsmImageCopyState : public ImageCopyStateIntf, public StateChangeLogger
     // 0x65 (101): Progress sentinel meaning "reporting not supported".
     static constexpr uint8_t progressNotSupported = 0x65;
 
-    NsmImageCopyState(sdbusplus::bus::bus& bus, const std::string& objPath,
+    NsmImageCopyState(sdbusplus::bus_t& bus, const std::string& objPath,
                       NsmSensor& nsmSensor);
 
     ~NsmImageCopyState() override = default;
@@ -423,7 +423,7 @@ class NsmImageCopyStateObject : public NsmSensor
     }
 
   public:
-    NsmImageCopyStateObject(sdbusplus::bus::bus& bus,
+    NsmImageCopyStateObject(sdbusplus::bus_t& bus,
                             const std::string& chassisName);
 
     NsmImageCopyStateObject() = delete;

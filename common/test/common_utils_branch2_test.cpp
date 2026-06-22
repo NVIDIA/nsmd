@@ -197,14 +197,12 @@ TEST(GetDbusPropertyBranch2, VectorUint64_Success)
 TEST(GetDbusPropertyBranch2, VectorObjectPath_Success)
 {
     MockDBusHandler2 handler;
-    std::vector<sdbusplus::message::object_path> val = {
-        sdbusplus::message::object_path("/a"),
-        sdbusplus::message::object_path("/b")};
+    std::vector<sdbusplus::object_path> val = {sdbusplus::object_path("/a"),
+                                               sdbusplus::object_path("/b")};
     EXPECT_CALL(handler, getDbusPropertyVariant(_, _, _))
         .WillOnce(Return(PropertyValue{val}));
-    auto result =
-        handler.getDbusProperty<std::vector<sdbusplus::message::object_path>>(
-            "/obj", "prop", "iface");
+    auto result = handler.getDbusProperty<std::vector<sdbusplus::object_path>>(
+        "/obj", "prop", "iface");
     EXPECT_EQ(result.size(), 2u);
 }
 

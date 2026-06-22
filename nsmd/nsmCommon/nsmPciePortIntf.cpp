@@ -9,8 +9,7 @@
 
 namespace nsm
 {
-NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus::bus& bus,
-                                 const std::string& name,
+NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus_t& bus, const std::string& name,
                                  const std::string& type,
                                  std::string& inventoryObjPath) :
     NsmObject(name, type)

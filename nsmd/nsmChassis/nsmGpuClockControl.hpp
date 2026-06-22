@@ -55,10 +55,10 @@ class NsmClearClockLimAsyncIntf :
     public StateChangeLogger
 {
   public:
-    NsmClearClockLimAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+    NsmClearClockLimAsyncIntf(sdbusplus::bus_t& bus, const char* path,
                               std::shared_ptr<NsmDevice> device);
 
-    sdbusplus::message::object_path clearClockLimit() override;
+    sdbusplus::object_path clearClockLimit() override;
     requester::Coroutine doClearClockLimitOnDevice(
         std::shared_ptr<AsyncStatusIntf> statusInterface);
     requester::Coroutine clearReqClockLimit(AsyncOperationStatusType* status);
@@ -71,7 +71,7 @@ class NsmChassisClockControl : public NsmSensor
 {
   public:
     NsmChassisClockControl(
-        sdbusplus::bus::bus& bus, const std::string& name,
+        sdbusplus::bus_t& bus, const std::string& name,
         std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf,
         std::shared_ptr<NsmClearClockLimAsyncIntf> nsmClearClockLimAsyncIntf,
         const std::vector<utils::Association>& associations, std::string& type,

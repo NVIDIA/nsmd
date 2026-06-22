@@ -270,7 +270,7 @@ void createWriteProtect(std::shared_ptr<NsmDevice> device,
 }
 
 void createResetMetrics(std::shared_ptr<NsmDevice> device,
-                        const std::string& name, sdbusplus::bus::bus& bus)
+                        const std::string& name, sdbusplus::bus_t& bus)
 {
     auto objectPath = chassisInventoryBasePath.string() + "/" + name +
                       "/ResetStatistics";
@@ -332,7 +332,7 @@ void createErrorInjectionPayload(
 #if defined(ENABLE_DEBUG_INFO)
 void createDeviceDiagnostics(std::shared_ptr<NsmDevice> device,
                              const std::string& name, const uuid_t& uuid,
-                             sdbusplus::bus::bus& bus)
+                             sdbusplus::bus_t& bus)
 {
     device->addStaticSensor(std::make_shared<NsmDebugInfoObject>(
         bus, name, chassisInventoryBasePath.string() + "/",
@@ -341,7 +341,7 @@ void createDeviceDiagnostics(std::shared_ptr<NsmDevice> device,
 #endif
 
 void createChassisAttributes(std::shared_ptr<NsmDevice> device,
-                             SensorManager& manager, sdbusplus::bus::bus& bus,
+                             SensorManager& manager, sdbusplus::bus_t& bus,
                              const std::string& name,
                              [[maybe_unused]] const uuid_t& uuid,
                              const dbus::PropertyMap& allCurrentIfaceProperties,

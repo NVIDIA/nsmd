@@ -382,9 +382,8 @@ TEST(DBusHandlerTest, Sync_setDbusProperty_ArrayObjPath_ThrowsNoService)
     mapping.interface = "com.test.Iface";
     mapping.propertyName = "Paths";
     mapping.propertyType = "array[object_path]";
-    std::vector<sdbusplus::message::object_path> paths{
-        sdbusplus::message::object_path("/a"),
-        sdbusplus::message::object_path("/b")};
+    std::vector<sdbusplus::object_path> paths{sdbusplus::object_path("/a"),
+                                              sdbusplus::object_path("/b")};
     PropertyValue val{paths};
     EXPECT_ANY_THROW(dbusHandler.setDbusProperty(mapping, val));
 }

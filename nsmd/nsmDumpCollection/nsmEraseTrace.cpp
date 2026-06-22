@@ -33,7 +33,7 @@ using std::filesystem::path;
 namespace nsm
 {
 
-NsmEraseTraceObject::NsmEraseTraceObject(sdbusplus::bus::bus& bus,
+NsmEraseTraceObject::NsmEraseTraceObject(sdbusplus::bus_t& bus,
                                          const std::string& name,
                                          const std::string& inventoryPath,
                                          const std::string& type,

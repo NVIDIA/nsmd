@@ -21,7 +21,7 @@
 namespace nsm
 {
 
-NsmPort::NsmPort(sdbusplus::bus::bus& bus, std::string& portName,
+NsmPort::NsmPort(sdbusplus::bus_t& bus, std::string& portName,
                  const std::string& type,
                  const std::vector<utils::Association>& associations,
                  const std::string& inventoryObjPath) :
@@ -1508,8 +1508,8 @@ requester::Coroutine createNsmPCIeRetimerPorts(SensorManager& manager,
 }
 
 inline std::shared_ptr<NsmObject> createNsmPCIePortConfigurationInfo(
-    sdbusplus::bus::bus& bus, const std::string& portName,
-    const std::string& type, const std::string& objPath, const bool priority,
+    sdbusplus::bus_t& bus, const std::string& portName, const std::string& type,
+    const std::string& objPath, const bool priority,
     const uint64_t upstreamPortNumber, const uint8_t portTypeVal,
     const uint64_t index, std::shared_ptr<NsmDevice> nsmDevice)
 {
@@ -1578,7 +1578,7 @@ std::optional<std::vector<uint8_t>>
 }
 
 PortSensorGroup NsmPCIePortDiscovery::createMultiPCIePort(
-    sdbusplus::bus::bus& bus, const std::string& portName,
+    sdbusplus::bus_t& bus, const std::string& portName,
     const std::string& portObjPath, uint8_t portTypeVal, uint64_t portIndex,
     uint8_t upstreamPortNumber, bool includeInboundCounters)
 {
@@ -1836,7 +1836,7 @@ void NsmPCIePortDiscovery::removeExcessUpstreamPorts(
 }
 
 uint16_t NsmPCIePortDiscovery::reconcileDownstreamPorts(
-    sdbusplus::bus::bus& bus, uint16_t upstreamIndex,
+    sdbusplus::bus_t& bus, uint16_t upstreamIndex,
     uint8_t newDownstreamPortsCount, uint16_t downstreamPortIndex,
     bool includeInboundCounters)
 {
@@ -1873,9 +1873,8 @@ uint16_t NsmPCIePortDiscovery::reconcileDownstreamPorts(
 }
 
 uint16_t NsmPCIePortDiscovery::createUpstreamPortGroup(
-    sdbusplus::bus::bus& bus, uint16_t upstreamIndex,
-    uint8_t downstreamPortsCount, uint16_t downstreamPortIndex,
-    bool includeInboundCounters)
+    sdbusplus::bus_t& bus, uint16_t upstreamIndex, uint8_t downstreamPortsCount,
+    uint16_t downstreamPortIndex, bool includeInboundCounters)
 {
     std::string upPortName = upstreamPortName + "_" +
                              std::to_string(upstreamIndex);

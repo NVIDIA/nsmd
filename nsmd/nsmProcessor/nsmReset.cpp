@@ -30,7 +30,7 @@
 #include <vector>
 namespace nsm
 {
-NsmReset::NsmReset(sdbusplus::bus::bus& bus, const std::string& name,
+NsmReset::NsmReset(sdbusplus::bus_t& bus, const std::string& name,
                    const std::string& type, std::string& inventoryObjPath,
                    std::shared_ptr<NsmDevice> device,
                    const uint8_t deviceIndex) : NsmObject(name, type)

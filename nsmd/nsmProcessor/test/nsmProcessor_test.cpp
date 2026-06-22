@@ -7963,7 +7963,7 @@ TEST_F(NsmProcessorTest,
     EXPECT_CALL(*gpu, sensorIO).WillRepeatedly(mockSensorIO(curProfileBuf));
 
     uint16_t profileId = 2;
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     EXPECT_NO_THROW(objPath = action->activatePresetProfile(profileId));
     EXPECT_FALSE(std::string(objPath).empty());
 }
@@ -7990,7 +7990,7 @@ TEST_F(NsmProcessorTest, NsmPowerSmoothingAction_applyAdminOverride_HappyPath)
     EXPECT_CALL(*gpu, postPatchIO).WillRepeatedly(mockPostPatchIO(applyResp));
     EXPECT_CALL(*gpu, sensorIO).WillRepeatedly(mockSensorIO(curProfileBuf));
 
-    sdbusplus::message::object_path objPath;
+    sdbusplus::object_path objPath;
     EXPECT_NO_THROW(objPath = action->applyAdminOverride());
     EXPECT_FALSE(std::string(objPath).empty());
 }
