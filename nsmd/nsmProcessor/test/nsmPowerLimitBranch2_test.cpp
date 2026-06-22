@@ -10,7 +10,7 @@
  * - genRequestMsg: encode failure with bad instanceId (> NSM_INSTANCE_MAX)
  * - handleResponseMsg: decode failure (rc != NSM_SW_SUCCESS)
  * - handleResponseMsg: persistencyIntf == nullptr with valid response
- * - handleResponseMsg: pendingPowerLimit valid (non-INVALID) value
+ * - handleResponseMsg: pending value valid (non-INVALID) → persistentPowerLimit
  * - handleOfflineState: GPU_BASE (default) → no-op
  * - handleOfflineState: CPU_LIMIT_GPU_COPY → powerCap(INVALID)
  * - NsmOneShotPowerLimit: genRequestMsg encode failure
@@ -36,6 +36,8 @@ using namespace ::testing;
 #define protected public
 
 #include "nsmPowerLimit.hpp"
+
+#include <cmath>
 
 using namespace nsm;
 
@@ -213,21 +215,24 @@ TEST_F(NsmPowerLimitBranch2Test,
 }
 
 // =============================================================================
-// handleResponseMsg: valid pendingPowerLimit (non-INVALID) value
-// Covers: pendingLimit != INVALID_POWER_LIMIT → optional has value
+// handleResponseMsg: valid pending value differing from current → persistency
+// is false and persistentPowerLimit holds the pending value (in Watts)
 // =============================================================================
 TEST_F(NsmPowerLimitBranch2Test,
-       PersistentHandleResponseMsg_ValidPendingLimit_HasValue)
+       PersistentHandleResponseMsg_ValidPendingLimit_PersistentSet)
 {
     std::shared_ptr<PowerLimitsIntf> plIntf;
-    auto sensor = makeSensor(GPU_BASE, false, &plIntf);
+    std::shared_ptr<PowerPersistencyIntf> persIntf;
+    auto sensor = makeSensor(GPU_BASE, true, &plIntf, &persIntf);
 
     auto response = makeGetDevModeResp(300000, 400000); // 300W, pending 400W
     auto rc = sensor->handleResponseMsg(
         reinterpret_cast<const nsm_msg*>(response.data()), response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_TRUE(sensor->pendingPowerLimit.has_value());
-    EXPECT_EQ(sensor->pendingPowerLimit.value(), 400u);
+    EXPECT_EQ(plIntf->powerCap(), 300u);
+    EXPECT_DOUBLE_EQ(persIntf->persistentPowerLimit(), 400.0);
+    // pending (400W) != current powerCap (300W) → persistency false
+    EXPECT_FALSE(persIntf->persistency());
 }
 
 // =============================================================================
@@ -459,7 +464,7 @@ TEST_F(NsmPowerLimitBranch2Test,
 
 // =============================================================================
 // NsmPersistentPowerLimit: handleResponseMsg with INVALID_POWER_LIMIT and
-// persistencyIntf set → reading=0, persistentPowerLimit=0, powerCap=0
+// persistencyIntf set → powerCap=0, persistentPowerLimit=nan, persistency=false
 // =============================================================================
 TEST_F(NsmPowerLimitBranch2Test,
        PersistentHandleResponseMsg_InvalidPower_WithPersistency)
@@ -474,11 +479,9 @@ TEST_F(NsmPowerLimitBranch2Test,
         reinterpret_cast<const nsm_msg*>(response.data()), response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(plIntf->powerCap(), 0u);
-    EXPECT_EQ(persIntf->persistentPowerLimit(), 0.0);
-    // powerCap=0 == persistentPowerLimit=0 → persistency=true
-    EXPECT_TRUE(persIntf->persistency());
-    // INVALID_POWER_LIMIT as pending → nullopt
-    EXPECT_FALSE(sensor->pendingPowerLimit.has_value());
+    // INVALID pending → persistentPowerLimit=nan, persistency=false
+    EXPECT_TRUE(std::isnan(persIntf->persistentPowerLimit()));
+    EXPECT_FALSE(persIntf->persistency());
 }
 
 // =============================================================================

@@ -48,6 +48,8 @@ using namespace ::testing;
 
 #include "nsmPowerLimit.hpp"
 
+#include <cmath>
+
 using namespace nsm;
 
 // Forward-declare free function defined in nsmPowerLimit.cpp
@@ -228,50 +230,57 @@ TEST_F(NsmPowerLimitBranch3Test,
     std::shared_ptr<PowerLimitsIntf> pli;
     std::shared_ptr<PowerPersistencyIntf> perI;
     auto sensor = makeSensor(GPU_BASE, true, &pli, &perI);
-    perI->persistentPowerLimit(200.0);
 
-    auto response = makeGetDevModeResp(300000, 300000); // 300W
+    // current 300W, pending 250W → powerCap(300) != pending(250)
+    auto response = makeGetDevModeResp(300000, 250000);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     auto rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(pli->powerCap(), 300u);
-    // The source code sets persistentPowerLimit to the reading (300) before
-    // comparing, so powerCap()==persistentPowerLimit() is always true here.
-    EXPECT_TRUE(perI->persistency());
+    EXPECT_DOUBLE_EQ(perI->persistentPowerLimit(), 250.0);
+    // pending (250W) != current powerCap (300W) → persistency false
+    EXPECT_FALSE(perI->persistency());
 }
 
 // =============================================================================
-// handleResponseMsg: pending limit is valid (non-INVALID_POWER_LIMIT)
+// handleResponseMsg: pending limit is valid (non-INVALID_POWER_LIMIT) →
+// persistentPowerLimit holds the pending value (in Watts)
 // =============================================================================
 TEST_F(NsmPowerLimitBranch3Test,
-       PersistentHandleResp_ValidPendingLimit_HasValue)
+       PersistentHandleResp_ValidPendingLimit_PersistentSet)
 {
-    auto sensor = makeSensor(GPU_BASE, false);
+    std::shared_ptr<PowerLimitsIntf> pli;
+    std::shared_ptr<PowerPersistencyIntf> perI;
+    auto sensor = makeSensor(GPU_BASE, true, &pli, &perI);
 
     auto response = makeGetDevModeResp(300000, 250000);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     auto rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_TRUE(sensor->pendingPowerLimit.has_value());
-    EXPECT_EQ(sensor->pendingPowerLimit.value(), 250u);
+    EXPECT_DOUBLE_EQ(perI->persistentPowerLimit(), 250.0);
 }
 
 // =============================================================================
-// handleResponseMsg: pending limit is INVALID -> nullopt
+// handleResponseMsg: pending limit is INVALID -> persistentPowerLimit=nan,
+// persistency=false
 // =============================================================================
-TEST_F(NsmPowerLimitBranch3Test,
-       PersistentHandleResp_InvalidPendingLimit_Nullopt)
+TEST_F(NsmPowerLimitBranch3Test, PersistentHandleResp_InvalidPendingLimit_Nan)
 {
-    auto sensor = makeSensor(GPU_BASE, false);
+    std::shared_ptr<PowerLimitsIntf> pli;
+    std::shared_ptr<PowerPersistencyIntf> perI;
+    auto sensor = makeSensor(GPU_BASE, true, &pli, &perI);
+    perI->persistentPowerLimit(300.0);
+    perI->persistency(true);
 
     auto response = makeGetDevModeResp(300000, INVALID_POWER_LIMIT);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     auto rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_FALSE(sensor->pendingPowerLimit.has_value());
+    EXPECT_TRUE(std::isnan(perI->persistentPowerLimit()));
+    EXPECT_FALSE(perI->persistency());
 }
 
 // =============================================================================
@@ -392,22 +401,26 @@ TEST_F(NsmPowerLimitBranch3Test,
 }
 
 // =============================================================================
-// NsmOneShotPowerLimit: persistency check - powerCap != persistentPowerLimit
+// NsmOneShotPowerLimit: oneShotPowerLimit comes from pending; persistency is
+// not modified by this handler
 // =============================================================================
-TEST_F(NsmPowerLimitBranch3Test, OneShotHandleResp_PersistencyFalse)
+TEST_F(NsmPowerLimitBranch3Test, OneShotHandleResp_OneShotFromPendingValue)
 {
     auto perI = std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
     auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     perI->persistentPowerLimit(200.0);
+    perI->persistency(false);
     pli->powerCap(300);
 
     NsmOneShotPowerLimit sensor("TestOneShot", "NSM_ONE_SHOT", GPU_BASE, perI,
                                 pli);
 
-    auto response = makeGetDevModeResp(250000, 0); // 250W
+    auto response = makeGetDevModeResp(250000, 150000); // pending 150W
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_DOUBLE_EQ(perI->oneShotPowerLimit(), 150.0);
+    // one-shot handler does not write persistency
     EXPECT_FALSE(perI->persistency());
 }
 
@@ -567,25 +580,28 @@ TEST_F(NsmPowerLimitBranch3Test, OneShotGenRequestMsg_CpuLimitGpuCopy_Success)
 }
 
 // =============================================================================
-// NsmOneShotPowerLimit::handleResponseMsg: valid current with
-// CPU_LIMIT_GPU_COPY, persistency true (powerCap == persistentPowerLimit)
+// NsmOneShotPowerLimit::handleResponseMsg with CPU_LIMIT_GPU_COPY:
+// oneShotPowerLimit is sourced from pending; persistency is not written here.
 // =============================================================================
 TEST_F(NsmPowerLimitBranch3Test,
-       OneShotHandleResp_CpuLimitGpuCopy_PersistencyTrue)
+       OneShotHandleResp_CpuLimitGpuCopy_OneShotFromPending)
 {
     auto perI = std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
     auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     pli->powerCap(400);
     perI->persistentPowerLimit(400.0);
+    perI->persistency(false);
 
     NsmOneShotPowerLimit sensor("TestOneShot", "NSM_ONE_SHOT",
                                 CPU_LIMIT_GPU_COPY, perI, pli);
 
-    auto response = makeGetDevModeResp(400000, 0); // 400W
+    auto response = makeGetDevModeResp(400000, 400000); // pending 400W
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_TRUE(perI->persistency());
+    EXPECT_DOUBLE_EQ(perI->oneShotPowerLimit(), 400.0);
+    // one-shot handler does not write persistency
+    EXPECT_FALSE(perI->persistency());
 }
 
 // =============================================================================
@@ -861,9 +877,10 @@ TEST_F(NsmPowerLimitBranch3Test,
     auto rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(pli->powerCap(), 400u);
-    EXPECT_EQ(perI->persistentPowerLimit(), 400.0);
-    EXPECT_TRUE(sensor->pendingPowerLimit.has_value());
-    EXPECT_EQ(sensor->pendingPowerLimit.value(), 500u);
+    // persistentPowerLimit holds the pending value (500W)
+    EXPECT_DOUBLE_EQ(perI->persistentPowerLimit(), 500.0);
+    // pending (500W) != current powerCap (400W) → persistency false
+    EXPECT_FALSE(perI->persistency());
 }
 
 // =============================================================================
@@ -884,10 +901,10 @@ TEST_F(NsmPowerLimitBranch3Test, SetPowerLimit_TupleNonPersistent_Success)
 }
 
 // =============================================================================
-// NsmOneShotPowerLimit: handleResponseMsg with valid non-INVALID current,
-// powerCap == persistentPowerLimit -> persistency true
+// NsmOneShotPowerLimit: handleResponseMsg sources oneShotPowerLimit from the
+// pending value; persistency is left untouched by this handler
 // =============================================================================
-TEST_F(NsmPowerLimitBranch3Test, OneShotHandleResp_ValidCurrent_PersistencyTrue)
+TEST_F(NsmPowerLimitBranch3Test, OneShotHandleResp_ValidPending_OneShotSet)
 {
     auto perI = std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
     auto pli = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
@@ -898,10 +915,11 @@ TEST_F(NsmPowerLimitBranch3Test, OneShotHandleResp_ValidCurrent_PersistencyTrue)
     NsmOneShotPowerLimit sensor("TestOneShot", "NSM_ONE_SHOT", GPU_BASE, perI,
                                 pli);
 
-    auto response = makeGetDevModeResp(250000, 0); // 250W
+    auto response = makeGetDevModeResp(250000, 250000); // pending 250W
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_DOUBLE_EQ(perI->oneShotPowerLimit(), 250.0);
-    EXPECT_TRUE(perI->persistency());
+    // one-shot handler does not write persistency
+    EXPECT_FALSE(perI->persistency());
 }

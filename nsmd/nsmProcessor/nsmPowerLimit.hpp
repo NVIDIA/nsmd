@@ -110,9 +110,6 @@ class NsmPersistentPowerLimit : public NsmSensor
     std::shared_ptr<NsmDevice> nsmDevice;
     std::shared_ptr<PowerPersistencyIntf> persistencyIntf;
     uint8_t powerLimitId;
-
-    /** @brief Pending power limit value after reset (from v2 response) */
-    std::optional<uint32_t> pendingPowerLimit;
 };
 
 class NsmPowerLimitRange : public NsmObject
