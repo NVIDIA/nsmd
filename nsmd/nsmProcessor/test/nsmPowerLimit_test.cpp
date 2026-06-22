@@ -319,8 +319,10 @@ TEST(NsmOneShotPowerLimit, GoodHandleResp)
     size_t msg_len = response.size();
     rc = sensor.handleResponseMsg(responseMsg, msg_len);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    // oneShotPowerLimit comes from the pending value (300000mW / 1000 = 300W)
     EXPECT_EQ(persistencyIntf->oneShotPowerLimit(), 300.0);
-    EXPECT_EQ(persistencyIntf->persistency(), true);
+    // persistency is no longer written by the one-shot handler
+    EXPECT_EQ(persistencyIntf->persistency(), false);
 }
 
 TEST(NsmOneShotPowerLimit, BadHandleResp)

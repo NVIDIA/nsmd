@@ -140,22 +140,6 @@ uint8_t NsmPersistentPowerLimit::handleResponseMsg(
             uint32_t reading =
                 (currentLimit == INVALID_POWER_LIMIT) ? 0 : currentLimit / 1000;
             powerLimitsIntf->powerCap(reading);
-
-            if (persistencyIntf)
-            {
-                persistencyIntf->persistentPowerLimit(
-                    static_cast<double>(reading));
-
-                if (static_cast<double>(powerLimitsIntf->powerCap()) ==
-                    persistencyIntf->persistentPowerLimit())
-                {
-                    persistencyIntf->persistency(true);
-                }
-                else
-                {
-                    persistencyIntf->persistency(false);
-                }
-            }
         }
         else
         {
@@ -169,19 +153,46 @@ uint8_t NsmPersistentPowerLimit::handleResponseMsg(
             }
         }
 
-        if (pendingModeLength == sizeof(uint32_t))
+        if (persistencyIntf)
         {
-            uint32_t pendingLimit;
-            memcpy(&pendingLimit, pendingModeData, sizeof(uint32_t));
-            pendingLimit = le32toh(pendingLimit);
-            pendingPowerLimit =
-                (pendingLimit == INVALID_POWER_LIMIT)
-                    ? std::nullopt
-                    : std::optional<uint32_t>(pendingLimit / 1000);
-        }
-        else
-        {
-            pendingPowerLimit = std::nullopt;
+            if (pendingModeLength == sizeof(uint32_t))
+            {
+                uint32_t pendingLimit;
+                memcpy(&pendingLimit, pendingModeData, sizeof(uint32_t));
+                pendingLimit = le32toh(pendingLimit);
+
+                if (pendingLimit == INVALID_POWER_LIMIT)
+                {
+                    persistencyIntf->persistency(false);
+                    persistencyIntf->persistentPowerLimit(std::nan(""));
+                }
+                else
+                {
+                    // Device reports the limit in milliwatts; convert to Watts
+                    // for the D-Bus persistentPowerLimit property.
+                    double pendingReading = static_cast<double>(pendingLimit) /
+                                            1000;
+                    persistencyIntf->persistentPowerLimit(pendingReading);
+
+                    // Persistency holds only when the pending limit matches the
+                    // currently applied power cap; otherwise a change is
+                    // pending.
+                    if (static_cast<double>(powerLimitsIntf->powerCap()) ==
+                        pendingReading)
+                    {
+                        persistencyIntf->persistency(true);
+                    }
+                    else
+                    {
+                        persistencyIntf->persistency(false);
+                    }
+                }
+            }
+            else
+            {
+                persistencyIntf->persistency(false);
+                persistencyIntf->persistentPowerLimit(std::nan(""));
+            }
         }
     }
     else
@@ -232,6 +243,22 @@ requester::Coroutine NsmPersistentPowerLimit::setPowerLimit(
     else
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    if (powerLimitId == GPU_BASE)
+    {
+        uint32_t minCap = powerLimitsIntf->minPowerCapValue();
+        uint32_t maxCap = powerLimitsIntf->maxPowerCapValue();
+
+        if (powerLimit < minCap || powerLimit > maxCap)
+        {
+            lg2::error(
+                "setPowerLimit: requested {REQ}W out of range [{MIN}, {MAX}]W for eid={EID}",
+                "REQ", powerLimit, "MIN", minCap, "MAX", maxCap, "EID",
+                nsmDevice->getEid());
+            *status = AsyncOperationStatusType::InvalidArgument;
+            co_return NSM_SW_ERROR_DATA;
+        }
     }
 
     auto rc = co_await updatePowerLimit(status, nsmDevice, persistent,
@@ -538,26 +565,7 @@ uint8_t
             currentLimit = le32toh(currentLimit);
             uint32_t reading =
                 (currentLimit == INVALID_POWER_LIMIT) ? 0 : currentLimit / 1000;
-
-            if (persistencyIntf)
-            {
-                persistencyIntf->oneShotPowerLimit(
-                    static_cast<double>(reading));
-
-                if (static_cast<double>(powerLimitsIntf->powerCap()) ==
-                    persistencyIntf->persistentPowerLimit())
-                {
-                    persistencyIntf->persistency(true);
-                }
-                else
-                {
-                    persistencyIntf->persistency(false);
-                }
-            }
-            else
-            {
-                powerLimitsIntf->powerCap(reading);
-            }
+            powerLimitsIntf->powerCap(reading);
         }
         else
         {
@@ -568,6 +576,25 @@ uint8_t
                 lg2::error(
                     "NsmOneShotPowerLimit handleResponseMsg unexpected currentModeLength={LENGTH}, expected={EXPECTED}",
                     "LENGTH", currentModeLength, "EXPECTED", sizeof(uint32_t));
+            }
+        }
+
+        if (persistencyIntf)
+        {
+            if (pendingModeLength == sizeof(uint32_t))
+            {
+                uint32_t pendingLimit;
+                memcpy(&pendingLimit, pendingModeData, sizeof(uint32_t));
+                pendingLimit = le32toh(pendingLimit);
+
+                persistencyIntf->oneShotPowerLimit(
+                    (pendingLimit == INVALID_POWER_LIMIT)
+                        ? std::nan("")
+                        : static_cast<double>(pendingLimit) / 1000);
+            }
+            else
+            {
+                persistencyIntf->oneShotPowerLimit(std::nan(""));
             }
         }
     }

@@ -30,6 +30,8 @@ using namespace ::testing;
 
 #include "nsmPowerLimit.hpp"
 
+#include <cmath>
+
 using namespace nsm;
 
 // =============================================================================
@@ -236,8 +238,8 @@ TEST_F(NsmPowerLimitBranchTest,
 
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    // handleResponseMsg sets persistentPowerLimit=300 and powerCap=300 → equal
-    // → true
+    // pending mode value is valid → persistency=true and persistentPowerLimit
+    // is the pending value (300000mW / 1000 = 300W)
     EXPECT_TRUE(persistencyIntf->persistency());
     EXPECT_EQ(persistencyIntf->persistentPowerLimit(), 300.0);
 }
@@ -266,8 +268,8 @@ TEST_F(NsmPowerLimitBranchTest, HandleResponseMsg_CurrentModeLenZero_ErrorPath)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
-// pendingModeLength = 0 → pendingPowerLimit = nullopt (else branch at L175)
-TEST_F(NsmPowerLimitBranchTest, HandleResponseMsg_PendingModeLenZero_Nullopt)
+// pendingModeLength = 0 → persistency=false, persistentPowerLimit=nan
+TEST_F(NsmPowerLimitBranchTest, HandleResponseMsg_PendingModeLenZero_Nan)
 {
     auto powerLimitsIntf = std::make_shared<PowerLimitsIntf>(bus(),
                                                              objPath.c_str());
@@ -277,6 +279,7 @@ TEST_F(NsmPowerLimitBranchTest, HandleResponseMsg_PendingModeLenZero_Nullopt)
     auto persistencyIntf =
         std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
     persistencyIntf->persistentPowerLimit(300.0);
+    persistencyIntf->persistency(true);
 
     NsmPersistentPowerLimit sensor("test", "type", powerLimitsIntf, clearIntf,
                                    assocIntf, nullptr, GPU_BASE,
@@ -296,7 +299,9 @@ TEST_F(NsmPowerLimitBranchTest, HandleResponseMsg_PendingModeLenZero_Nullopt)
 
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_FALSE(sensor.pendingPowerLimit.has_value());
+    EXPECT_EQ(powerLimitsIntf->powerCap(), 300u);
+    EXPECT_FALSE(persistencyIntf->persistency());
+    EXPECT_TRUE(std::isnan(persistencyIntf->persistentPowerLimit()));
 }
 
 // INVALID_POWER_LIMIT as currentLimit → reading = 0
@@ -326,21 +331,25 @@ TEST_F(NsmPowerLimitBranchTest, HandleResponseMsg_InvalidPowerLimit_ReadingZero)
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(powerLimitsIntf->powerCap(), 0u);
-    // pending limit is nullopt when INVALID_POWER_LIMIT
-    EXPECT_FALSE(sensor.pendingPowerLimit.has_value());
 }
 
-// INVALID_POWER_LIMIT as pendingLimit → pendingPowerLimit = nullopt
-TEST_F(NsmPowerLimitBranchTest, HandleResponseMsg_InvalidPendingLimit_Nullopt)
+// INVALID_POWER_LIMIT as pendingLimit → persistency=false,
+// persistentPowerLimit=nan
+TEST_F(NsmPowerLimitBranchTest, HandleResponseMsg_InvalidPendingLimit_Nan)
 {
     auto powerLimitsIntf = std::make_shared<PowerLimitsIntf>(bus(),
                                                              objPath.c_str());
     auto clearIntf = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
     auto assocIntf =
         std::make_shared<AssociationDefinitionsIntf>(bus(), objPath.c_str());
+    auto persistencyIntf =
+        std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
+    persistencyIntf->persistentPowerLimit(500.0);
+    persistencyIntf->persistency(true);
 
     NsmPersistentPowerLimit sensor("test", "type", powerLimitsIntf, clearIntf,
-                                   assocIntf, nullptr, GPU_BASE, nullptr);
+                                   assocIntf, nullptr, GPU_BASE,
+                                   persistencyIntf);
 
     uint32_t currentLimit = htole32(300000);
     uint32_t pendingLimit = htole32(INVALID_POWER_LIMIT);
@@ -358,7 +367,8 @@ TEST_F(NsmPowerLimitBranchTest, HandleResponseMsg_InvalidPendingLimit_Nullopt)
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(powerLimitsIntf->powerCap(), 300u);
-    EXPECT_FALSE(sensor.pendingPowerLimit.has_value());
+    EXPECT_FALSE(persistencyIntf->persistency());
+    EXPECT_TRUE(std::isnan(persistencyIntf->persistentPowerLimit()));
 }
 
 // =============================================================================
@@ -407,15 +417,15 @@ TEST_F(NsmPowerLimitBranchTest, CreateGPUPowerLimit_UnknownType_NoSensors)
     EXPECT_EQ(gpu->staticSensors.size(), beforeStatic);
 }
 
-// NsmOneShotPowerLimit: persistencyIntf != nullptr with persistency mismatch
-TEST_F(NsmPowerLimitBranchTest, NsmOneShot_HandleResponse_PersistencyMismatch)
+// NsmOneShotPowerLimit: persistencyIntf != nullptr → oneShotPowerLimit is
+// sourced from the pending mode value; persistency is left untouched.
+TEST_F(NsmPowerLimitBranchTest, NsmOneShot_HandleResponse_OneShotFromPending)
 {
     auto persistencyIntf =
         std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
     auto powerLimitsIntf = std::make_shared<PowerLimitsIntf>(bus(),
                                                              objPath.c_str());
 
-    // Set values so that powerCap != persistentPowerLimit
     powerLimitsIntf->powerCap(500);
     persistencyIntf->persistentPowerLimit(300.0);
     persistencyIntf->persistency(true);
@@ -438,8 +448,10 @@ TEST_F(NsmPowerLimitBranchTest, NsmOneShot_HandleResponse_PersistencyMismatch)
 
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    // powerCap=500, persistentPowerLimit=300 → not equal → persistency=false
-    EXPECT_FALSE(persistencyIntf->persistency());
+    // oneShotPowerLimit comes from the pending value (200000mW / 1000 = 200W)
+    EXPECT_DOUBLE_EQ(persistencyIntf->oneShotPowerLimit(), 200.0);
+    // persistency is no longer written by the one-shot handler
+    EXPECT_TRUE(persistencyIntf->persistency());
 }
 
 // NsmOneShotPowerLimit: currentModeLength != sizeof(uint32_t) → shouldLog path
@@ -675,21 +687,18 @@ TEST_F(NsmPowerLimitBranchTest, NsmDefaultPowerLimit_Default_PropertyId)
     EXPECT_NE(&sensor, nullptr);
 }
 
-// NsmOneShotPowerLimit: persistencyIntf not null, powerCap ==
-// persistentPowerLimit Covers: TRUE branch of `if (powerCap() ==
-// persistentPowerLimit())` → L546
-TEST_F(NsmPowerLimitBranchTest, NsmOneShot_HandleResponse_PersistencyMatch)
+// NsmOneShotPowerLimit: persistencyIntf not null → oneShotPowerLimit sourced
+// from the pending mode value; persistency is left untouched by this handler.
+TEST_F(NsmPowerLimitBranchTest, NsmOneShot_HandleResponse_OneShotValue)
 {
     auto persistencyIntf =
         std::make_shared<PowerPersistencyIntf>(bus(), objPath.c_str());
     auto powerLimitsIntf = std::make_shared<PowerLimitsIntf>(bus(),
                                                              objPath.c_str());
 
-    // powerCap and persistentPowerLimit both set to 300 → match →
-    // persistency=true
     powerLimitsIntf->powerCap(300);
     persistencyIntf->persistentPowerLimit(300.0);
-    persistencyIntf->persistency(false); // start as false
+    persistencyIntf->persistency(false); // start as false; must stay unchanged
 
     NsmOneShotPowerLimit sensor("test", "type", GPU_BASE, persistencyIntf,
                                 powerLimitsIntf);
@@ -709,8 +718,10 @@ TEST_F(NsmPowerLimitBranchTest, NsmOneShot_HandleResponse_PersistencyMatch)
 
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    // powerCap=300, persistentPowerLimit=300 → equal → persistency=true
-    EXPECT_TRUE(persistencyIntf->persistency());
+    // oneShotPowerLimit comes from the pending value (300000mW / 1000 = 300W)
+    EXPECT_DOUBLE_EQ(persistencyIntf->oneShotPowerLimit(), 300.0);
+    // persistency is no longer written by the one-shot handler
+    EXPECT_FALSE(persistencyIntf->persistency());
 }
 
 // powerLimitIdToDeviceModeIndex: default case (unknown powerLimitId) —
@@ -788,18 +799,9 @@ TEST_F(NsmPowerLimitBranchTest,
 
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    // handleResponseMsg sets powerCap=200 and persistentPowerLimit=200
-    // Both are the same → persistency=true (the response sets both equally)
-    // To get false, we need a scenario where powerCap (from handleResponseMsg)
-    // differs from persistentPowerLimit. But handleResponseMsg sets both
-    // from the same currentLimit. The only way is if persistentPowerLimit
-    // was already set to a different value and we're reading a new one.
-    // Actually: handleResponseMsg sets powerCap(reading) AND
-    // persistentPowerLimit(reading) from the SAME currentLimit, so they'll
-    // always be equal in handleResponseMsg. The false branch is hit when
-    // NsmOneShotPowerLimit sets oneShotPowerLimit but powerCap and
-    // persistentPowerLimit differ. This is already covered by
-    // NsmOneShot_HandleResponse_PersistencyMismatch.
+    // powerCap comes from current-mode (200W). persistentPowerLimit comes from
+    // the pending value (200W) and, since the pending value is valid,
+    // persistency is set to true.
     EXPECT_EQ(persistencyIntf->persistentPowerLimit(), 200.0);
     EXPECT_EQ(powerLimitsIntf->powerCap(), 200u);
     EXPECT_TRUE(persistencyIntf->persistency());
@@ -838,8 +840,8 @@ TEST_F(NsmPowerLimitBranchTest,
 
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    // INVALID_POWER_LIMIT → reading=0 → oneShotPowerLimit=0.0
-    EXPECT_EQ(persistencyIntf->oneShotPowerLimit(), 0.0);
+    // INVALID_POWER_LIMIT pending → oneShotPowerLimit = nan
+    EXPECT_TRUE(std::isnan(persistencyIntf->oneShotPowerLimit()));
 }
 
 // =============================================================================
