@@ -148,7 +148,7 @@ void processData(const std::string& shmName, const std::string& description,
     CountersBufferCollection data;
     size_t rowSize = sizeof(CountersDataHeader) +
                      sizeof(CounterDataType) * countersHeaders.size();
-    for (size_t pos = 0; pos < fd.size(); pos += rowSize)
+    for (size_t pos = 0; pos + rowSize <= fd.size(); pos += rowSize)
     {
         auto buffer = std::vector<uint8_t>(rowSize);
         if (!fd.read(pos, buffer.data(), buffer.size()))
@@ -156,6 +156,12 @@ void processData(const std::string& shmName, const std::string& description,
             lg2::error("Failed to read dump data: {SHM} at position {POS}",
                        "SHM", shmName, "POS", pos);
             break;
+        }
+        const auto* hdr =
+            reinterpret_cast<const CountersDataHeader*>(buffer.data());
+        if (hdr->timestamp == 0)
+        {
+            continue; // skip zero-initialized (never-written) rows
         }
         data.push_back(std::move(buffer));
     }

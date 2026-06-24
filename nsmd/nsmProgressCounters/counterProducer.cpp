@@ -77,11 +77,11 @@ DeviceCounterDumpObjectTemplate(bool)::updateCounters(
 {
     try
     {
-        // Check if all counters are zero (empty)
+        // Check if all counters are zero (nothing to record)
         if (std::ranges::all_of(rowData.counters,
                                 [](const auto& val) { return val == 0; }))
         {
-            throw std::runtime_error("No counters to write");
+            return false;
         }
 
         const auto row = static_cast<uint32_t>(rowData.key) %
