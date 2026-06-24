@@ -20,28 +20,27 @@
 #include "types.hpp"
 #include "utils.hpp"
 
-#include <com/nvidia/Dump/Counters/server.hpp>
+#include <string>
 
 namespace nsm
 {
-using CountersIntf =
-    sdbusplus::server::object_t<sdbusplus::com::nvidia::Dump::server::Counters>;
 
 #define CountersTemplate                                                       \
     template <typename CounterDataType, std::size_t Size,                      \
               std::size_t MemFdBytesSize>
 
-CountersTemplate class DeviceCounterDumpObject : public CountersIntf
+CountersTemplate class DeviceCounterDumpObject
 {
   public:
     DeviceCounterDumpObject(const std::string& path);
+    ~DeviceCounterDumpObject();
     bool updateCounters(const CountersDataRow<CounterDataType, Size>& rowData);
 
   private:
+    std::string shmName;
     utils::CustomFD fd;
     static constexpr size_t maxRows =
         MemFdBytesSize / sizeof(CountersDataRow<CounterDataType, Size>);
-    sdbusplus::message::unix_fd getFd() override;
 };
 
 } // namespace nsm

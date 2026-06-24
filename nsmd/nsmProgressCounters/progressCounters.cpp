@@ -37,22 +37,8 @@ CountersTemplate ProgressCountersBaseClass::ProgressCountersBase(
     dumpObject(path), countThreshold(countThreshold),
     timeThreshold(timeThreshold)
 {
-    dumpObject.description(description);
-    dumpObject.countersHeaders(countersHeaders);
-
-    // Set the counterType property according to the type of CounterDataType
-    if constexpr (std::is_same_v<CounterDataType, int8_t>)
-    {
-        dumpObject.counterType(CountersIntf::CounterType::INT8);
-    }
-    else if constexpr (std::is_same_v<CounterDataType, uint32_t>)
-    {
-        dumpObject.counterType(CountersIntf::CounterType::UINT32);
-    }
-    else
-    {
-        static_assert(false, "Unsupported counter type");
-    }
+    (void)description;
+    (void)countersHeaders;
 }
 
 ProgressCountersBaseMacro(bool)::flushIfNeeded(const uint64_t& time)

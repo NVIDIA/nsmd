@@ -186,9 +186,8 @@ if get_option('progressCounter').enabled()
         'nsmProgressCountersReader',
         'nsmProgressCounters/progressCounterReader.cpp',
         '../common/utils.cpp',
-        '../common/dBusHandler.cpp',
         include_directories: include_directories(['../common', '../libnsm']),
-        dependencies: [phosphor_logging, sdbusplus, phosphor_dbus_interfaces],
+        dependencies: [phosphor_logging],
         install: true,
         install_dir: get_option('bindir'),
     )

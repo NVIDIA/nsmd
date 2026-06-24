@@ -19,8 +19,15 @@
 
 #include "counterProducer.hpp"
 
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+
+#include <cstring>
+
 #include <phosphor-logging/lg2.hpp>
 
+#include <algorithm>
 #include <ranges>
 
 namespace nsm
@@ -31,17 +38,38 @@ namespace nsm
 #define DeviceCounterDumpObjectTemplate(ReturnType)                            \
     CountersTemplate ReturnType DeviceCounterDumpObjectClass
 
-CountersTemplate DeviceCounterDumpObjectClass::DeviceCounterDumpObject(
-    const std::string& path) :
-    CountersIntf(utils::DBusHandler::getBus(), path.c_str()),
-    fd(memfd_create("nsm_progress_counters", MFD_ALLOW_SEALING))
+// Derives "/nsm_polling_0" from "/xyz/.../polling/0"
+static std::string toShmName(const std::string& path)
 {
-    lg2::info("Initialized dump object {PATH}", "PATH", path);
+    auto last = path.rfind('/');
+    auto prev = path.rfind('/', last - 1);
+    std::string tail = path.substr(prev + 1);
+    std::replace(tail.begin(), tail.end(), '/', '_');
+    return "/nsm_" + tail;
 }
 
-DeviceCounterDumpObjectTemplate(sdbusplus::message::unix_fd)::getFd()
+CountersTemplate DeviceCounterDumpObjectClass::DeviceCounterDumpObject(
+    const std::string& path) :
+    shmName(toShmName(path)),
+    fd([&]() {
+        shm_unlink(shmName.c_str());
+        int rawFd = shm_open(shmName.c_str(), O_CREAT | O_RDWR, 0644);
+        if (rawFd >= 0 && ftruncate(rawFd, MemFdBytesSize) < 0)
+        {
+            lg2::error("Failed to size shm {SHM}: {ERR}", "SHM", shmName,
+                       "ERR", strerror(errno));
+            close(rawFd);
+            rawFd = -1;
+        }
+        return rawFd;
+    }())
 {
-    return sdbusplus::message::unix_fd(fd);
+    lg2::info("Initialized shm object {SHM}", "SHM", shmName);
+}
+
+CountersTemplate DeviceCounterDumpObjectClass::~DeviceCounterDumpObject()
+{
+    shm_unlink(shmName.c_str());
 }
 
 DeviceCounterDumpObjectTemplate(bool)::updateCounters(
@@ -69,8 +97,8 @@ DeviceCounterDumpObjectTemplate(bool)::updateCounters(
     catch (const std::exception& e)
     {
         lg2::error(
-            "Failed to write dump data: Description={DESCRIPTION}, Key={KEY}, Error={ERR}",
-            "DESCRIPTION", description(), "KEY",
+            "Failed to write dump data: Shm={SHM}, Key={KEY}, Error={ERR}",
+            "SHM", shmName, "KEY",
             static_cast<uint32_t>(rowData.key), "ERR", e.what());
         return false;
     }

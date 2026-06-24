@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#include <fcntl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -71,12 +73,16 @@ TEST_F(CountersTest, DeviceCounterDumpObjectCreation)
     EXPECT_EQ(deviceData.maxRows, deviceData2.maxRows);
 }
 
-// getFd() covers counterProducer.cpp lines 42-44 (the unix_fd return method)
-TEST_F(CountersTest, DeviceCounterDumpObjectGetFd)
+// Verify shm is accessible by name after construction
+TEST_F(CountersTest, DeviceCounterDumpObjectShmAccessible)
 {
     DeviceCounterDumpObject deviceData("/tmp/test_getfd");
-    auto fd = deviceData.getFd();
-    EXPECT_GE(static_cast<int>(fd), 0);
+    int fd = shm_open("/nsm_tmp_test_getfd", O_RDONLY, 0);
+    EXPECT_GE(fd, 0);
+    if (fd >= 0)
+    {
+        close(fd);
+    }
 }
 
 TEST_F(CountersTest, DeviceCounterDumpObjectUpdateCounters)

@@ -15,30 +15,31 @@
  * limitations under the License.
  */
 
-#include "globals.hpp"
 #include "progressCounterType.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
-#include <com/nvidia/Dump/Counters/server.hpp>
 #include <phosphor-logging/lg2.hpp>
-#include <sdbusplus/message.hpp>
 
+#include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <ctime>
+#include <format>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 #include <string>
 
-using namespace dbus;
 using namespace nsm;
 using std::cout;
 using std::endl;
-
-using CountersIntf =
-    sdbusplus::server::object_t<sdbusplus::com::nvidia::Dump::server::Counters>;
 
 template <typename CounterDataType>
 struct CountersDataReadRow
@@ -106,32 +107,29 @@ static std::string join(const std::vector<T>& collection)
 }
 
 template <typename CounterDataType>
-static void printData(const std::string& path, const std::string& description,
+static void printData(const std::string& shmName,
+                      const std::string& description,
                       const CountersHeaders& countersHeaders,
                       const CountersBufferCollection&& data)
 {
     if (data.empty())
     {
-        cout << "No dump data available for " << description << " at path "
-             << path << endl;
+        cout << "No dump data available for " << description << " at "
+             << shmName << endl;
         return;
     }
 
-    // Print the path and dump information
     std::stringstream header;
     header << "====== " << "Dump data (" << data.size() << " entries, "
-           << countersHeaders.size() << " counters) for path (..."
-           << path.substr(progressCountersObjectBasePath.string().size()) << ")"
+           << countersHeaders.size() << " counters) for " << shmName
            << " ======";
     cout << header.str() << endl;
     cout << "Description: " << description << endl;
 
-    // Print the header in csv format
     cout << "DumpIteration,Timestamp";
     cout << join(countersHeaders);
     cout << endl;
 
-    // Print the data in csv format
     for (const auto& buffer : data)
     {
         CountersDataReadRow<CounterDataType> row(buffer,
@@ -144,7 +142,7 @@ static void printData(const std::string& path, const std::string& description,
 }
 
 template <typename CounterDataType>
-void processData(const std::string& path, const std::string& description,
+void processData(const std::string& shmName, const std::string& description,
                  const CountersHeaders& countersHeaders, utils::CustomFD& fd)
 {
     CountersBufferCollection data;
@@ -155,27 +153,25 @@ void processData(const std::string& path, const std::string& description,
         auto buffer = std::vector<uint8_t>(rowSize);
         if (!fd.read(pos, buffer.data(), buffer.size()))
         {
-            lg2::error("Failed to read dump data: {PATH} at position {POS}",
-                       "PATH", path, "POS", pos);
+            lg2::error("Failed to read dump data: {SHM} at position {POS}",
+                       "SHM", shmName, "POS", pos);
             break;
         }
         data.push_back(std::move(buffer));
     }
 
-    // sort the data by timestamp
     std::ranges::sort(data, [](const auto& a, const auto& b) {
         if (a.size() < sizeof(CountersDataHeader) ||
             b.size() < sizeof(CountersDataHeader))
         {
-            return false; // Invalid buffers sort last
+            return false;
         }
         auto& rowA = *reinterpret_cast<const CountersDataHeader*>(a.data());
         auto& rowB = *reinterpret_cast<const CountersDataHeader*>(b.data());
         return rowA.timestamp < rowB.timestamp;
     });
 
-    // dumping the output to the console
-    printData<CounterDataType>(path, description, countersHeaders,
+    printData<CounterDataType>(shmName, description, countersHeaders,
                                std::move(data));
 }
 
@@ -189,35 +185,18 @@ static void showUsage(const char* programName)
          << "  -h, --help    Show this help message and exit\n"
          << "\n"
          << "ARGUMENTS:\n"
-         << "  name    Show data only for specified path suffix (string)\n"
+         << "  name    Show data only for specified name suffix (string)\n"
          << "                If not specified, shows data for all devices\n"
          << endl;
 }
 
-template <typename T>
-static T getProperty(sdbusplus::bus::bus& bus, const std::string& path,
-                     const std::string& service,
-                     const std::string& propertyName)
-{
-    sdbusplus::message::message method =
-        bus.new_method_call(service.c_str(), path.c_str(),
-                            "org.freedesktop.DBus.Properties", "Get");
-    method.append("com.nvidia.Dump.Counters", propertyName);
-    auto reply = bus.call(method);
-    std::variant<T> propertyVariant;
-    reply.read(propertyVariant);
-    return std::get<T>(propertyVariant);
-}
-
 int main(int argc, char* argv[])
 {
-    std::string targetPathSuffix = ""; // empty string means show all devices
+    std::string targetSuffix = "";
 
-    // Parse command line arguments
     for (int i = 1; i < argc; ++i)
     {
         std::string arg = argv[i];
-
         if (arg == "-h" || arg == "--help")
         {
             showUsage(argv[0]);
@@ -225,68 +204,92 @@ int main(int argc, char* argv[])
         }
         else
         {
-            targetPathSuffix = arg;
+            targetSuffix = arg;
         }
     }
 
-    try
+    static const CountersHeaders pollingHeaders = {
+        "Priority",
+        "DumpCollection",
+        "GPM",
+        "LongRunning",
+        "Static",
+        "RoundRobin",
+        "PriorityTimeExceeded",
+        "PostPatch",
+        "Event",
+        "Error",
+        "Timeout",
+    };
+
+    static const CountersHeaders discoveryHeaders = {
+        "InterfaceAdded_Signal",
+        "InterfaceRemoved_Signal",
+        "Connectivity_Available",
+        "Online_coSetdeviceStateOnlineTask_RC",
+        "Online_ping_RC",
+        "Online_getQueryDeviceIdentification_RC",
+        "Online_mapNsmDeviceUsingEid_Success",
+        "Online_getSupportedNvidiaMessageType_RC",
+        "Online_getSupportedCommandCodes0_RC",
+        "Online_getSupportedCommandCodes1_RC",
+        "Online_getSupportedCommandCodes2_RC",
+        "Online_getSupportedCommandCodes3_RC",
+        "Online_getSupportedCommandCodes4_RC",
+        "Online_getSupportedCommandCodes5_RC",
+        "Online_getSupportedCommandCodes6_RC",
+        "Online_getFRU_RC",
+        "Offline_coSetdeviceStateOfflineTask_RC",
+        "Offline_mapNsmDeviceUsingEid_Success",
+    };
+
+    DIR* dir = opendir("/dev/shm");
+    if (!dir)
     {
-        auto& bus = utils::DBusHandler::getBus();
-
-        auto getFd = [&bus](const std::string& path,
-                            const std::string& service) -> int {
-            sdbusplus::message::message method =
-                bus.new_method_call(service.c_str(), path.c_str(),
-                                    "com.nvidia.Dump.Counters", "GetFd");
-            auto reply = bus.call(method);
-
-            sdbusplus::message::unix_fd unixfd;
-            reply.read(unixfd);
-            return dup(unixfd); // duplicate the fd before releasing the native
-                                // RAII unixfd
-        };
-
-        auto objects = utils::DBusHandler().getSubtree(
-            progressCountersObjectBasePath, 0, {"com.nvidia.Dump.Counters"});
-
-        for (const auto& [path, services] : objects)
-        {
-            // Skip if specific path suffix requested and this isn't it
-            if (!targetPathSuffix.empty() &&
-                path.find(targetPathSuffix) == std::string::npos)
-            {
-                continue;
-            }
-
-            auto service = services.front().first;
-            utils::CustomFD fd(getFd(path, service));
-
-            auto countersHeaders = getProperty<CountersHeaders>(
-                bus, path, service, "CountersHeaders");
-            auto description = getProperty<std::string>(bus, path, service,
-                                                        "Description");
-            auto counterType = getProperty<CountersIntf::CounterType>(
-                bus, path, service, "CounterType");
-            if (counterType == CountersIntf::CounterType::INT8)
-            {
-                processData<int8_t>(path, description, countersHeaders, fd);
-            }
-            else if (counterType == CountersIntf::CounterType::UINT32)
-            {
-                processData<uint32_t>(path, description, countersHeaders, fd);
-            }
-            else
-            {
-                lg2::error("Unsupported counter type: {TYPE}", "TYPE",
-                           counterType);
-            }
-        }
-    }
-    catch (const std::exception& e)
-    {
-        lg2::error("Error reading dump data: {ERR}", "ERR", e.what());
+        lg2::error("Failed to open /dev/shm: {ERR}", "ERR", strerror(errno));
         return 1;
     }
 
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr)
+    {
+        std::string name = entry->d_name;
+        bool isPolling = name.starts_with("nsm_polling_");
+        bool isDiscovery = name.starts_with("nsm_discovery_");
+
+        if (!isPolling && !isDiscovery)
+        {
+            continue;
+        }
+        if (!targetSuffix.empty() &&
+            name.find(targetSuffix) == std::string::npos)
+        {
+            continue;
+        }
+
+        std::string shmName = "/" + name;
+        int rawFd = shm_open(shmName.c_str(), O_RDONLY, 0);
+        if (rawFd < 0)
+        {
+            lg2::error("Failed to open shm {SHM}: {ERR}", "SHM", shmName,
+                       "ERR", strerror(errno));
+            continue;
+        }
+        utils::CustomFD fd(rawFd);
+
+        if (isPolling)
+        {
+            processData<uint32_t>(shmName,
+                                  "Polling Progress Counters for " + name,
+                                  pollingHeaders, fd);
+        }
+        else
+        {
+            processData<int8_t>(shmName,
+                                "Discovery Progress Counters for " + name,
+                                discoveryHeaders, fd);
+        }
+    }
+    closedir(dir);
     return 0;
 }
