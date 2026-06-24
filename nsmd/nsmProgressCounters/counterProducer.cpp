@@ -23,11 +23,10 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#include <cstring>
-
 #include <phosphor-logging/lg2.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <ranges>
 
 namespace nsm
@@ -50,14 +49,13 @@ static std::string toShmName(const std::string& path)
 
 CountersTemplate DeviceCounterDumpObjectClass::DeviceCounterDumpObject(
     const std::string& path) :
-    shmName(toShmName(path)),
-    fd([&]() {
+    shmName(toShmName(path)), fd([&]() {
         shm_unlink(shmName.c_str());
         int rawFd = shm_open(shmName.c_str(), O_CREAT | O_RDWR, 0644);
         if (rawFd >= 0 && ftruncate(rawFd, MemFdBytesSize) < 0)
         {
-            lg2::error("Failed to size shm {SHM}: {ERR}", "SHM", shmName,
-                       "ERR", strerror(errno));
+            lg2::error("Failed to size shm {SHM}: {ERR}", "SHM", shmName, "ERR",
+                       strerror(errno));
             close(rawFd);
             rawFd = -1;
         }
@@ -98,8 +96,8 @@ DeviceCounterDumpObjectTemplate(bool)::updateCounters(
     {
         lg2::error(
             "Failed to write dump data: Shm={SHM}, Key={KEY}, Error={ERR}",
-            "SHM", shmName, "KEY",
-            static_cast<uint32_t>(rowData.key), "ERR", e.what());
+            "SHM", shmName, "KEY", static_cast<uint32_t>(rowData.key), "ERR",
+            e.what());
         return false;
     }
     return true;

@@ -277,8 +277,8 @@ int main(int argc, char* argv[])
         int rawFd = shm_open(shmName.c_str(), O_RDONLY, 0);
         if (rawFd < 0)
         {
-            lg2::error("Failed to open shm {SHM}: {ERR}", "SHM", shmName,
-                       "ERR", strerror(errno));
+            lg2::error("Failed to open shm {SHM}: {ERR}", "SHM", shmName, "ERR",
+                       strerror(errno));
             continue;
         }
         utils::CustomFD fd(rawFd);
