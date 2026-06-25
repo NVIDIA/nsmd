@@ -39,15 +39,75 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <cctype>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <functional>
+#include <string_view>
 
 using namespace utils;
 
 namespace MockupResponder
 {
+
+// END-of-stream sentinels for the iterative dump commands. These mirror
+// the same-named #defines in nsmd's nsmDebugInfo.cpp / nsmLogInfo.cpp;
+// kept here so the mockup's wire-level behavior stays in sync with the
+// requester side. Spec ("Type 4 - Diagnostics v1.01"):
+//   - Get Network Device Debug Info (0x50)   p27 — Next handle 0 = END
+//   - Get Network Device Log Info   (0x52)   p28 — Next handle 0 = END
+//   - Get Device Diagnostics        (0x40)   p13 — Next handle 0xFF = END
+constexpr uint8_t kMockDiagnosticsEndRecord = 0xFF;
+constexpr uint32_t kMockDebugInfoEndRecord = 0x00;
+constexpr uint32_t kMockLogInfoEndRecord = 0x00;
+
+// Resolve the page for the current failure-cycle position, log it, and
+// advance the global counter (page within case, then case, wrapping at
+// the end of kDumpFailureCycle). For single-shot erase commands
+// (iterative == false) any multi-page iteration-only case is skipped so a
+// case is never left half-consumed between two commands.
+DumpCyclePage MockupResponder::nextDumpCyclePage(std::string_view cmdName,
+                                                 bool iterative)
+{
+    if (!iterative)
+    {
+        // Bounded by the list length so an all-multi-page list (not our
+        // case) can never spin forever.
+        for (size_t lap = 0; lap < kDumpFailureCycle.size() &&
+                             kDumpFailureCycle[cycleCaseIndex].pageCount > 1;
+             ++lap)
+        {
+            const auto& skipped = kDumpFailureCycle[cycleCaseIndex];
+            lg2::info("[MOCK-CYCLE] cmd={CMD} skipping iteration-only "
+                      "case[{CI}]={ID}",
+                      "CMD", std::string(cmdName), "CI", cycleCaseIndex, "ID",
+                      std::string(skipped.caseId));
+            cyclePageIndex = 0;
+            cycleCaseIndex = (cycleCaseIndex + 1) % kDumpFailureCycle.size();
+        }
+    }
+
+    const auto& curCase = kDumpFailureCycle[cycleCaseIndex];
+    const DumpCyclePage page = curCase.pages[cyclePageIndex];
+
+    lg2::info("[MOCK-CYCLE] cmd={CMD} case[{CI}]={ID} page={PG}/{PC} "
+              "silent={SL} cc=0x{CC:02x} reason=0x{RS:04x} expect={EXP}",
+              "CMD", std::string(cmdName), "CI", cycleCaseIndex, "ID",
+              std::string(curCase.caseId), "PG", cyclePageIndex, "PC",
+              curCase.pageCount, "SL", page.silent, "CC", page.cc, "RS",
+              page.reasonCode, "EXP", std::string(curCase.expectedStatus));
+
+    // Advance to the next page, wrapping to the next case at the end.
+    ++cyclePageIndex;
+    if (cyclePageIndex >= curCase.pageCount)
+    {
+        cyclePageIndex = 0;
+        cycleCaseIndex = (cycleCaseIndex + 1) % kDumpFailureCycle.size();
+    }
+    return page;
+}
 
 std::unordered_map<uint8_t, uint8_t> pciePortConfigMockTable = {
     {0, 17}, // PCIe_Gen_3_Preset
@@ -90,7 +150,7 @@ std::unordered_map<uint8_t, EventSource>
 MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
-                                 uint8_t instanceId) :
+                                 uint8_t instanceId, bool dumpFailureCycle) :
     event(event), verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
     state({
@@ -155,6 +215,17 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
         {}, // eventSources
     })
 {
+    // Dump failure-cycle replay flag (see --dump_failure_cycle / README).
+    // When set, the five dump handlers replay kDumpFailureCycle instead of
+    // their happy path. The cycle counter starts at the beginning.
+    this->dumpFailureCycle = dumpFailureCycle;
+    if (dumpFailureCycle)
+    {
+        lg2::info("MockupResponder: dump failure cycle ENABLED "
+                  "({N} cases in kDumpFailureCycle)",
+                  "N", kDumpFailureCycle.size());
+    }
+
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
     iface = server.add_interface(path, "xyz.openbmc_project.NSM.Device");
 
@@ -5950,6 +6021,24 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+// Compute next_record_handle / next_segment for a dump cycle success page.
+// endSentinel differs per command (0 for 0x50/0x52, 0xFF for 0x40); the
+// uint32 result is narrowed by the caller for the uint8 diagnostics handle.
+static uint32_t cycleNextHandle(DumpHandleMode mode, uint32_t requestHandle,
+                                uint32_t endSentinel)
+{
+    switch (mode)
+    {
+        case DumpHandleMode::Advance:
+            return requestHandle + 1;
+        case DumpHandleMode::Stuck:
+            return requestHandle;
+        case DumpHandleMode::EndSentinel:
+        default:
+            return endSentinel;
+    }
+}
+
 std::optional<std::vector<uint8_t>>
     MockupResponder::getDeviceDiagnosticsHandler(const nsm_msg* requestMsg,
                                                  size_t requestLen)
@@ -5963,22 +6052,66 @@ std::optional<std::vector<uint8_t>>
                    rc);
         return std::nullopt;
     }
+
     if (verbose)
     {
         lg2::info("getDeviceDiagnosticsHandler: request length={LEN}, "
-                  "handle={HANDLE}",
+                  "handle=0x{HANDLE:02x}",
                   "LEN", requestLen, "HANDLE", handle);
     }
-    std::string segmentData = "Hello World, this is device diagnostics info";
 
+    uint16_t reasonCode = ERR_NULL;
+    // Happy path (cycle off): 2-segment dump (handle 0 -> 1 -> END=0xFF).
+    uint8_t nextHandle = (handle == 0 ? 1 : kMockDiagnosticsEndRecord);
+
+    if (dumpFailureCycle)
+    {
+        const DumpCyclePage page = nextDumpCyclePage("GetDeviceDiagnostics",
+                                                     /*iterative=*/true);
+        if (page.silent)
+        {
+            return std::nullopt;
+        }
+        if (page.cc != NSM_SUCCESS)
+        {
+            // Non-success cc: encode_reason_code writes only
+            // nsm_common_non_success_resp, but size for the full success
+            // struct so LTO cannot flag the unreachable success-path memcpy
+            // as out of bounds (-Werror=stringop-overflow).
+            std::vector<uint8_t> errResponse(
+                sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_diagnostics_resp),
+                0);
+            auto* errMsg = reinterpret_cast<nsm_msg*>(errResponse.data());
+            rc = encode_get_device_diagnostics_resp(requestMsg->hdr.instance_id,
+                                                    page.cc, page.reasonCode,
+                                                    nullptr, 0, 0, errMsg);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error("encode_get_device_diagnostics_resp (cycle) failed: "
+                           "rc={RC}",
+                           "RC", rc);
+                return std::nullopt;
+            }
+            // encode_reason_code wrote only nsm_common_non_success_resp; shrink
+            // the over-allocated success-sized buffer to the real error length
+            // so the consumer's decode_reason_code_and_cc() exact-length check
+            // passes (otherwise it returns NSM_SW_ERROR_LENGTH and the cc-based
+            // status mapping is masked as InternalFailure).
+            errResponse.resize(sizeof(nsm_msg_hdr) +
+                               sizeof(nsm_common_non_success_resp));
+            return errResponse;
+        }
+        nextHandle = static_cast<uint8_t>(cycleNextHandle(
+            page.handleMode, handle, kMockDiagnosticsEndRecord));
+    }
+
+    // Build the success response body.
+    std::string segmentData = "Hello World, this is device diagnostics info";
     Response response(sizeof(nsm_msg_hdr) +
                           sizeof(nsm_get_device_diagnostics_resp) - 1 +
                           segmentData.size(),
                       0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reasonCode = ERR_NULL;
-    uint8_t nextHandle =
-        handle == 0 ? 1 : 0xFF; // mockup responder will send only 2 segments
     rc = encode_get_device_diagnostics_resp(
         requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode,
         (uint8_t*)segmentData.data(), segmentData.size(), nextHandle,
@@ -6005,18 +6138,59 @@ std::optional<std::vector<uint8_t>>
                    "RC", rc);
         return std::nullopt;
     }
+
     if (verbose)
     {
         lg2::info("getNetworkDeviceDebugInfoHandler: request length={LEN}, "
-                  "debugType={DEBUG_TYPE}, handle={HANDLE}",
+                  "debugType={DEBUG_TYPE}, handle=0x{HANDLE:08x}",
                   "LEN", requestLen, "DEBUG_TYPE", debugType, "HANDLE", handle);
     }
 
-    std::string segmentData = "Hello World, this is device debug info data.";
     uint16_t reasonCode = ERR_NULL;
-    uint32_t nextHandle =
-        handle == 0 ? 1 : 0; // mockup responder will send only 2 segments
+    // Happy path (cycle off): 2-segment dump (handle 0 -> 1 -> END=0).
+    uint32_t nextHandle = (handle == 0 ? 1 : kMockDebugInfoEndRecord);
 
+    if (dumpFailureCycle)
+    {
+        const DumpCyclePage page =
+            nextDumpCyclePage("GetNetworkDeviceDebugInfo", /*iterative=*/true);
+        if (page.silent)
+        {
+            return std::nullopt;
+        }
+        if (page.cc != NSM_SUCCESS)
+        {
+            // Success-sized buffer (LTO -Werror=stringop-overflow); see
+            // getDeviceDiagnosticsHandler.
+            std::vector<uint8_t> errResponse(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_network_device_debug_info_resp),
+                0);
+            auto* errMsg = reinterpret_cast<nsm_msg*>(errResponse.data());
+            rc = encode_get_network_device_debug_info_resp(
+                requestMsg->hdr.instance_id, page.cc, page.reasonCode, nullptr,
+                0, 0, errMsg);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error("encode_get_network_device_debug_info_resp (cycle) "
+                           "failed: rc={RC}",
+                           "RC", rc);
+                return std::nullopt;
+            }
+            // encode_reason_code wrote only nsm_common_non_success_resp; shrink
+            // the over-allocated success-sized buffer to the real error length
+            // so the consumer's decode_reason_code_and_cc() exact-length check
+            // passes (otherwise it returns NSM_SW_ERROR_LENGTH and the cc-based
+            // status mapping is masked as InternalFailure).
+            errResponse.resize(sizeof(nsm_msg_hdr) +
+                               sizeof(nsm_common_non_success_resp));
+            return errResponse;
+        }
+        nextHandle = cycleNextHandle(page.handleMode, handle,
+                                     kMockDebugInfoEndRecord);
+    }
+
+    std::string segmentData = "Hello World, this is device debug info data.";
     Response response(sizeof(nsm_msg_hdr) +
                           sizeof(nsm_get_network_device_debug_info_resp) - 1 +
                           segmentData.size(),
@@ -6053,6 +6227,42 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
+    // Erase is single-shot (no record-handle iteration), so it walks the
+    // cycle as a non-iterative command: silent and non-success-cc pages
+    // apply directly, and any multi-page iteration-only case is skipped.
+    if (dumpFailureCycle)
+    {
+        const DumpCyclePage page = nextDumpCyclePage("EraseTrace",
+                                                     /*iterative=*/false);
+        if (page.silent)
+        {
+            return std::nullopt;
+        }
+        if (page.cc != NSM_SUCCESS)
+        {
+            std::vector<uint8_t> errResponse(
+                sizeof(nsm_msg_hdr) + sizeof(nsm_erase_trace_resp), 0);
+            auto* errMsg = reinterpret_cast<nsm_msg*>(errResponse.data());
+            rc = encode_erase_trace_resp(requestMsg->hdr.instance_id, page.cc,
+                                         page.reasonCode, 0, errMsg);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error("encode_erase_trace_resp (cycle) failed: rc={RC}",
+                           "RC", rc);
+                return std::nullopt;
+            }
+            // encode_reason_code wrote only nsm_common_non_success_resp; shrink
+            // the over-allocated success-sized buffer to the real error length
+            // so the consumer's decode_reason_code_and_cc() exact-length check
+            // passes (otherwise it returns NSM_SW_ERROR_LENGTH and the cc-based
+            // status mapping is masked as InternalFailure).
+            errResponse.resize(sizeof(nsm_msg_hdr) +
+                               sizeof(nsm_common_non_success_resp));
+            return errResponse;
+        }
+        // Success page: fall through to the normal success response.
+    }
+
     uint16_t reason_code = ERR_NULL;
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_erase_trace_resp), 0);
@@ -6083,18 +6293,60 @@ std::optional<std::vector<uint8_t>>
                    "RC", rc);
         return std::nullopt;
     }
+
     if (verbose)
     {
         lg2::info("getNetworkDeviceLogInfoHandler: request length={LEN}, "
-                  "handle={HANDLE}",
+                  "handle=0x{HANDLE:08x}",
                   "LEN", requestLen, "HANDLE", handle);
     }
 
-    // this is some dummy data segment with random size
-    // It says "Hello World, this is device log info data."
-    std::string logData = "Hello World, this is device log info data.";
     uint16_t reasonCode = ERR_NULL;
-    uint32_t nextHandle = 0; // mockup responder will send only 1 log info
+    // Happy path (cycle off): single-segment dump (END after first call).
+    uint32_t nextHandle = kMockLogInfoEndRecord;
+
+    if (dumpFailureCycle)
+    {
+        const DumpCyclePage page = nextDumpCyclePage("GetNetworkDeviceLogInfo",
+                                                     /*iterative=*/true);
+        if (page.silent)
+        {
+            return std::nullopt;
+        }
+        if (page.cc != NSM_SUCCESS)
+        {
+            // Success-sized buffer (LTO -Werror=stringop-overflow).
+            std::vector<uint8_t> errResponse(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_network_device_log_info_resp),
+                0);
+            auto* errMsg = reinterpret_cast<nsm_msg*>(errResponse.data());
+            nsm_device_log_info_breakdown emptyLogInfo{};
+            rc = encode_get_network_device_log_info_resp(
+                requestMsg->hdr.instance_id, page.cc, page.reasonCode, 0,
+                emptyLogInfo, nullptr, 0, errMsg);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error("encode_get_network_device_log_info_resp (cycle) "
+                           "failed: rc={RC}",
+                           "RC", rc);
+                return std::nullopt;
+            }
+            // encode_reason_code wrote only nsm_common_non_success_resp; shrink
+            // the over-allocated success-sized buffer to the real error length
+            // so the consumer's decode_reason_code_and_cc() exact-length check
+            // passes (otherwise it returns NSM_SW_ERROR_LENGTH and the cc-based
+            // status mapping is masked as InternalFailure).
+            errResponse.resize(sizeof(nsm_msg_hdr) +
+                               sizeof(nsm_common_non_success_resp));
+            return errResponse;
+        }
+        nextHandle = cycleNextHandle(page.handleMode, handle,
+                                     kMockLogInfoEndRecord);
+    }
+
+    // Dummy log payload (single segment).
+    std::string logData = "Hello World, this is device log info data.";
     nsm_device_log_info_breakdown logInfo;
     logInfo.lost_events = 02;
     logInfo.unused = 00;
@@ -6142,6 +6394,42 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("decode_erase_debug_info_req failed: rc={RC}", "RC", rc);
         return std::nullopt;
+    }
+
+    // Single-shot, same cycle treatment as eraseTrace (non-iterative).
+    if (dumpFailureCycle)
+    {
+        const DumpCyclePage page = nextDumpCyclePage("EraseDebugInfo",
+                                                     /*iterative=*/false);
+        if (page.silent)
+        {
+            return std::nullopt;
+        }
+        if (page.cc != NSM_SUCCESS)
+        {
+            std::vector<uint8_t> errResponse(
+                sizeof(nsm_msg_hdr) + sizeof(nsm_erase_debug_info_resp), 0);
+            auto* errMsg = reinterpret_cast<nsm_msg*>(errResponse.data());
+            rc = encode_erase_debug_info_resp(requestMsg->hdr.instance_id,
+                                              page.cc, page.reasonCode, 0,
+                                              errMsg);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_erase_debug_info_resp (cycle) failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            // encode_reason_code wrote only nsm_common_non_success_resp; shrink
+            // the over-allocated success-sized buffer to the real error length
+            // so the consumer's decode_reason_code_and_cc() exact-length check
+            // passes (otherwise it returns NSM_SW_ERROR_LENGTH and the cc-based
+            // status mapping is masked as InternalFailure).
+            errResponse.resize(sizeof(nsm_msg_hdr) +
+                               sizeof(nsm_common_non_success_resp));
+            return errResponse;
+        }
+        // Success page: fall through to the normal success response.
     }
 
     uint16_t reason_code = ERR_NULL;

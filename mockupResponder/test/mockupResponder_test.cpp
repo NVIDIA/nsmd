@@ -9500,6 +9500,410 @@ TEST_F(MockupResponderTest, testUpdateMinSecurityVersionDecodeFailure)
     EXPECT_FALSE(resp.has_value());
 }
 
+// ===========================================================================
+// Dump failure-cycle tests.
+// Verifies the --dump_failure_cycle replay added to the 5 dump handlers:
+//   getDeviceDiagnostics (0x40), getNetworkDeviceDebugInfo (0x50),
+//   eraseTrace (0x51), getNetworkDeviceLogInfo (0x52),
+//   eraseDebugInfo (0x59).
+// Each test builds a fresh MockupResponder (with the cycle on or off),
+// invokes a handler, and decodes the response with the same libnsm helper
+// a real consumer would use — so the assertions are wire-level accurate.
+// The cycle list itself is MockupResponder::kDumpFailureCycle.
+// ===========================================================================
+namespace
+{
+
+class MockupDumpCycleTest : public Test
+{
+  protected:
+    void TearDown() override
+    {
+        mockupResponder.reset();
+        objServer.reset();
+        systemBus.reset();
+        io.stop();
+    }
+
+    // Build a fresh mock with the dump failure cycle on or off.
+    void buildMock(bool dumpFailureCycle, uint8_t deviceType = NSM_DEV_ID_GPU)
+    {
+        systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+        objServer = std::make_shared<sdbusplus::asio::object_server>(systemBus);
+        mockupResponder = std::make_shared<MockupResponder::MockupResponder>(
+            true, event, *objServer, /*eid=*/30, deviceType, /*instanceId=*/0,
+            dumpFailureCycle);
+    }
+
+    // Index of a cycle case by its stable id (test positioning helper).
+    static uint32_t caseIndexOf(std::string_view id)
+    {
+        for (uint32_t i = 0; i < MockupResponder::kDumpFailureCycle.size(); ++i)
+        {
+            if (MockupResponder::kDumpFailureCycle[i].caseId == id)
+            {
+                return i;
+            }
+        }
+        ADD_FAILURE() << "unknown cycle case id: " << id;
+        return 0;
+    }
+
+    uint8_t instanceId = 0;
+    common::Event event;
+    boost::asio::io_context io;
+    std::shared_ptr<sdbusplus::asio::connection> systemBus;
+    std::shared_ptr<sdbusplus::asio::object_server> objServer;
+    std::shared_ptr<MockupResponder::MockupResponder> mockupResponder;
+};
+
+// Helper: build a Get-Network-Device-Debug-Info request for a given handle.
+static Request makeDebugInfoReq(uint8_t instanceId, uint32_t handle,
+                                uint8_t debugType = 0)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_network_device_debug_info_req));
+    auto* msg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(encode_get_network_device_debug_info_req(instanceId, debugType,
+                                                       handle, msg),
+              NSM_SW_SUCCESS);
+    return request;
+}
+
+static Request makeDiagnosticsReq(uint8_t instanceId, uint8_t handle)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_device_diagnostics_req));
+    auto* msg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(encode_get_device_diagnostics_req(instanceId, handle, msg),
+              NSM_SW_SUCCESS);
+    return request;
+}
+
+static Request makeLogInfoReq(uint8_t instanceId, uint32_t handle)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_network_device_log_info_req));
+    auto* msg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(encode_get_network_device_log_info_req(instanceId, handle, msg),
+              NSM_SW_SUCCESS);
+    return request;
+}
+
+// Decode a debug-info (0x50) response into (rc, cc, reason, nextHandle).
+struct DebugInfoDecoded
+{
+    uint8_t rc;
+    uint8_t cc;
+    uint16_t reason;
+    uint32_t nextHandle;
+};
+static DebugInfoDecoded decodeDebugInfo(const std::vector<uint8_t>& resp)
+{
+    DebugInfoDecoded d{};
+    uint16_t segSize = 0;
+    std::vector<uint8_t> seg(512, 0);
+    auto* respMsg =
+        reinterpret_cast<nsm_msg*>(const_cast<uint8_t*>(resp.data()));
+    d.rc = decode_get_network_device_debug_info_resp(respMsg, resp.size(),
+                                                     &d.cc, &d.reason, &segSize,
+                                                     seg.data(), &d.nextHandle);
+    return d;
+}
+
+// Read the completion_code / reason_code of a non-success response. The
+// command + completion_code + reason_code header is identical across every
+// NSM response, so this is valid for both success and error responses.
+static uint8_t respCompletionCode(const std::vector<uint8_t>& resp)
+{
+    auto* respMsg =
+        reinterpret_cast<nsm_msg*>(const_cast<uint8_t*>(resp.data()));
+    return reinterpret_cast<nsm_common_non_success_resp*>(respMsg->payload)
+        ->completion_code;
+}
+static uint16_t respReasonCode(const std::vector<uint8_t>& resp)
+{
+    auto* respMsg =
+        reinterpret_cast<nsm_msg*>(const_cast<uint8_t*>(resp.data()));
+    return le16toh(
+        reinterpret_cast<nsm_common_non_success_resp*>(respMsg->payload)
+            ->reason_code);
+}
+
+// ---- cycle off ---------------------------------------------------------
+
+TEST_F(MockupDumpCycleTest, CycleOff_ReturnsSuccessByDefault)
+{
+    buildMock(/*dumpFailureCycle=*/false);
+    auto req = makeDebugInfoReq(instanceId, 0);
+    auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+    auto resp = mockupResponder->getNetworkDeviceDebugInfoHandler(reqMsg,
+                                                                  req.size());
+    ASSERT_TRUE(resp.has_value());
+    const auto d = decodeDebugInfo(*resp);
+    EXPECT_EQ(d.rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(d.cc, NSM_SUCCESS);
+    // Counter is never touched when the cycle is off.
+    EXPECT_EQ(mockupResponder->cycleCaseIndex, 0u);
+    EXPECT_EQ(mockupResponder->cyclePageIndex, 0u);
+}
+
+// ---- cycle on: ordering / advancement ----------------------------------
+
+TEST_F(MockupDumpCycleTest, CycleOn_FirstEntryIsSuccess)
+{
+    buildMock(/*dumpFailureCycle=*/true);
+    EXPECT_EQ(mockupResponder->cycleCaseIndex, 0u);
+
+    auto req = makeDebugInfoReq(instanceId, 0);
+    auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+    auto resp = mockupResponder->getNetworkDeviceDebugInfoHandler(reqMsg,
+                                                                  req.size());
+    ASSERT_TRUE(resp.has_value());
+    const auto d = decodeDebugInfo(*resp);
+    EXPECT_EQ(d.rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(d.cc, NSM_SUCCESS);
+    EXPECT_EQ(d.nextHandle, 0u); // END sentinel -> single page
+    // SUCCESS is a single-page case, so the counter moved to entry 1.
+    EXPECT_EQ(mockupResponder->cycleCaseIndex, 1u);
+}
+
+TEST_F(MockupDumpCycleTest, CycleOn_AdvancesGlobally)
+{
+    buildMock(/*dumpFailureCycle=*/true);
+
+    // 0x40 consumes entry 0 (SUCCESS).
+    {
+        auto req = makeDiagnosticsReq(instanceId, 0);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        auto resp = mockupResponder->getDeviceDiagnosticsHandler(reqMsg,
+                                                                 req.size());
+        ASSERT_TRUE(resp.has_value());
+        EXPECT_EQ(respCompletionCode(*resp), NSM_SUCCESS);
+    }
+    EXPECT_EQ(mockupResponder->cycleCaseIndex, 1u);
+
+    // 0x50 consumes entry 1 (CC_UNSUPPORTED_COMMAND_CODE).
+    {
+        auto req = makeDebugInfoReq(instanceId, 0);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        auto resp = mockupResponder->getNetworkDeviceDebugInfoHandler(
+            reqMsg, req.size());
+        ASSERT_TRUE(resp.has_value());
+        EXPECT_EQ(respCompletionCode(*resp), NSM_ERR_UNSUPPORTED_COMMAND_CODE);
+    }
+    EXPECT_EQ(mockupResponder->cycleCaseIndex, 2u);
+
+    // 0x52 consumes entry 2 (CC_UNSUPPORTED_MSG_TYPE).
+    {
+        auto req = makeLogInfoReq(instanceId, 0);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        auto resp = mockupResponder->getNetworkDeviceLogInfoHandler(reqMsg,
+                                                                    req.size());
+        ASSERT_TRUE(resp.has_value());
+        EXPECT_EQ(respCompletionCode(*resp), NSM_ERR_UNSUPPORTED_MSG_TYPE);
+    }
+    EXPECT_EQ(mockupResponder->cycleCaseIndex, 3u);
+}
+
+TEST_F(MockupDumpCycleTest, CycleOn_WrapsAtEnd)
+{
+    buildMock(/*dumpFailureCycle=*/true);
+
+    // Total device responses across all cases (single + multi page).
+    uint32_t totalPages = 0;
+    for (const auto& c : MockupResponder::kDumpFailureCycle)
+    {
+        totalPages += c.pageCount;
+    }
+
+    // Drive the iterative debug handler one response at a time through the
+    // whole list; it should land back exactly at the start.
+    for (uint32_t i = 0; i < totalPages; ++i)
+    {
+        auto req = makeDebugInfoReq(instanceId, 0);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        (void)mockupResponder->getNetworkDeviceDebugInfoHandler(reqMsg,
+                                                                req.size());
+    }
+    EXPECT_EQ(mockupResponder->cycleCaseIndex, 0u);
+    EXPECT_EQ(mockupResponder->cyclePageIndex, 0u);
+}
+
+// ---- cycle on: completion-code entries ---------------------------------
+
+TEST_F(MockupDumpCycleTest, CycleOn_AllCcCases)
+{
+    struct Expect
+    {
+        const char* id;
+        uint8_t cc;
+    };
+    const std::vector<Expect> ccCases = {
+        {"CC_UNSUPPORTED_COMMAND_CODE", NSM_ERR_UNSUPPORTED_COMMAND_CODE},
+        {"CC_UNSUPPORTED_MSG_TYPE", NSM_ERR_UNSUPPORTED_MSG_TYPE},
+        {"CC_NSM_BUSY", NSM_BUSY},
+        {"CC_NSM_ERR_NOT_READY", NSM_ERR_NOT_READY},
+        {"CC_NSM_ERR_BUS_ACCESS", NSM_ERR_BUS_ACCESS},
+        {"CC_INVALID_STATE_FOR_COMMAND", NSM_ERR_INVALID_STATE_FOR_COMMAND},
+        {"CC_INVALID_DATA", NSM_ERR_INVALID_DATA},
+        {"CC_INVALID_DATA_LENGTH", NSM_ERR_INVALID_DATA_LENGTH},
+        {"CC_INVALID_REQUEST_TYPE", NSM_ERR_INVALID_REQUEST_TYPE},
+        {"CC_NSM_ACCEPTED", NSM_ACCEPTED},
+    };
+
+    // Build the mock once; rebuilding inside the loop would create a second
+    // asio object_server on the same io_context/EID and fail with
+    // "assign: File exists". Each iteration just repositions the cycle cursor.
+    buildMock(/*dumpFailureCycle=*/true);
+    for (const auto& e : ccCases)
+    {
+        // Position the global counter at this case.
+        mockupResponder->cycleCaseIndex = caseIndexOf(e.id);
+        mockupResponder->cyclePageIndex = 0;
+
+        auto req = makeDebugInfoReq(instanceId, 0);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        auto resp = mockupResponder->getNetworkDeviceDebugInfoHandler(
+            reqMsg, req.size());
+        ASSERT_TRUE(resp.has_value()) << e.id;
+        EXPECT_EQ(respCompletionCode(*resp), e.cc) << e.id;
+    }
+}
+
+// ---- cycle on: reason-code entries -------------------------------------
+
+TEST_F(MockupDumpCycleTest, CycleOn_AllReasonCases)
+{
+    struct Expect
+    {
+        const char* id;
+        uint16_t reason;
+    };
+    const std::vector<Expect> reasonCases = {
+        {"REASON_ERR_TIMEOUT", ERR_TIMEOUT},
+        {"REASON_ERR_DOWNSTREAM_TIMEOUT", ERR_DOWNSTREAM_TIMEOUT},
+        {"REASON_ERR_NOT_SUPPORTED", ERR_NOT_SUPPORTED},
+        {"REASON_ERR_NO_BOOT_COMPLETE", ERR_NO_BOOT_COMPLETE},
+        {"REASON_ERR_UPDATE_IN_PROGRESS", ERR_UPDATE_IN_PROGRESS},
+        {"REASON_ERR_IMAGE_COPY_IN_PROGRESS", ERR_IMAGE_COPY_IN_PROGRESS},
+        {"REASON_ERR_FLASH_WEAR_MITIGATION", ERR_FLASH_WEAR_MITIGATION},
+        {"REASON_ERR_INVALID_PCI", ERR_INVALID_PCI},
+        {"REASON_ERR_INVALID_RQD", ERR_INVALID_RQD},
+        {"REASON_ERR_INCOMPLETE_COMPONENT_SET", ERR_INCOMPLETE_COMPONENT_SET},
+        {"REASON_ERR_I2C_NACK_FROM_DEV_ADDR", ERR_I2C_NACK_FROM_DEV_ADDR},
+    };
+
+    // Build the mock once (see CycleOn_AllCcCases); rebuilding per iteration
+    // collides on the asio object_server ("assign: File exists").
+    buildMock(/*dumpFailureCycle=*/true);
+    for (const auto& e : reasonCases)
+    {
+        mockupResponder->cycleCaseIndex = caseIndexOf(e.id);
+        mockupResponder->cyclePageIndex = 0;
+
+        auto req = makeDebugInfoReq(instanceId, 0);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        auto resp = mockupResponder->getNetworkDeviceDebugInfoHandler(
+            reqMsg, req.size());
+        ASSERT_TRUE(resp.has_value()) << e.id;
+        // Carrier cc is NSM_ERR_NOT_READY; the reason code carries the trigger.
+        EXPECT_EQ(respCompletionCode(*resp), NSM_ERR_NOT_READY) << e.id;
+        EXPECT_EQ(respReasonCode(*resp), e.reason) << e.id;
+    }
+}
+
+// ---- cycle on: transport silence ---------------------------------------
+
+TEST_F(MockupDumpCycleTest, CycleOn_NoResponseEmitsNothing)
+{
+    buildMock(/*dumpFailureCycle=*/true);
+    mockupResponder->cycleCaseIndex = caseIndexOf("NO_RESPONSE_TIMEOUT");
+    mockupResponder->cyclePageIndex = 0;
+
+    auto req = makeDebugInfoReq(instanceId, 0);
+    auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+    auto resp = mockupResponder->getNetworkDeviceDebugInfoHandler(reqMsg,
+                                                                  req.size());
+    EXPECT_FALSE(resp.has_value());
+    // The silent page still advances the counter past this case.
+    EXPECT_EQ(mockupResponder->cycleCaseIndex,
+              caseIndexOf("NO_RESPONSE_TIMEOUT") + 1);
+}
+
+// ---- cycle on: multi-page stuck-handle case ----------------------------
+
+TEST_F(MockupDumpCycleTest, CycleOn_StuckHandlePages)
+{
+    buildMock(/*dumpFailureCycle=*/true);
+    const uint32_t stuckIdx = caseIndexOf("PROTO_STUCK_HANDLE");
+    mockupResponder->cycleCaseIndex = stuckIdx;
+    mockupResponder->cyclePageIndex = 0;
+
+    // Page 0: Advance -> next handle = request + 1, BMC would recurse.
+    {
+        auto req = makeDebugInfoReq(instanceId, 0);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        auto resp = mockupResponder->getNetworkDeviceDebugInfoHandler(
+            reqMsg, req.size());
+        ASSERT_TRUE(resp.has_value());
+        const auto d = decodeDebugInfo(*resp);
+        EXPECT_EQ(d.cc, NSM_SUCCESS);
+        EXPECT_EQ(d.nextHandle, 1u);
+    }
+    // Still inside the same case, now on page 1.
+    EXPECT_EQ(mockupResponder->cycleCaseIndex, stuckIdx);
+    EXPECT_EQ(mockupResponder->cyclePageIndex, 1u);
+
+    // Page 1: Stuck -> next handle == request handle, BMC guard would trip.
+    {
+        auto req = makeDebugInfoReq(instanceId, 1);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        auto resp = mockupResponder->getNetworkDeviceDebugInfoHandler(
+            reqMsg, req.size());
+        ASSERT_TRUE(resp.has_value());
+        const auto d = decodeDebugInfo(*resp);
+        EXPECT_EQ(d.cc, NSM_SUCCESS);
+        EXPECT_EQ(d.nextHandle, 1u); // == request handle
+    }
+    // Both pages consumed -> counter wrapped to the next case (index 0).
+    EXPECT_EQ(mockupResponder->cyclePageIndex, 0u);
+    EXPECT_EQ(mockupResponder->cycleCaseIndex,
+              (stuckIdx + 1) % MockupResponder::kDumpFailureCycle.size());
+}
+
+// ---- cycle on: erase command skips the iteration-only case -------------
+
+TEST_F(MockupDumpCycleTest, CycleOn_EraseCmdSkipsIterationOnlyCase)
+{
+    buildMock(/*dumpFailureCycle=*/true);
+    const uint32_t stuckIdx = caseIndexOf("PROTO_STUCK_HANDLE");
+    mockupResponder->cycleCaseIndex = stuckIdx;
+    mockupResponder->cyclePageIndex = 0;
+
+    // Erase is single-shot: it skips the multi-page PROTO_STUCK_HANDLE case,
+    // then consumes the following single-page case (SUCCESS at index 0) and
+    // returns a success-shaped erase response.
+    Request req(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+    ASSERT_EQ(encode_erase_trace_req(instanceId, reqMsg), NSM_SW_SUCCESS);
+    auto resp = mockupResponder->eraseTraceHandler(reqMsg, req.size());
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(respCompletionCode(*resp), NSM_SUCCESS);
+
+    // Erase skips the multi-page stuck case (cursor wraps to the next case),
+    // then consumes that single-page case, landing one past it. Derive the
+    // expected index from kDumpFailureCycle so the test survives layout
+    // changes.
+    const uint32_t cycleSize = MockupResponder::kDumpFailureCycle.size();
+    const uint32_t consumedIdx = (stuckIdx + 1) % cycleSize;
+    const uint32_t expectedIdx = (consumedIdx + 1) % cycleSize;
+    EXPECT_EQ(mockupResponder->cycleCaseIndex, expectedIdx);
+    EXPECT_EQ(mockupResponder->cyclePageIndex, 0u);
+}
+
+} // namespace
+
 namespace
 {
 class MockupResponderProcessCleanup : public ::testing::Environment
