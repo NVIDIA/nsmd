@@ -275,9 +275,11 @@ TEST_F(NsmDebugTokenUnifiedMultiRecordTest, PartialFailureOnMiddleRecord)
     ASSERT_TRUE(std::holds_alternative<ValueTuple>(valueIntf->value()));
     const auto result = std::get<ValueTuple>(valueIntf->value());
     EXPECT_EQ(std::get<0>(result), 1u);
-    // Partial-success message format: "Installed X of Y record(s); Z failed"
-    EXPECT_NE(std::get<1>(result).find("Installed 2 of 3"), std::string::npos);
-    EXPECT_NE(std::get<1>(result).find("1 failed"), std::string::npos);
+    // After the fix the async value carries the last record's real install
+    // failure, not a generic "Installed X of Y record(s); Z failed" summary.
+    EXPECT_FALSE(std::get<1>(result).empty());
+    EXPECT_EQ(std::get<1>(result).find("Installed 2 of 3"), std::string::npos);
+    EXPECT_EQ(std::get<1>(result).find("record(s)"), std::string::npos);
 
     close(fd);
 }

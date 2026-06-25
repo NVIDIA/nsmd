@@ -237,11 +237,15 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installMultiRecordToken(
     const uint16_t parsedRecords = static_cast<uint16_t>(records.size());
     uint16_t okCount = 0;
     uint16_t failCount = static_cast<uint16_t>(totalRecords - parsedRecords);
+    uint16_t statusCode = 1;
+    std::string statusMsg;
     if (failCount > 0)
     {
         lg2::error(
             "DebugToken: truncated multi-record file, parsed {N} of {TOTAL}",
             "N", parsedRecords, "TOTAL", totalRecords);
+        statusCode = static_cast<uint16_t>(NSM_SW_ERROR);
+        statusMsg = "Truncated multi-record file";
     }
 
     for (uint16_t i = 0; i < parsedRecords; ++i)
@@ -254,6 +258,9 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installMultiRecordToken(
                 "DebugToken: memfd_create failed for record {REC}/{TOTAL}: {ERR}",
                 "REC", static_cast<uint16_t>(i + 1), "TOTAL", totalRecords,
                 "ERR", strerror(errno));
+            statusCode = static_cast<uint16_t>(NSM_SW_ERROR);
+            statusMsg = std::format("Failed to prepare record {}/{}: {}", i + 1,
+                                    totalRecords, strerror(errno));
             failCount++;
             continue;
         }
@@ -267,6 +274,10 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installMultiRecordToken(
                 static_cast<uint64_t>(rec.size()), "ERR",
                 written < 0 ? strerror(errno) : "short write");
             close(memFd);
+            statusCode = static_cast<uint16_t>(NSM_SW_ERROR);
+            statusMsg = std::format(
+                "Failed to prepare record {}/{}: {}", i + 1, totalRecords,
+                written < 0 ? strerror(errno) : "short write");
             failCount++;
             continue;
         }
@@ -286,6 +297,11 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installMultiRecordToken(
         }
         else
         {
+            statusCode = (errCode != 0) ? errCode : static_cast<uint16_t>(rc);
+            statusMsg =
+                errMsg.empty()
+                    ? std::string(debug_token::Error(statusCode).to_string())
+                    : errMsg;
             failCount++;
         }
         lg2::debug("DebugToken: Record {REC}/{TOTAL}: rc={RC} {MSG}", "REC",
@@ -302,19 +318,11 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installMultiRecordToken(
         valueIntf->value(std::make_tuple(static_cast<uint16_t>(0), "Success"));
         statusIntf->status(AsyncOperationStatusType::Success);
     }
-    else if (okCount == 0)
-    {
-        valueIntf->value(std::make_tuple(
-            static_cast<uint16_t>(1),
-            std::format("All {} record(s) failed", totalRecords)));
-        statusIntf->status(AsyncOperationStatusType::InternalFailure);
-    }
     else
     {
         valueIntf->value(std::make_tuple(
-            static_cast<uint16_t>(1),
-            std::format("Installed {} of {} record(s); {} failed", okCount,
-                        totalRecords, failCount)));
+            statusCode, statusMsg.empty() ? std::string("Token install failed")
+                                          : statusMsg));
         statusIntf->status(AsyncOperationStatusType::InternalFailure);
     }
     // coverity[missing_return]
