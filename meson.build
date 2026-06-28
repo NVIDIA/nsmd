@@ -105,6 +105,7 @@ conf_data.set(
     get_option('discovery-progress-counters-memfd-size'),
 )
 conf_data.set('RESPONSE_TIME_OUT', get_option('response-time-out'))
+conf_data.set('MCTP_SEND_TIMEOUT_MS', get_option('mctp-send-timeout'))
 conf_data.set(
     'RESPONSE_TIME_OUT_LONG_RUNNING',
     get_option('response-time-out-long-running'),
