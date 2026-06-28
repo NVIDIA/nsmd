@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#include "config.h"
+
 #include "socket_handler.hpp"
 
 #include "libnsm/base.h"
@@ -27,6 +29,7 @@
 #include <linux/mctp.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
 
@@ -367,6 +370,21 @@ int InKernelHandler::registerMctpEndpoint(
         return rc;
     }
 
+    struct timeval sendTimeout = {.tv_sec = MCTP_SEND_TIMEOUT_MS / 1000,
+                                  .tv_usec = (MCTP_SEND_TIMEOUT_MS % 1000) *
+                                             1000};
+    rc = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout,
+                    sizeof(sendTimeout));
+    if (rc == -1)
+    {
+        rc = -errno;
+        lg2::error(
+            "Error setting send timeout on MCTP socket, RC={RC}, EID={ED}",
+            "RC", strerror(-rc), "ED", eid);
+        close(fd);
+        return rc;
+    }
+
     struct sockaddr_mctp addr;
     memset(&addr, 0, sizeof(addr));
 
@@ -473,8 +491,8 @@ int InKernelHandler::sendMsg(uint8_t tag, eid_t eid, int mctpFd,
     if (rc == -1)
     {
         int error = -errno;
-        lg2::error("Error while sending the message. RC={RC}, EID={ED}", "RC",
-                   strerror(-error), "ED", eid);
+        lg2::error("sendto syscall failed. EID={ED}, RC={RC}", "ED", eid, "RC",
+                   strerror(-error));
         return NSM_SW_ERROR;
     }
 

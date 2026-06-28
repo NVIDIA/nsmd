@@ -192,6 +192,14 @@ option(
     value: 2000,
 )
 option(
+    'mctp-send-timeout',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'SO_SNDTIMEO for the AF_MCTP socket in milliseconds. Bounds sendto() when the MCTP TX queue is full. Must be less than response-time-out (default 2000ms) to avoid consuming the response window. Default 1000ms = 50% of response-time-out.',
+    value: 1000,
+)
+option(
     'response-time-out-long-running',
     type: 'integer',
     min: 1,
