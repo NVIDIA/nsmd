@@ -276,9 +276,8 @@ class Handler
      *  @param[in] respMsgLen - length of the response message
      */
     void handleResponse(uint8_t tag, eid_t eid, uint8_t instanceId,
-                        [[maybe_unused]] uint8_t type,
-                        [[maybe_unused]] uint8_t command,
-                        const nsm_msg* response, size_t respMsgLen)
+                        uint8_t type, uint8_t command, const nsm_msg* response,
+                        size_t respMsgLen)
     {
         // Check if response is for Regular request
         auto requestFound = handleResponseImpl(eid, instanceId, type, command,
@@ -298,10 +297,9 @@ class Handler
         }
     }
 
-    bool handleResponseImpl(eid_t eid, uint8_t instanceId,
-                            [[maybe_unused]] uint8_t type,
-                            [[maybe_unused]] uint8_t command,
-                            const nsm_msg* response, size_t respMsgLen,
+    bool handleResponseImpl(eid_t eid, uint8_t instanceId, uint8_t type,
+                            uint8_t command, const nsm_msg* response,
+                            size_t respMsgLen,
                             std::unordered_map<eid_t, RequestQueue>& handlers,
                             std::chrono::seconds instanceIdExpiryInterval)
     {
@@ -313,6 +311,19 @@ class Handler
                    valid] = handlers[eid].front();
             if (request->getInstanceId() == instanceId)
             {
+                if (request->getMsgType() != type ||
+                    request->getCommandCode() != command)
+                {
+                    lg2::error(
+                        "Dropping NSM response: type/command mismatch for "
+                        "EID={EID} instanceId={IID}: expected type={ETYPE} "
+                        "cmd={ECMD}, got type={RTYPE} cmd={RCMD}",
+                        "EID", eid, "IID", instanceId, "ETYPE",
+                        request->getMsgType(), "ECMD",
+                        request->getCommandCode(), "RTYPE", type, "RCMD",
+                        command);
+                    return false;
+                }
                 // Note1: timeOutTracker can be updated through TimeoutEvent or
                 // a succesfull responseMsg, for better handling please refer
                 // instanceIdExpiryCallBack as well

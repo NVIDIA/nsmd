@@ -204,6 +204,18 @@ class Request final : public RequestBase, public RequestRetryTimer
         return nsmMsg->hdr.instance_id;
     }
 
+    uint8_t getMsgType()
+    {
+        auto nsmMsg = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        return nsmMsg->hdr.nvidia_msg_type;
+    }
+
+    uint8_t getCommandCode()
+    {
+        auto nsmMsg = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        return nsmMsg->payload[0];
+    }
+
     void setInstanceId(uint8_t instanceId)
     {
         auto nsmMsg = reinterpret_cast<nsm_msg*>(requestMsg.data());
