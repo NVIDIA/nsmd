@@ -3109,6 +3109,83 @@ class QueryScalarGroupTelemetry : public CommandInterface
 
                 auto rc = decode_query_scalar_group_telemetry_v1_group10_resp(
                     responsePtr, payloadLength, &cc, &reasonCode, &data);
+
+                if (rc == NSM_SW_ERROR_LENGTH)
+                {
+                    // Device sent the 56-byte extended response; try extended
+                    // decode before treating this as a hard error.
+                    nsm_query_scalar_group_telemetry_group_10_extended extData;
+                    uint16_t extReasonCode = ERR_NULL;
+                    uint8_t extCc = NSM_ERROR;
+                    auto extRc =
+                        decode_query_scalar_group_telemetry_v1_group10_extended_resp(
+                            responsePtr, payloadLength, &extCc, &extReasonCode,
+                            &extData);
+                    if (extRc != NSM_SW_SUCCESS || extCc != NSM_SUCCESS)
+                    {
+                        std::cerr
+                            << "Response message error: "
+                            << "rc=" << extRc << ", cc=" << (int)extCc
+                            << ", reasonCode=" << (int)extReasonCode << "\n"
+                            << payloadLength << "...."
+                            << (sizeof(struct nsm_msg_hdr) +
+                                sizeof(
+                                    struct
+                                    nsm_query_scalar_group_telemetry_v1_group_10_extended_resp));
+                        return;
+                    }
+
+                    uint64_t dwordsTransferredInOutboundReadTlp =
+                        (uint64_t(
+                             extData
+                                 .dwords_transferred_in_outbound_read_tlp_high)
+                         << 32) |
+                        uint64_t(
+                            extData
+                                .dwords_transferred_in_outbound_read_tlp_low);
+
+                    uint64_t dwordsTransferredInOutboundWriteTlp =
+                        (uint64_t(
+                             extData
+                                 .dwords_transferred_in_outbound_write_tlp_high)
+                         << 32) |
+                        uint64_t(
+                            extData
+                                .dwords_transferred_in_outbound_write_tlp_low);
+
+                    ordered_json result;
+                    result["Completion Code"] = extCc;
+                    result["Outbound Read TLP Count"] =
+                        uint32_t(extData.outbound_read_tlp_count);
+                    result["DWORDs Transferred in Outbound Read TLP"] =
+                        dwordsTransferredInOutboundReadTlp;
+                    result["Outbound Write TLP Count"] =
+                        uint32_t(extData.outbound_write_tlp_count);
+                    result["DWORDs Transferred in Outbound Write TLP"] =
+                        dwordsTransferredInOutboundWriteTlp;
+                    result["Outbound Completion TLP Count"] =
+                        uint32_t(extData.outbound_completion_tlp_count);
+                    result["DWORDs Transferred in Outbound Completion"] =
+                        uint32_t(
+                            extData.dwords_transferred_in_outbound_completion);
+                    result["Read Requests Dropped (Tag Unavailable)"] =
+                        uint32_t(extData.read_requests_dropped_tag_unavailable);
+                    result["Read Requests Dropped (Credit Exhaustion)"] =
+                        uint32_t(
+                            extData.read_requests_dropped_credit_exhaustion);
+                    result["Read Requests Dropped (Credit Not Posted)"] =
+                        uint32_t(
+                            extData.read_requests_dropped_credit_not_posted);
+                    result["Inbound Completion TLP Count"] =
+                        uint32_t(extData.inbound_completion_tlp_count);
+                    result["Inbound Completion TLP Bytes High"] =
+                        uint32_t(extData.inbound_completion_tlp_bytes_high);
+                    result["Inbound Completion TLP Bytes Low"] =
+                        uint32_t(extData.inbound_completion_tlp_bytes_low);
+                    nsmtool::helper::DisplayInJson(result);
+                    break;
+                }
+
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr

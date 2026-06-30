@@ -874,6 +874,98 @@ TEST(NsmTelemetryCmdParse,
     EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
 }
 
+// ---- [28] QueryScalarGroupTelemetry (group 10 extended / 56-byte)
+// --------------------------------
+
+TEST(NsmTelemetryCmdParse,
+     QueryScalarGroupTelemetry_Group10Extended_ParseResponseSuccess)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "10"});
+
+    struct nsm_query_scalar_group_telemetry_group_10_extended data{};
+    data.outbound_read_tlp_count = 1;
+    data.dwords_transferred_in_outbound_read_tlp_high = 2;
+    data.dwords_transferred_in_outbound_read_tlp_low = 3;
+    data.outbound_write_tlp_count = 4;
+    data.dwords_transferred_in_outbound_write_tlp_high = 5;
+    data.dwords_transferred_in_outbound_write_tlp_low = 6;
+    data.outbound_completion_tlp_count = 7;
+    data.dwords_transferred_in_outbound_completion = 8;
+    data.read_requests_dropped_tag_unavailable = 9;
+    data.read_requests_dropped_credit_exhaustion = 10;
+    data.read_requests_dropped_credit_not_posted = 11;
+    data.inbound_completion_tlp_count = 12;
+    data.inbound_completion_tlp_bytes_high = 13;
+    data.inbound_completion_tlp_bytes_low = 14;
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_10_extended_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group10_extended_resp(
+        0, NSM_SUCCESS, ERR_NULL, &data, msg);
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- [55] QueryMultiportScalarGroupTelemetry (group 10 legacy / 44-byte)
+// --------------------------------
+
+TEST(NsmTelemetryCmdParse,
+     QueryMultiportScalarGroupTelemetry_Group10_ParseResponseSuccess)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryMultiportScalarGroupTelemetry",
+                    {"-d", "0", "-g", "10", "-t", "0", "-u", "0", "-i", "0"});
+
+    struct nsm_query_scalar_group_telemetry_group_10 data{};
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_10_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group10_resp(0, NSM_SUCCESS,
+                                                        ERR_NULL, &data, msg);
+    EXPECT_NO_THROW(commands[55]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- [55] QueryMultiportScalarGroupTelemetry (group 10 extended / 56-byte)
+// --------------------------------
+
+TEST(NsmTelemetryCmdParse,
+     QueryMultiportScalarGroupTelemetry_Group10Extended_ParseResponseSuccess)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryMultiportScalarGroupTelemetry",
+                    {"-d", "0", "-g", "10", "-t", "0", "-u", "0", "-i", "0"});
+
+    struct nsm_query_scalar_group_telemetry_group_10_extended data{};
+    data.outbound_read_tlp_count = 1;
+    data.dwords_transferred_in_outbound_read_tlp_high = 2;
+    data.dwords_transferred_in_outbound_read_tlp_low = 3;
+    data.outbound_write_tlp_count = 4;
+    data.dwords_transferred_in_outbound_write_tlp_high = 5;
+    data.dwords_transferred_in_outbound_write_tlp_low = 6;
+    data.outbound_completion_tlp_count = 7;
+    data.dwords_transferred_in_outbound_completion = 8;
+    data.read_requests_dropped_tag_unavailable = 9;
+    data.read_requests_dropped_credit_exhaustion = 10;
+    data.read_requests_dropped_credit_not_posted = 11;
+    data.inbound_completion_tlp_count = 12;
+    data.inbound_completion_tlp_bytes_high = 13;
+    data.inbound_completion_tlp_bytes_low = 14;
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_10_extended_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_scalar_group_telemetry_v1_group10_extended_resp(
+        0, NSM_SUCCESS, ERR_NULL, &data, msg);
+    EXPECT_NO_THROW(commands[55]->parseResponseMsg(msg, buf.size()));
+}
+
 // ---- [28] QueryScalarGroupTelemetry (unknown group -> default case)
 // ----------
 
