@@ -585,6 +585,93 @@ TEST_F(HandlerTest, HandleResponse_NoMatchingRequest_DoesNotCrash)
         handler.handleResponse(0, 99, 0, 0, 0, &response, sizeof(response)));
 }
 
+// NVBug 6368378: GPU may send a response with a different NSM type/command but
+// a matching instance ID. nsmd must drop such responses and not invoke the
+// request's callback, leaving the outstanding request intact for normal
+// timeout.
+TEST_F(HandlerTest, HandleResponseImpl_TypeMismatch_ReturnsFalse_NoBug6368378)
+{
+    constexpr eid_t eid = 5;
+    constexpr uint8_t instanceId = 7;
+    // Request: NSM Capabilities type (0x00), GetSupportedCommandCodes (0x02)
+    constexpr uint8_t reqType = 0x00;
+    constexpr uint8_t reqCmd = 0x02;
+    // Response: NSM PlatformEnvironmentals type (0x03), SetClockLimit (0x10)
+    constexpr uint8_t respType = 0x03;
+    constexpr uint8_t respCmd = 0x10;
+
+    std::vector<uint8_t> reqMsg(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req),
+                                0);
+    auto* nsmHdr = reinterpret_cast<nsm_msg*>(reqMsg.data());
+    nsmHdr->hdr.instance_id = instanceId;
+    nsmHdr->hdr.nvidia_msg_type = reqType;
+    nsmHdr->payload[0] = reqCmd;
+
+    bool handlerCalled = false;
+    auto responseHandler = [&handlerCalled](eid_t, const nsm_msg*, size_t) {
+        handlerCalled = true;
+    };
+
+    auto request = std::make_unique<requester::Request>(
+        -1, eid, 0, event, nullptr, std::move(reqMsg), 0,
+        std::chrono::milliseconds(0), false);
+
+    // timer is null: the mismatch path returns before any timer dereference
+    std::unordered_map<eid_t, TestHandler::RequestQueue> testHandlers;
+    testHandlers[eid].emplace(
+        std::make_tuple(std::move(request), std::move(responseHandler),
+                        std::unique_ptr<sdbusplus::Timer>{}, true));
+
+    nsm_msg response{};
+    bool found = handler.handleResponseImpl(
+        eid, instanceId, respType, respCmd, &response, sizeof(response),
+        testHandlers, std::chrono::seconds(5));
+
+    EXPECT_FALSE(found);
+    EXPECT_FALSE(handlerCalled);
+}
+
+TEST_F(HandlerTest,
+       HandleResponseImpl_CommandMismatch_ReturnsFalse_NoBug6368378)
+{
+    constexpr eid_t eid = 6;
+    constexpr uint8_t instanceId = 3;
+    constexpr uint8_t reqType = 0x00;
+    constexpr uint8_t reqCmd = 0x02;
+    // Same type, different command
+    constexpr uint8_t respType = 0x00;
+    constexpr uint8_t respCmd = 0x09;
+
+    std::vector<uint8_t> reqMsg(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req),
+                                0);
+    auto* nsmHdr = reinterpret_cast<nsm_msg*>(reqMsg.data());
+    nsmHdr->hdr.instance_id = instanceId;
+    nsmHdr->hdr.nvidia_msg_type = reqType;
+    nsmHdr->payload[0] = reqCmd;
+
+    bool handlerCalled = false;
+    auto responseHandler = [&handlerCalled](eid_t, const nsm_msg*, size_t) {
+        handlerCalled = true;
+    };
+
+    auto request = std::make_unique<requester::Request>(
+        -1, eid, 0, event, nullptr, std::move(reqMsg), 0,
+        std::chrono::milliseconds(0), false);
+
+    std::unordered_map<eid_t, TestHandler::RequestQueue> testHandlers;
+    testHandlers[eid].emplace(
+        std::make_tuple(std::move(request), std::move(responseHandler),
+                        std::unique_ptr<sdbusplus::Timer>{}, true));
+
+    nsm_msg response{};
+    bool found = handler.handleResponseImpl(
+        eid, instanceId, respType, respCmd, &response, sizeof(response),
+        testHandlers, std::chrono::seconds(5));
+
+    EXPECT_FALSE(found);
+    EXPECT_FALSE(handlerCalled);
+}
+
 // ===========================================================================
 // SendRecvNsmMsg tests
 // ===========================================================================
