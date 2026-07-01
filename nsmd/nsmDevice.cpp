@@ -145,8 +145,9 @@ bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
     return isCommandCodeSupportedSafe(messageType, commandCode).value_or(false);
 }
 
-std::optional<bool> NsmDevice::isCommandCodeSupportedSafe(
-    uint8_t messageType, uint8_t commandCode) const noexcept
+std::optional<bool>
+    NsmDevice::isCommandCodeSupportedSafe(uint8_t messageType,
+                                          uint8_t commandCode) const noexcept
 {
     if (messageType >= messageTypesToCommandCodeMatrix.size())
     {
@@ -214,8 +215,7 @@ void NsmDevice::updateMessageTypesToCommandCodeMatrix(
         // outside the matrix — same shape as the outer guard above. This
         // also closes the FW-payload OOB class (NvBug 5972182) if the row
         // is ever resized smaller than NUM_COMMAND_CODES.
-        (void)setCommandCodeSupportedSafe(messageType,
-                                          static_cast<uint8_t>(i),
+        (void)setCommandCodeSupportedSafe(messageType, static_cast<uint8_t>(i),
                                           static_cast<bool>(isSupported));
     }
 }

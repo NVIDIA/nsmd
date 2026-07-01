@@ -188,8 +188,7 @@ class MctpDiscovery
     virtual std::array<std::chrono::milliseconds, 5>
         getMapperRetryBackoff() const noexcept
     {
-        return {std::chrono::milliseconds{50},
-                std::chrono::milliseconds{200},
+        return {std::chrono::milliseconds{50}, std::chrono::milliseconds{200},
                 std::chrono::milliseconds{1000},
                 std::chrono::milliseconds{3000},
                 std::chrono::milliseconds{5000}};
@@ -208,8 +207,9 @@ class MctpDiscovery
      *         GetManagedObjects call fails. Returns the response tree on
      *         success; throws on terminal exhaustion (caller catches and
      *         skips the service). */
-    requester::Coroutine retryGetManagedObjects(std::string service,
-                                                dbus::ObjectValueTree& outObjects);
+    requester::Coroutine
+        retryGetManagedObjects(std::string service,
+                               dbus::ObjectValueTree& outObjects);
 
     requester::Coroutine readMctpProperties(const std::string& objPath,
                                             MctpInfos& mctpInfos);

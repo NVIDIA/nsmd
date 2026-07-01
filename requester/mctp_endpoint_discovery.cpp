@@ -146,8 +146,9 @@ void MctpDiscovery::init()
 
         auto addedRule = sdbusplus::bus::match::rules::interfacesAddedAtPath(
             mctpNetworksPath);
-        auto removedRule = sdbusplus::bus::match::rules::interfacesRemovedAtPath(
-            mctpNetworksPath);
+        auto removedRule =
+            sdbusplus::bus::match::rules::interfacesRemovedAtPath(
+                mctpNetworksPath);
         if (resolvedMctpServices.size() == 1)
         {
             // Single bus-owner — add sender= narrowing. This is the common
@@ -263,10 +264,9 @@ requester::Coroutine MctpDiscovery::retryResolveBusOwner()
                 "retryResolveBusOwner: attempt {ATTEMPT} threw, sleeping then retrying. {ERR}",
                 "ATTEMPT", static_cast<int>(attempt + 1), "ERR", e);
         }
-        co_await common::Sleep(event,
-                               static_cast<uint64_t>(backoff[attempt].count()) *
-                                   1000,
-                               common::NonPriority);
+        co_await common::Sleep(
+            event, static_cast<uint64_t>(backoff[attempt].count()) * 1000,
+            common::NonPriority);
     }
     lg2::error(
         "retryResolveBusOwner: exhausted {N} attempts; resolvedMctpServices stays empty",
@@ -274,8 +274,9 @@ requester::Coroutine MctpDiscovery::retryResolveBusOwner()
     co_return NSM_SW_ERROR;
 }
 
-requester::Coroutine MctpDiscovery::retryGetManagedObjects(
-    std::string service, dbus::ObjectValueTree& outObjects)
+requester::Coroutine
+    MctpDiscovery::retryGetManagedObjects(std::string service,
+                                          dbus::ObjectValueTree& outObjects)
 {
     const auto backoff = getMapperRetryBackoff();
     auto event = sdeventplus::Event::get_default();
@@ -297,14 +298,13 @@ requester::Coroutine MctpDiscovery::retryGetManagedObjects(
                 "ATTEMPT", static_cast<int>(attempt + 1), "SVC", service, "ERR",
                 e);
         }
-        co_await common::Sleep(event,
-                               static_cast<uint64_t>(backoff[attempt].count()) *
-                                   1000,
-                               common::NonPriority);
+        co_await common::Sleep(
+            event, static_cast<uint64_t>(backoff[attempt].count()) * 1000,
+            common::NonPriority);
     }
     lg2::error(
-        "retryGetManagedObjects: exhausted {N} attempts for service={SVC}",
-        "N", static_cast<int>(backoff.size()), "SVC", service);
+        "retryGetManagedObjects: exhausted {N} attempts for service={SVC}", "N",
+        static_cast<int>(backoff.size()), "SVC", service);
     co_return NSM_SW_ERROR;
 }
 
@@ -1173,9 +1173,8 @@ requester::Coroutine
     }
     catch (const std::exception& e)
     {
-        lg2::error(
-            "MctpDiscovery::SendRecvNsmMsg threw on eid={EID}. {ERR}",
-            "EID", eid, "ERR", e);
+        lg2::error("MctpDiscovery::SendRecvNsmMsg threw on eid={EID}. {ERR}",
+                   "EID", eid, "ERR", e);
         co_return NSM_SW_ERROR;
     }
 }
@@ -1225,64 +1224,68 @@ requester::Coroutine MctpDiscovery::discoverNsmDeviceTask(eid_t eid)
         // snapshot, continue the loop — never abort the task.
         try
         {
-        if (active)
-        {
-            auto rc = co_await coSetdeviceStateOnlineTask(mctpInfos);
-            discoveryEvents(eid).setValue(
-                nsm::DiscoveryEventType::SetDeviceStateOnline, rc);
-            if (rc == NSM_SW_ERROR_TIMEOUT &&
-                perEidDiscoveryTimeoutRetries[eid] < DiscoveryTimeoutMaxRetries)
+            if (active)
             {
-                ++perEidDiscoveryTimeoutRetries[eid];
-                lg2::info(
-                    "discoverNsmDeviceTask: ping/QDI timeout, re-queueing eid={EID} attempt={ATTEMPT}/{MAX} delayMs={DELAY}",
-                    "EID", eid, "ATTEMPT", perEidDiscoveryTimeoutRetries[eid],
-                    "MAX", DiscoveryTimeoutMaxRetries, "DELAY",
-                    DiscoveryTimeoutRetryDelayMs);
-                auto event = sdeventplus::Event::get_default();
-                co_await common::Sleep(
-                    event,
-                    static_cast<uint64_t>(DiscoveryTimeoutRetryDelayMs) * 1000,
-                    common::NonPriority);
-                // A newer transition for this EID may have been queued while we
-                // slept (e.g. InterfacesRemoved or Connectivity=Unavailable).
-                // The snapshot we just processed is still at the front (popped
-                // below), so size() > 1 means a fresher state is already
-                // pending. Re-queueing the stale active snapshot would re-probe
-                // the EID after that newer (possibly offline) transition runs,
-                // clobbering it. Only retry while this snapshot is still the
-                // latest known state for the EID.
-                if (perEidQueuedMctpInfos[eid].size() == 1)
+                auto rc = co_await coSetdeviceStateOnlineTask(mctpInfos);
+                discoveryEvents(eid).setValue(
+                    nsm::DiscoveryEventType::SetDeviceStateOnline, rc);
+                if (rc == NSM_SW_ERROR_TIMEOUT &&
+                    perEidDiscoveryTimeoutRetries[eid] <
+                        DiscoveryTimeoutMaxRetries)
                 {
-                    perEidQueuedMctpInfos[eid].emplace(mctpInfo);
+                    ++perEidDiscoveryTimeoutRetries[eid];
+                    lg2::info(
+                        "discoverNsmDeviceTask: ping/QDI timeout, re-queueing eid={EID} attempt={ATTEMPT}/{MAX} delayMs={DELAY}",
+                        "EID", eid, "ATTEMPT",
+                        perEidDiscoveryTimeoutRetries[eid], "MAX",
+                        DiscoveryTimeoutMaxRetries, "DELAY",
+                        DiscoveryTimeoutRetryDelayMs);
+                    auto event = sdeventplus::Event::get_default();
+                    co_await common::Sleep(
+                        event,
+                        static_cast<uint64_t>(DiscoveryTimeoutRetryDelayMs) *
+                            1000,
+                        common::NonPriority);
+                    // A newer transition for this EID may have been queued
+                    // while we slept (e.g. InterfacesRemoved or
+                    // Connectivity=Unavailable). The snapshot we just processed
+                    // is still at the front (popped below), so size() > 1 means
+                    // a fresher state is already pending. Re-queueing the stale
+                    // active snapshot would re-probe the EID after that newer
+                    // (possibly offline) transition runs, clobbering it. Only
+                    // retry while this snapshot is still the latest known state
+                    // for the EID.
+                    if (perEidQueuedMctpInfos[eid].size() == 1)
+                    {
+                        perEidQueuedMctpInfos[eid].emplace(mctpInfo);
+                    }
+                    else
+                    {
+                        lg2::info(
+                            "discoverNsmDeviceTask: newer transition queued during retry sleep, dropping stale retry eid={EID}",
+                            "EID", eid);
+                        perEidDiscoveryTimeoutRetries.erase(eid);
+                    }
                 }
                 else
                 {
-                    lg2::info(
-                        "discoverNsmDeviceTask: newer transition queued during retry sleep, dropping stale retry eid={EID}",
-                        "EID", eid);
+                    if (rc == NSM_SW_ERROR_TIMEOUT)
+                    {
+                        lg2::error(
+                            "discoverNsmDeviceTask: timeout retry budget exhausted, eid={EID} attempts={ATTEMPTS}",
+                            "EID", eid, "ATTEMPTS",
+                            perEidDiscoveryTimeoutRetries[eid]);
+                    }
                     perEidDiscoveryTimeoutRetries.erase(eid);
                 }
             }
             else
             {
-                if (rc == NSM_SW_ERROR_TIMEOUT)
-                {
-                    lg2::error(
-                        "discoverNsmDeviceTask: timeout retry budget exhausted, eid={EID} attempts={ATTEMPTS}",
-                        "EID", eid, "ATTEMPTS",
-                        perEidDiscoveryTimeoutRetries[eid]);
-                }
+                auto rc = co_await coSetdeviceStateOfflineTask(mctpInfos);
+                discoveryEvents(eid).setValue(
+                    nsm::DiscoveryEventType::SetDeviceStateOffline, rc);
                 perEidDiscoveryTimeoutRetries.erase(eid);
             }
-        }
-        else
-        {
-            auto rc = co_await coSetdeviceStateOfflineTask(mctpInfos);
-            discoveryEvents(eid).setValue(
-                nsm::DiscoveryEventType::SetDeviceStateOffline, rc);
-            perEidDiscoveryTimeoutRetries.erase(eid);
-        }
         }
         catch (const std::exception& e)
         {
@@ -1314,85 +1317,88 @@ requester::Coroutine
         // batch alive for remaining endpoints.
         try
         {
-        auto rc = co_await ping(eid);
-        discoveryEvents(eid).setValue(nsm::DiscoveryEventType::Ping, rc);
-        if (rc != NSM_SW_SUCCESS)
-        {
-            lg2::error("NSM ping failed, rc={RC} eid={EID}", "RC",
-                       utils::nsmSwCodeToString(rc), "EID", eid);
-            overallRC = rc;
-            continue;
-        }
-
-        lg2::info("found NSM Endpoint, eid={EID} uuid={UUID}", "EID", eid,
-                  "UUID", mctpUuid);
-
-        // get device identification from device
-        uint8_t deviceType = 0;
-        uint8_t instanceNumber = 0;
-        rc = co_await getQueryDeviceIdentification(eid, deviceType,
-                                                   instanceNumber);
-        discoveryEvents(eid).setValue(
-            nsm::DiscoveryEventType::QueryDeviceIdentification, rc);
-        if (rc != NSM_SUCCESS)
-        {
-            lg2::error(
-                "NSM getQueryDeviceIdentification failed, rc={RC} eid={EID}",
-                "RC", utils::nsmSwCodeToString(rc), "EID", eid);
-            overallRC = rc;
-            continue;
-        }
-
-        std::string configuredPath = "";
-        rc = co_await findConfiguredAssociations(mctpObjPath, configuredPath);
-
-        // save the nsm device identification info (localEid from MCTP, nullopt
-        // if not provided)
-        discoveredEIDs[eid] = {
-            mctpUuid,    deviceType,     instanceNumber, true, mctpMedium,
-            mctpBinding, configuredPath, localEid}; // std::optional - no
-                                                    // assumption when absent
-        auto nsmDevice = mapNsmDeviceUsingEid(
-            eid, mctpUuid, deviceType, instanceNumber, configuredPath, true,
-            mctpMedium, mctpBinding, localEid);
-        discoveryEvents(eid).setValue(
-            nsm::DiscoveryEventType::OnlineMapNsmDeviceUsingEid,
-            nsmDevice ? 1 : 0);
-        if (nsmDevice)
-        {
-            lg2::info("initDeviceDiscovery for nsmDevice eid={EID}", "EID",
-                      eid);
-            nsmDevice->initDeviceDiscovery();
-            auto rc = co_await nsmDevice->updateNsmDevice();
-            if (rc == NSM_SW_SUCCESS &&
-                perEidQueuedMctpInfos[eid].size() == 1 &&
-                nsmDevice->getEid() ==
-                    eid) // check if there is no pending mctp rediscovery signal
-                         // for same EID and nsmDevice is not changed with new
-                         // EID during updateNsmDevice
+            auto rc = co_await ping(eid);
+            discoveryEvents(eid).setValue(nsm::DiscoveryEventType::Ping, rc);
+            if (rc != NSM_SW_SUCCESS)
             {
-                co_await nsmDevice->setOnline();
-                if (nsmDevice->getEid() ==
-                    eid) // check if nsmDevice is not changed with new EID
-                         // during setOnline
+                lg2::error("NSM ping failed, rc={RC} eid={EID}", "RC",
+                           utils::nsmSwCodeToString(rc), "EID", eid);
+                overallRC = rc;
+                continue;
+            }
+
+            lg2::info("found NSM Endpoint, eid={EID} uuid={UUID}", "EID", eid,
+                      "UUID", mctpUuid);
+
+            // get device identification from device
+            uint8_t deviceType = 0;
+            uint8_t instanceNumber = 0;
+            rc = co_await getQueryDeviceIdentification(eid, deviceType,
+                                                       instanceNumber);
+            discoveryEvents(eid).setValue(
+                nsm::DiscoveryEventType::QueryDeviceIdentification, rc);
+            if (rc != NSM_SUCCESS)
+            {
+                lg2::error(
+                    "NSM getQueryDeviceIdentification failed, rc={RC} eid={EID}",
+                    "RC", utils::nsmSwCodeToString(rc), "EID", eid);
+                overallRC = rc;
+                continue;
+            }
+
+            std::string configuredPath = "";
+            rc = co_await findConfiguredAssociations(mctpObjPath,
+                                                     configuredPath);
+
+            // save the nsm device identification info (localEid from MCTP,
+            // nullopt if not provided)
+            discoveredEIDs[eid] =
                 {
-                    if (perEidQueuedMctpInfos[eid].size() == 1)
+                    mctpUuid,       deviceType, instanceNumber,
+                    true,           mctpMedium, mctpBinding,
+                    configuredPath, localEid}; // std::optional - no
+                                               // assumption when absent
+            auto nsmDevice = mapNsmDeviceUsingEid(
+                eid, mctpUuid, deviceType, instanceNumber, configuredPath, true,
+                mctpMedium, mctpBinding, localEid);
+            discoveryEvents(eid).setValue(
+                nsm::DiscoveryEventType::OnlineMapNsmDeviceUsingEid,
+                nsmDevice ? 1 : 0);
+            if (nsmDevice)
+            {
+                lg2::info("initDeviceDiscovery for nsmDevice eid={EID}", "EID",
+                          eid);
+                nsmDevice->initDeviceDiscovery();
+                auto rc = co_await nsmDevice->updateNsmDevice();
+                if (rc == NSM_SW_SUCCESS &&
+                    perEidQueuedMctpInfos[eid].size() == 1 &&
+                    nsmDevice->getEid() ==
+                        eid) // check if there is no pending mctp rediscovery
+                             // signal for same EID and nsmDevice is not changed
+                             // with new EID during updateNsmDevice
+                {
+                    co_await nsmDevice->setOnline();
+                    if (nsmDevice->getEid() ==
+                        eid) // check if nsmDevice is not changed with new EID
+                             // during setOnline
                     {
-                        nsmDevice->finishDeviceDiscovery();
-                    }
-                    else
-                    {
-                        lg2::info(
-                            "coSetdeviceStateOnlineTask : signal still in queue for eid= {EID}, marking device as discovery pending",
-                            "EID", eid);
-                        nsmDevice->initDeviceDiscovery();
+                        if (perEidQueuedMctpInfos[eid].size() == 1)
+                        {
+                            nsmDevice->finishDeviceDiscovery();
+                        }
+                        else
+                        {
+                            lg2::info(
+                                "coSetdeviceStateOnlineTask : signal still in queue for eid= {EID}, marking device as discovery pending",
+                                "EID", eid);
+                            nsmDevice->initDeviceDiscovery();
+                        }
                     }
                 }
             }
-        }
-        // update eid table [from UUID from MCTP dbus property]
-        insertIntoEidTableifNotExist(
-            mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding));
+            // update eid table [from UUID from MCTP dbus property]
+            insertIntoEidTableifNotExist(
+                mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding));
         }
         catch (const std::exception& e)
         {
@@ -1420,35 +1426,37 @@ requester::Coroutine
         // caller and triggered std::terminate.
         try
         {
-        if (discoveredEIDs.find(eid) != discoveredEIDs.end())
-        {
-            auto& value = discoveredEIDs[eid];
-            std::get<3>(value) = false; // set EID is inactive
-            auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber, active,
-                   mctpMedium, mctpBinding, associatedPath, localEid] = value;
-            nsmDevice = mapNsmDeviceUsingEid(
-                eid, uuid, mctpDeviceType, mctpDeviceInstanceNumber,
-                associatedPath, false, mctpMedium, mctpBinding, localEid);
-            discoveryEvents(eid).setValue(
-                nsm::DiscoveryEventType::OfflineMapNsmDeviceUsingEid,
-                nsmDevice ? 1 : 0);
-        }
-
-        if (nsmDevice)
-        {
-            co_await nsmDevice->setOffline();
-            if (perEidQueuedMctpInfos[eid].size() == 1 &&
-                nsmDevice->getEid() == eid) // check if nsmDevice is not changed
-                                            // with new EID during setOffline
+            if (discoveredEIDs.find(eid) != discoveredEIDs.end())
             {
-                nsmDevice->finishDeviceDiscovery();
+                auto& value = discoveredEIDs[eid];
+                std::get<3>(value) = false; // set EID is inactive
+                auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber, active,
+                       mctpMedium, mctpBinding, associatedPath,
+                       localEid] = value;
+                nsmDevice = mapNsmDeviceUsingEid(
+                    eid, uuid, mctpDeviceType, mctpDeviceInstanceNumber,
+                    associatedPath, false, mctpMedium, mctpBinding, localEid);
+                discoveryEvents(eid).setValue(
+                    nsm::DiscoveryEventType::OfflineMapNsmDeviceUsingEid,
+                    nsmDevice ? 1 : 0);
             }
-        }
-        else
-        {
-            // coverity[missing_return]
-            co_return NSM_SW_ERROR_NULL;
-        }
+
+            if (nsmDevice)
+            {
+                co_await nsmDevice->setOffline();
+                if (perEidQueuedMctpInfos[eid].size() == 1 &&
+                    nsmDevice->getEid() ==
+                        eid) // check if nsmDevice is not changed
+                             // with new EID during setOffline
+                {
+                    nsmDevice->finishDeviceDiscovery();
+                }
+            }
+            else
+            {
+                // coverity[missing_return]
+                co_return NSM_SW_ERROR_NULL;
+            }
         }
         catch (const std::exception& e)
         {

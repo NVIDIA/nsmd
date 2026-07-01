@@ -90,9 +90,10 @@ class UnifyMctpNsmRegression : public Test
 
     // Build a minimal-but-valid InterfacesAdded payload for an endpoint that
     // supports MCTP type 0x7e (VDM — required for nsmd to ingest the EID).
-    dbus::InterfaceMap makeVdmEndpointInterfaces(
-        uint8_t eid, const std::string& uuid, const std::string& connectivity,
-        const std::string& binding = "PCIe")
+    dbus::InterfaceMap
+        makeVdmEndpointInterfaces(uint8_t eid, const std::string& uuid,
+                                  const std::string& connectivity,
+                                  const std::string& binding = "PCIe")
     {
         dbus::InterfaceMap interfaces;
 
@@ -110,8 +111,8 @@ class UnifyMctpNsmRegression : public Test
 
         dbus::PropertyMap endpointProps;
         endpointProps["EID"] = static_cast<uint8_t>(eid);
-        endpointProps["SupportedMessageTypes"] =
-            std::vector<uint8_t>{0x00, 0x7e};
+        endpointProps["SupportedMessageTypes"] = std::vector<uint8_t>{0x00,
+                                                                      0x7e};
         endpointProps["NetworkId"] = static_cast<uint32_t>(1);
         endpointProps["MediumType"] = std::string("SPI");
         interfaces["xyz.openbmc_project.MCTP.Endpoint"] = endpointProps;
@@ -318,8 +319,7 @@ TEST_F(UnifyMctpNsmRegression, BindingInterface_NoBindingType_EmptyBinding)
     interfaces["xyz.openbmc_project.MCTP.Endpoint"] = endpointProps;
 
     MctpInfos infos;
-    EXPECT_NO_THROW(
-        mctp::testPopulateMctpInfo(interfaces, "/no-btype", infos));
+    EXPECT_NO_THROW(mctp::testPopulateMctpInfo(interfaces, "/no-btype", infos));
     if (!infos.empty())
     {
         EXPECT_EQ(std::get<4>(infos[0]), std::string{});
@@ -332,13 +332,11 @@ TEST_F(UnifyMctpNsmRegression, BindingInterface_NoBindingType_EmptyBinding)
 TEST_F(UnifyMctpNsmRegression, LocalEidPresent_PropagatesToMctpInfo)
 {
     auto interfaces = makeVdmEndpointInterfaces(19, "uuid-19", "Available");
-    auto& endpointProps =
-        interfaces["xyz.openbmc_project.MCTP.Endpoint"];
+    auto& endpointProps = interfaces["xyz.openbmc_project.MCTP.Endpoint"];
     endpointProps["LocalEID"] = static_cast<uint8_t>(8);
 
     MctpInfos infos;
-    EXPECT_NO_THROW(
-        mctp::testPopulateMctpInfo(interfaces, "/localeid", infos));
+    EXPECT_NO_THROW(mctp::testPopulateMctpInfo(interfaces, "/localeid", infos));
     if (!infos.empty())
     {
         EXPECT_EQ(std::get<7>(infos[0]).value_or(0), 8);
@@ -727,8 +725,7 @@ TEST_F(UnifyMctpNsmRegression, N6_SafeRead_InRange_ReturnsExpected)
     EXPECT_TRUE(*w);
 }
 
-TEST_F(UnifyMctpNsmRegression,
-       N6_SafeRead_OobMessageType_ReturnsNullopt)
+TEST_F(UnifyMctpNsmRegression, N6_SafeRead_OobMessageType_ReturnsNullopt)
 {
     MockNsmDevice dev(1, 1, "MCTP_UUID", "uuid-safe-r-mt", 0);
     EXPECT_FALSE(dev.isCommandCodeSupportedSafe(NUM_NSM_TYPES, 0).has_value());
@@ -795,22 +792,20 @@ TEST_F(UnifyMctpNsmRegression,
     EXPECT_TRUE(*sentinel);
 }
 
-
 // ============================================================================
 // (18) updateMessageTypesToCommandCodeMatrix with OOB messageType is a
 //     silent no-op (pre-existing guard at cpp:155). Pre-N6 pin — N6 adds the
 //     same shape via setCommandCodeSupportedSafe for the other write sites.
 // ============================================================================
-TEST_F(UnifyMctpNsmRegression,
-       NsmDeviceMatrix_UpdateOobMessageType_SilentNoOp)
+TEST_F(UnifyMctpNsmRegression, NsmDeviceMatrix_UpdateOobMessageType_SilentNoOp)
 {
     MockNsmDevice dev(1, 1, "MCTP_UUID", "uuid-update-oob", 0);
 
     bitfield8_t supported[1] = {{0xFF}};
-    EXPECT_NO_THROW(dev.updateMessageTypesToCommandCodeMatrix(
-        NUM_NSM_TYPES, supported, 1));
-    EXPECT_NO_THROW(dev.updateMessageTypesToCommandCodeMatrix(255, supported,
-                                                              1));
+    EXPECT_NO_THROW(
+        dev.updateMessageTypesToCommandCodeMatrix(NUM_NSM_TYPES, supported, 1));
+    EXPECT_NO_THROW(
+        dev.updateMessageTypesToCommandCodeMatrix(255, supported, 1));
     // No matrix row was added — confirm in-range row 0 stayed all-false.
     EXPECT_FALSE(dev.isCommandSupported(0, 0));
 }

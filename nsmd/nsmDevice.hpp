@@ -40,7 +40,6 @@
 #include <sdbusplus/timer.hpp>
 
 #include <coroutine>
-#include <optional>
 #include <deque>
 #include <map>
 #include <optional>
@@ -256,8 +255,9 @@ class NsmDevice :
      *  commandCode outside the static 256-wide row, which previously
      *  dereferenced the inner vector past end (UB → terminate). With this
      *  accessor, that bad payload becomes a logged drop. */
-    [[nodiscard]] std::optional<bool> isCommandCodeSupportedSafe(
-        uint8_t messageType, uint8_t commandCode) const noexcept;
+    [[nodiscard]] std::optional<bool>
+        isCommandCodeSupportedSafe(uint8_t messageType,
+                                   uint8_t commandCode) const noexcept;
 
     /** @brief Bounds-checked write of messageTypesToCommandCodeMatrix.
      *         Returns false (no-op) if (messageType, commandCode) is out
