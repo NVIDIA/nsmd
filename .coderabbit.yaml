@@ -176,3 +176,21 @@ knowledge_base:
         enabled: true
         filePatterns:
             - "docs/nsmd-review-context.md"
+
+    linked_repositories:
+        - repository: "dgx/bmc/phosphor-dbus-interfaces"
+          instructions: >
+              Canonical D-Bus interface and property TYPE definitions that nsmd implements and
+              consumes (e.g. Metric Value is a double). Check the interface YAML here before
+              flagging a D-Bus property type, name, or signature - for example, do not warn about
+              uint64 to double precision loss when the interface type is double.
+        - repository: "dgx/bmc/entity-manager"
+          instructions: >
+              EntityManager hardware configuration JSON that drives nsmd (device-type strings,
+              sensor and threshold config). Check the EM configs here before flagging a config key
+              name, case, or value - for example, DebugTokenDeviceType is "ERoT" (mixed case), not "EROT".
+        - repository: "dgx/bmc/nv-shmem"
+          instructions: >
+              NVIDIA shared-memory namespace and mapping definitions that nsmd publishes telemetry
+              into. Check the shmem namespace/mapping config here before flagging nsmd's
+              updateMetricOnSharedMemory usage or which metrics must be published to shared memory.
