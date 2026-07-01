@@ -21,8 +21,6 @@
  */
 #include "socketIo.hpp"
 
-#include <sys/ioctl.h>
-
 /**
  * @brief Concrete implementation that forwards every call to the real syscall.
  *
@@ -91,10 +89,6 @@ class RealSocketIo : public SocketIoInterface
                    socklen_t optlen) override
     {
         return ::setsockopt(fd, level, optname, optval, optlen);
-    }
-    int ioctl(int fd, unsigned long request, void* argp) override
-    {
-        return ::ioctl(fd, request, argp);
     }
 };
 
