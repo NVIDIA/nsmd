@@ -3,7 +3,9 @@
 # dgx/bmc/nsmd — repo-specific review context only.
 # General settings inherit from dgx/bmc/coderabbit:
 # language, tone, profile, chat, summaries, auto_review, request_changes_workflow,
-# commit_status, tools (all default-on), etc.
+# commit_status, etc.
+
+inheritance: true
 
 reviews:
     path_filters:
@@ -32,12 +34,13 @@ reviews:
               cleanup, naming, comments, Doxygen, local helper reuse, stronger test
               assertions, and refactor preferences are nitpicks only.
 
-        - path: "{nsmd,common,dot,debug-token}/**/*.{c,cpp,h,hpp}"
+        - path: "nsmd/**"
           instructions: |
               ## nsmd execution model
 
-              nsmd is a single-threaded OpenBMC daemon built around a
-              sdbusplus/asio cooperative coroutine event loop.
+              Production nsmd event-loop code is intended to run on a single
+              sdbusplus/asio cooperative coroutine loop unless a change explicitly
+              introduces another concurrent execution path.
 
               Do not flag std::localtime, lazy initialization, check-then-set
               flags, static local state, or shared member maps as thread-unsafe
@@ -47,7 +50,7 @@ reviews:
               - shared state accessed from multiple OS threads
               - callbacks registered on different execution contexts or strands
               - async/co_await interleaving where inconsistent state can actually
-                be observed
+                be observed, such as a co_await between a check and the set
 
               Before raising a thread-safety defect, identify the real concurrent
               path. If no such path is visible, do not raise it as a defect; ask a
@@ -57,7 +60,36 @@ reviews:
               missing cleanup, read the class header, access specifiers, default
               member initializers, destructor, and callers.
 
-        - path: "libnsm/**/*.{c,h}"
+        - path: "common/**"
+          instructions: |
+              ## common code review context
+
+              Common helpers may be used by nsmd's single event-loop daemon code.
+              Before raising a thread-safety defect, identify the real concurrent
+              path. If no such path is visible, ask a non-blocking question instead.
+              Verify callers before claiming missing validation, guards, cleanup,
+              or tests.
+
+        - path: "dot/**"
+          instructions: |
+              ## dot code review context
+
+              DOT-related helpers may be used by nsmd's single event-loop daemon
+              code. Before raising a thread-safety defect, identify the real
+              concurrent path. If no such path is visible, ask a non-blocking
+              question instead. Verify callers before claiming missing validation,
+              guards, cleanup, or tests.
+
+        - path: "debug-token/**"
+          instructions: |
+              ## debug-token review context
+
+              debug-token contains TLV encoder/decoder helpers and tests used by
+              nsmd debug-token flows. Verify the local parser/caller contract before
+              claiming missing validation, guards, cleanup, or tests. Before raising
+              a thread-safety defect, identify the real concurrent execution path.
+
+        - path: "libnsm/**"
           instructions: |
               ## NSM protocol encoder/decoder review
 
@@ -77,7 +109,7 @@ reviews:
               sizeof(struct) - sizeof(one_element) + N * sizeof(one_element)
               are expected when the caller allocates that payload size.
 
-        - path: "nsmtool/**/*.{c,cpp,h,hpp}"
+        - path: "nsmtool/**"
           instructions: |
               ## nsmtool review context
 
@@ -90,7 +122,7 @@ reviews:
 
               Style/refactor comments should be non-blocking nitpicks.
 
-        - path: "mockupResponder/**/*.{c,cpp,h,hpp}"
+        - path: "mockupResponder/**"
           instructions: |
               ## mockupResponder review context
 
@@ -108,7 +140,7 @@ reviews:
               Duplicate-looking static-inline helpers scoped to one file are
               acceptable.
 
-        - path: "**/test/**/*.{c,cpp,h,hpp}"
+        - path: "**/test/**"
           instructions: |
               ## Test code review context
 
@@ -122,7 +154,7 @@ reviews:
               Suggest stronger assertions as nitpicks, not defects. Empty or weak
               tests that pre-date the MR are not the MR's issue.
 
-        - path: "requester/**/*.{c,cpp,h,hpp}"
+        - path: "requester/**"
           instructions: |
               ## requester / transport review context
 

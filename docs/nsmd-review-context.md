@@ -3,15 +3,17 @@
 > Committed at the repo root (or `docs/`) and ingested by CodeRabbit via
 > `knowledge_base.code_guidelines.filePatterns`. This is the repo-level context CodeRabbit lacks
 > when it reviews a single diff. Every item below corresponds to a false-positive class found in a
-> 6-month review audit. Keep it current — CodeRabbit treats it as ground truth for every review.
+> 6-month review audit. Keep it current — CodeRabbit uses it as durable review guidance.
 
 ## Architecture facts (so reviews stop mis-assuming)
-- **nsmd is SINGLE-THREADED.** It runs one sdbusplus/asio event loop with cooperative coroutines.
-  There is exactly one OS thread. Two coroutines never run in parallel; control only yields at a
-  `co_await`. Therefore:
+- **Production nsmd event-loop code is intended to be single-threaded.** It runs one
+  sdbusplus/asio event loop with cooperative coroutines unless a change explicitly introduces
+  another concurrent execution path such as worker threads, callbacks on a different execution
+  context/strand, or shared state accessed from multiple OS threads. Therefore:
   - `std::localtime`, `static` local buffers, lazy `if(p==nullptr) p=make_unique<>()` init, and a
     `if(flag){...} flag=true;` check-then-set are **NOT** data races **unless** there is a `co_await`
-    *between* the check and the set. Do not flag them as thread-unsafe.
+    *between* the check and the set, or another concrete concurrent path is visible. Do not flag them
+    as thread-unsafe without identifying that path.
 - **`mockupResponder/**` is a test simulator, not production firmware.** Production-grade error
   handling, leak/null-deref hardening, and behavioral test assertions do not apply. Advertising a
   command in `supportedCommands` before its handler exists is the intended "advertise-first" pattern
@@ -21,9 +23,10 @@
   `EXPECT_NO_THROW`, an empty `catch{}`, or `EXPECT_NE(rc,0)` without asserting a specific value.
 - **`libnsm/**` implements the NSM (MCTP System Management API) wire protocol.** Enum numeric values
   and field widths are **spec-mandated** — changing them is usually spec-alignment, not a wire break.
-  Decoders perform **structural** validation (lengths/sizes) only; **semantic** field validation lives
-  in the encoders. A trailing `[1]` / `bitfield8_t[1]` member means `sizeof(struct)` already counts one
-  element, so `resize(sizeof(struct)+n-1)` is correct.
+  Many decoders perform **structural** validation (lengths/sizes), while **semantic** field
+  validation may live in encoders or callers. Check the local encoder/decoder contract before
+  demanding symmetric semantic validation. A trailing `[1]` / `bitfield8_t[1]` member means
+  `sizeof(struct)` already counts one element, so `resize(sizeof(struct)+n-1)` is correct.
 
 ## House conventions (intentional — not defects)
 - `const` on **by-value** parameters is intentional (prevents accidental mutation of the local copy).
@@ -40,6 +43,13 @@
   function's **callers** — most "issues" are handled just outside the diff hunk.
 - Treat pure style/lint preferences as **nitpicks**, never "Potential issue / Major / Critical".
 - Verify any "✅ Addressed" claim against the latest commit; don't assume.
+
+## Maintaining this context
+- If CodeRabbit raises a one-off false positive, reply on the CodeRabbit thread with the evidence and
+  resolve it.
+- If the same false-positive pattern repeats, update this file through a normal MR.
+- If the correction is a strict review rule or path-specific instruction, update `.coderabbit.yaml`.
+- If the rule applies across BMC repositories, propose it in the parent `dgx/bmc/coderabbit` config.
 
 ## Pointers
 - NSM protocol spec: MCTP System Management API (Type 0 Device Capability Discovery, Type 3 Platform
