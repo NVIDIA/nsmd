@@ -26,6 +26,7 @@
 #include "requester/mctp_endpoint_prober.hpp"
 #include "requester/request_timeout_tracker.hpp"
 #include "requester/retry_backoff_utils.hpp"
+#include "requester/type_cmd_mismatch_tracker.hpp"
 #include "socket_manager.hpp"
 
 #undef private
@@ -670,6 +671,88 @@ TEST_F(HandlerTest,
 
     EXPECT_FALSE(found);
     EXPECT_FALSE(handlerCalled);
+}
+
+// ===========================================================================
+// TypeCmdMismatchTracker tests
+// ===========================================================================
+
+class TypeCmdMismatchTrackerTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override
+    {
+        // Clear singleton state between tests
+        requester::TypeCmdMismatchTracker::instances.clear();
+    }
+};
+
+TEST_F(TypeCmdMismatchTrackerTest, NoMismatches_LogMismatchesEmitsNothing)
+{
+    // logMismatches() on empty state must not crash and emit no entries
+    EXPECT_NO_FATAL_FAILURE(requester::TypeCmdMismatchTracker::logMismatches());
+    EXPECT_TRUE(requester::TypeCmdMismatchTracker::instances.empty());
+}
+
+TEST_F(TypeCmdMismatchTrackerTest, FirstMismatch_StoredWithCountOne)
+{
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
+
+    auto& queue = requester::TypeCmdMismatchTracker::instances[5];
+    ASSERT_EQ(queue.size(), 1u);
+    EXPECT_EQ(queue.front().expectedType, 0x00);
+    EXPECT_EQ(queue.front().expectedCmd, 0x02);
+    EXPECT_EQ(queue.front().gotType, 0x03);
+    EXPECT_EQ(queue.front().gotCmd, 0x10);
+    EXPECT_EQ(queue.front().count, 1u);
+}
+
+TEST_F(TypeCmdMismatchTrackerTest,
+       RepeatedSameMismatch_CountIncrements_NoNewEntry)
+{
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
+
+    auto& queue = requester::TypeCmdMismatchTracker::instances[5];
+    ASSERT_EQ(queue.size(), 1u);
+    EXPECT_EQ(queue.front().count, 3u);
+}
+
+TEST_F(TypeCmdMismatchTrackerTest, DifferentMismatch_SameEid_AddsNewEntry)
+{
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
+    requester::TypeCmdMismatchTracker::record(5, 3, 0x01, 0x05, 0x02, 0x08);
+
+    auto& queue = requester::TypeCmdMismatchTracker::instances[5];
+    ASSERT_EQ(queue.size(), 2u);
+}
+
+TEST_F(TypeCmdMismatchTrackerTest, RingBufferCap_OldestEvictedWhenFull)
+{
+    // Fill to MAX_MISMATCH_DEBUG_EVENTS_PER_EID (10) with distinct combos
+    for (uint8_t i = 0; i < 10; ++i)
+    {
+        requester::TypeCmdMismatchTracker::record(5, i, 0x00, i, 0x01, i);
+    }
+    EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[5].size(), 10u);
+
+    // 11th distinct combo evicts the oldest
+    requester::TypeCmdMismatchTracker::record(5, 10, 0x00, 10, 0x01, 10);
+    EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[5].size(), 10u);
+
+    // Oldest (cmd=0) should be gone; newest (cmd=10) should be at back
+    EXPECT_EQ(
+        requester::TypeCmdMismatchTracker::instances[5].back().expectedCmd, 10);
+}
+
+TEST_F(TypeCmdMismatchTrackerTest, MultipleEids_TrackedIndependently)
+{
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
+    requester::TypeCmdMismatchTracker::record(6, 3, 0x01, 0x05, 0x02, 0x08);
+
+    EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[5].size(), 1u);
+    EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[6].size(), 1u);
 }
 
 // ===========================================================================
