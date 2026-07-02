@@ -1337,7 +1337,7 @@ requester::Coroutine
                                                        instanceNumber);
             discoveryEvents(eid).setValue(
                 nsm::DiscoveryEventType::QueryDeviceIdentification, rc);
-            if (rc != NSM_SUCCESS)
+            if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
                     "NSM getQueryDeviceIdentification failed, rc={RC} eid={EID}",

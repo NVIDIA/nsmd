@@ -133,11 +133,11 @@ TEST_F(UnifyMctpNsmRegression,
     MctpInfos infos;
     EXPECT_NO_THROW(
         mctp::testPopulateMctpInfo(interfaces, "/au/.../ep/11", infos));
-    // Either the socket call succeeds (and we publish the info) or it throws
-    // inside populateMctpInfo's catch (and infos stays empty); branch-tests
-    // already lock the latter path, here we just confirm "no mapper round-trip
-    // for the payload-first path" — populateMctpInfo never calls the mapper.
-    SUCCEED();
+    // Payload-first walk produces the MctpInfo from the InterfacesAdded
+    // payload alone — no mapper round-trip. registerMctpEndpoint's return is
+    // ignored, so a socket failure cannot empty infos.
+    ASSERT_FALSE(infos.empty()) << "expected one parsed MctpInfo";
+    EXPECT_EQ(std::get<0>(infos[0]), 11);
 }
 
 // ============================================================================
@@ -149,10 +149,8 @@ TEST_F(UnifyMctpNsmRegression, Connectivity_Available_ActiveTrue)
 
     MctpInfos infos;
     mctp::testPopulateMctpInfo(interfaces, "/path/12", infos);
-    if (!infos.empty())
-    {
-        EXPECT_TRUE(std::get<5>(infos[0]));
-    }
+    ASSERT_FALSE(infos.empty()) << "expected one parsed MctpInfo";
+    EXPECT_TRUE(std::get<5>(infos[0]));
 }
 
 // ============================================================================
@@ -164,10 +162,8 @@ TEST_F(UnifyMctpNsmRegression, Connectivity_Degraded_ActiveFalse)
 
     MctpInfos infos;
     mctp::testPopulateMctpInfo(interfaces, "/path/13", infos);
-    if (!infos.empty())
-    {
-        EXPECT_FALSE(std::get<5>(infos[0]));
-    }
+    ASSERT_FALSE(infos.empty()) << "expected one parsed MctpInfo";
+    EXPECT_FALSE(std::get<5>(infos[0]));
 }
 
 // ============================================================================
@@ -182,10 +178,8 @@ TEST_F(UnifyMctpNsmRegression,
 
     MctpInfos infos;
     EXPECT_NO_THROW(mctp::testPopulateMctpInfo(interfaces, "/path/14", infos));
-    if (!infos.empty())
-    {
-        EXPECT_FALSE(std::get<5>(infos[0]));
-    }
+    ASSERT_FALSE(infos.empty()) << "expected one parsed MctpInfo";
+    EXPECT_FALSE(std::get<5>(infos[0]));
 }
 
 // ============================================================================
@@ -201,14 +195,11 @@ TEST_F(UnifyMctpNsmRegression, PayloadFirst_CachesByObjPath_ForRemovalPath)
     mctp::testPopulateMctpInfo(interfaces, "/au/.../ep/15", infos);
 
     auto& cache = mctp::testGetCachedMctpInfoByPath();
-    // If the happy path produced a record, the cache must hold it; if not
-    // (registerMctpEndpoint failed under SdBusMock), the cache stays empty —
-    // either way the contract is that the cache, not the mapper, is the
-    // source of truth for InterfacesRemoved.
-    if (!infos.empty())
-    {
-        EXPECT_NE(cache.find("/au/.../ep/15"), cache.end());
-    }
+    // Payload-first ingest fills cachedMctpInfoByPath in lock-step with infos,
+    // so the cache — not the mapper — is the source of truth the
+    // InterfacesRemoved handler looks up.
+    ASSERT_FALSE(infos.empty()) << "expected one parsed MctpInfo";
+    EXPECT_NE(cache.find("/au/.../ep/15"), cache.end());
 }
 
 // ============================================================================
@@ -320,10 +311,8 @@ TEST_F(UnifyMctpNsmRegression, BindingInterface_NoBindingType_EmptyBinding)
 
     MctpInfos infos;
     EXPECT_NO_THROW(mctp::testPopulateMctpInfo(interfaces, "/no-btype", infos));
-    if (!infos.empty())
-    {
-        EXPECT_EQ(std::get<4>(infos[0]), std::string{});
-    }
+    ASSERT_FALSE(infos.empty()) << "expected one parsed MctpInfo";
+    EXPECT_EQ(std::get<4>(infos[0]), std::string{});
 }
 
 // ============================================================================
@@ -337,10 +326,8 @@ TEST_F(UnifyMctpNsmRegression, LocalEidPresent_PropagatesToMctpInfo)
 
     MctpInfos infos;
     EXPECT_NO_THROW(mctp::testPopulateMctpInfo(interfaces, "/localeid", infos));
-    if (!infos.empty())
-    {
-        EXPECT_EQ(std::get<7>(infos[0]).value_or(0), 8);
-    }
+    ASSERT_FALSE(infos.empty()) << "expected one parsed MctpInfo";
+    EXPECT_EQ(std::get<7>(infos[0]).value_or(0), 8);
 }
 
 // ============================================================================
