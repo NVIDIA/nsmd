@@ -21,6 +21,7 @@
 #include "nsmDevice.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 #include "requester/request_timeout_tracker.hpp"
+#include "requester/type_cmd_mismatch_tracker.hpp"
 #include "sensorManager.hpp"
 
 #include <com/nvidia/Common/LogDump/server.hpp>
@@ -43,6 +44,7 @@ class NsmLogDumpIntf : public LogDumpIntf
         nsm::SensorManagerImpl::dumpReadinessLogs();
         nsm::SensorManagerImpl::dumpNsmDevicesInfo();
         requester::DeviceRequestTimeOutTracker::logFailures();
+        requester::TypeCmdMismatchTracker::logMismatches();
         mctp::MctpDiscovery::logProberSummaries();
     }
 };
