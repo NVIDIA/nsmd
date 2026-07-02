@@ -28,6 +28,7 @@
 #include "nsmd/socket_manager.hpp"
 #include "request.hpp"
 #include "request_timeout_tracker.hpp"
+#include "type_cmd_mismatch_tracker.hpp"
 
 #include <function2/function2.hpp>
 #include <phosphor-logging/lg2.hpp>
@@ -314,14 +315,9 @@ class Handler
                 if (request->getMsgType() != type ||
                     request->getCommandCode() != command)
                 {
-                    lg2::error(
-                        "Dropping NSM response: type/command mismatch for "
-                        "EID={EID} instanceId={IID}: expected type={ETYPE} "
-                        "cmd={ECMD}, got type={RTYPE} cmd={RCMD}",
-                        "EID", eid, "IID", instanceId, "ETYPE",
-                        request->getMsgType(), "ECMD",
-                        request->getCommandCode(), "RTYPE", type, "RCMD",
-                        command);
+                    TypeCmdMismatchTracker::record(
+                        eid, instanceId, request->getMsgType(),
+                        request->getCommandCode(), type, command);
                     return false;
                 }
                 // Note1: timeOutTracker can be updated through TimeoutEvent or
