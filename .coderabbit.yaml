@@ -1,9 +1,12 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 #
-# dgx/bmc/nsmd — repo-specific review context only.
-# General settings inherit from dgx/bmc/coderabbit:
-# language, tone, profile, chat, summaries, auto_review, request_changes_workflow,
-# commit_status, etc.
+# dgx/bmc/nsmd — repo-specific facts ONLY.
+# All generic review guidelines (evidence-first, concurrency-model procedure,
+# production-vs-test identification, cross-repo contract checks, severity
+# discipline, test/markdown nitpick rules) live in the central config:
+# dgx/bmc/coderabbit/.coderabbit.yaml (inherited via inheritance: true).
+# This file adds only what cannot be generic: directory roles, NSM wire-spec
+# conventions, and the concrete linked repos.
 
 inheritance: true
 
@@ -12,82 +15,19 @@ reviews:
         - "!subprojects/**"
 
     path_instructions:
-        - path: "**/*"
+        - path: "{nsmd,common,dot,debug-token,requester}/**"
           instructions: |
-              ## Evidence-first review
+              Repo fact: production nsmd code runs on a single sdbusplus/asio
+              cooperative-coroutine event loop (one OS thread). Apply the
+              central concurrency-model guideline with that model in mind.
 
-              Before raising any actionable comment, verify the claim against the
-              full changed file plus relevant declarations, headers, helpers,
-              build configuration, and callers. Do not reason from the diff hunk
-              alone.
-
-              Quote the specific code, file:line, or documented contract that
-              supports the claim. If you cannot find supporting evidence, ask a
-              non-blocking question instead of asserting a defect.
-
-              Review new or modified behavior. Do not flag pre-existing code unless
-              the MR touches it or the changed code newly depends on it.
-
-              Severity discipline:
-              Major/Critical should be reserved for provable correctness, security,
-              memory-safety, protocol, or production reliability issues. Style,
-              cleanup, naming, comments, Doxygen, local helper reuse, stronger test
-              assertions, and refactor preferences are nitpicks only.
-
-        - path: "nsmd/**"
+        - path: "mockupResponder/**"
           instructions: |
-              ## nsmd execution model
-
-              Production nsmd event-loop code is intended to run on a single
-              sdbusplus/asio cooperative coroutine loop unless a change explicitly
-              introduces another concurrent execution path.
-
-              Do not flag std::localtime, lazy initialization, check-then-set
-              flags, static local state, or shared member maps as thread-unsafe
-              unless the changed code introduces a concrete concurrent execution
-              path, such as:
-              - std::thread, pthreads, worker threads, or detached threads
-              - shared state accessed from multiple OS threads
-              - callbacks registered on different execution contexts or strands
-              - async/co_await interleaving where inconsistent state can actually
-                be observed, such as a co_await between a check and the set
-
-              Before raising a thread-safety defect, identify the real concurrent
-              path. If no such path is visible, do not raise it as a defect; ask a
-              non-blocking question instead.
-
-              Before claiming a missing guard, missing test, missing error type, or
-              missing cleanup, read the class header, access specifiers, default
-              member initializers, destructor, and callers.
-
-        - path: "common/**"
-          instructions: |
-              ## common code review context
-
-              Common helpers may be used by nsmd's single event-loop daemon code.
-              Before raising a thread-safety defect, identify the real concurrent
-              path. If no such path is visible, ask a non-blocking question instead.
-              Verify callers before claiming missing validation, guards, cleanup,
-              or tests.
-
-        - path: "dot/**"
-          instructions: |
-              ## dot code review context
-
-              DOT-related helpers may be used by nsmd's single event-loop daemon
-              code. Before raising a thread-safety defect, identify the real
-              concurrent path. If no such path is visible, ask a non-blocking
-              question instead. Verify callers before claiming missing validation,
-              guards, cleanup, or tests.
-
-        - path: "debug-token/**"
-          instructions: |
-              ## debug-token review context
-
-              debug-token contains TLV encoder/decoder helpers and tests used by
-              nsmd debug-token flows. Verify the local parser/caller contract before
-              claiming missing validation, guards, cleanup, or tests. Before raising
-              a thread-safety defect, identify the real concurrent execution path.
+              Repo fact: mockupResponder is test/simulation infrastructure, not
+              production nsmd. Apply the central production-vs-test guideline
+              accordingly. Advertising a command in supportedCommands before its
+              handler exists can be intentional; the default path returns
+              NSM_ERR_UNSUPPORTED_COMMAND_CODE.
 
         - path: "libnsm/**"
           instructions: |
@@ -101,75 +41,21 @@ reviews:
               pair, caller allocation, and NSM contract.
 
               Decoders often perform structural validation while semantic
-              validation may live in encoders or callers. Do not demand symmetric
-              semantic validation unless the local contract requires it.
+              validation may live in encoders or callers. Do not demand
+              symmetric semantic validation unless the local contract requires
+              it.
 
-              A trailing [1] or bitfield8_t[1] member means sizeof already includes
-              one element. Flexible-array formulas of the form
+              A trailing [1] or bitfield8_t[1] member means sizeof already
+              includes one element. Flexible-array formulas of the form
               sizeof(struct) - sizeof(one_element) + N * sizeof(one_element)
               are expected when the caller allocates that payload size.
 
-        - path: "nsmtool/**"
-          instructions: |
-              ## nsmtool review context
-
-              nsmtool is a CLI for NSM operations.
-
-              Do not classify CLI parsing type preferences, enum storage
-              preferences, duplicate local helpers, or display-formatting choices
-              as defects unless they cause incorrect behavior, build failure, ABI
-              breakage, or invalid wire data.
-
-              Style/refactor comments should be non-blocking nitpicks.
-
-        - path: "mockupResponder/**"
-          instructions: |
-              ## mockupResponder review context
-
-              mockupResponder is test/simulation infrastructure, not production
-              nsmd.
-
-              Do not demand production-grade error handling, leak/null-deref
-              guards, or thread-safety unless there is a clear production execution
-              path.
-
-              Advertising a command in supportedCommands before its handler exists
-              can be intentional; default behavior may return
-              NSM_ERR_UNSUPPORTED_COMMAND_CODE.
-
-              Duplicate-looking static-inline helpers scoped to one file are
-              acceptable.
-
-        - path: "**/test/**"
-          instructions: |
-              ## Test code review context
-
-              Test code includes unit tests, branch-coverage tests,
-              sanitizer-cleanup tests, and mock-driven construction tests.
-
-              EXPECT_NO_THROW, empty catch blocks, or EXPECT_NE(rc, 0) without a
-              specific value can be acceptable when the purpose is only to exercise
-              a path cleanly.
-
-              Suggest stronger assertions as nitpicks, not defects. Empty or weak
-              tests that pre-date the MR are not the MR's issue.
-
         - path: "requester/**"
           instructions: |
-              ## requester / transport review context
-
-              requester contains transport and request plumbing.
-
-              Failed MCTP send/sendto paths are real delivery failures and may
-              intentionally log at error severity. Do not suggest downgrading failed
-              sends to warnings unless the caller has a documented retry/recovery
-              path that makes the failure non-error.
-
-        - path: "**/*.md"
-          instructions: |
-              Markdown style issues such as missing fenced-code language tags are
-              nitpicks only. Do not raise Markdown lint/style as Potential issue,
-              Major, or Critical.
+              Repo fact: failed MCTP send/sendto paths are real delivery
+              failures and may intentionally log at error severity. Do not
+              suggest downgrading failed sends to warnings unless the caller
+              has a documented retry/recovery path.
 
 knowledge_base:
     code_guidelines:
