@@ -432,7 +432,8 @@ void createChassisAttributes(std::shared_ptr<NsmDevice> device,
             allCurrentIfaceProperties.at("SoCPowerSmoothingSupported")))
     {
         if (device->getDeviceType() == NSM_DEV_ID_MCTP_BRIDGE &&
-            device->getDeviceRole() == NSM_MCTP_BRIDGE_DEV_ROLE_SXM_SMA)
+            (device->getDeviceRole() == NSM_MCTP_BRIDGE_DEV_ROLE_SXM_SMA ||
+             device->getDeviceRole() == NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA))
         {
             std::string type = "NSM_Chassis";
             std::string inventoryObjPath = chassisInventoryBasePath.string() +
