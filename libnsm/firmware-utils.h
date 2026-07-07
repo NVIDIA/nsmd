@@ -81,6 +81,7 @@ enum nsm_firmware_state_information_fields {
 	NSM_FIRMWARE_BACKGROUND_COPY_POLICY_CURRENT = 18,   // Enum8
 	NSM_FIRMWARE_AP_SKU_ID = 19,			    // NvU32
 	NSM_FIRMWARE_GLOBAL_FAILOVER_POLICY = 20,	    // Enum8
+	NSM_FIRMWARE_DOT_AUTH_STATE = 21,		    // Enum8
 };
 
 /** @brief NSM code authentication key permissions request type
@@ -212,6 +213,7 @@ struct nsm_firmware_slot_info {
 	uint8_t firmware_state;
 	uint16_t security_version_number;
 	uint16_t signing_key_index;
+	uint8_t dot_auth_state;
 };
 
 /** @struct nsm_firmware_erot_state_info_resp

@@ -23,7 +23,8 @@ namespace nsm
 NsmFirmwareSlot::NsmFirmwareSlot(
     sdbusplus::bus_t& bus, const std::string& chassisPath,
     const std::vector<utils::Association>& associations, int slotNum,
-    SlotIntf::FirmwareType fwType, const std::string& chassisName) :
+    SlotIntf::FirmwareType fwType, const std::string& chassisName,
+    uint8_t deviceType) :
     AssociationDefinitionsIntf(
         bus, getPath(chassisPath, slotNum, chassisName).c_str()),
     SecSigningIntf(bus, getPath(chassisPath, slotNum, chassisName).c_str()),
@@ -55,6 +56,12 @@ NsmFirmwareSlot::NsmFirmwareSlot(
     type(fwType);
     extendedVersion("NA");
     buildType(FirmwareBuildType::Unknown);
+
+    if (deviceType == NSM_DEV_ID_CPU)
+    {
+        dotAuthStateIntf = std::make_shared<DOTAuthStateIntf>(
+            bus, getPath(chassisPath, slotNum, chassisName).c_str());
+    }
 }
 
 void NsmFirmwareSlot::updateActiveSlotAssociation()
@@ -147,6 +154,27 @@ void NsmFirmwareSlot::update(
             break;
         default:
             break;
+    }
+
+    if (dotAuthStateIntf)
+    {
+        DOTAuthStateIntf::AuthState das = DOTAuthStateIntf::AuthState::Unknown;
+        switch (info.dot_auth_state)
+        {
+            case 0:
+                das = DOTAuthStateIntf::AuthState::DOTNotInstalled;
+                break;
+            case 1:
+                das = DOTAuthStateIntf::AuthState::AuthenticationSuccess;
+                break;
+            case 2:
+                das = DOTAuthStateIntf::AuthState::AuthenticationFailed;
+                break;
+            default:
+                das = DOTAuthStateIntf::AuthState::Unknown;
+                break;
+        }
+        dotAuthStateIntf->dotAuthState(das);
     }
 
     updateActiveSlotAssociation();
