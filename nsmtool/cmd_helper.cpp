@@ -24,11 +24,13 @@
 #include "xyz/openbmc_project/Common/error.hpp"
 
 #include <linux/mctp.h>
+#include <sys/time.h>
 #include <systemd/sd-bus.h>
 
 #include <sdbusplus/server.hpp>
 #include <xyz/openbmc_project/Logging/Entry/server.hpp>
 
+#include <chrono>
 #include <exception>
 
 using namespace utils;
@@ -179,6 +181,25 @@ int inKernelMctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
 
     CustomFD socketFd(sockFd);
 
+    // Bound the receive so nsmtool never blocks forever when the endpoint is
+    // reachable (send succeeds) but delivers no matching reply to our socket.
+    // Without this the recv() calls below block indefinitely and the command
+    // never returns a return code (requiring Ctrl-C). See NVBug 6253606.
+    // Use the same NSM response timeout as nsmd (config.h RESPONSE_TIME_OUT, in
+    // milliseconds) so the tool and daemon stay consistent.
+    constexpr auto mctpRecvTimeoutMs = RESPONSE_TIME_OUT;
+    struct timeval recvTimeout;
+    recvTimeout.tv_sec = mctpRecvTimeoutMs / 1000;
+    recvTimeout.tv_usec = (mctpRecvTimeoutMs % 1000) * 1000;
+    if (-1 == setsockopt(socketFd(), SOL_SOCKET, SO_RCVTIMEO, &recvTimeout,
+                         sizeof(recvTimeout)))
+    {
+        returnCode = -errno;
+        std::cerr << "Failed to set socket receive timeout : RC = "
+                  << returnCode << "\n";
+        return returnCode;
+    }
+
     struct sockaddr_mctp addr;
     memset(&addr, 0, sizeof(addr));
 
@@ -210,22 +231,46 @@ int inKernelMctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
     }
     else if (peekedLength <= -1)
     {
-        returnCode = -errno;
-        std::cerr << "recv() system call failed : RC = " << returnCode << "\n";
+        if (EAGAIN == errno || EWOULDBLOCK == errno)
+        {
+            returnCode = NSM_SW_ERROR_TIMEOUT;
+            std::cerr << "Timed out waiting for NSM response (no reply within "
+                      << mctpRecvTimeoutMs << "ms) : RC = " << returnCode
+                      << "\n";
+        }
+        else
+        {
+            returnCode = -errno;
+            std::cerr << "recv() system call failed : RC = " << returnCode
+                      << "\n";
+        }
         return returnCode;
     }
     else
     {
         auto reqhdr = reinterpret_cast<const nsm_msg_hdr*>(&requestMsg[3]);
+        const auto deadline = std::chrono::steady_clock::now() +
+                              std::chrono::milliseconds(mctpRecvTimeoutMs);
         do
         {
             auto peekedLength = recv(socketFd(), nullptr, 0,
                                      MSG_PEEK | MSG_TRUNC);
             if (-1 == peekedLength)
             {
-                returnCode = -errno;
-                std::cerr << "Failed to recv message length : RC = "
-                          << returnCode << "\n";
+                if (EAGAIN == errno || EWOULDBLOCK == errno)
+                {
+                    returnCode = NSM_SW_ERROR_TIMEOUT;
+                    std::cerr
+                        << "Timed out waiting for matching NSM response : RC = "
+                        << returnCode << "\n";
+                }
+                else
+                {
+                    returnCode = -errno;
+                    std::cerr
+                        << "Failed to recv message length : RC = " << returnCode
+                        << "\n";
+                }
                 return returnCode;
             }
             responseMsg.resize(peekedLength);
@@ -253,8 +298,15 @@ int inKernelMctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
                           << recvDataLength << "\n";
                 return returnCode;
             }
-        } while (1);
+        } while (std::chrono::steady_clock::now() < deadline);
+
+        // Deadline exceeded while draining non-matching packets.
+        std::cerr << "Timed out waiting for matching NSM response (deadline "
+                  << mctpRecvTimeoutMs << "ms exceeded)\n";
+        return NSM_SW_ERROR_TIMEOUT;
     }
+
+    return NSM_SW_ERROR_TIMEOUT;
 }
 
 // parser for bitField variable
@@ -431,7 +483,11 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
                                     MCTP_MSG_TYPE_PCI_VDM};
         reqMsg.insert(reqMsg.end(), requestMsg.begin(), requestMsg.end());
 
-        inKernelMctpSockSendRecv(reqMsg, responseMsg, mctpVerbose);
+        int rc = inKernelMctpSockSendRecv(reqMsg, responseMsg, mctpVerbose);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            return rc;
+        }
 #else
         auto [type, protocol, sockAddress] = getMctpSockInfo(mctpEid);
         if (sockAddress.empty())
@@ -510,9 +566,17 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
         requestMsg.insert(requestMsg.begin(), MCTP_MSG_TYPE_PCI_VDM);
 
 #ifdef MCTP_IN_KERNEL
-        inKernelMctpSockSendRecv(requestMsg, responseMsg, mctpVerbose);
+        int rc = inKernelMctpSockSendRecv(requestMsg, responseMsg, mctpVerbose);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            return rc;
+        }
 #else
-        mctpSockSendRecv(requestMsg, responseMsg, mctpVerbose);
+        int rc = mctpSockSendRecv(requestMsg, responseMsg, mctpVerbose);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            return rc;
+        }
         responseMsg.erase(responseMsg.begin(),
                           responseMsg.begin() + 2 /* skip the mctp header */);
 #endif
