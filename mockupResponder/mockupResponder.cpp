@@ -1456,7 +1456,7 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    /* Mock payload: produce a synthetic IEEE 802.1AB frame on (port 0,
+    /* Mock payload: produce a synthetic Ethernet-framed LLDPDU on (port 0,
      * direction RX) so an operator can validate the TLV decode path
      * through nsmd. Every other (port, direction) tuple returns the
      * working-assumption empty buffer (CC=0x00 + data_size=0) per
@@ -1464,22 +1464,29 @@ std::optional<std::vector<uint8_t>>
     std::vector<uint8_t> data;
     if (portNumber == 0 && direction == NSM_LLDP_DIRECTION_RX)
     {
+        std::vector<uint8_t> lldpPdu;
         /* Chassis ID TLV (type 1, length 7): subtype MAC + 6 MAC bytes. */
-        data.insert(data.end(),
-                    {0x02, 0x07, 0x04, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55});
+        lldpPdu.insert(lldpPdu.end(),
+                       {0x02, 0x07, 0x04, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55});
         /* Port ID TLV (type 2, length 7): subtype MAC + 6 MAC bytes. */
-        data.insert(data.end(),
-                    {0x04, 0x07, 0x03, 0x00, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE});
+        lldpPdu.insert(lldpPdu.end(),
+                       {0x04, 0x07, 0x03, 0x00, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE});
         /* TTL TLV (type 3, length 2): 120 seconds (0x0078). */
-        data.insert(data.end(), {0x06, 0x02, 0x00, 0x78});
-        /* System Name TLV (type 5) — "mock-cx9-peer". */
-        const char* sn = "mock-cx9-peer";
+        lldpPdu.insert(lldpPdu.end(), {0x06, 0x02, 0x00, 0x78});
+        /* System Name TLV (type 5) — "mock-lldp-peer". */
+        const char* sn = "mock-lldp-peer";
         size_t snLen = strlen(sn);
-        data.push_back(static_cast<uint8_t>((5u << 1) | ((snLen >> 8) & 1u)));
-        data.push_back(static_cast<uint8_t>(snLen & 0xFFu));
-        data.insert(data.end(), sn, sn + snLen);
+        lldpPdu.push_back(
+            static_cast<uint8_t>((5u << 1) | ((snLen >> 8) & 1u)));
+        lldpPdu.push_back(static_cast<uint8_t>(snLen & 0xFFu));
+        lldpPdu.insert(lldpPdu.end(), sn, sn + snLen);
         /* End-of-LLDPDU (type 0, length 0). */
-        data.insert(data.end(), {0x00, 0x00});
+        lldpPdu.insert(lldpPdu.end(), {0x00, 0x00});
+
+        /* Match device wire format: DST + SRC + EtherType 0x88CC + LLDPDU. */
+        data = {0x01, 0x80, 0xC2, 0x00, 0x00, 0x0E, 0x00,
+                0x11, 0x22, 0x33, 0x44, 0x55, 0x88, 0xCC};
+        data.insert(data.end(), lldpPdu.begin(), lldpPdu.end());
     }
 
     uint16_t reason_code = ERR_NULL;

@@ -76,11 +76,11 @@ void createLldpPacketSensorsForPort(sdbusplus::bus::bus& bus,
 {
     const std::string lldpBase = portInventoryPath + "/LLDP/";
     auto rx = std::make_shared<NsmLldpPacket>(
-        bus, sensorNamePrefix + "_LLDP_RX", type, lldpBase + "RX", portNumber,
-        NSM_LLDP_DIRECTION_RX);
+        bus, sensorNamePrefix + "_LLDP_RX", type, lldpBase + "RX",
+        portInventoryPath, portNumber, NSM_LLDP_DIRECTION_RX);
     auto tx = std::make_shared<NsmLldpPacket>(
-        bus, sensorNamePrefix + "_LLDP_TX", type, lldpBase + "TX", portNumber,
-        NSM_LLDP_DIRECTION_TX);
+        bus, sensorNamePrefix + "_LLDP_TX", type, lldpBase + "TX",
+        portInventoryPath, portNumber, NSM_LLDP_DIRECTION_TX);
     nsmDevice->addSensor(rx, priority);
     nsmDevice->addSensor(tx, priority);
 }

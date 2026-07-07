@@ -1921,7 +1921,7 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
         {
             createLldpPacketSensorsForPort(
                 bus, nsmDevice, deviceName + '_' + portName, type, objPath,
-                static_cast<uint16_t>(i), priority);
+                static_cast<uint16_t>(logicalPortNum), priority);
         }
 #endif
 
