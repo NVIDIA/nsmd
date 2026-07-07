@@ -22,6 +22,7 @@
 #include "globals.hpp"
 #include "utils.hpp"
 
+#include <com/nvidia/Software/DOTAuthState/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Security/Signing/server.hpp>
@@ -34,6 +35,7 @@
 #include <xyz/openbmc_project/Software/State/server.hpp>
 #include <xyz/openbmc_project/Software/VersionComparison/server.hpp>
 
+#include <memory>
 #include <vector>
 
 namespace nsm
@@ -45,6 +47,8 @@ using namespace sdbusplus::server;
 using AssociationDefinitionsIntf = object_t<association::Definitions>;
 using SecSigningIntf = object_t<security::Signing>;
 using BuildTypeIntf = object_t<software::BuildType>;
+using DOTAuthStateIntf =
+    object_t<sdbusplus::server::com::nvidia::software::DOTAuthState>;
 using ExtendedVersionIntf = object_t<software::ExtendedVersion>;
 using SettingsIntf = object_t<software::Settings>;
 using SigningTypeIntf = object_t<software::Signing>;
@@ -69,7 +73,7 @@ class NsmFirmwareSlot :
     NsmFirmwareSlot(sdbusplus::bus::bus& bus, const std::string& chassisPath,
                     const std::vector<utils::Association>& associations,
                     int slotNum, SlotIntf::FirmwareType fwType,
-                    const std::string& chassisName);
+                    const std::string& chassisName, uint8_t deviceType = 0);
 
     void update(
         const struct ::nsm_firmware_slot_info& info,
@@ -91,6 +95,8 @@ class NsmFirmwareSlot :
     }
     void updateActiveSlotAssociation();
     void updateSlotKeyData();
+
+    std::shared_ptr<DOTAuthStateIntf> dotAuthStateIntf;
 
     uint16_t activeKeyIndex{0};
     uint16_t pendingKeyIndex{0};

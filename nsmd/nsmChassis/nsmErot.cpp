@@ -341,7 +341,8 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
             {
                 auto slotObject = std::make_shared<NsmFirmwareSlot>(
                     bus, path, slot.associations, extractNumber(slot.slotName),
-                    SlotIntf::FirmwareType::AP, slot.chassisName);
+                    SlotIntf::FirmwareType::AP, slot.chassisName,
+                    device->getDeviceType());
 
                 const std::string& slotKey = slot.isRoT ? name
                                                         : slot.chassisName;
@@ -469,7 +470,8 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
             {
                 auto slotObject = std::make_shared<NsmFirmwareSlot>(
                     bus, path, slot.associations, extractNumber(slot.slotName),
-                    SlotIntf::FirmwareType::EC, slot.chassisName);
+                    SlotIntf::FirmwareType::EC, slot.chassisName,
+                    device->getDeviceType());
 
                 if (ecFirmwareType == nullptr)
                 {

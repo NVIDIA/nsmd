@@ -232,6 +232,9 @@ class GetRotInformation : public CommandInterface
                 erot_info.slot_info[i].security_version_number);
             slot_info["Signing key index"] =
                 static_cast<uint32_t>(erot_info.slot_info[i].signing_key_index);
+            slot_info["DOT auth state"] = mapEnumToString(
+                static_cast<uint32_t>(erot_info.slot_info[i].dot_auth_state),
+                dotAuthStateMap);
 
             slots.push_back(std::move(slot_info));
         }
@@ -271,6 +274,12 @@ class GetRotInformation : public CommandInterface
         {7, "Pending image copy"},
         {8, "Image copy in progress"},
         {9, "Failed image copy"}};
+
+    const std::unordered_map<uint32_t, std::string> dotAuthStateMap = {
+        {0, "DOT Not Installed"},
+        {1, "Authentication Success"},
+        {2, "Authentication Failed"},
+        {0xFF, "Unknown"}};
 
     const std::unordered_map<uint32_t, std::string> globalFailoverPolicyMap = {
         {NSM_ROT_GLOBAL_FAILOVER_POLICY_NO_FAILOVER, "No Failover"},

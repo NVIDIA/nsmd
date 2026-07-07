@@ -440,6 +440,10 @@ int encode_nsm_query_get_erot_state_parameters_resp(
 		    &ptr, NSM_FIRMWARE_SIGNING_KEY_INDEX,
 		    fw_info->slot_info[i].signing_key_index, &msg_size);
 		telemetry_count++;
+		encode_nsm_firmware_aggregate_tag_uint8(
+		    &ptr, NSM_FIRMWARE_DOT_AUTH_STATE,
+		    fw_info->slot_info[i].dot_auth_state, &msg_size);
+		telemetry_count++;
 	}
 
 	response->hdr.telemetry_count = htole16(telemetry_count);
@@ -780,6 +784,22 @@ int decode_nsm_query_firmware_slot_information(
 					    "value = %u\n",
 					    fw_slot_info->signing_key_index);)
 			}
+		} else if (tag == NSM_FIRMWARE_DOT_AUTH_STATE) {
+			uint8_t dot_auth_val = 0xFF;
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint8(
+			    ptr, &tag, &valid, &dot_auth_val, payload_size);
+			if (rc_ok) {
+				/* valid=0: device unable to fetch; map to
+				 * Unknown */
+				fw_slot_info->dot_auth_state =
+				    valid ? dot_auth_val : 0xFF;
+				(*telemetry_count)--;
+				DBG2(printf("Decoded "
+					    "NSM_FIRMWARE_DOT_AUTH_STATE, "
+					    "valid = %u, value = %u\n",
+					    valid,
+					    fw_slot_info->dot_auth_state);)
+			}
 		} else if (tag == NSM_FIRMWARE_FIRMWARE_SLOT_ID) {
 			/* we are good, we reached new firmware slot id */
 			return NSM_SW_SUCCESS;
@@ -868,6 +888,7 @@ int decode_nsm_query_get_erot_state_parameters_resp(
 
 		for (int i = 0; i < fw_resp->fq_resp_hdr.firmware_slot_count;
 		     i++) {
+			fw_resp->slot_info[i].dot_auth_state = 0xFF;
 			int ret = decode_nsm_query_firmware_slot_information(
 			    &(fw_resp->slot_info[i]), &ptr, &payload_size,
 			    &telemetry_count);

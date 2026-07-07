@@ -224,7 +224,7 @@ TEST(GetRotInformation, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_TYPE_FIRMWARE, responseMsg->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_FW_GET_EROT_STATE_INFORMATION, responseTest->hdr.command);
-	EXPECT_EQ(26, responseTest->hdr.telemetry_count);
+	EXPECT_EQ(28, responseTest->hdr.telemetry_count);
 }
 
 TEST(GetRotInformation, testGoodEncodeResponse2)
@@ -300,7 +300,7 @@ TEST(GetRotInformation, testGoodEncodeResponse2)
 	EXPECT_EQ(NSM_TYPE_FIRMWARE, responseMsg->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_FW_GET_EROT_STATE_INFORMATION, responseTest->hdr.command);
-	EXPECT_EQ(26, responseTest->hdr.telemetry_count);
+	EXPECT_EQ(28, responseTest->hdr.telemetry_count);
 }
 
 TEST(GetRotInformation, testGoodDecodeResponse)
@@ -4994,4 +4994,128 @@ TEST(FirmwareDotRecovery, EncodeResponseErrorCompletionCode)
 	EXPECT_EQ(resp->command, NSM_FW_DOT_RECOVERY);
 	EXPECT_EQ(resp->completion_code, NSM_ERR_INVALID_DATA);
 	EXPECT_EQ(le16toh(resp->reason_code), 0xBAD8);
+}
+
+// DOTAuthState encode/decode tests
+TEST(GetRotInformation, testEncodeDecodeDOTAuthState)
+{
+	const char *firmware_version1 = "Version ABCDE";
+	const char *firmware_version2 = "Version 12345";
+
+	uint16_t msg_size = sizeof(struct nsm_msg_hdr) +
+			    sizeof(nsm_firmware_erot_state_info_hdr_resp) +
+			    sizeof(nsm_firmware_slot_info) * 2;
+	std::vector<uint8_t> response(msg_size, 0);
+	auto responseMsg = reinterpret_cast<nsm_msg *>(response.data());
+
+	struct nsm_firmware_erot_state_info_resp fq_resp = {};
+	fq_resp.fq_resp_hdr.active_slot = 0;
+	fq_resp.fq_resp_hdr.firmware_slot_count = 2;
+	fq_resp.slot_info = (struct nsm_firmware_slot_info *)malloc(
+	    2 * sizeof(struct nsm_firmware_slot_info));
+	memset((char *)(fq_resp.slot_info), 0,
+	       2 * sizeof(struct nsm_firmware_slot_info));
+
+	// Slot 0: active, DOT authentication success
+	fq_resp.slot_info[0].slot_id = 0;
+	strcpy((char *)(&(fq_resp.slot_info[0].firmware_version_string[0])),
+	       firmware_version1);
+	fq_resp.slot_info[0].firmware_state = 1; // Activated
+	fq_resp.slot_info[0].dot_auth_state = 1; // AuthenticationSuccess
+
+	// Slot 1: inactive, DOT not installed (0)
+	fq_resp.slot_info[1].slot_id = 1;
+	strcpy((char *)(&(fq_resp.slot_info[1].firmware_version_string[0])),
+	       firmware_version2);
+	fq_resp.slot_info[1].firmware_state = 5; // Inactive
+	fq_resp.slot_info[1].dot_auth_state = 0; // DOTNotInstalled
+
+	uint16_t reason_code = encode_nsm_query_get_erot_state_parameters_resp(
+	    0, NSM_SUCCESS, NSM_SW_SUCCESS, &fq_resp, responseMsg);
+	free(fq_resp.slot_info);
+	ASSERT_EQ(reason_code, NSM_SW_SUCCESS);
+
+	uint8_t cc = NSM_SUCCESS;
+	struct nsm_firmware_erot_state_info_resp decoded = {};
+	auto rc = decode_nsm_query_get_erot_state_parameters_resp(
+	    responseMsg, response.size(), &cc, &reason_code, &decoded);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	ASSERT_NE(nullptr, decoded.slot_info);
+	EXPECT_EQ(2, decoded.fq_resp_hdr.firmware_slot_count);
+	EXPECT_EQ(1,
+		  decoded.slot_info[0].dot_auth_state); // AuthenticationSuccess
+	EXPECT_EQ(0, decoded.slot_info[1].dot_auth_state); // DOTNotInstalled
+
+	free(decoded.slot_info);
+}
+
+// Verify decode succeeds with real firmware response ending in 15 00 00
+// (slot 2 DOTAuthState with valid=0, 3 bytes at end of buffer).
+// Previously failed with rc=2 (NSM_SW_ERROR_LENGTH) when using uint16 decode.
+TEST(GetRotInformation, testDecodeDOTAuthStateValidZeroAtBufferEnd)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,
+	    0x00,
+	    0x89,
+	    NSM_TYPE_FIRMWARE,
+	    NSM_FW_GET_EROT_STATE_INFORMATION,
+	    0x00, // cc = NSM_SUCCESS
+	    0x08,
+	    0x00, // telemetry_count = 8
+	    // Global header tags
+	    NSM_FIRMWARE_ACTIVE_FIRMWARE_SLOT,
+	    0x01,
+	    0x00,
+	    NSM_FIRMWARE_FIRMWARE_SLOT_COUNT,
+	    0x01,
+	    0x02,
+	    // Slot 0 (active): DOTAuthState valid=1, value=1
+	    // (AuthenticationSuccess)
+	    NSM_FIRMWARE_FIRMWARE_SLOT_ID,
+	    0x01,
+	    0x00,
+	    NSM_FIRMWARE_FIRMWARE_STATE,
+	    0x01,
+	    0x01,
+	    NSM_FIRMWARE_DOT_AUTH_STATE,
+	    0x01,
+	    0x01,
+	    // Slot 1 (inactive): DOTAuthState valid=0 (3 bytes at end of
+	    // buffer)
+	    NSM_FIRMWARE_FIRMWARE_SLOT_ID,
+	    0x01,
+	    0x01,
+	    NSM_FIRMWARE_FIRMWARE_STATE,
+	    0x01,
+	    0x05,
+	    NSM_FIRMWARE_DOT_AUTH_STATE,
+	    0x00,
+	    0x00,
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	struct nsm_firmware_erot_state_info_resp erot_info = {};
+
+	auto rc = decode_nsm_query_get_erot_state_parameters_resp(
+	    response, msg_len, &cc, &reason_code, &erot_info);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	ASSERT_NE(nullptr, erot_info.slot_info);
+	EXPECT_EQ(2, erot_info.fq_resp_hdr.firmware_slot_count);
+
+	// Slot 0: DOTAuthState = 1 (AuthenticationSuccess)
+	EXPECT_EQ(1, erot_info.slot_info[0].dot_auth_state);
+	// Slot 1: valid=0 → dot_auth_state = 0xFF (Unknown sentinel)
+	EXPECT_EQ(0xFF, erot_info.slot_info[1].dot_auth_state);
+
+	free(erot_info.slot_info);
 }
