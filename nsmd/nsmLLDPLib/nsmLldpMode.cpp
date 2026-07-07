@@ -18,6 +18,8 @@
 
 #include "device-configuration.h"
 
+#include "log.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 
@@ -141,18 +143,20 @@ uint8_t NsmLldpMode::handleResponseMsg(const nsm_msg* responseMsg,
     auto rc = decode_get_device_mode_settings_v2_resp(
         responseMsg, responseLen, &cc, &reasonCode, currentData, &currentLength,
         pendingData, &pendingLength);
+
+    LG2_ERROR_FLT(
+        "decode_get_device_mode_settings_v2_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error(
-            "NsmLldpMode: decode_get_device_mode_settings_v2_resp failed. reasonCode={RC2} cc={CC} rc={RC}",
-            "RC2", reasonCode, "CC", cc, "RC", rc);
         return cc ? cc : rc;
     }
     if (currentLength != sizeof(nsm_lldp_mode_bitfield))
     {
-        lg2::error(
-            "NsmLldpMode: device returned invalid current-mode payload length {LEN} for idx 24 (expected 1 byte)",
-            "LEN", currentLength);
+        LG2_ERROR_FLT(
+            "NsmLldpMode: invalid current-mode payload length {LEN} for idx 24 | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "LEN", currentLength, "REASONCODE", reasonCode, "CC", cc, "RC",
+            NSM_SW_ERROR_LENGTH, "LENGTH_ERR", true);
         return NSM_SW_ERROR_LENGTH;
     }
 

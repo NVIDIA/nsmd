@@ -18,12 +18,13 @@
 
 #include "network-ports.h"
 
-#include <arpa/inet.h>
+#include "log.hpp"
 
-#include <phosphor-logging/lg2.hpp>
+#include <arpa/inet.h>
 
 #include <chrono>
 #include <cstring>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -186,17 +187,78 @@ enum class MandatoryPhase : uint8_t
     Done,
 };
 
+constexpr size_t kEthernetAddrLen = 6;
+constexpr size_t kEtherTypeFieldLen = 2;
+constexpr size_t kEtherTypeFieldOffset = kEthernetAddrLen + kEthernetAddrLen;
+constexpr size_t kEthernetHeaderLen = kEtherTypeFieldOffset +
+                                      kEtherTypeFieldLen;
+constexpr size_t kVlanTagLen = 4;
+constexpr size_t kVlanInnerEtherTypeOffset = kEtherTypeFieldOffset +
+                                             kVlanTagLen;
+constexpr uint16_t kEtherTypeVlan = 0x8100;
+constexpr uint16_t kEtherTypeLldp = 0x88CC;
+
+uint16_t readUint16Be(const uint8_t* frame, size_t offset)
+{
+    return static_cast<uint16_t>((frame[offset] << 8) | frame[offset + 1]);
+}
+
+/* Device firmware returns a full Ethernet frame (DST + SRC + EtherType +
+ * LLDPDU). VLAN-tagged frames (0x8100 + inner 0x88CC) are also accepted.
+ */
+
 } // namespace
+
+std::optional<size_t> NsmLldpPacket::findLldpPduOffset(const uint8_t* frame,
+                                                       size_t frameLen)
+{
+    if (frameLen < kEthernetHeaderLen)
+    {
+        LG2_WARNING_FLT(
+            "NsmLldpPacket: LLDP frame too short for Ethernet header | port={PORT} dir={DIR} frameLen={LEN}",
+            "PORT", portNumber_, "DIR", direction_, "LEN", frameLen,
+            "LLDP_FRAME_FORMAT_UNRECOGNIZED", true);
+        return std::nullopt;
+    }
+
+    const auto etherType = readUint16Be(frame, kEtherTypeFieldOffset);
+    if (etherType == kEtherTypeLldp)
+    {
+        return kEthernetHeaderLen;
+    }
+    if (frameLen >= kEthernetHeaderLen + kVlanTagLen &&
+        etherType == kEtherTypeVlan)
+    {
+        const auto innerType = readUint16Be(frame, kVlanInnerEtherTypeOffset);
+        if (innerType == kEtherTypeLldp)
+        {
+            return kEthernetHeaderLen + kVlanTagLen;
+        }
+    }
+
+    LG2_WARNING_FLT(
+        "NsmLldpPacket: unrecognized LLDP frame format | port={PORT} dir={DIR} frameLen={LEN} etherType=0x{ETYPE:04x}",
+        "PORT", portNumber_, "DIR", direction_, "LEN", frameLen, "ETYPE",
+        etherType, "LLDP_FRAME_FORMAT_UNRECOGNIZED", true);
+    return std::nullopt;
+}
 
 NsmLldpPacket::NsmLldpPacket(sdbusplus::bus_t& bus, const std::string& name,
                              const std::string& type,
-                             const std::string& objectPath, uint16_t portNumber,
-                             uint8_t direction) :
+                             const std::string& objectPath,
+                             const std::string& portInventoryPath,
+                             uint16_t portNumber, uint8_t direction) :
     NsmSensor(name, type), objectPath_(objectPath), portNumber_(portNumber),
     direction_(direction)
 {
     rawIntf_ = std::make_shared<LldpRawFrameIntf>(bus, objectPath_.c_str());
     tlvsIntf_ = std::make_shared<LldpTlvsIntf>(bus, objectPath_.c_str());
+    assocIntf_ = std::make_shared<LldpAssociationIntf>(bus,
+                                                       objectPath_.c_str());
+    const std::string assocBackward =
+        (direction_ == NSM_LLDP_DIRECTION_RX) ? "lldp_rx_data" : "lldp_tx_data";
+    assocIntf_->associations(
+        {{"parent_port", assocBackward, portInventoryPath}});
     /* Initial-default state: empty buffer, never-populated timestamp. */
     rawIntf_->data(std::vector<uint8_t>{});
     rawIntf_->lastUpdateTimestamp(0);
@@ -251,38 +313,39 @@ uint8_t NsmLldpPacket::handleResponseMsg(const nsm_msg* responseMsg,
 
     auto rc = decode_get_lldp_packet_resp(responseMsg, responseLen, &cc,
                                           &reasonCode, data.data(), &dataSize);
-    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
-    {
-        lg2::warning(
-            "NsmLldpPacket: decode_get_lldp_packet_resp failed. port={PORT} dir={DIR} reasonCode={RCN} cc={CC} rc={RC}",
-            "PORT", portNumber_, "DIR", direction_, "RCN", reasonCode, "CC", cc,
-            "RC", rc);
-        return cc ? cc : rc;
-    }
 
-    if (dataSize == 0)
+    LG2_ERROR_FLT(
+        "decode_get_lldp_packet_resp failure | port={PORT} dir={DIR} reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "PORT", portNumber_, "DIR", direction_, "REASONCODE", reasonCode, "CC",
+        cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
-        rawIntf_->data(std::vector<uint8_t>{});
+        if (dataSize == 0)
+        {
+            rawIntf_->data(std::vector<uint8_t>{});
+            rawIntf_->lastUpdateTimestamp(monotonicMicros());
+            clearTlvs();
+            lg2::debug(
+                "NsmLldpPacket: empty buffer (ARCH GAP OMD-REQ-05 assumption) port={PORT} dir={DIR}",
+                "PORT", portNumber_, "DIR", direction_);
+            return NSM_SUCCESS;
+        }
+
+        data.resize(dataSize);
+        rawIntf_->data(data);
         rawIntf_->lastUpdateTimestamp(monotonicMicros());
-        clearTlvs();
-        lg2::debug(
-            "NsmLldpPacket: empty buffer (ARCH GAP OMD-REQ-05 assumption) port={PORT} dir={DIR}",
-            "PORT", portNumber_, "DIR", direction_);
+
+        if (!decodeAndPopulateTlvs(data.data(), data.size()))
+        {
+            clearTlvs();
+            LG2_ERROR_FLT(
+                "NsmLldpPacket TLV decode failed; RawFrame.Data preserved | port={PORT} dir={DIR}",
+                "PORT", portNumber_, "DIR", direction_, "TLV_DECODE_FAILED",
+                true);
+        }
         return NSM_SUCCESS;
     }
-
-    data.resize(dataSize);
-    rawIntf_->data(data);
-    rawIntf_->lastUpdateTimestamp(monotonicMicros());
-
-    if (!decodeAndPopulateTlvs(data.data(), data.size()))
-    {
-        clearTlvs();
-        lg2::warning(
-            "NsmLldpPacket: TLV decode failed; RawFrame.Data preserved. port={PORT} dir={DIR}",
-            "PORT", portNumber_, "DIR", direction_);
-    }
-    return NSM_SUCCESS;
+    return cc ? cc : rc;
 }
 
 bool NsmLldpPacket::decodeAndPopulateTlvs(const uint8_t* frame, size_t frameLen)
@@ -298,6 +361,18 @@ bool NsmLldpPacket::decodeAndPopulateTlvs(const uint8_t* frame, size_t frameLen)
      * Followed by `Length` value bytes.
      */
     if (frame == nullptr || frameLen < 2)
+    {
+        return false;
+    }
+
+    const auto pduOffset = findLldpPduOffset(frame, frameLen);
+    if (!pduOffset)
+    {
+        return false;
+    }
+    frame += *pduOffset;
+    frameLen -= *pduOffset;
+    if (frameLen < 2)
     {
         return false;
     }
@@ -496,13 +571,10 @@ bool NsmLldpPacket::decodeAndPopulateTlvs(const uint8_t* frame, size_t frameLen)
         }
     }
 
-    /* IEEE 802.1AB requires Chassis ID, Port ID, TTL in that order, followed
-     * by an End TLV that terminates the LLDPDU with no trailing bytes. */
-    if (!sawEnd || phase != MandatoryPhase::Done || cursor != frameLen)
-    {
-        return false;
-    }
-    return true;
+    /* Mandatory triple must be present. End TLV is optional on the wire —
+     * device frames may terminate with org-specific TLVs and no trailing End
+     * marker. */
+    return phase == MandatoryPhase::Done && cursor == frameLen;
 }
 
 } // namespace nsm

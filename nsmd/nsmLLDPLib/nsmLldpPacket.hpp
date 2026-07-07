@@ -24,9 +24,11 @@
 #include <com/nvidia/Network/LLDP/RawFrame/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/server.hpp>
+#include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Network/LLDP/TLVs/server.hpp>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -35,13 +37,18 @@ namespace nsm
 
 /** Per (NetworkAdapter, port, direction) LLDP packet buffer.
  *
- *  Co-hosts two D-Bus interfaces on a single object:
+ *  Co-hosts three D-Bus interfaces on a single object path:
  *    - `com.nvidia.Network.LLDP.RawFrame`
  *    - `xyz.openbmc_project.Network.LLDP.TLVs`
+ *    - `xyz.openbmc_project.Association.Definitions`
  *
  *  Object path:
  *    /xyz/openbmc_project/inventory/system/<chassis>/<CX_NIC_N>/
  *      Ports/<Port_M>/LLDP/<RX|TX>
+ *
+ *  Association: ("parent_port", "lldp_rx_data"|"lldp_tx_data",
+ *  <Port inventory path>) — lets bmcweb discover packet objects via
+ *  ObjectMapper.
  *
  *  Polling: enqueued on the existing `roundRobinSensors` queue — no
  *  separate timer. Each tick issues NSM Type 1 cmd 0x16 GetLLDPPacket
@@ -56,6 +63,8 @@ using LldpRawFrameIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::network::lldp::RawFrame>;
 using LldpTlvsIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::network::lldp::TLVs>;
+using LldpAssociationIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
 
 class NsmLldpPacket : public NsmSensor
 {
@@ -64,12 +73,14 @@ class NsmLldpPacket : public NsmSensor
      *  @param name         - sensor name (used in logs and aggregator keys)
      *  @param type         - sensor type tag (per existing nsmd convention)
      *  @param objectPath   - D-Bus object path (must terminate in /RX or /TX)
-     *  @param portNumber   - port index on the CX9 NIC (0-based)
+     *  @param portInventoryPath - parent Port inventory path for associations
+     *  @param portNumber   - NSM port index (logicalPortNum)
      *  @param direction    - NSM_LLDP_DIRECTION_TX or NSM_LLDP_DIRECTION_RX
      */
     NsmLldpPacket(sdbusplus::bus_t& bus, const std::string& name,
                   const std::string& type, const std::string& objectPath,
-                  uint16_t portNumber, uint8_t direction);
+                  const std::string& portInventoryPath, uint16_t portNumber,
+                  uint8_t direction);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -93,8 +104,15 @@ class NsmLldpPacket : public NsmSensor
     /* Reset the TLVs interface properties to their default-empty state. */
     void clearTlvs();
 
+    /* Locate the LLDPDU within an Ethernet-framed buffer. Logs a
+     * flood-filtered warning and returns nullopt when the L2 header is
+     * missing or unrecognized. */
+    std::optional<size_t> findLldpPduOffset(const uint8_t* frame,
+                                            size_t frameLen);
+
     std::shared_ptr<LldpRawFrameIntf> rawIntf_;
     std::shared_ptr<LldpTlvsIntf> tlvsIntf_;
+    std::shared_ptr<LldpAssociationIntf> assocIntf_;
     std::string objectPath_;
     uint16_t portNumber_;
     uint8_t direction_;
