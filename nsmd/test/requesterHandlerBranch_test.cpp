@@ -709,7 +709,7 @@ TEST_F(RequesterHandlerBranchTest,
 // ===========================================================================
 
 TEST_F(RequesterHandlerBranchTest,
-       HandleResponseImpl_EmptyHandlers_ReturnsFalse)
+       HandleResponseImpl_EmptyHandlers_ReturnsNotFound)
 {
     std::unordered_map<
         eid_t, std::queue<std::tuple<std::unique_ptr<requester::Request>,
@@ -719,10 +719,10 @@ TEST_F(RequesterHandlerBranchTest,
     auto respBuf = makePingResponse(0);
     auto respMsg = reinterpret_cast<const nsm_msg*>(respBuf.data());
 
-    bool found = handler.handleResponseImpl(testEid, 0, 0, 0, respMsg,
-                                            respBuf.size(), emptyHandlers,
-                                            std::chrono::seconds(2));
-    EXPECT_FALSE(found);
+    auto result = handler.handleResponseImpl(testEid, 0, 0, 0, respMsg,
+                                             respBuf.size(), emptyHandlers,
+                                             std::chrono::seconds(2));
+    EXPECT_EQ(result, requester::MatchResult::NotFound);
 }
 
 // ===========================================================================

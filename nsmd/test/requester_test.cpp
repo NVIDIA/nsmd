@@ -25,8 +25,8 @@
 #include "requester/handler.hpp"
 #include "requester/mctp_endpoint_prober.hpp"
 #include "requester/request_timeout_tracker.hpp"
+#include "requester/response_mismatch_tracker.hpp"
 #include "requester/retry_backoff_utils.hpp"
-#include "requester/type_cmd_mismatch_tracker.hpp"
 #include "socket_manager.hpp"
 
 #undef private
@@ -568,14 +568,14 @@ TEST_F(HandlerTest, RunRegisteredRequest_EmptyHandlers_ReturnsSuccess)
     EXPECT_EQ(rc, NSM_SUCCESS);
 }
 
-TEST_F(HandlerTest, HandleResponseImpl_NoMatchingEid_ReturnsFalse)
+TEST_F(HandlerTest, HandleResponseImpl_NoMatchingEid_ReturnsNotFound)
 {
     std::unordered_map<eid_t, TestHandler::RequestQueue> emptyHandlers;
     nsm_msg response{};
-    bool found = handler.handleResponseImpl(99, 0, 0, 0, &response,
-                                            sizeof(response), emptyHandlers,
-                                            std::chrono::seconds(5));
-    EXPECT_FALSE(found);
+    auto result = handler.handleResponseImpl(99, 0, 0, 0, &response,
+                                             sizeof(response), emptyHandlers,
+                                             std::chrono::seconds(5));
+    EXPECT_EQ(result, MatchResult::NotFound);
 }
 
 TEST_F(HandlerTest, HandleResponse_NoMatchingRequest_DoesNotCrash)
@@ -590,7 +590,8 @@ TEST_F(HandlerTest, HandleResponse_NoMatchingRequest_DoesNotCrash)
 // a matching instance ID. nsmd must drop such responses and not invoke the
 // request's callback, leaving the outstanding request intact for normal
 // timeout.
-TEST_F(HandlerTest, HandleResponseImpl_TypeMismatch_ReturnsFalse_NoBug6368378)
+TEST_F(HandlerTest,
+       HandleResponseImpl_TypeMismatch_ReturnsTypeCmdRejected_NoBug6368378)
 {
     constexpr eid_t eid = 5;
     constexpr uint8_t instanceId = 7;
@@ -624,16 +625,16 @@ TEST_F(HandlerTest, HandleResponseImpl_TypeMismatch_ReturnsFalse_NoBug6368378)
                         std::unique_ptr<sdbusplus::Timer>{}, true));
 
     nsm_msg response{};
-    bool found = handler.handleResponseImpl(
+    auto result = handler.handleResponseImpl(
         eid, instanceId, respType, respCmd, &response, sizeof(response),
         testHandlers, std::chrono::seconds(5));
 
-    EXPECT_FALSE(found);
+    EXPECT_EQ(result, MatchResult::TypeCmdRejected);
     EXPECT_FALSE(handlerCalled);
 }
 
 TEST_F(HandlerTest,
-       HandleResponseImpl_CommandMismatch_ReturnsFalse_NoBug6368378)
+       HandleResponseImpl_CommandMismatch_ReturnsTypeCmdRejected_NoBug6368378)
 {
     constexpr eid_t eid = 6;
     constexpr uint8_t instanceId = 3;
@@ -665,25 +666,24 @@ TEST_F(HandlerTest,
                         std::unique_ptr<sdbusplus::Timer>{}, true));
 
     nsm_msg response{};
-    bool found = handler.handleResponseImpl(
+    auto result = handler.handleResponseImpl(
         eid, instanceId, respType, respCmd, &response, sizeof(response),
         testHandlers, std::chrono::seconds(5));
 
-    EXPECT_FALSE(found);
+    EXPECT_EQ(result, MatchResult::TypeCmdRejected);
     EXPECT_FALSE(handlerCalled);
 }
 
 // ===========================================================================
-// TypeCmdMismatchTracker tests
+// ResponseMismatchTracker tests
 // ===========================================================================
 
-class TypeCmdMismatchTrackerTest : public ::testing::Test
+class ResponseMismatchTrackerTest : public ::testing::Test
 {
   protected:
     void SetUp() override
     {
-        // Clear singleton state between tests
-        requester::TypeCmdMismatchTracker::instances.clear();
+        requester::ResponseMismatchTracker::instances.clear();
     }
 
     // Minimal dummy byte buffers — content irrelevant for dedup/count tests.
@@ -691,21 +691,23 @@ class TypeCmdMismatchTrackerTest : public ::testing::Test
     const std::vector<uint8_t> dummyResp{0x0e, 0x02, 0x03, 0x10};
 };
 
-TEST_F(TypeCmdMismatchTrackerTest, NoMismatches_LogMismatchesEmitsNothing)
+TEST_F(ResponseMismatchTrackerTest, Empty_LogMismatchesDoesNotCrash)
 {
-    // logMismatches() on empty state must not crash and emit no entries
-    EXPECT_NO_FATAL_FAILURE(requester::TypeCmdMismatchTracker::logMismatches());
-    EXPECT_TRUE(requester::TypeCmdMismatchTracker::instances.empty());
+    EXPECT_NO_FATAL_FAILURE(
+        requester::ResponseMismatchTracker::logMismatches());
+    EXPECT_TRUE(requester::ResponseMismatchTracker::instances.empty());
 }
 
-TEST_F(TypeCmdMismatchTrackerTest, FirstMismatch_StoredWithCountOne)
+TEST_F(ResponseMismatchTrackerTest,
+       TypeCmdRejected_FirstMismatch_StoredWithCountOne)
 {
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
-                                              dummyReq, dummyResp.data(),
-                                              dummyResp.size());
+    requester::ResponseMismatchTracker::recordTypeCmdRejected(
+        5, 7, 0x00, 0x02, 0x03, 0x10, dummyReq, dummyResp.data(),
+        dummyResp.size());
 
-    auto& queue = requester::TypeCmdMismatchTracker::instances[5];
+    auto& queue = requester::ResponseMismatchTracker::instances[5];
     ASSERT_EQ(queue.size(), 1u);
+    EXPECT_EQ(queue.front().reason, requester::MismatchReason::TypeCmdRejected);
     EXPECT_EQ(queue.front().expectedType, 0x00);
     EXPECT_EQ(queue.front().expectedCmd, 0x02);
     EXPECT_EQ(queue.front().gotType, 0x03);
@@ -713,70 +715,110 @@ TEST_F(TypeCmdMismatchTrackerTest, FirstMismatch_StoredWithCountOne)
     EXPECT_EQ(queue.front().count, 1u);
 }
 
-TEST_F(TypeCmdMismatchTrackerTest,
-       RepeatedSameMismatch_CountIncrements_NoNewEntry)
+TEST_F(ResponseMismatchTrackerTest,
+       TypeCmdRejected_Repeated_CountIncrements_NoNewEntry)
 {
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
-                                              dummyReq, dummyResp.data(),
-                                              dummyResp.size());
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
-                                              dummyReq, dummyResp.data(),
-                                              dummyResp.size());
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
-                                              dummyReq, dummyResp.data(),
-                                              dummyResp.size());
+    requester::ResponseMismatchTracker::recordTypeCmdRejected(
+        5, 7, 0x00, 0x02, 0x03, 0x10, dummyReq, dummyResp.data(),
+        dummyResp.size());
+    requester::ResponseMismatchTracker::recordTypeCmdRejected(
+        5, 7, 0x00, 0x02, 0x03, 0x10, dummyReq, dummyResp.data(),
+        dummyResp.size());
+    requester::ResponseMismatchTracker::recordTypeCmdRejected(
+        5, 7, 0x00, 0x02, 0x03, 0x10, dummyReq, dummyResp.data(),
+        dummyResp.size());
 
-    auto& queue = requester::TypeCmdMismatchTracker::instances[5];
+    auto& queue = requester::ResponseMismatchTracker::instances[5];
     ASSERT_EQ(queue.size(), 1u);
     EXPECT_EQ(queue.front().count, 3u);
 }
 
-TEST_F(TypeCmdMismatchTrackerTest, DifferentMismatch_SameEid_AddsNewEntry)
+TEST_F(ResponseMismatchTrackerTest,
+       TypeCmdRejected_DifferentMismatch_SameEid_AddsNewEntry)
 {
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
-                                              dummyReq, dummyResp.data(),
-                                              dummyResp.size());
-    requester::TypeCmdMismatchTracker::record(5, 3, 0x01, 0x05, 0x02, 0x08,
-                                              dummyReq, dummyResp.data(),
-                                              dummyResp.size());
+    requester::ResponseMismatchTracker::recordTypeCmdRejected(
+        5, 7, 0x00, 0x02, 0x03, 0x10, dummyReq, dummyResp.data(),
+        dummyResp.size());
+    requester::ResponseMismatchTracker::recordTypeCmdRejected(
+        5, 3, 0x01, 0x05, 0x02, 0x08, dummyReq, dummyResp.data(),
+        dummyResp.size());
 
-    auto& queue = requester::TypeCmdMismatchTracker::instances[5];
-    ASSERT_EQ(queue.size(), 2u);
+    EXPECT_EQ(requester::ResponseMismatchTracker::instances[5].size(), 2u);
 }
 
-TEST_F(TypeCmdMismatchTrackerTest, RingBufferCap_OldestEvictedWhenFull)
+TEST_F(ResponseMismatchTrackerTest, NotFound_FirstOccurrence_StoredWithCountOne)
 {
-    // Fill to MAX_MISMATCH_DEBUG_EVENTS_PER_EID (10) with distinct combos
+    requester::ResponseMismatchTracker::recordNotFound(
+        5, 0, 7, 0x03, 0x10, dummyResp.data(), dummyResp.size());
+
+    auto& queue = requester::ResponseMismatchTracker::instances[5];
+    ASSERT_EQ(queue.size(), 1u);
+    EXPECT_EQ(queue.front().reason, requester::MismatchReason::NotFound);
+    EXPECT_EQ(queue.front().gotType, 0x03);
+    EXPECT_EQ(queue.front().gotCmd, 0x10);
+    EXPECT_EQ(queue.front().count, 1u);
+}
+
+TEST_F(ResponseMismatchTrackerTest,
+       NotFound_Repeated_CountIncrements_NoNewEntry)
+{
+    requester::ResponseMismatchTracker::recordNotFound(
+        5, 0, 7, 0x03, 0x10, dummyResp.data(), dummyResp.size());
+    requester::ResponseMismatchTracker::recordNotFound(
+        5, 0, 7, 0x03, 0x10, dummyResp.data(), dummyResp.size());
+    requester::ResponseMismatchTracker::recordNotFound(
+        5, 0, 7, 0x03, 0x10, dummyResp.data(), dummyResp.size());
+
+    auto& queue = requester::ResponseMismatchTracker::instances[5];
+    ASSERT_EQ(queue.size(), 1u);
+    EXPECT_EQ(queue.front().count, 3u);
+}
+
+// Reason must be part of the dedup key: same gotType/gotCmd with different
+// reason must produce two separate entries, not count as one.
+TEST_F(ResponseMismatchTrackerTest, SameGotTypeCmd_DifferentReason_TwoEntries)
+{
+    requester::ResponseMismatchTracker::recordTypeCmdRejected(
+        5, 3, 0x00, 0x02, 0x03, 0x10, dummyReq, dummyResp.data(),
+        dummyResp.size());
+    requester::ResponseMismatchTracker::recordNotFound(
+        5, 0, 7, 0x03, 0x10, dummyResp.data(), dummyResp.size());
+
+    EXPECT_EQ(requester::ResponseMismatchTracker::instances[5].size(), 2u);
+}
+
+TEST_F(ResponseMismatchTrackerTest, RingBufferCap_OldestEvictedWhenFull)
+{
     for (uint8_t i = 0; i < 10; ++i)
     {
-        requester::TypeCmdMismatchTracker::record(5, i, 0x00, i, 0x01, i,
-                                                  dummyReq, dummyResp.data(),
-                                                  dummyResp.size());
+        requester::ResponseMismatchTracker::recordTypeCmdRejected(
+            5, i, 0x00, i, 0x01, i, dummyReq, dummyResp.data(),
+            dummyResp.size());
     }
-    EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[5].size(), 10u);
+    EXPECT_EQ(requester::ResponseMismatchTracker::instances[5].size(), 10u);
 
-    // 11th distinct combo evicts the oldest
-    requester::TypeCmdMismatchTracker::record(5, 10, 0x00, 10, 0x01, 10,
-                                              dummyReq, dummyResp.data(),
-                                              dummyResp.size());
-    EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[5].size(), 10u);
+    // 11th distinct entry evicts oldest
+    requester::ResponseMismatchTracker::recordTypeCmdRejected(
+        5, 10, 0x00, 10, 0x01, 10, dummyReq, dummyResp.data(),
+        dummyResp.size());
+    EXPECT_EQ(requester::ResponseMismatchTracker::instances[5].size(), 10u);
 
-    // Oldest (cmd=0) should be gone; newest (cmd=10) should be at back
+    // Oldest (expectedCmd=0) gone; newest (expectedCmd=10) at back
     EXPECT_EQ(
-        requester::TypeCmdMismatchTracker::instances[5].back().expectedCmd, 10);
+        requester::ResponseMismatchTracker::instances[5].back().expectedCmd,
+        10);
 }
 
-TEST_F(TypeCmdMismatchTrackerTest, MultipleEids_TrackedIndependently)
+TEST_F(ResponseMismatchTrackerTest, MultipleEids_TrackedIndependently)
 {
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
-                                              dummyReq, dummyResp.data(),
-                                              dummyResp.size());
-    requester::TypeCmdMismatchTracker::record(6, 3, 0x01, 0x05, 0x02, 0x08,
-                                              dummyReq, dummyResp.data(),
-                                              dummyResp.size());
+    requester::ResponseMismatchTracker::recordTypeCmdRejected(
+        5, 7, 0x00, 0x02, 0x03, 0x10, dummyReq, dummyResp.data(),
+        dummyResp.size());
+    requester::ResponseMismatchTracker::recordNotFound(
+        6, 0, 3, 0x01, 0x08, dummyResp.data(), dummyResp.size());
 
-    EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[5].size(), 1u);
-    EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[6].size(), 1u);
+    EXPECT_EQ(requester::ResponseMismatchTracker::instances[5].size(), 1u);
+    EXPECT_EQ(requester::ResponseMismatchTracker::instances[6].size(), 1u);
 }
 
 // ===========================================================================
