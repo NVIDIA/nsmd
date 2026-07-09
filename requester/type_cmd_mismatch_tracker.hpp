@@ -23,6 +23,7 @@
 #include <deque>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 namespace requester
 {
@@ -39,7 +40,9 @@ class TypeCmdMismatchTracker
 {
   public:
     static void record(eid_t eid, uint8_t instanceId, uint8_t expectedType,
-                       uint8_t expectedCmd, uint8_t gotType, uint8_t gotCmd);
+                       uint8_t expectedCmd, uint8_t gotType, uint8_t gotCmd,
+                       const std::vector<uint8_t>& reqBytes,
+                       const uint8_t* respBytes, size_t respLen);
 
     static void logMismatches();
 
