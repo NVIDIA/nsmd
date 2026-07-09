@@ -317,7 +317,9 @@ class Handler
                 {
                     TypeCmdMismatchTracker::record(
                         eid, instanceId, request->getMsgType(),
-                        request->getCommandCode(), type, command);
+                        request->getCommandCode(), type, command,
+                        request->requestData(),
+                        reinterpret_cast<const uint8_t*>(response), respMsgLen);
                     return false;
                 }
                 // Note1: timeOutTracker can be updated through TimeoutEvent or

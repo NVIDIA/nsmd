@@ -17,6 +17,8 @@
 
 #include "type_cmd_mismatch_tracker.hpp"
 
+#include "common/utils.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 
 namespace requester
@@ -32,9 +34,12 @@ void TypeCmdMismatchTracker::logEvent(eid_t eid, const MismatchEvent& event)
                event.gotCmd, "COUNT", event.count);
 }
 
+// Not thread-safe; must be called from the single-threaded event loop only.
 void TypeCmdMismatchTracker::record(eid_t eid, uint8_t instanceId,
                                     uint8_t expectedType, uint8_t expectedCmd,
-                                    uint8_t gotType, uint8_t gotCmd)
+                                    uint8_t gotType, uint8_t gotCmd,
+                                    const std::vector<uint8_t>& reqBytes,
+                                    const uint8_t* respBytes, size_t respLen)
 {
     auto& queue = instances[eid];
 
@@ -46,23 +51,33 @@ void TypeCmdMismatchTracker::record(eid_t eid, uint8_t instanceId,
             event.gotCmd == gotCmd)
         {
             event.count++;
-            // Only the first occurrence is logged to journal; subsequent
-            // identical mismatches are counted silently and re-emitted on
-            // logMismatches().
+            // Only the first occurrence is logged to journal with raw bytes;
+            // subsequent identical mismatches are counted silently and
+            // re-emitted on logMismatches().
             return;
         }
     }
 
-    // New mismatch combination — log immediately and store.
-    MismatchEvent event{instanceId, expectedType, expectedCmd,
-                        gotType,    gotCmd,       1};
-    logEvent(eid, event);
+    // New mismatch combination — log immediately with raw request and response
+    // bytes so the full context is available for decoding against the NSM spec.
+    std::vector<uint8_t> reqCopy(reqBytes);
+    std::vector<uint8_t> respCopy(respBytes, respBytes + respLen);
+    std::string reqHex = utils::requestMsgToHexString(reqCopy);
+    std::string respHex = utils::requestMsgToHexString(respCopy);
+
+    lg2::error("NSM type/command mismatch: EID={EID} instanceId={IID} "
+               "expected type={ETYPE} cmd={ECMD}, got type={RTYPE} cmd={RCMD} "
+               "request={REQ} response={RESP}",
+               "EID", eid, "IID", instanceId, "ETYPE", expectedType, "ECMD",
+               expectedCmd, "RTYPE", gotType, "RCMD", gotCmd, "REQ", reqHex,
+               "RESP", respHex);
 
     if (queue.size() == MAX_MISMATCH_DEBUG_EVENTS_PER_EID)
     {
         queue.pop_front();
     }
-    queue.push_back(event);
+    queue.push_back(
+        {instanceId, expectedType, expectedCmd, gotType, gotCmd, 1});
 }
 
 void TypeCmdMismatchTracker::logMismatches()

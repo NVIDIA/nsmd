@@ -24,6 +24,7 @@
 #include "common/utils.hpp"
 #include "nsmd/socket_handler.hpp"
 
+#include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -158,6 +159,11 @@ class RequestBase
     RequestBase(eid_t eid, uint8_t tag, RequestMsg&& requestMsg) :
         eid(eid), tag(tag), requestMsg(std::move(requestMsg))
     {}
+
+    const RequestMsg& requestData() const
+    {
+        return requestMsg;
+    }
 };
 
 /** @class Request
@@ -204,15 +210,16 @@ class Request final : public RequestBase, public RequestRetryTimer
         return nsmMsg->hdr.instance_id;
     }
 
-    uint8_t getMsgType()
+    uint8_t getMsgType() const
     {
-        auto nsmMsg = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto nsmMsg = reinterpret_cast<const nsm_msg*>(requestMsg.data());
         return nsmMsg->hdr.nvidia_msg_type;
     }
 
-    uint8_t getCommandCode()
+    uint8_t getCommandCode() const
     {
-        auto nsmMsg = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        assert(requestMsg.size() > sizeof(nsm_msg_hdr));
+        auto nsmMsg = reinterpret_cast<const nsm_msg*>(requestMsg.data());
         return nsmMsg->payload[0];
     }
 

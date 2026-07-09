@@ -685,6 +685,10 @@ class TypeCmdMismatchTrackerTest : public ::testing::Test
         // Clear singleton state between tests
         requester::TypeCmdMismatchTracker::instances.clear();
     }
+
+    // Minimal dummy byte buffers — content irrelevant for dedup/count tests.
+    const std::vector<uint8_t> dummyReq{0x0e, 0x02, 0x00, 0x02};
+    const std::vector<uint8_t> dummyResp{0x0e, 0x02, 0x03, 0x10};
 };
 
 TEST_F(TypeCmdMismatchTrackerTest, NoMismatches_LogMismatchesEmitsNothing)
@@ -696,7 +700,9 @@ TEST_F(TypeCmdMismatchTrackerTest, NoMismatches_LogMismatchesEmitsNothing)
 
 TEST_F(TypeCmdMismatchTrackerTest, FirstMismatch_StoredWithCountOne)
 {
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
+                                              dummyReq, dummyResp.data(),
+                                              dummyResp.size());
 
     auto& queue = requester::TypeCmdMismatchTracker::instances[5];
     ASSERT_EQ(queue.size(), 1u);
@@ -710,9 +716,15 @@ TEST_F(TypeCmdMismatchTrackerTest, FirstMismatch_StoredWithCountOne)
 TEST_F(TypeCmdMismatchTrackerTest,
        RepeatedSameMismatch_CountIncrements_NoNewEntry)
 {
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
+                                              dummyReq, dummyResp.data(),
+                                              dummyResp.size());
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
+                                              dummyReq, dummyResp.data(),
+                                              dummyResp.size());
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
+                                              dummyReq, dummyResp.data(),
+                                              dummyResp.size());
 
     auto& queue = requester::TypeCmdMismatchTracker::instances[5];
     ASSERT_EQ(queue.size(), 1u);
@@ -721,8 +733,12 @@ TEST_F(TypeCmdMismatchTrackerTest,
 
 TEST_F(TypeCmdMismatchTrackerTest, DifferentMismatch_SameEid_AddsNewEntry)
 {
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
-    requester::TypeCmdMismatchTracker::record(5, 3, 0x01, 0x05, 0x02, 0x08);
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
+                                              dummyReq, dummyResp.data(),
+                                              dummyResp.size());
+    requester::TypeCmdMismatchTracker::record(5, 3, 0x01, 0x05, 0x02, 0x08,
+                                              dummyReq, dummyResp.data(),
+                                              dummyResp.size());
 
     auto& queue = requester::TypeCmdMismatchTracker::instances[5];
     ASSERT_EQ(queue.size(), 2u);
@@ -733,12 +749,16 @@ TEST_F(TypeCmdMismatchTrackerTest, RingBufferCap_OldestEvictedWhenFull)
     // Fill to MAX_MISMATCH_DEBUG_EVENTS_PER_EID (10) with distinct combos
     for (uint8_t i = 0; i < 10; ++i)
     {
-        requester::TypeCmdMismatchTracker::record(5, i, 0x00, i, 0x01, i);
+        requester::TypeCmdMismatchTracker::record(5, i, 0x00, i, 0x01, i,
+                                                  dummyReq, dummyResp.data(),
+                                                  dummyResp.size());
     }
     EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[5].size(), 10u);
 
     // 11th distinct combo evicts the oldest
-    requester::TypeCmdMismatchTracker::record(5, 10, 0x00, 10, 0x01, 10);
+    requester::TypeCmdMismatchTracker::record(5, 10, 0x00, 10, 0x01, 10,
+                                              dummyReq, dummyResp.data(),
+                                              dummyResp.size());
     EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[5].size(), 10u);
 
     // Oldest (cmd=0) should be gone; newest (cmd=10) should be at back
@@ -748,8 +768,12 @@ TEST_F(TypeCmdMismatchTrackerTest, RingBufferCap_OldestEvictedWhenFull)
 
 TEST_F(TypeCmdMismatchTrackerTest, MultipleEids_TrackedIndependently)
 {
-    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10);
-    requester::TypeCmdMismatchTracker::record(6, 3, 0x01, 0x05, 0x02, 0x08);
+    requester::TypeCmdMismatchTracker::record(5, 7, 0x00, 0x02, 0x03, 0x10,
+                                              dummyReq, dummyResp.data(),
+                                              dummyResp.size());
+    requester::TypeCmdMismatchTracker::record(6, 3, 0x01, 0x05, 0x02, 0x08,
+                                              dummyReq, dummyResp.data(),
+                                              dummyResp.size());
 
     EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[5].size(), 1u);
     EXPECT_EQ(requester::TypeCmdMismatchTracker::instances[6].size(), 1u);
