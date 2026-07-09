@@ -1069,3 +1069,81 @@ TEST_F(RequesterHandlerBranchTest, MultipleEids_IndependentProcessing)
 
     EXPECT_TRUE(calledA);
 }
+
+// Short-buffer request is rejected; a subsequent valid request on the same
+// EID succeeds and its response handler is invoked normally.
+TEST_F(RequesterHandlerBranchTest,
+       RegisterRequest_ShortBuffer_ReturnsError_ValidRequestSucceeds)
+{
+    mockMctpHandler.sendResult = 1;
+
+    // Register a request whose buffer is too short (header only, no payload).
+    std::vector<uint8_t> shortMsg(sizeof(nsm_msg_hdr), 0);
+    bool badCalled = false;
+    int rc = handler.registerRequest(
+        MCTP_MSG_TAG_REQ, testEid, 0, 0, std::move(shortMsg),
+        [&](eid_t, const nsm_msg*, size_t) { badCalled = true; });
+    EXPECT_EQ(rc, NSM_SW_ERROR);
+    EXPECT_FALSE(badCalled);
+
+    // Register a valid request for the same EID — must succeed.
+    bool goodCalled = false;
+    const nsm_msg* goodResp = nullptr;
+    size_t goodLen = 0;
+    auto req = makePingRequest();
+    uint8_t reqType =
+        reinterpret_cast<nsm_msg*>(req.data())->hdr.nvidia_msg_type;
+    rc = handler.registerRequest(
+        MCTP_MSG_TAG_REQ, testEid, reqType, req.data()[sizeof(nsm_msg_hdr)],
+        std::move(req), [&](eid_t, const nsm_msg* r, size_t l) {
+        goodCalled = true;
+        goodResp = r;
+        goodLen = l;
+    });
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Deliver a matching response — good handler must fire.
+    auto respBuf = makePingResponse(0);
+    auto respMsg = reinterpret_cast<const nsm_msg*>(respBuf.data());
+    handler.handleResponse(MCTP_MSG_TAG_REQ, testEid, 0, reqType, 0, respMsg,
+                           respBuf.size());
+    EXPECT_TRUE(goodCalled);
+    EXPECT_NE(goodResp, nullptr);
+    EXPECT_GT(goodLen, 0u);
+}
+
+// Short-buffer request on one EID does not affect a valid request on a
+// different EID.
+TEST_F(RequesterHandlerBranchTest,
+       RegisterRequest_ShortBuffer_DoesNotAffectOtherEid)
+{
+    mockMctpHandler.sendResult = 1;
+
+    constexpr eid_t otherEid = 20;
+    sockManager.registerEndpoint(otherEid, fakeFd, 4096);
+
+    // Short-buffer request on testEid.
+    std::vector<uint8_t> shortMsg(sizeof(nsm_msg_hdr), 0);
+    int rc = handler.registerRequest(MCTP_MSG_TAG_REQ, testEid, 0, 0,
+                                     std::move(shortMsg),
+                                     [](eid_t, const nsm_msg*, size_t) {});
+    EXPECT_EQ(rc, NSM_SW_ERROR);
+
+    // Valid request on otherEid — must succeed.
+    bool otherCalled = false;
+    auto req = makePingRequest();
+    uint8_t reqType =
+        reinterpret_cast<nsm_msg*>(req.data())->hdr.nvidia_msg_type;
+    rc = handler.registerRequest(
+        MCTP_MSG_TAG_REQ, otherEid, reqType, req.data()[sizeof(nsm_msg_hdr)],
+        std::move(req),
+        [&](eid_t, const nsm_msg*, size_t) { otherCalled = true; });
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    // Deliver response to otherEid — its handler must fire.
+    auto respBuf = makePingResponse(0);
+    auto respMsg = reinterpret_cast<const nsm_msg*>(respBuf.data());
+    handler.handleResponse(MCTP_MSG_TAG_REQ, otherEid, 0, reqType, 0, respMsg,
+                           respBuf.size());
+    EXPECT_TRUE(otherCalled);
+}

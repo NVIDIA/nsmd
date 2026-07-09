@@ -185,9 +185,18 @@ class Handler
                                           requestMsg.size());
         }
 
-        auto request = std::make_unique<RequestInterface>(
-            sockManager.getSocket(eid), eid, tag, event, socketHandler,
-            std::move(requestMsg), numRetries, responseTimeOut, verbose);
+        std::unique_ptr<RequestInterface> request;
+        try
+        {
+            request = std::make_unique<RequestInterface>(
+                sockManager.getSocket(eid), eid, tag, event, socketHandler,
+                std::move(requestMsg), numRetries, responseTimeOut, verbose);
+        }
+        catch (const std::invalid_argument& e)
+        {
+            lg2::error("Failed to create NSM request: {ERR}", "ERR", e.what());
+            return NSM_SW_ERROR;
+        }
         auto timer = std::make_unique<sdbusplus::Timer>(
             event.get(), instanceIdExpiryCallBack);
 
