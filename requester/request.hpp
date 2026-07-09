@@ -24,7 +24,6 @@
 #include "common/utils.hpp"
 #include "nsmd/socket_handler.hpp"
 
-#include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -40,6 +39,7 @@
 #include <coroutine>
 #include <functional>
 #include <iostream>
+#include <stdexcept>
 
 #ifdef LTTNG_TRACING
 #include "tracepoints/nsmd-tp.h"
@@ -158,7 +158,16 @@ class RequestBase
   public:
     RequestBase(eid_t eid, uint8_t tag, RequestMsg&& requestMsg) :
         eid(eid), tag(tag), requestMsg(std::move(requestMsg))
-    {}
+    {
+        if (this->requestMsg.size() <= sizeof(nsm_msg_hdr))
+        {
+            std::string hex = utils::requestMsgToHexString(this->requestMsg);
+            throw std::invalid_argument(
+                "NSM request message too short to contain command code: "
+                "EID=" +
+                std::to_string(eid) + " bytes=" + hex);
+        }
+    }
 
     const RequestMsg& requestData() const
     {
@@ -218,7 +227,6 @@ class Request final : public RequestBase, public RequestRetryTimer
 
     uint8_t getCommandCode() const
     {
-        assert(requestMsg.size() > sizeof(nsm_msg_hdr));
         auto nsmMsg = reinterpret_cast<const nsm_msg*>(requestMsg.data());
         return nsmMsg->payload[0];
     }
