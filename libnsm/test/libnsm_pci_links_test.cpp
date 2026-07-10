@@ -17,6 +17,7 @@
 
 #include "base.h"
 #include "pci-links.h"
+#include <cstddef>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -3852,3 +3853,90 @@ TEST(queryVectorGroupTelemetryV2Group1, testBadDecodeResponse)
 	    response, msg_len, &cc, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 } */
+
+// ---------------------------------------------------------------------------
+// Glasswing re-scan regression: wire length/count must be bounded against the
+// destination and msg_len before copy (stack-overflow / OOB guards).
+// ---------------------------------------------------------------------------
+namespace
+{
+constexpr size_t kPcRespDsOff =
+    sizeof(nsm_msg_hdr) + offsetof(nsm_common_resp, data_size);
+void pcU16(std::vector<uint8_t> &b, size_t o, uint16_t v)
+{
+	b[o] = v & 0xFF;
+	b[o + 1] = v >> 8;
+}
+const nsm_msg *pcMsg(const std::vector<uint8_t> &b)
+{
+	return reinterpret_cast<const nsm_msg *>(b.data());
+}
+} // namespace
+
+TEST(PciLinksOverflowGuard, VectorGroup1_OversizedDataSizeRejected)
+{
+	// data_size=64 => cnt=16 uint32s into a 4-byte group-1 buffer; must be
+	// rejected before the copy (stack overflow otherwise).
+	const size_t off =
+	    offsetof(nsm_query_vector_data_sources_v2_resp, data_values);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 64, 0);
+	pcU16(b, kPcRespDsOff, 64);
+	uint8_t cc = 0;
+	uint16_t rc = 0;
+	nsm_query_vector_group_1_data d{};
+	EXPECT_EQ(decode_query_vector_group_telemetry_v2_group1_resp(
+		      pcMsg(b), b.size(), &cc, &rc, &d),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(PciLinksOverflowGuard, VectorGroup1_WellFormedAccepted)
+{
+	const size_t off =
+	    offsetof(nsm_query_vector_data_sources_v2_resp, data_values);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4, 0);
+	pcU16(b, kPcRespDsOff, sizeof(nsm_query_vector_group_1_data));
+	uint8_t cc = 0;
+	uint16_t rc = 0;
+	nsm_query_vector_group_1_data d{};
+	EXPECT_EQ(decode_query_vector_group_telemetry_v2_group1_resp(
+		      pcMsg(b), b.size(), &cc, &rc, &d),
+		  NSM_SW_SUCCESS);
+}
+
+TEST(PciLinksOverflowGuard, ScalarMaskLengthTooLargeRejected)
+{
+	const size_t off = offsetof(
+	    nsm_query_available_clearable_scalar_data_sources_v1_resp, data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 600, 0);
+	pcU16(b, kPcRespDsOff, 1 + 2 * 255);
+	b[sizeof(nsm_msg_hdr) +
+	  offsetof(nsm_query_available_clearable_scalar_data_sources_v1_resp,
+		   mask_length)] = 255;
+	uint8_t cc = 0, ml = 0;
+	uint16_t rc = 0, ds = 0;
+	uint8_t a[NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE] = {0};
+	uint8_t c[NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE] = {0};
+	EXPECT_EQ(decode_query_available_clearable_scalar_data_sources_v1_resp(
+		      pcMsg(b), b.size(), &cc, &ds, &rc, &ml, a, c),
+		  NSM_SW_ERROR_DATA);
+}
+
+TEST(PciLinksOverflowGuard, ScalarWellFormedAccepted)
+{
+	const size_t off = offsetof(
+	    nsm_query_available_clearable_scalar_data_sources_v1_resp, data);
+	const uint8_t ml_in = NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE;
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 2 * ml_in, 0);
+	pcU16(b, kPcRespDsOff, 1 + 2 * ml_in);
+	b[sizeof(nsm_msg_hdr) +
+	  offsetof(nsm_query_available_clearable_scalar_data_sources_v1_resp,
+		   mask_length)] = ml_in;
+	uint8_t cc = 0, ml = 0;
+	uint16_t rc = 0, ds = 0;
+	uint8_t a[NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE] = {0};
+	uint8_t c[NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE] = {0};
+	EXPECT_EQ(decode_query_available_clearable_scalar_data_sources_v1_resp(
+		      pcMsg(b), b.size(), &cc, &ds, &rc, &ml, a, c),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(ml, ml_in);
+}

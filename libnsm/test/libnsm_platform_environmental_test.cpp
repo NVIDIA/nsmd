@@ -7070,3 +7070,120 @@ TEST(LibnsmOverreadGuard, GetSupportedGpmMetricsResp)
 		      bitmask, &bitmaskSize),
 		  NSM_SW_ERROR_LENGTH);
 }
+
+// Build a driver-info response of exactly `bufBytes` total, with the on-wire
+// data_size field set to `dataSize`. The driver_version region is left zeroed
+// (so a NUL terminator is present wherever it lands).
+namespace
+{
+std::vector<uint8_t> driverInfoBuf(size_t bufBytes, uint16_t dataSize)
+{
+	std::vector<uint8_t> buf(bufBytes, 0);
+	putU16(buf, kRespDataSizeOff, dataSize);
+	return buf;
+}
+constexpr size_t kDriverVerOff =
+    offsetof(nsm_get_driver_info_resp, driver_version);
+constexpr size_t kDriverStateSize = sizeof(enum8);
+} // namespace
+
+TEST(LibnsmOverreadGuard, GetDriverInfoResp_ZeroDataSizeRejected)
+{
+	auto buf = driverInfoBuf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_driver_info_resp), 0);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	enum8 st = 0;
+	char v[MAX_VERSION_STRING_SIZE] = {0};
+	EXPECT_EQ(decode_get_driver_info_resp(asMsg(buf), buf.size(), &cc, &rc,
+					      &st, v),
+		  NSM_SW_ERROR_DATA);
+}
+
+// data_size == sizeof(driver_state) would make driver_version_length 0 and
+// underflow driver_version[length - 1]; must be rejected.
+TEST(LibnsmOverreadGuard, GetDriverInfoResp_ZeroLengthVersionRejected)
+{
+	auto buf = driverInfoBuf(sizeof(nsm_msg_hdr) +
+				     sizeof(nsm_get_driver_info_resp),
+				 kDriverStateSize);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	enum8 st = 0;
+	char v[MAX_VERSION_STRING_SIZE] = {0};
+	EXPECT_EQ(decode_get_driver_info_resp(asMsg(buf), buf.size(), &cc, &rc,
+					      &st, v),
+		  NSM_SW_ERROR_DATA);
+}
+
+// data_size (50) is under MAX_VERSION_STRING_SIZE so the output-capacity
+// check is bypassed; the msg_len bound must still reject it on a short buffer.
+TEST(LibnsmOverreadGuard, GetDriverInfoResp_OversizedRejected)
+{
+	auto buf = driverInfoBuf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_driver_info_resp), 50);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	enum8 st = 0;
+	char v[MAX_VERSION_STRING_SIZE] = {0};
+	EXPECT_EQ(decode_get_driver_info_resp(asMsg(buf), buf.size(), &cc, &rc,
+					      &st, v),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+// version longer than MAX_VERSION_STRING_SIZE but within msg_len: the
+// output-capacity check must reject it.
+TEST(LibnsmOverreadGuard, GetDriverInfoResp_VersionTooLongRejected)
+{
+	const size_t verLen = MAX_VERSION_STRING_SIZE + 1;
+	auto buf =
+	    driverInfoBuf(sizeof(nsm_msg_hdr) + kDriverVerOff + verLen,
+			  static_cast<uint16_t>(kDriverStateSize + verLen));
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	enum8 st = 0;
+	char v[MAX_VERSION_STRING_SIZE + 8] = {0};
+	EXPECT_EQ(decode_get_driver_info_resp(asMsg(buf), buf.size(), &cc, &rc,
+					      &st, v),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, GetDriverInfoResp_MissingNulRejected)
+{
+	auto buf = driverInfoBuf(sizeof(nsm_msg_hdr) + kDriverVerOff + 4,
+				 kDriverStateSize + 4);
+	const size_t vo = sizeof(nsm_msg_hdr) + kDriverVerOff;
+	buf[vo] = '1';
+	buf[vo + 1] = '.';
+	buf[vo + 2] = '0';
+	buf[vo + 3] = 'X'; // no NUL terminator
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	enum8 st = 0;
+	char v[MAX_VERSION_STRING_SIZE] = {0};
+	EXPECT_EQ(decode_get_driver_info_resp(asMsg(buf), buf.size(), &cc, &rc,
+					      &st, v),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, GetDriverInfoResp_HappyPath)
+{
+	auto buf = driverInfoBuf(sizeof(nsm_msg_hdr) + kDriverVerOff + 4,
+				 kDriverStateSize + 4);
+	buf[sizeof(nsm_msg_hdr) +
+	    offsetof(nsm_get_driver_info_resp, driver_state)] = 7;
+	const size_t vo = sizeof(nsm_msg_hdr) + kDriverVerOff;
+	buf[vo] = '1';
+	buf[vo + 1] = '.';
+	buf[vo + 2] = '0';
+	buf[vo + 3] = '\0';
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	enum8 st = 0;
+	char v[MAX_VERSION_STRING_SIZE] = {0};
+	EXPECT_EQ(decode_get_driver_info_resp(asMsg(buf), buf.size(), &cc, &rc,
+					      &st, v),
+		  NSM_SUCCESS);
+	EXPECT_EQ(st, 7);
+	EXPECT_STREQ(v, "1.0");
+}

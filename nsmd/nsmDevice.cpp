@@ -975,7 +975,10 @@ requester::Coroutine
         case DEVICE_GUID:
         {
             std::vector<uint8_t> nvu8ArrVal(UUID_INT_SIZE, 0);
-            if (dataSize < UUID_INT_SIZE || data.size() < UUID_INT_SIZE)
+            // DEVICE_GUID is a fixed-width field: require the wire dataSize to
+            // be exactly the UUID width and reject anything else, rather than
+            // accepting an oversized value and truncating into the buffer.
+            if (dataSize != UUID_INT_SIZE || data.size() < UUID_INT_SIZE)
             {
                 lg2::error(
                     "NsmDevice::getInventoryInformation decode_get_inventory_information_resp invalid property data. eid={EID} porpertyID={PID}",
@@ -983,7 +986,7 @@ requester::Coroutine
                 // coverity[missing_return]
                 co_return NSM_SW_ERROR_LENGTH;
             }
-            memcpy(nvu8ArrVal.data(), data.data(), dataSize);
+            memcpy(nvu8ArrVal.data(), data.data(), UUID_INT_SIZE);
 
             uuid_t uuidStr = utils::convertUUIDToString(nvu8ArrVal);
             if (uuidStr.empty())

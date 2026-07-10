@@ -499,6 +499,15 @@ int decode_get_port_telemetry_counter_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_LENGTH;
 	}
 
+	/* Bound the wire data_size against the bytes actually received so the
+	 * copy source cannot run past the end of the message. */
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_port_telemetry_counter_resp, data) +
+		(size_t)*data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	memcpy(data, &(resp->data), *data_size);
 
 	// conversion le64toh for each counter data

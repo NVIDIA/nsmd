@@ -721,6 +721,16 @@ int decode_nsm_get_device_capabilities_v2_resp(
 		return rc;
 	}
 
+	/* Require the full telemetry response header before dereferencing any
+	 * field inside it (telemetry_count is a uint16_t at offset 2 of the
+	 * struct, so a message shorter than
+	 * hdr+sizeof(nsm_common_telemetry_resp) would cause an OOB read without
+	 * this guard). */
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_common_telemetry_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	struct nsm_get_device_capabilities_v2_resp *response =
 	    (struct nsm_get_device_capabilities_v2_resp *)msg->payload;
 	if (response->hdr.telemetry_count < 2) {
@@ -831,6 +841,15 @@ int decode_nsm_gpio_state_change_event(
 	    (sizeof(struct nsm_gpio_state_change_event_payload) -
 	     sizeof(struct nsm_gpio_event))) {
 		return NSM_SW_ERROR_DATA;
+	}
+
+	/* The on-wire data_size must fit within the bytes actually received
+	 * before any payload field (incl. the trailing gpio_events[] array)
+	 * is dereferenced. */
+	if (sizeof(struct nsm_msg_hdr) + offsetof(struct nsm_event, data) +
+		(size_t)event->data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
 	}
 
 	*event_class = event->event_class;
@@ -1011,6 +1030,14 @@ int decode_nsm_get_event_log_record_v2_resp_first_handle(
 		out->event_data_len =
 		    data_size -
 		    NSM_GET_EVENT_LOG_RECORD_V2_RESP_FIRST_HANDLE_MIN_DATA_SIZE;
+		if (sizeof(struct nsm_msg_hdr) +
+			offsetof(struct
+				 nsm_get_event_log_record_v2_resp_first_handle,
+				 event_data) +
+			(size_t)out->event_data_len >
+		    msg_len) {
+			return NSM_SW_ERROR_LENGTH;
+		}
 	} else {
 		out->event_data = NULL;
 		out->event_data_len = 0;
@@ -1094,6 +1121,14 @@ int decode_nsm_get_event_log_record_v2_resp_next_handle(
 		out->event_data_len =
 		    data_size -
 		    NSM_GET_EVENT_LOG_RECORD_V2_RESP_NEXT_HANDLE_MIN_DATA_SIZE;
+		if (sizeof(struct nsm_msg_hdr) +
+			offsetof(
+			    struct nsm_get_event_log_record_v2_resp_next_handle,
+			    event_data) +
+			(size_t)out->event_data_len >
+		    msg_len) {
+			return NSM_SW_ERROR_LENGTH;
+		}
 	} else {
 		out->event_data = NULL;
 		out->event_data_len = 0;

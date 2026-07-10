@@ -445,7 +445,7 @@ int InKernelHandler::sendMsg([[maybe_unused]] uint8_t tag, eid_t eid,
     return NSM_SW_SUCCESS;
 }
 
-void InKernelHandler::handleReceivedMsg(IO& io, int fd,
+void InKernelHandler::handleReceivedMsg([[maybe_unused]] IO& io, int fd,
                                         [[maybe_unused]] uint32_t revents)
 {
     int returnCode{0};
@@ -453,14 +453,15 @@ void InKernelHandler::handleReceivedMsg(IO& io, int fd,
     ssize_t peekedLength = recv(fd, nullptr, 0, MSG_PEEK | MSG_TRUNC);
     if (peekedLength == 0)
     {
-        // This may or may not be an error scenario, in either case the
-        // recovery mechanism for this daemon is to restart, and hence
-        // exit the event loop, that will cause this daemon to exit with a
-        // failure code.
-        returnCode = -errno;
-        lg2::error("recv system call failed. Terminating. RC={RC}", "RC",
-                   returnCode);
-        io.get_event().exit(0);
+        // A zero-length datagram is a valid (if unusual) message on a
+        // SOCK_DGRAM AF_MCTP socket, not an end-of-stream/disconnect
+        // condition (datagram sockets have no EOF). Terminating here let any
+        // MCTP peer take the daemon down with a single empty packet, so drain
+        // the empty datagram and continue processing instead.
+        uint8_t drain = 0;
+        (void)recv(fd, &drain, sizeof(drain), 0);
+        lg2::warning("Received zero-length MCTP datagram; ignoring.");
+        return;
     }
     else if (peekedLength <= -1)
     {

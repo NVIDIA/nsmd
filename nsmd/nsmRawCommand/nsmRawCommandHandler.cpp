@@ -52,6 +52,14 @@ NsmRawCommandHandler& NsmRawCommandHandler::getInstance()
 Response copySuccessResponse(uint8_t cc, const nsm_msg* responseMsg,
                              size_t responseLen)
 {
+    // Guard against a short response: without the NSM header plus the
+    // command/data-size bytes there is no payload to copy, and the
+    // subtraction below would underflow (size_t) and request a huge
+    // allocation.
+    if (responseLen < sizeof(nsm_msg_hdr) + 2)
+    {
+        return Response{cc};
+    }
     auto dataSize = responseLen - sizeof(nsm_msg_hdr) - 2;
     // completion code + data
     Response data(1 + dataSize, 0);
