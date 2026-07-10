@@ -195,6 +195,24 @@ class QueryTokenParameters : public CommandInterface
             case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NIC:
                 result["Device type"] = "NIC";
                 break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_SOC:
+                result["Device type"] = "SOC";
+                break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_ARCUS:
+                result["Device type"] = "Arcus";
+                break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_ETH_SWITCH:
+                result["Device type"] = "Eth switch";
+                break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_BMC_IROT:
+                result["Device type"] = "BMC IRoT";
+                break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_BMC_VROT:
+                result["Device type"] = "BMC VRoT";
+                break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CABLE_MCU:
+                result["Device type"] = "Cable MCU";
+                break;
             default:
                 result["Device type"] =
                     "Invalid value: " +

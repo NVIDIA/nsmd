@@ -305,10 +305,24 @@ const std::unordered_map<uint32_t,
 constexpr std::array<std::pair<uint32_t, TokenTypeEnum>, 2> bmcIrotTokenTypes{
     {{0, TokenTypeEnum::None}, {1, TokenTypeEnum::DebugFirmwareUnlock}}};
 
+// BMCVRoT device token types (numeric to enum)
+// Kept separate from BMCIRoT: the two roots of trust are expected to expose
+// different token types in future, so they do not share a table.
+constexpr std::array<std::pair<uint32_t, TokenTypeEnum>, 2> bmcVrotTokenTypes{
+    {{0, TokenTypeEnum::None}, {1, TokenTypeEnum::DebugFirmwareUnlock}}};
+
 // BMCIRoT device token subtypes - no subtypes supported
 const std::unordered_map<uint32_t,
                          std::vector<std::pair<uint32_t, TokenSubtypeEnum>>>
     bmcIrotTokenSubtypesMap = {
+        {0, {{0, TokenSubtypeEnum::None}}},
+        {1, {{0, TokenSubtypeEnum::None}}}}; // DebugFirmwareUnlock
+
+// BMCVRoT device token subtypes - no subtypes supported
+// Kept separate from BMCIRoT for the same reason as the token type table.
+const std::unordered_map<uint32_t,
+                         std::vector<std::pair<uint32_t, TokenSubtypeEnum>>>
+    bmcVrotTokenSubtypesMap = {
         {0, {{0, TokenSubtypeEnum::None}}},
         {1, {{0, TokenSubtypeEnum::None}}}}; // DebugFirmwareUnlock
 
@@ -346,6 +360,10 @@ std::pair<const std::pair<uint32_t, TokenTypeEnum>*, size_t>
     {
         return {bmcIrotTokenTypes.data(), bmcIrotTokenTypes.size()};
     }
+    if (deviceType == "BMCVRoT")
+    {
+        return {bmcVrotTokenTypes.data(), bmcVrotTokenTypes.size()};
+    }
     return {defaultTokenTypes.data(), defaultTokenTypes.size()};
 }
 
@@ -376,6 +394,10 @@ const std::unordered_map<uint32_t,
     if (deviceType == "BMCIRoT")
     {
         return &bmcIrotTokenSubtypesMap;
+    }
+    if (deviceType == "BMCVRoT")
+    {
+        return &bmcVrotTokenSubtypesMap;
     }
     return nullptr;
 }

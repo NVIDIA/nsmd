@@ -123,23 +123,31 @@ TEST(NsmDiagCmdParse, QueryTokenParameters_ErrorDeviceType)
 TEST(NsmDiagCmdParse, QueryTokenParameters_AllDeviceTypes)
 {
     const uint8_t deviceTypes[] = {
-        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX7, NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_MCU,
+        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX7,
+        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_MCU,
         NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NIC,
+        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_BMC_VROT,
+        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_SOC,
+        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_ARCUS,
+        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_ETH_SWITCH,
+        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_BMC_IROT,
+        NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CABLE_MCU,
         0xFF // default case
     };
     const uint8_t statuses[] = {
         NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_TOKEN_NOT_SUPPORTED,
         NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_NO_KEY_CONFIGURED,
         NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_INTERFACE_NOT_ALLOWED,
+        NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_OK,
         0xFF // default
     };
     const uint8_t opcodes[] = {
         NSM_DEBUG_TOKEN_OPCODE_CRCS, NSM_DEBUG_TOKEN_OPCODE_CRDT,
-        NSM_DEBUG_TOKEN_OPCODE_LINKX_FRC,
+        NSM_DEBUG_TOKEN_OPCODE_LINKX_FRC, NSM_DEBUG_TOKEN_OPCODE_RMCS,
         0xFF // default
     };
 
-    for (size_t i = 0; i < 4; i++)
+    for (size_t i = 0; i < sizeof(deviceTypes); i++)
     {
         CLI::App app;
         setupDiagCommands(app);
@@ -148,8 +156,8 @@ TEST(NsmDiagCmdParse, QueryTokenParameters_AllDeviceTypes)
         nsm_debug_token_request tokenReq{};
         tokenReq.token_request_size = sizeof(nsm_debug_token_request);
         tokenReq.device_type = deviceTypes[i];
-        tokenReq.status = statuses[i];
-        tokenReq.token_opcode = opcodes[i];
+        tokenReq.status = statuses[i % sizeof(statuses)];
+        tokenReq.token_opcode = opcodes[i % sizeof(opcodes)];
 
         std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_query_token_parameters_resp));
