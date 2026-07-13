@@ -30,6 +30,15 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
+// Fallbacks for kernels whose uapi headers predate the MCTP tag-timeout
+// option. Safe to remove once the updated <linux/mctp.h> is in the sysroot.
+#ifndef SOL_MCTP
+#define SOL_MCTP 285
+#endif
+#ifndef MCTP_OPT_TAG_TIMEOUT_MS
+#define MCTP_OPT_TAG_TIMEOUT_MS 3
+#endif
+
 #include <phosphor-logging/lg2.hpp>
 
 #ifdef LTTNG_TRACING
@@ -380,6 +389,21 @@ int InKernelHandler::registerMctpEndpoint(
             "RC", strerror(-rc), "ED", eid);
         close(fd);
         return rc;
+    }
+
+    // Cap the MCTP tag/key lifetime at 2s: NSM responses arrive well within
+    // that, so tags can be reclaimed sooner than the 6s kernel default. This
+    // is a best-effort optimisation — if the running kernel does not support
+    // the option, log and carry on with the default rather than failing.
+    int tagTimeoutMs = 2000;
+    rc = setsockopt(fd, SOL_MCTP, MCTP_OPT_TAG_TIMEOUT_MS, &tagTimeoutMs,
+                    sizeof(tagTimeoutMs));
+    if (rc == -1)
+    {
+        lg2::warning(
+            "Could not set MCTP tag timeout on socket (using kernel default), "
+            "RC={RC}, EID={ED}",
+            "RC", strerror(errno), "ED", eid);
     }
 
     struct sockaddr_mctp addr;
