@@ -26,6 +26,15 @@
 #include <linux/mctp.h>
 #include <systemd/sd-bus.h>
 
+// Fallbacks for kernels whose uapi headers predate the MCTP tag-timeout
+// option. Safe to remove once the updated <linux/mctp.h> is in the sysroot.
+#ifndef SOL_MCTP
+#define SOL_MCTP 285
+#endif
+#ifndef MCTP_OPT_TAG_TIMEOUT_MS
+#define MCTP_OPT_TAG_TIMEOUT_MS 3
+#endif
+
 #include <sdbusplus/server.hpp>
 #include <xyz/openbmc_project/Logging/Entry/server.hpp>
 
@@ -178,6 +187,19 @@ int inKernelMctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
     Logger(verbose, "Success in creating the socket : RC = ", sockFd);
 
     CustomFD socketFd(sockFd);
+
+    // Cap the MCTP tag/key lifetime at 2s to match nsmd: NSM responses arrive
+    // well within that, so tags are reclaimed sooner than the 6s kernel
+    // default. Best-effort — if the running kernel lacks the option, warn and
+    // continue with the default rather than failing the command.
+    int tagTimeoutMs = 2000;
+    if (setsockopt(socketFd(), SOL_MCTP, MCTP_OPT_TAG_TIMEOUT_MS, &tagTimeoutMs,
+                   sizeof(tagTimeoutMs)) == -1)
+    {
+        std::cerr << "Warning: failed to set MCTP tag timeout, using kernel "
+                     "default : RC = "
+                  << -errno << "\n";
+    }
 
     struct sockaddr_mctp addr;
     memset(&addr, 0, sizeof(addr));
