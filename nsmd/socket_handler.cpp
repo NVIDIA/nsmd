@@ -30,11 +30,9 @@
 #include <sys/types.h>
 #include <sys/un.h>
 
-// Fallbacks for kernels whose uapi headers predate the MCTP tag-timeout
-// option. Safe to remove once the updated <linux/mctp.h> is in the sysroot.
-#ifndef SOL_MCTP
-#define SOL_MCTP 285
-#endif
+// The userspace <linux/mctp.h> comes from linux-libc-headers, which lags the
+// BMC kernel's uapi, so this option may be missing. (SOL_MCTP itself comes from
+// glibc and is always defined.) Remove once linux-libc-headers carries it.
 #ifndef MCTP_OPT_TAG_TIMEOUT_MS
 #define MCTP_OPT_TAG_TIMEOUT_MS 3
 #endif
