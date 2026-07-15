@@ -18,6 +18,9 @@
 #include "test/mockDBusHandler.hpp"
 #include "test/mockSensorManager.hpp"
 
+#include <algorithm>
+#include <limits>
+
 using namespace ::testing;
 
 #define private public
@@ -60,6 +63,13 @@ static std::vector<uint8_t>
     encode_get_supported_command_codes_resp(
         0, cc, cc == NSM_SUCCESS ? ERR_NULL : ERR_INVALID_RQD, codes, msg);
     return buf;
+}
+
+static bool
+    containsSensor(const std::vector<std::shared_ptr<NsmObject>>& sensors,
+                   const std::shared_ptr<NsmObject>& sensor)
+{
+    return std::find(sensors.begin(), sensors.end(), sensor) != sensors.end();
 }
 
 // -----------------------------------------------------------------------
@@ -270,4 +280,65 @@ TEST_F(NsmMsgTypesSensorTest, NsmMsgTypes_Update_CalledTwice_NoDuplicateSensors)
     auto coro2 = sensor.update(gpu);
     // Second call with same types: no new sensors added
     EXPECT_EQ(gpu->deviceSensors.size(), sensorsAfterFirst);
+}
+
+TEST_F(NsmMsgTypesSensorTest,
+       NsmMsgTypes_Update_DisablesStaleCommandCodeSensors)
+{
+    NsmMsgTypes sensor("msgtypes_stale", "type", *gpu);
+
+    bitfield8_t typesWithFirmware[SUPPORTED_MSG_TYPE_DATA_SIZE] = {};
+    typesWithFirmware[0].byte = 0x41; // Message types 0 and 6 are supported
+
+    bitfield8_t typesWithoutFirmware[SUPPORTED_MSG_TYPE_DATA_SIZE] = {};
+    typesWithoutFirmware[0].byte = 0x01; // Only message type 0 is supported
+
+    // Timestamp far beyond any refresh limit so needsUpdate() is gated
+    // only by the supported flag
+    const uint64_t distantFuture = std::numeric_limits<uint64_t>::max() / 2;
+
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(
+            mockSensorIO(makeMsgTypesResp(NSM_SUCCESS, typesWithFirmware)))
+        .WillOnce(
+            mockSensorIO(makeMsgTypesResp(NSM_SUCCESS, typesWithoutFirmware)))
+        .WillOnce(
+            mockSensorIO(makeMsgTypesResp(NSM_SUCCESS, typesWithFirmware)));
+
+    auto firstUpdate = sensor.update(gpu);
+    ASSERT_EQ(sensor.commandCodesSensors.count(0), 1);
+    ASSERT_EQ(sensor.commandCodesSensors.count(6), 1);
+
+    auto staleType6Sensor = sensor.commandCodesSensors.at(6);
+    EXPECT_TRUE(containsSensor(gpu->deviceSensors, staleType6Sensor));
+    EXPECT_TRUE(containsSensor(gpu->roundRobinSensors, staleType6Sensor));
+    EXPECT_TRUE(staleType6Sensor->isSupported());
+    EXPECT_TRUE(staleType6Sensor->needsUpdate(distantFuture));
+
+    // Simulate a prior command-code refresh for message type 6
+    bitfield8_t codes[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {};
+    codes[0].byte = 0x02; // Command 1 supported
+    gpu->updateMessageTypesToCommandCodeMatrix(
+        6, codes, SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    ASSERT_TRUE(gpu->isCommandSupported(6, 1));
+
+    auto secondUpdate = sensor.update(gpu);
+    // The sensor is kept everywhere (queue entries are never erased) but
+    // is disabled: polling skips it and its matrix row is cleared
+    EXPECT_EQ(sensor.commandCodesSensors.count(6), 1);
+    EXPECT_TRUE(containsSensor(gpu->deviceSensors, staleType6Sensor));
+    EXPECT_TRUE(containsSensor(gpu->roundRobinSensors, staleType6Sensor));
+    EXPECT_FALSE(staleType6Sensor->isSupported());
+    EXPECT_FALSE(staleType6Sensor->needsUpdate(distantFuture));
+    EXPECT_FALSE(gpu->isCommandSupported(6, 1));
+
+    // A direct update on the disabled sensor issues no request: the mock
+    // has no queued response left, so any sensorIO call would fail
+    auto disabledUpdate = staleType6Sensor->update(gpu);
+
+    auto thirdUpdate = sensor.update(gpu);
+    // Message type 6 is advertised again: the same sensor is re-enabled
+    EXPECT_EQ(sensor.commandCodesSensors.at(6), staleType6Sensor);
+    EXPECT_TRUE(staleType6Sensor->isSupported());
+    EXPECT_TRUE(staleType6Sensor->needsUpdate(distantFuture));
 }

@@ -16,6 +16,9 @@
  */
 
 #pragma once
+
+#include <set>
+
 namespace nsm
 {
 
@@ -27,8 +30,33 @@ class NsmCommandCodes : public NsmObject
         NsmObject(name, type), messageType(messageType), nsmDevice(nsmDevice)
     {}
 
+    bool isSupported() const
+    {
+        return supported;
+    }
+
+    void setSupported(bool value)
+    {
+        supported = value;
+    }
+
+    bool needsUpdate(const uint64_t& currentTimestampInUsec) const override
+    {
+        // A sensor whose message type is no longer advertised stays in the
+        // polling queue but is skipped by the polling loop.
+        return supported && NsmObject::needsUpdate(currentTimestampInUsec);
+    }
+
     requester::Coroutine update(std::shared_ptr<NsmDevice> device) override
     {
+        if (!supported)
+        {
+            // Guard for update paths that do not consult needsUpdate():
+            // issue no request for a de-advertised message type.
+            // coverity[missing_return]
+            co_return NSM_SW_SUCCESS;
+        }
+
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_get_supported_command_codes_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -81,6 +109,7 @@ class NsmCommandCodes : public NsmObject
   private:
     uint8_t messageType;
     NsmDevice& nsmDevice;
+    bool supported = true;
 };
 class NsmMsgTypes : public NsmObject
 {
@@ -138,20 +167,59 @@ class NsmMsgTypes : public NsmObject
             co_return cc ? cc : rc;
         }
 
-        // convert bit matrix of types into supportedTypes
+        // Convert bit matrix of types into the latest supported type set.
+        std::set<uint8_t> supportedTypes;
         for (size_t i = 0; i < SUPPORTED_MSG_TYPE_DATA_SIZE * 8; i++)
         {
             auto isSupported = types[i / 8].byte & (1 << (i % 8));
-            if (isSupported &&
-                commandCodesSensors.find(i) == commandCodesSensors.end())
+            if (isSupported)
+            {
+                supportedTypes.emplace(static_cast<uint8_t>(i));
+            }
+        }
+
+        // Treat the latest response as authoritative. Sensors are never
+        // removed from the device sensor list: erasing entries would shift
+        // CircularQueue indexing while the polling loop iterates. A sensor
+        // whose message type is no longer advertised is disabled instead,
+        // so polling skips it, and its command-code matrix row is cleared.
+        // It is re-enabled if the type is advertised again later.
+        for (auto& [messageType, commandCodes] : commandCodesSensors)
+        {
+            bool typeSupported = supportedTypes.contains(messageType);
+            if (commandCodes->isSupported() && !typeSupported)
+            {
+                lg2::info(
+                    "NsmMsgTypes: disabling stale command code sensor. eid={EID} messageType={MSG_TYPE} name={NAME}",
+                    "EID", device->getEid(), "MSG_TYPE", messageType, "NAME",
+                    commandCodes->getName());
+                const bitfield8_t
+                    noCommands[SUPPORTED_COMMAND_CODE_DATA_SIZE]{};
+                device->updateMessageTypesToCommandCodeMatrix(
+                    messageType, noCommands, SUPPORTED_COMMAND_CODE_DATA_SIZE);
+            }
+            else if (!commandCodes->isSupported() && typeSupported)
+            {
+                lg2::info(
+                    "NsmMsgTypes: re-enabling command code sensor. eid={EID} messageType={MSG_TYPE} name={NAME}",
+                    "EID", device->getEid(), "MSG_TYPE", messageType, "NAME",
+                    commandCodes->getName());
+            }
+            commandCodes->setSupported(typeSupported);
+        }
+
+        for (auto messageType : supportedTypes)
+        {
+            if (commandCodesSensors.find(messageType) ==
+                commandCodesSensors.end())
             {
                 // New message type, create and add sensor
-                auto sensor = std::make_shared<NsmCommandCodes>(
-                    "Supported Command Codes " + std::to_string(i),
-                    "NSM_NVIDIA_MESSAGE_TYPE_" + std::to_string(i), nsmDevice,
-                    i);
-                commandCodesSensors[i] = sensor;
-                device->addSensor(sensor, false);
+                auto commandSensor = std::make_shared<NsmCommandCodes>(
+                    "Supported Command Codes " + std::to_string(messageType),
+                    "NSM_NVIDIA_MESSAGE_TYPE_" + std::to_string(messageType),
+                    nsmDevice, messageType);
+                commandCodesSensors[messageType] = commandSensor;
+                device->addSensor(commandSensor, false);
             }
         }
 
