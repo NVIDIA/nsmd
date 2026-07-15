@@ -389,11 +389,12 @@ int InKernelHandler::registerMctpEndpoint(
         return rc;
     }
 
-    // Cap the MCTP tag/key lifetime at 2s: NSM responses arrive well within
-    // that, so tags can be reclaimed sooner than the 6s kernel default. This
-    // is a best-effort optimisation — if the running kernel does not support
-    // the option, log and carry on with the default rather than failing.
-    int tagTimeoutMs = 2000;
+    // Cap the MCTP tag/key lifetime at RESPONSE_TIME_OUT (defaults to 2s): NSM
+    // responses arrive well within that, so tags can be reclaimed sooner than
+    // the 6s kernel default. This is a best-effort optimisation — if the
+    // running kernel does not support the option, log and carry on with the
+    // default rather than failing.
+    int tagTimeoutMs = RESPONSE_TIME_OUT;
     rc = setsockopt(fd, SOL_MCTP, MCTP_OPT_TAG_TIMEOUT_MS, &tagTimeoutMs,
                     sizeof(tagTimeoutMs));
     if (rc == -1)

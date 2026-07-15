@@ -186,11 +186,12 @@ int inKernelMctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
 
     CustomFD socketFd(sockFd);
 
-    // Cap the MCTP tag/key lifetime at 2s to match nsmd: NSM responses arrive
-    // well within that, so tags are reclaimed sooner than the 6s kernel
-    // default. Best-effort — if the running kernel lacks the option, warn and
-    // continue with the default rather than failing the command.
-    int tagTimeoutMs = 2000;
+    // Cap the MCTP tag/key lifetime at RESPONSE_TIME_OUT (defaults to 2s) to
+    // match nsmd: NSM responses arrive well within that, so tags are reclaimed
+    // sooner than the 6s kernel default. Best-effort — if the running kernel
+    // lacks the option, warn and continue with the default rather than failing
+    // the command.
+    int tagTimeoutMs = RESPONSE_TIME_OUT;
     if (setsockopt(socketFd(), SOL_MCTP, MCTP_OPT_TAG_TIMEOUT_MS, &tagTimeoutMs,
                    sizeof(tagTimeoutMs)) == -1)
     {
