@@ -25,6 +25,10 @@ NsmGPIOState::NsmGPIOState(
 
     this->gpioStateIntf = gpioStateIntf;
     this->gpioStateIntf->lastChangeTime(0);
+    // Initialize LineStates to a silent empty (all-false) baseline; the static
+    // GetGPIO seed and the genuine event path build on this without the seed
+    // itself raising a PropertiesChanged.
+    this->gpioStateIntf->lineStates({}, true);
     objPath = inventoryObjPath;
 
     associationDefIntf = std::make_unique<AssociationDefInft>(bus,
@@ -89,7 +93,14 @@ uint8_t NsmGPIOState::handleResponseMsg(const struct nsm_msg* responseMsg,
 
         if (gpioStateIntf != nullptr && !gpioStateMap.empty())
         {
-            gpioStateIntf->lineStates(gpioStateMap);
+            // NsmGPIOState is a static sensor: this GetGPIO response only seeds
+            // LineStates on D-Bus. Publish it without emitting PropertiesChanged
+            // (skipSignal=true) so the {} -> {...} seed is not misread as a
+            // genuine HIGH->LOW transition by monitor-eventing, which would
+            // raise spurious Critical events (e.g. HPM_SMA-PCIE_CLKBUF-FAULTY)
+            // for any line already in its abnormal state. Genuine transitions
+            // are published, with signal, by NsmGPIOStateChangeEvent.
+            gpioStateIntf->lineStates(gpioStateMap, true);
         }
     }
 

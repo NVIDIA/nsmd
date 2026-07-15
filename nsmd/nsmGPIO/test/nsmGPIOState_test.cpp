@@ -492,3 +492,79 @@ TEST_F(NsmGPIOStateTest, HandleResponseMsg_NullGpioStateIntf_SkipsLineStates)
     auto result = sensor->handleResponseMsg(responseMsgPtr, responseMsg.size());
     EXPECT_EQ(result, NSM_SUCCESS);
 }
+
+// Spy over GPIOStateIntf that records the skipSignal argument passed to the
+// two-argument lineStates() setter, so a test can assert whether a publish
+// would emit PropertiesChanged (skipSignal == false) or stay silent
+// (skipSignal == true) without needing a live D-Bus broker.
+struct SkipSignalSpyIntf : public GPIOStateIntf
+{
+    using GPIOStateIntf::GPIOStateIntf;
+    using GPIOStateIntf::lineStates; // keep getter/other overloads visible
+
+    std::vector<bool> skipSignals;
+
+    std::map<uint16_t, bool> lineStates(std::map<uint16_t, bool> value,
+                                        bool skipSignal) override
+    {
+        skipSignals.push_back(skipSignal);
+        return GPIOStateIntf::lineStates(std::move(value), skipSignal);
+    }
+};
+
+// NsmGPIOState is a static sensor: every GetGPIO response only seeds LineStates,
+// so it must be published silently (skipSignal=true, no PropertiesChanged) and
+// never be misread as a genuine transition. Genuine transitions are published,
+// with signal, by NsmGPIOStateChangeEvent. Regression guard for nvbug 6437887
+// (spurious HPM_SMA-PCIE_CLKBUF-FAULTY).
+TEST_F(NsmGPIOStateTest, HandleResponseMsg_SeedsLineStatesSilently)
+{
+    std::vector<std::tuple<std::string, std::string, std::string>> associations;
+
+    auto spy = std::make_shared<SkipSignalSpyIntf>(utils::DBusHandler::getBus(),
+                                                   objPath.c_str());
+
+    auto sensor = std::make_shared<NsmGPIOState>(
+        utils::DBusHandler::getBus(), type, name, objPath, associations, spy);
+
+    // Ignore the constructor's silent LineStates initialization.
+    spy->skipSignals.clear();
+
+    auto buildResponse = [&](uint8_t byteVal) {
+        std::vector<uint8_t> gpioData = {byteVal};
+        auto msg = std::make_shared<std::vector<uint8_t>>(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_gpio_state_resp) - 1 +
+            gpioData.size());
+        auto ptr = reinterpret_cast<struct nsm_msg*>(msg->data());
+        EXPECT_EQ(encode_get_gpio_state_resp(0, NSM_SUCCESS, ERR_NULL, 0, 1,
+                                             gpioData.data(), gpioData.size(),
+                                             ptr),
+                  NSM_SW_SUCCESS);
+        return msg;
+    };
+
+    // First poll: bit0 low. Seeded silently (skipSignal=true); value stored.
+    auto first = buildResponse(0x00);
+    EXPECT_EQ(sensor->handleResponseMsg(
+                  reinterpret_cast<struct nsm_msg*>(first->data()),
+                  first->size()),
+              NSM_SUCCESS);
+    ASSERT_EQ(spy->skipSignals.size(), 1u);
+    EXPECT_TRUE(spy->skipSignals.at(0));
+    auto afterFirst = spy->lineStates();
+    ASSERT_NE(afterFirst.find(0), afterFirst.end());
+    EXPECT_FALSE(afterFirst.at(0));
+
+    // A subsequent poll (e.g. a re-seed on reconnect) is still silent
+    // (skipSignal=true), and the stored state reflects the new snapshot.
+    auto second = buildResponse(0x01);
+    EXPECT_EQ(sensor->handleResponseMsg(
+                  reinterpret_cast<struct nsm_msg*>(second->data()),
+                  second->size()),
+              NSM_SUCCESS);
+    ASSERT_EQ(spy->skipSignals.size(), 2u);
+    EXPECT_TRUE(spy->skipSignals.at(1));
+    auto afterSecond = spy->lineStates();
+    ASSERT_NE(afterSecond.find(0), afterSecond.end());
+    EXPECT_TRUE(afterSecond.at(0));
+}
