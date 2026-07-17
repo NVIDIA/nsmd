@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 #pragma once
+#include "libnsm/pci-links.h"
+
 #include "asyncOperationManager.hpp"
 #include "nsmAsioInterface/nsmAsioPortInfoInterface.hpp"
 #include "nsmCommon/nsmPcieGroup.hpp"
@@ -31,7 +33,10 @@
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 
-#define MAX_SCALAR_SOURCE_MASK_SIZE 4
+// Single source of truth for the scalar-data-source mask size lives in
+// libnsm (NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE); alias it here so the daemon
+// and its tests don't carry a second independent copy of the same limit.
+#define MAX_SCALAR_SOURCE_MASK_SIZE NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE
 
 namespace nsm
 {
