@@ -60,6 +60,7 @@ class NsmEventLogRecordV2 : public NsmSensor
     uint8_t recordReadAttempts = 0;
     uint8_t recordAckAttempts = 0;
     uint16_t nextEventHandle = NO_MORE_HANDLES;
+    uint8_t eventVersion{NSM_EVENT_VERSION};
 };
 
 } // namespace nsm

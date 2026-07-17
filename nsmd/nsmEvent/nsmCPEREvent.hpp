@@ -31,6 +31,7 @@ inline constexpr uint16_t MAX_CPER_RECORD_DATA_SIZE_KB = 16;
 inline constexpr uint16_t MAX_EVENT_HANDLES = 255;
 inline constexpr uint16_t PENDING_HANDLE_VALUE = 0;
 inline constexpr uint16_t NO_MORE_HANDLES = 0xFFFF;
+inline constexpr uint8_t DEFAULT_CPER_FORMAT = 0x00;
 using eventHandles_t = std::queue<uint16_t>;
 class NsmDevice;
 class NsmEventLogRecordV2;
@@ -44,7 +45,7 @@ class NsmCPEREvent : public NsmEvent
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) final;
     void logRecordOnRf(std::vector<uint8_t>& recordChunk, uint8_t returnCode,
-                       uint16_t nextEventHandle);
+                       uint16_t nextEventHandle, uint8_t eventVersion);
 
     void setEventLogRecordChunkCollector(
         std::shared_ptr<NsmEventLogRecordV2> collector);
@@ -56,6 +57,7 @@ class NsmCPEREvent : public NsmEvent
     eventHandles_t eventHandles;
     requester::Coroutine cperRecordLogger();
     std::vector<uint8_t> cperRecordData;
+    uint8_t cperEventFormatVersion{NSM_EVENT_VERSION};
 };
 
 requester::Coroutine createNsmCPEREvent(std::shared_ptr<NsmDevice> nsmDevice,
