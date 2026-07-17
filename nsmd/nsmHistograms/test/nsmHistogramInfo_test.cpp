@@ -614,9 +614,20 @@ TEST(NsmHistogramDataTest, HandleResponseMsg_MismatchedDataType)
         bucketDataBytes.size(), response);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
+    // Data type validation was relaxed: as long as the bucket count matches
+    // and the payload size is valid for the reported data type, the response
+    // is accepted even if it differs from the format's bucket data type.
+    // Values are parsed using the response data type (U16), not the format
+    // type (U32).
     size_t msg_len = responseMsg.size();
     rc = sensor.handleResponseMsg(response, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SUCCESS);
+
+    auto result = bucketInfoIntf->bucketData();
+    ASSERT_EQ(result.size(), numBuckets);
+    EXPECT_EQ(std::get<2>(std::get<1>(result[0])), 10.0);
+    EXPECT_EQ(std::get<2>(std::get<1>(result[1])), 20.0);
+    EXPECT_EQ(std::get<2>(std::get<1>(result[2])), 30.0);
 }
 
 TEST(NsmHistogramDataTest, HandleResponseMsg_CompletionError)

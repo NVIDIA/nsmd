@@ -416,8 +416,6 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
     {
         uint32_t calculatedSize = 0;
         if ((formatIntf->numOfBuckets() != number_of_buckets) ||
-            (formatIntf->bucketDataType() !=
-             getDataTypeEnum(dataTypeOfBucket)) ||
             !checkSizeOfBucketArrayIsValid(total_bucket_data_size,
                                            number_of_buckets, dataTypeOfBucket,
                                            calculatedSize))
@@ -438,7 +436,7 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
         for (size_t i = 0; i < number_of_buckets; i++)
         {
             auto value = getValueFromBucketArray(
-                bucket_data.data(), formatIntf->bucketDataType(), i);
+                bucket_data.data(), getDataTypeEnum(dataTypeOfBucket), i);
             std::get<2>(std::get<1>(bucketData[i])) = value;
         }
         bucketInfoIntf->bucketData(bucketData);
