@@ -124,7 +124,7 @@ inline requester::Coroutine sendSystemConfig(std::shared_ptr<NsmDevice> dev,
                     dynamicData.size());
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
-    auto rc = encode_diag_set_system_config_req(
+    auto rc = encode_nsm_diag_set_system_config_req(
         0, configType, testDuration,
         dynamicData.empty() ? nullptr : dynamicData.data(),
         static_cast<uint8_t>(dynamicData.size()), requestMsg);
@@ -234,7 +234,7 @@ inline requester::Coroutine sendTidConfigs(std::shared_ptr<NsmDevice> dev,
                         sizeof(nsm_diag_set_tid_config_req) - 1 + dynSize);
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
-        auto rc = encode_diag_set_tid_config_req(
+        auto rc = encode_nsm_diag_set_tid_config_req(
             0, tid, testDuration, loops, logLevel, dynSize,
             dynamicData.empty() ? nullptr : dynamicData.data(), requestMsg);
 

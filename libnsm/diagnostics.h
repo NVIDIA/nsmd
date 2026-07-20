@@ -1374,11 +1374,12 @@ int decode_nsm_diag_set_flow_control_event(const struct nsm_msg *msg,
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_diag_set_system_config_req(uint8_t instance_id, uint8_t config_type,
-				      uint8_t system_test_duration,
-				      const uint8_t *dynamic_data,
-				      uint8_t dynamic_data_size,
-				      struct nsm_msg *msg);
+int encode_nsm_diag_set_system_config_req(uint8_t instance_id,
+					  uint8_t config_type,
+					  uint8_t system_test_duration,
+					  const uint8_t *dynamic_data,
+					  uint8_t dynamic_data_size,
+					  struct nsm_msg *msg);
 
 /** @brief Decode a Set Diag System Config request
  *
@@ -1390,11 +1391,11 @@ int encode_diag_set_system_config_req(uint8_t instance_id, uint8_t config_type,
  *  @param[out] dynamic_data - configuration data
  *  @return nsm_completion_codes
  */
-int decode_diag_set_system_config_req(const struct nsm_msg *msg, size_t msg_len,
-				      uint8_t *config_type,
-				      uint8_t *system_test_duration,
-				      uint8_t *dynamic_data_size,
-				      uint8_t *dynamic_data);
+int decode_nsm_diag_set_system_config_req(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *config_type,
+					  uint8_t *system_test_duration,
+					  uint8_t *dynamic_data_size,
+					  uint8_t *dynamic_data);
 
 /** @brief Encode a Set Diag TID Config request (BMC -> CPU)
  *
@@ -1408,12 +1409,10 @@ int decode_diag_set_system_config_req(const struct nsm_msg *msg, size_t msg_len,
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_diag_set_tid_config_req(uint8_t instance_id, uint8_t tid,
-				   uint8_t tid_test_duration, uint16_t loops,
-				   uint8_t console_log_level,
-				   uint8_t dynamic_data_size,
-				   const uint8_t *dynamic_data,
-				   struct nsm_msg *msg);
+int encode_nsm_diag_set_tid_config_req(
+    uint8_t instance_id, uint8_t tid, uint8_t tid_test_duration, uint16_t loops,
+    uint8_t console_log_level, uint8_t dynamic_data_size,
+    const uint8_t *dynamic_data, struct nsm_msg *msg);
 
 /** @brief Decode a Set Diag TID Config request
  *
@@ -1427,11 +1426,10 @@ int encode_diag_set_tid_config_req(uint8_t instance_id, uint8_t tid,
  *  @param[out] dynamic_data - test-specific config data
  *  @return nsm_completion_codes
  */
-int decode_diag_set_tid_config_req(const struct nsm_msg *msg, size_t msg_len,
-				   uint8_t *tid, uint8_t *tid_test_duration,
-				   uint16_t *loops, uint8_t *console_log_level,
-				   uint8_t *dynamic_data_size,
-				   uint8_t *dynamic_data);
+int decode_nsm_diag_set_tid_config_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *tid,
+    uint8_t *tid_test_duration, uint16_t *loops, uint8_t *console_log_level,
+    uint8_t *dynamic_data_size, uint8_t *dynamic_data);
 
 /** @brief Encode a Runtime IST Complete v1 event message.
  *

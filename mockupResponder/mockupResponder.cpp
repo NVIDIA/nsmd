@@ -9784,14 +9784,14 @@ std::optional<std::vector<uint8_t>>
     uint8_t dynamicDataSize = 0;
     uint8_t dynamicData[NSM_DIAG_MAX_DYNAMIC_DATA_SIZE] = {};
 
-    auto rc = decode_diag_set_system_config_req(
+    auto rc = decode_nsm_diag_set_system_config_req(
         requestMsg, requestLen, &configType, &systemTestDuration,
         &dynamicDataSize, dynamicData);
 
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_diag_set_system_config_req failed, rc={RC}", "RC",
-                   rc);
+        lg2::error("decode_nsm_diag_set_system_config_req failed, rc={RC}",
+                   "RC", rc);
         return unsupportedCommandHandler(requestMsg, requestLen);
     }
 
@@ -9847,13 +9847,14 @@ std::optional<std::vector<uint8_t>>
     uint8_t dynamicDataSize = 0;
     uint8_t dynamicData[NSM_DIAG_MAX_DYNAMIC_DATA_SIZE] = {};
 
-    auto rc = decode_diag_set_tid_config_req(
+    auto rc = decode_nsm_diag_set_tid_config_req(
         requestMsg, requestLen, &tid, &tidTestDuration, &loops,
         &consoleLogLevel, &dynamicDataSize, dynamicData);
 
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_diag_set_tid_config_req failed, rc={RC}", "RC", rc);
+        lg2::error("decode_nsm_diag_set_tid_config_req failed, rc={RC}", "RC",
+                   rc);
         return unsupportedCommandHandler(requestMsg, requestLen);
     }
 
