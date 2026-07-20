@@ -1676,6 +1676,14 @@ int decode_diag_set_system_config_req(const struct nsm_msg *msg, size_t msg_len,
 
 	*dynamic_data_size = request->hdr.data_size - fixed_fields_size;
 
+	/* Wire format carries no explicit dynamic size — it is derived from
+	 * hdr.data_size, which can encode up to 253 dynamic bytes while
+	 * callers provide NSM_DIAG_MAX_DYNAMIC_DATA_SIZE-byte buffers.
+	 * Reject anything above the protocol cap before copying. */
+	if (*dynamic_data_size > NSM_DIAG_MAX_DYNAMIC_DATA_SIZE) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	if (*dynamic_data_size > 0) {
 		if (dynamic_data == NULL) {
 			return NSM_SW_ERROR_NULL;
@@ -1769,6 +1777,13 @@ int decode_diag_set_tid_config_req(const struct nsm_msg *msg, size_t msg_len,
 	*loops = le16toh(request->loops);
 	*console_log_level = request->console_log_level;
 	*dynamic_data_size = request->dynamic_data_size;
+
+	/* Same protocol-cap guard as the system-config decoder: the wire
+	 * byte can claim up to 255 dynamic bytes, above both the TID cap
+	 * (244) and typical caller buffers. Reject before copying. */
+	if (*dynamic_data_size > NSM_DIAG_MAX_TID_DYNAMIC_DATA_SIZE) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 
 	if (*dynamic_data_size > 0) {
 		if (dynamic_data == NULL) {

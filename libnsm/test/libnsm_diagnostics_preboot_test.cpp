@@ -770,3 +770,58 @@ TEST(DiagPreBootTest, DecodeSetTidConfigReqNullBufferWithSize)
 					    nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
+
+/* decode_diag_set_system_config_req derives the dynamic size from
+ * hdr.data_size, which can claim up to 253 dynamic bytes — more than the
+ * NSM_DIAG_MAX_DYNAMIC_DATA_SIZE (251) buffer callers provide. A crafted
+ * message must be rejected before any copy. */
+TEST(DiagPreBootTest, DecodeSetSystemConfigReqOversizeDynamicData)
+{
+	/* Message long enough that the wire-level "available" check alone
+	 * would pass; only the protocol cap catches the oversize claim. */
+	std::vector<uint8_t> reqMsg(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_diag_set_system_config_req) - 1 +
+				    UINT8_MAX);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
+
+	int rc = encode_diag_set_system_config_req(5, 0, 0x01, nullptr, 0, msg);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto *request =
+	    reinterpret_cast<struct nsm_diag_set_system_config_req *>(
+		msg->payload);
+	request->hdr.data_size = UINT8_MAX; /* => 253 dynamic bytes */
+
+	uint8_t config_type, duration, dyn_size;
+	uint8_t dyn_data[NSM_DIAG_MAX_DYNAMIC_DATA_SIZE] = {};
+	rc = decode_diag_set_system_config_req(msg, reqMsg.size(), &config_type,
+					       &duration, &dyn_size, dyn_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+/* Same guard for the TID config decoder: the explicit wire byte can claim
+ * up to 255 dynamic bytes, above the NSM_DIAG_MAX_TID_DYNAMIC_DATA_SIZE
+ * (244) cap. */
+TEST(DiagPreBootTest, DecodeSetTidConfigReqOversizeDynamicData)
+{
+	std::vector<uint8_t> reqMsg(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_diag_set_tid_config_req) - 1 +
+				    UINT8_MAX);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
+
+	int rc = encode_diag_set_tid_config_req(5, 0x01, 0x01, 1, 0, 0, nullptr,
+						msg);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto *request = reinterpret_cast<struct nsm_diag_set_tid_config_req *>(
+	    msg->payload);
+	request->dynamic_data_size = UINT8_MAX;
+
+	uint8_t tid, duration, log_level, dyn_size;
+	uint16_t loops;
+	uint8_t dyn_data[NSM_DIAG_MAX_TID_DYNAMIC_DATA_SIZE] = {};
+	rc = decode_diag_set_tid_config_req(msg, reqMsg.size(), &tid, &duration,
+					    &loops, &log_level, &dyn_size,
+					    dyn_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
