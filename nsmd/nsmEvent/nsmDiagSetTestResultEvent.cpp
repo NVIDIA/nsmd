@@ -22,7 +22,6 @@
 #include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
 #include "nsmPreBootDiagStateClient.hpp"
-#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 
 #include <nlohmann/json.hpp>
@@ -31,9 +30,9 @@
 namespace nsm
 {
 
-NsmDiagSetTestResultEvent::NsmDiagSetTestResultEvent(const std::string& name,
-                                                     const std::string& type) :
-    NsmEvent(name, type)
+NsmDiagSetTestResultEvent::NsmDiagSetTestResultEvent(
+    const std::string& name, const std::string& type,
+    std::weak_ptr<NsmDevice> device) : NsmEvent(name, type), device(device)
 {}
 
 int NsmDiagSetTestResultEvent::handle(eid_t eid, NsmType /*type*/,
@@ -47,8 +46,7 @@ int NsmDiagSetTestResultEvent::handle(eid_t eid, NsmType /*type*/,
     uint8_t dynamicDataSize{};
     uint8_t dynamicData[NSM_DIAG_MAX_DYNAMIC_DATA_SIZE]{};
 
-    auto nsmDevice =
-        mctp::MctpDiscovery::getInstance().getNsmDeviceFromEid(eid);
+    auto nsmDevice = device.lock();
 
     auto rc = decode_nsm_diag_set_test_result_event(
         event, eventLen, &eventClass, &eventState, &tid, &testErrorCode,
@@ -115,7 +113,8 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    auto event = std::make_shared<NsmDiagSetTestResultEvent>(name, type);
+    auto event = std::make_shared<NsmDiagSetTestResultEvent>(name, type,
+                                                             nsmDevice);
     nsmDevice->addDeviceEvent(event, NSM_TYPE_DIAGNOSTIC,
                               NSM_DIAG_SET_TEST_RESULT_EVENT);
     lg2::info(

@@ -22,17 +22,22 @@
 namespace nsm
 {
 
+class NsmDevice;
+
 /// Per-device handler for NSM Type 4, Event ID 0x03 (Set Diag Flow Control).
 /// Decodes the heartbeat / completion status and pushes a HeartbeatReceived
 /// or SessionEnded App.Notify to prebootdiag. ACKR=0 per spec §3.2.
 class NsmDiagSetFlowControlEvent : public NsmEvent
 {
   public:
-    NsmDiagSetFlowControlEvent(const std::string& name,
-                               const std::string& type);
+    NsmDiagSetFlowControlEvent(const std::string& name, const std::string& type,
+                               std::weak_ptr<NsmDevice> device);
 
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) final;
+
+  private:
+    std::weak_ptr<NsmDevice> device;
 };
 
 } // namespace nsm

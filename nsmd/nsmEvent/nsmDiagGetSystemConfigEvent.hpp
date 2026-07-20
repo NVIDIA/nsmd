@@ -22,6 +22,8 @@
 namespace nsm
 {
 
+class NsmDevice;
+
 /// Per-device handler for NSM Type 4, Event ID 0x00 (Get Diag System Config).
 /// Decodes the event, ensures the prebootdiag Config endpoint exists for the
 /// device, and pushes a SystemConfigRequested App.Notify to prebootdiag.
@@ -29,10 +31,14 @@ class NsmDiagGetSystemConfigEvent : public NsmEvent
 {
   public:
     NsmDiagGetSystemConfigEvent(const std::string& name,
-                                const std::string& type);
+                                const std::string& type,
+                                std::weak_ptr<NsmDevice> device);
 
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) final;
+
+  private:
+    std::weak_ptr<NsmDevice> device;
 };
 
 } // namespace nsm

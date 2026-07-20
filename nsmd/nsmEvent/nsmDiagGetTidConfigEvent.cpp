@@ -23,7 +23,6 @@
 #include "nsmDevice.hpp"
 #include "nsmPreBootDiagStateClient.hpp"
 #include "nsmProcessor/nsmPreBootDiag.hpp"
-#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 
 #include <nlohmann/json.hpp>
@@ -32,9 +31,9 @@
 namespace nsm
 {
 
-NsmDiagGetTidConfigEvent::NsmDiagGetTidConfigEvent(const std::string& name,
-                                                   const std::string& type) :
-    NsmEvent(name, type)
+NsmDiagGetTidConfigEvent::NsmDiagGetTidConfigEvent(
+    const std::string& name, const std::string& type,
+    std::weak_ptr<NsmDevice> device) : NsmEvent(name, type), device(device)
 {}
 
 int NsmDiagGetTidConfigEvent::handle(eid_t eid, NsmType /*type*/,
@@ -45,8 +44,7 @@ int NsmDiagGetTidConfigEvent::handle(eid_t eid, NsmType /*type*/,
     uint16_t eventState{};
     uint8_t tid{};
 
-    auto nsmDevice =
-        mctp::MctpDiscovery::getInstance().getNsmDeviceFromEid(eid);
+    auto nsmDevice = device.lock();
 
     auto rc = decode_nsm_diag_get_tid_config_event(event, eventLen, &eventClass,
                                                    &eventState, &tid);
@@ -111,7 +109,8 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    auto event = std::make_shared<NsmDiagGetTidConfigEvent>(name, type);
+    auto event = std::make_shared<NsmDiagGetTidConfigEvent>(name, type,
+                                                            nsmDevice);
     nsmDevice->addDeviceEvent(event, NSM_TYPE_DIAGNOSTIC,
                               NSM_DIAG_GET_TID_CONFIG_EVENT);
     lg2::info(
