@@ -3742,6 +3742,8 @@ TEST(getSupportedDeviceModesV2, testBadDecodeResponse)
 // Buffer-overflow guard regression (nvbug 6232725): each decoder must reject
 // a message whose on-wire payload length exceeds the bytes actually present
 // in msg_len, returning NSM_SW_ERROR_LENGTH instead of an out-of-bounds copy.
+// Power-capping Mode (DEVICE_MODE_POWER_CAPPING / POWER_CAPPING_MODE_DATA_SIZE)
+// uses these same v2 codecs.
 // ---------------------------------------------------------------------------
 
 namespace
@@ -3811,7 +3813,8 @@ TEST(LibnsmOverreadGuard, GetDeviceModeSettingsV2Resp)
 TEST(LibnsmOverreadGuard, SetDeviceModeSettingsV2Req)
 {
 	// nsm_common_req: command:1, data_size:1. Oversized data_size at
-	// payload offset 1.
+	// payload offset 1. Exercises the same encode/decode path used by
+	// DEVICE_MODE_POWER_CAPPING (POWER_CAPPING_MODE_DATA_SIZE).
 	std::vector<uint8_t> buf(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) -
 		1,
@@ -3928,4 +3931,164 @@ TEST(lldpModeBitfield, ReservedBitsRoundTrip)
 	EXPECT_EQ(view.rx_mode, NSM_LLDP_DIR_MODE_ALL);
 	EXPECT_EQ(view.dcbx_mode, NSM_LLDP_DCBX_DISABLED);
 	EXPECT_EQ(view.reserved, 7U);
+}
+
+// ---------------------------------------------------------------------------
+// Power Capping Mode (NSM Type 5 Device Mode Index 27, enum8).
+// enum8 {0 Default, 1 Enabled, 2 Disabled}; 1-byte data via the generic v2
+// codec. DGXOPENBMC-27169 / NVBug 6320086.
+// ---------------------------------------------------------------------------
+
+TEST(powerCappingModeV2, enumValues)
+{
+	EXPECT_EQ(DEVICE_MODE_POWER_CAPPING, 27);
+	EXPECT_EQ(NSM_POWER_CAPPING_MODE_DEFAULT, 0);
+	EXPECT_EQ(NSM_POWER_CAPPING_MODE_ENABLED, 1);
+	EXPECT_EQ(NSM_POWER_CAPPING_MODE_DISABLED, 2);
+	EXPECT_EQ(POWER_CAPPING_MODE_DATA_SIZE, 1);
+}
+
+TEST(powerCappingModeV2, setEncodeRequestEnabled)
+{
+	uint32_t device_mode_index = DEVICE_MODE_POWER_CAPPING;
+	uint8_t mode = NSM_POWER_CAPPING_MODE_ENABLED;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
+		POWER_CAPPING_MODE_DATA_SIZE - 1,
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_set_device_mode_settings_v2_req(
+	    0, device_mode_index, &mode, POWER_CAPPING_MODE_DATA_SIZE, request);
+
+	struct nsm_set_device_mode_settings_v2_req *req =
+	    reinterpret_cast<struct nsm_set_device_mode_settings_v2_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SET_DEVICE_MODE_SETTINGS_V2, req->hdr.command);
+	EXPECT_EQ(sizeof(req->device_mode_index) + POWER_CAPPING_MODE_DATA_SIZE,
+		  req->hdr.data_size);
+	EXPECT_EQ(device_mode_index, le32toh(req->device_mode_index));
+}
+
+TEST(powerCappingModeV2, setDecodeRequestDisabled)
+{
+	uint32_t device_mode_index = DEVICE_MODE_POWER_CAPPING;
+	uint8_t mode = NSM_POWER_CAPPING_MODE_DISABLED;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
+		POWER_CAPPING_MODE_DATA_SIZE - 1,
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	encode_set_device_mode_settings_v2_req(
+	    0, device_mode_index, &mode, POWER_CAPPING_MODE_DATA_SIZE, request);
+
+	uint32_t decoded_index = 0;
+	uint8_t decoded_data[POWER_CAPPING_MODE_DATA_SIZE] = {0};
+	uint16_t decoded_data_length = 0;
+
+	auto rc = decode_set_device_mode_settings_v2_req(
+	    request, requestMsg.size(), &decoded_index, decoded_data,
+	    &decoded_data_length);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(device_mode_index, decoded_index);
+	EXPECT_EQ(POWER_CAPPING_MODE_DATA_SIZE, decoded_data_length);
+	EXPECT_EQ(NSM_POWER_CAPPING_MODE_DISABLED, decoded_data[0]);
+}
+
+TEST(powerCappingModeV2, getEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_device_mode_settings_v2_req(
+	    0, DEVICE_MODE_POWER_CAPPING, request);
+
+	uint32_t decoded_index = 0;
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(decode_get_device_mode_settings_v2_req(
+		      request, requestMsg.size(), &decoded_index),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(DEVICE_MODE_POWER_CAPPING, decoded_index);
+}
+
+TEST(powerCappingModeV2, supportedListIncludesIndex27)
+{
+	const uint16_t handle = 0x0000;
+	const uint16_t mode_count = 2;
+	const uint32_t mode_list[] = {DEVICE_MODE_LLDP,
+				      DEVICE_MODE_POWER_CAPPING};
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_device_modes_resp) +
+		(mode_count - 1) * sizeof(uint32_t),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	ASSERT_EQ(encode_get_supported_device_modes_resp(
+		      0, NSM_SUCCESS, ERR_NULL, handle, mode_count, mode_list,
+		      response),
+		  NSM_SW_SUCCESS);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	uint16_t decoded_handle = 0;
+	uint16_t decoded_mode_count = 0;
+	uint32_t decoded_mode_list[2] = {0};
+
+	ASSERT_EQ(decode_get_supported_device_modes_resp(
+		      response, responseMsg.size(), &cc, &reason_code,
+		      &decoded_handle, &decoded_mode_count, decoded_mode_list),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(mode_count, decoded_mode_count);
+
+	bool found = false;
+	for (uint16_t i = 0; i < decoded_mode_count; i++) {
+		if (decoded_mode_list[i] == DEVICE_MODE_POWER_CAPPING) {
+			found = true;
+		}
+	}
+	EXPECT_TRUE(found);
+}
+
+TEST(powerCappingModeV2, setEncodeRejectsNullDataWithLength)
+{
+	/* Bounds guard: encode must fail when length > 0 but data pointer is
+	 * null. */
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
+		POWER_CAPPING_MODE_DATA_SIZE - 1,
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_set_device_mode_settings_v2_req(
+	    0, DEVICE_MODE_POWER_CAPPING, nullptr, POWER_CAPPING_MODE_DATA_SIZE,
+	    request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(powerCappingModeV2, getDecodeRejectsTruncatedResponse)
+{
+	/* Oversized-buffer / truncated-response regression for the shared v2
+	 * codec used by index 27: msg_len shorter than the fixed header must
+	 * fail. */
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 4, 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	uint8_t current_mode = 0;
+	uint8_t pending_mode = 0;
+	uint16_t current_len = 0;
+	uint16_t pending_len = 0;
+	auto rc = decode_get_device_mode_settings_v2_resp(
+	    response, responseMsg.size(), &cc, &reason_code, &current_mode,
+	    &current_len, &pending_mode, &pending_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

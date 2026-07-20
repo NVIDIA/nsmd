@@ -35,6 +35,8 @@
 
 #include <CLI/CLI.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -2012,6 +2014,223 @@ class SetLLDPMode : public CommandInterface
     uint8_t dcbxMode{0};
 };
 
+/**
+ * Human-readable NSM Type 5 Device Mode Index 27 (Power Capping Mode) enum8.
+ */
+namespace
+{
+inline std::string powerCappingModeToString(uint8_t value)
+{
+    switch (value)
+    {
+        case NSM_POWER_CAPPING_MODE_DEFAULT:
+            return "Default";
+        case NSM_POWER_CAPPING_MODE_ENABLED:
+            return "Enabled";
+        case NSM_POWER_CAPPING_MODE_DISABLED:
+            return "Disabled";
+        default:
+            return "Unknown(" + std::to_string(static_cast<int>(value)) + ")";
+    }
+}
+
+inline std::string powerCappingModeFromGetWireToString(uint8_t value)
+{
+    switch (value)
+    {
+        case NSM_POWER_CAPPING_MODE_ENABLED:
+            return "Enabled";
+        case NSM_POWER_CAPPING_MODE_DISABLED:
+            return "Disabled";
+        case NSM_POWER_CAPPING_MODE_DEFAULT:
+            return "Default";
+        default:
+            return "Unknown(" + std::to_string(static_cast<int>(value)) + ")";
+    }
+}
+} // namespace
+
+/**
+ * config subcommands targeting NSM Type 5 DEVICE_MODE_POWER_CAPPING (index 27)
+ * so the power-capping enable/disable mode can be read/set without hand-rolling
+ * a raw Get/Set Device Mode Settings v2 command.
+ */
+class GetPowerCappingMode : public CommandInterface
+{
+  public:
+    ~GetPowerCappingMode() = default;
+    GetPowerCappingMode() = delete;
+    GetPowerCappingMode(const GetPowerCappingMode&) = delete;
+    GetPowerCappingMode(GetPowerCappingMode&&) = default;
+    GetPowerCappingMode& operator=(const GetPowerCappingMode&) = delete;
+    GetPowerCappingMode& operator=(GetPowerCappingMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPowerCappingMode(const char* type, const char* name,
+                                 CLI::App* app) :
+        CommandInterface(type, name, app)
+    {}
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req),
+            0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_device_mode_settings_v2_req(
+            instanceId, static_cast<uint32_t>(DEVICE_MODE_POWER_CAPPING),
+            request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        uint8_t currentData[POWER_CAPPING_MODE_DATA_SIZE] = {};
+        uint8_t pendingData[POWER_CAPPING_MODE_DATA_SIZE] = {};
+        uint16_t currentLength = 0;
+        uint16_t pendingLength = 0;
+
+        /* Probe lengths first: reject oversized mode payloads before decode
+         * copies into the fixed POWER_CAPPING_MODE_DATA_SIZE stack buffers. */
+        auto rc = decode_get_device_mode_settings_v2_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, nullptr,
+            &currentLength, nullptr, &pendingLength);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+        if (currentLength > POWER_CAPPING_MODE_DATA_SIZE ||
+            pendingLength > POWER_CAPPING_MODE_DATA_SIZE)
+        {
+            std::cerr << "Power capping mode payload too large: current="
+                      << currentLength << " pending=" << pendingLength
+                      << " (max " << POWER_CAPPING_MODE_DATA_SIZE << ")\n";
+            return;
+        }
+        rc = decode_get_device_mode_settings_v2_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, currentData,
+            &currentLength, pendingData, &pendingLength);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+        ordered_json result;
+        result["Completion Code"] = cc;
+        if (currentLength == POWER_CAPPING_MODE_DATA_SIZE)
+        {
+            result["CurrentMode"] =
+                powerCappingModeFromGetWireToString(currentData[0]);
+        }
+        if (pendingLength == POWER_CAPPING_MODE_DATA_SIZE)
+        {
+            result["PendingMode"] =
+                powerCappingModeFromGetWireToString(pendingData[0]);
+        }
+        if (currentLength == POWER_CAPPING_MODE_DATA_SIZE &&
+            pendingLength == POWER_CAPPING_MODE_DATA_SIZE)
+        {
+            result["ResetRequired"] = (pendingData[0] != currentData[0]);
+        }
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
+class SetPowerCappingMode : public CommandInterface
+{
+  public:
+    ~SetPowerCappingMode() = default;
+    SetPowerCappingMode() = delete;
+    SetPowerCappingMode(const SetPowerCappingMode&) = delete;
+    SetPowerCappingMode(SetPowerCappingMode&&) = default;
+    SetPowerCappingMode& operator=(const SetPowerCappingMode&) = delete;
+    SetPowerCappingMode& operator=(SetPowerCappingMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetPowerCappingMode(const char* type, const char* name,
+                                 CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto g = app->add_option_group(
+            "Required",
+            "Set Power Capping Mode (NSM Type 5 idx 27): Default | Enabled | Disabled");
+        g->add_option("-M, --mode", modeStr,
+                      "Power capping mode: Default, Enabled, or Disabled");
+        g->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        uint8_t mode = 0;
+        std::string m = modeStr;
+        std::transform(m.begin(), m.end(), m.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (m == "default" || m == "0")
+        {
+            mode = NSM_POWER_CAPPING_MODE_DEFAULT;
+        }
+        else if (m == "enabled" || m == "enable" || m == "1")
+        {
+            mode = NSM_POWER_CAPPING_MODE_ENABLED;
+        }
+        else if (m == "disabled" || m == "disable" || m == "2")
+        {
+            mode = NSM_POWER_CAPPING_MODE_DISABLED;
+        }
+        else
+        {
+            std::cerr << "Invalid mode '" << modeStr
+                      << "' (expected Default, Enabled, or Disabled)\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) +
+                POWER_CAPPING_MODE_DATA_SIZE - 1,
+            0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_device_mode_settings_v2_req(
+            instanceId, static_cast<uint32_t>(DEVICE_MODE_POWER_CAPPING), &mode,
+            POWER_CAPPING_MODE_DATA_SIZE, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        auto rc = decode_set_device_mode_settings_v2_resp(
+            responsePtr, payloadLength, &cc, &reasonCode);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response error: rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Note"] =
+            "Non-volatile; new mode applies after the next device reset.";
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    std::string modeStr{};
+};
+
 void registerCommand(CLI::App& app)
 {
     auto config = app.add_subcommand("config",
@@ -2143,6 +2362,16 @@ void registerCommand(CLI::App& app)
         "SetLLDPMode", "Set LLDP mode bitfield (NSM Type 5 idx 24)");
     commands.push_back(
         std::make_unique<SetLLDPMode>("config", "SetLLDPMode", setLldpMode));
+
+    auto getPowerCappingMode = config->add_subcommand(
+        "GetPowerCappingMode", "Get power capping mode (NSM Type 5 idx 27)");
+    commands.push_back(std::make_unique<GetPowerCappingMode>(
+        "config", "GetPowerCappingMode", getPowerCappingMode));
+
+    auto setPowerCappingMode = config->add_subcommand(
+        "SetPowerCappingMode", "Set power capping mode (NSM Type 5 idx 27)");
+    commands.push_back(std::make_unique<SetPowerCappingMode>(
+        "config", "SetPowerCappingMode", setPowerCappingMode));
 }
 
 } // namespace config

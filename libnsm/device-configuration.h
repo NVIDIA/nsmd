@@ -607,6 +607,7 @@ enum device_mode_index {
 	DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT = 16,
 	DEVICE_MODE_ADAPTIVE_TGPMODE = 21,
 	DEVICE_MODE_LLDP = 24,
+	DEVICE_MODE_POWER_CAPPING = 27,
 };
 
 /** @brief AdaptiveTGPMode (Dual Part Number) data byte values per NSM Type 5
@@ -616,6 +617,19 @@ enum nsm_adaptive_tgpmode {
 	NSM_ADAPTIVE_TGPMODE_DISABLED = 0,
 	NSM_ADAPTIVE_TGPMODE_ENABLED = 1,
 };
+
+/** @brief Power Capping Mode values per NSM Type 5 Device Mode Index 27.
+ *         Single enum8 data byte. Non-volatile; requires a device reset to
+ *         take effect.
+ */
+enum nsm_power_capping_mode {
+	NSM_POWER_CAPPING_MODE_DEFAULT = 0,
+	NSM_POWER_CAPPING_MODE_ENABLED = 1,
+	NSM_POWER_CAPPING_MODE_DISABLED = 2,
+};
+
+/** @brief Data size (in bytes) of the Power Capping Mode (index 27) payload. */
+#define POWER_CAPPING_MODE_DATA_SIZE 1
 
 /** @brief LLDP TX/RX sub-mode values per NSM Type 5 Device Mode Index 24
  *         Bits 0:1 (TX) and 2:3 (RX) of the data byte.

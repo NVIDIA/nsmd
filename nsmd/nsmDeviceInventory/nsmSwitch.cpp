@@ -717,6 +717,252 @@ inline void createNsmSwitchL1PredictionMode(std::shared_ptr<NsmDevice> device,
                                                      device});
 }
 
+// Map NSM wire enum8 to PowerCapMode. Wire Default (0) is resolved to Enabled
+// at D-Bus publish time per the power-capping contract.
+static std::optional<PowerCapMode> toPowerCapModeFromGet(uint8_t nsmMode)
+{
+    switch (nsmMode)
+    {
+        case NSM_POWER_CAPPING_MODE_ENABLED:
+            return PowerCapMode::Enabled;
+        case NSM_POWER_CAPPING_MODE_DISABLED:
+            return PowerCapMode::Disabled;
+        case NSM_POWER_CAPPING_MODE_DEFAULT:
+            return PowerCapMode::Default;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmSwitchPowerCappingMode::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_device_mode_settings_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_device_mode_settings_v2_req(
+        instanceId, DEVICE_MODE_POWER_CAPPING, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug("encode_get_device_mode_settings_v2_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmSwitchPowerCappingMode::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint8_t currentMode = 0;
+    uint8_t pendingMode = 0;
+    uint16_t currentModeLength = 0;
+    uint16_t pendingModeLength = 0;
+
+    /* Probe lengths with null data pointers so decode cannot overflow the
+     * 1-byte mode buffers below on a malformed oversized payload. */
+    auto rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reason_code, nullptr,
+        &currentModeLength, nullptr, &pendingModeLength);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+    if (currentModeLength != POWER_CAPPING_MODE_DATA_SIZE ||
+        (pendingModeLength != 0 &&
+         pendingModeLength != POWER_CAPPING_MODE_DATA_SIZE))
+    {
+        return NSM_SW_ERROR_LENGTH;
+    }
+
+    rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reason_code, &currentMode,
+        &currentModeLength, &pendingMode, &pendingModeLength);
+
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        if (currentModeLength != POWER_CAPPING_MODE_DATA_SIZE)
+        {
+            return NSM_SW_ERROR_LENGTH;
+        }
+        auto current = toPowerCapModeFromGet(currentMode);
+        if (!current)
+        {
+            return NSM_SW_ERROR_DATA;
+        }
+        // Resolve wire Default (0) to Enabled for D-Bus publish per contract
+        PowerCapMode currentResolved = (*current == PowerCapMode::Default)
+                                           ? PowerCapMode::Enabled
+                                           : *current;
+        powerCappingModeIntf->currentMode(currentResolved);
+
+        if (pendingModeLength != 0 &&
+            pendingModeLength != POWER_CAPPING_MODE_DATA_SIZE)
+        {
+            return NSM_SW_ERROR_LENGTH;
+        }
+        if (pendingModeLength == POWER_CAPPING_MODE_DATA_SIZE)
+        {
+            auto pending = toPowerCapModeFromGet(pendingMode);
+            if (!pending)
+            {
+                return NSM_SW_ERROR_DATA;
+            }
+            PowerCapMode pendingResolved = (*pending == PowerCapMode::Default)
+                                               ? PowerCapMode::Enabled
+                                               : *pending;
+            powerCappingModeIntf->pendingMode(pendingResolved);
+        }
+        else
+        {
+            // No pending override from device; keep Settings in sync.
+            powerCappingModeIntf->pendingMode(currentResolved);
+        }
+    }
+    return cc ? cc : rc;
+}
+
+requester::Coroutine NsmSwitchPowerCappingMode::setPowerCappingMode(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const std::string* requested = std::get_if<std::string>(&value);
+    if (!requested)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    auto eid = device->getEid();
+    auto mode =
+        PowerCappingModeServer::convertPowerCapModeFromString(*requested);
+
+    uint8_t data = 0;
+    if (mode == PowerCapMode::Default)
+    {
+        data = NSM_POWER_CAPPING_MODE_DEFAULT;
+    }
+    else if (mode == PowerCapMode::Enabled)
+    {
+        data = NSM_POWER_CAPPING_MODE_ENABLED;
+    }
+    else if (mode == PowerCapMode::Disabled)
+    {
+        data = NSM_POWER_CAPPING_MODE_DISABLED;
+    }
+    else
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    if (!powerCappingModeIntf->isModeConfigurable())
+    {
+        *status = AsyncOperationStatusType::Unavailable;
+        throw sdbusplus::error::xyz::openbmc_project::common::NotAllowed{};
+    }
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_device_mode_settings_v2_req) +
+                    POWER_CAPPING_MODE_DATA_SIZE - 1);
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    auto rc = encode_set_device_mode_settings_v2_req(
+        0, DEVICE_MODE_POWER_CAPPING, &data, POWER_CAPPING_MODE_DATA_SIZE,
+        requestMsg);
+    if (shouldLog("setPowerCappingMode encode", uint16_t(0), uint8_t(0), rc))
+    {
+        lg2::error("Encoding power capping mode failed. eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+    }
+    if (rc)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
+    if (shouldLog("setPowerCappingMode postPatchIO", uint16_t(0), uint8_t(0),
+                  rc_))
+    {
+        lg2::error("Setting power capping mode failed. eid={EID} rc={RC}",
+                   "EID", eid, "RC", utils::nsmSwCodeToString(rc_));
+    }
+    if (rc_)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_set_device_mode_settings_v2_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reason_code);
+    if (shouldLog("setPowerCappingMode response", reason_code, cc, rc))
+    {
+        lg2::error(
+            "Setting power capping mode returned an error. eid={EID} cc={CC} reasonCode={REASON} rc={RC}",
+            "EID", eid, "CC", cc, "REASON", reason_code, "RC", rc);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        powerCappingModeIntf->pendingMode(
+            mode == PowerCapMode::Default ? PowerCapMode::Enabled : mode);
+    }
+    else
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
+inline void createNsmSwitchPowerCappingMode(std::shared_ptr<NsmDevice> device,
+                                            sdbusplus::bus_t& bus,
+                                            const std::string& objPath,
+                                            const std::string& type,
+                                            const std::string& name)
+{
+    auto dbusObjPath = objPath + name + "/Oem/Nvidia/PowerCappingMode";
+    std::vector<utils::Association> associations{
+        {"parent_switch", "power_capping_mode", objPath + name}};
+    auto powerCappingModeAssociationIntf =
+        std::make_unique<AssociationDefinitionsInft>(bus, dbusObjPath.c_str());
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    for (const auto& association : associations)
+    {
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
+    }
+    powerCappingModeAssociationIntf->associations(associationsList);
+
+    auto powerCappingModeIntf =
+        std::make_shared<PowerCappingModeIntf>(bus, dbusObjPath.c_str());
+    powerCappingModeIntf->currentMode(PowerCapMode::Enabled);
+    powerCappingModeIntf->pendingMode(PowerCapMode::Enabled);
+    powerCappingModeIntf->isModeConfigurable(true);
+    auto nvSwitchPowerCappingMode = std::make_shared<NsmSwitchPowerCappingMode>(
+        name, type, powerCappingModeIntf,
+        std::move(powerCappingModeAssociationIntf));
+    device->addSensor(nvSwitchPowerCappingMode, false);
+
+    nsm::AsyncSetOperationHandler setPowerCappingModeHandler =
+        std::bind(&NsmSwitchPowerCappingMode::setPowerCappingMode,
+                  nvSwitchPowerCappingMode, std::placeholders::_1,
+                  std::placeholders::_2, std::placeholders::_3);
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(dbusObjPath)
+        ->addAsyncSetOperation(
+            std::string(PowerCappingModeServer::interface), "PendingMode",
+            AsyncSetOperationInfo{setPowerCappingModeHandler,
+                                  nvSwitchPowerCappingMode, device});
+}
+
 requester::Coroutine createNsmSwitchDI(SensorManager& manager,
                                        const std::string& interface,
                                        const std::string& objPath)
@@ -793,6 +1039,23 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         if (SupportL1PredictionMode)
         {
             createNsmSwitchL1PredictionMode(device, bus, inventoryObjPath, type,
+                                            name);
+        }
+
+        // An absent support property means the mode is not exposed. Read it
+        // from the cached base properties so absence needs no D-Bus fetch.
+        bool supportPowerCappingMode = false;
+        auto powerCappingModeProperty =
+            allBaseIfaceProperties.find("SupportPowerCappingMode");
+        if (powerCappingModeProperty != allBaseIfaceProperties.end())
+        {
+            const bool* value =
+                std::get_if<bool>(&powerCappingModeProperty->second);
+            supportPowerCappingMode = value != nullptr && *value;
+        }
+        if (supportPowerCappingMode)
+        {
+            createNsmSwitchPowerCappingMode(device, bus, inventoryObjPath, type,
                                             name);
         }
 
