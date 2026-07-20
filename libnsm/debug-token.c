@@ -155,6 +155,12 @@ int decode_nsm_provide_token_req(const struct nsm_msg *msg, size_t msg_len,
 	if (request->hdr.data_size == 0) {
 		return NSM_SW_ERROR_DATA;
 	}
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_provide_token_req, token_data) +
+		(size_t)request->hdr.data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(token_data, request->token_data, request->hdr.data_size);
 	*token_data_len = request->hdr.data_size;
 
@@ -515,6 +521,12 @@ int decode_nsm_query_device_ids_resp(const struct nsm_msg *msg, size_t msg_len,
 	struct nsm_query_device_ids_resp *resp =
 	    (struct nsm_query_device_ids_resp *)msg->payload;
 	*device_id_len = le16toh(resp->hdr.data_size);
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_query_device_ids_resp, data) +
+		(size_t)*device_id_len >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	if (device_id != NULL) {
 		memcpy(device_id, resp->data, *device_id_len);
 	}
@@ -586,6 +598,12 @@ int decode_nsm_install_token_req(const struct nsm_msg *msg, size_t msg_len,
 	    sizeof(request->chunk_offset) + sizeof(request->chunk_length) +
 	    sizeof(request->length_remaining) + *chunk_length;
 	if (request->hdr.data_size != expected_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_install_token_req, data) +
+		(size_t)*chunk_length >
+	    msg_len) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 	if (data != NULL) {
@@ -832,6 +850,12 @@ int decode_nsm_query_token_resp(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_DATA;
 	}
 	*tlv_payload_len = resp->hdr.data_size;
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_query_token_resp, tlv_payload) +
+		(size_t)*tlv_payload_len >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	if (tlv_payload != NULL) {
 		memcpy(tlv_payload, resp->tlv_payload, *tlv_payload_len);
 	}

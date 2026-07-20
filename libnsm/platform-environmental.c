@@ -480,6 +480,13 @@ int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 	    (struct nsm_get_inventory_information_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_inventory_information_resp,
+			 inventory_information) +
+		(size_t)*data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(inventory_information, resp->inventory_information, *data_size);
 
 	return NSM_SW_SUCCESS;
@@ -1148,9 +1155,22 @@ int decode_get_driver_info_resp(const struct nsm_msg *msg, size_t msg_len,
 	struct nsm_get_driver_info_resp *response =
 	    (struct nsm_get_driver_info_resp *)msg->payload;
 	size_t data_size = le16toh(response->hdr.data_size);
+	// Require at least one driver_version byte in addition to driver_state:
+	// data_size == sizeof(driver_state) would make driver_version_length 0
+	// and underflow the driver_version[length - 1] terminator check below.
+	if (data_size <= sizeof(response->driver_state)) {
+		return NSM_SW_ERROR_DATA;
+	}
 	*driver_state = response->driver_state;
 	size_t driver_version_length =
 	    data_size - sizeof(response->driver_state);
+
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_driver_info_resp, driver_version) +
+		driver_version_length >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 
 	if (driver_version_length > MAX_VERSION_STRING_SIZE ||
 	    response->driver_version[driver_version_length - 1] != '\0') {
@@ -4145,6 +4165,13 @@ int decode_get_supported_gpm_metrics_resp(
 	}
 	*supported_metrics_bitmask_size = data_size - min_data_size;
 
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_supported_gpm_metrics_resp,
+			 supported_metrics_bitmask) +
+		(size_t)*supported_metrics_bitmask_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(supported_metrics_bitmask, resp->supported_metrics_bitmask,
 	       *supported_metrics_bitmask_size);
 

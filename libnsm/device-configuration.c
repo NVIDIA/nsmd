@@ -1250,11 +1250,9 @@ int encode_get_fpga_diagnostics_settings_resp(uint8_t instance_id, uint8_t cc,
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_fpga_diagnostics_settings_resp(const struct nsm_msg *msg,
-					      size_t msg_len, uint8_t *cc,
-					      uint16_t *data_size,
-					      uint16_t *reason_code,
-					      uint8_t *data)
+int decode_get_fpga_diagnostics_settings_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, uint8_t *data, size_t data_size_max)
 {
 	if (msg == NULL || cc == NULL || data_size == NULL ||
 	    reason_code == NULL || data == NULL) {
@@ -1275,6 +1273,15 @@ int decode_get_fpga_diagnostics_settings_resp(const struct nsm_msg *msg,
 	    (struct nsm_get_fpga_diagnostics_settings_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_fpga_diagnostics_settings_resp, data) +
+		(size_t)*data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if ((size_t)*data_size > data_size_max) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(data, resp->data, *data_size);
 	return NSM_SW_SUCCESS;
 }
@@ -1295,7 +1302,8 @@ int decode_get_fpga_diagnostics_settings_wp_resp(
 {
 	uint16_t data_size = 0;
 	int ret = decode_get_fpga_diagnostics_settings_resp(
-	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)data);
+	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)data,
+	    sizeof(struct nsm_fpga_diagnostics_settings_wp));
 	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
 		return ret;
 	if (data_size < sizeof(struct nsm_fpga_diagnostics_settings_wp))
@@ -1319,7 +1327,8 @@ int decode_get_fpga_diagnostics_settings_wp_jumper_resp(
 {
 	uint16_t data_size = 0;
 	int ret = decode_get_fpga_diagnostics_settings_resp(
-	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)data);
+	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)data,
+	    sizeof(struct nsm_fpga_diagnostics_settings_wp_jumper));
 	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
 		return ret;
 	if (data_size < sizeof(struct nsm_fpga_diagnostics_settings_wp_jumper))
@@ -1345,7 +1354,7 @@ int decode_get_power_supply_status_resp(const struct nsm_msg *msg,
 	uint16_t data_size = 0;
 	int ret = decode_get_fpga_diagnostics_settings_resp(
 	    msg, msg_len, cc, &data_size, reason_code,
-	    (uint8_t *)power_supply_status);
+	    (uint8_t *)power_supply_status, sizeof(uint8_t));
 	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
 		return ret;
 	if (data_size < sizeof(uint8_t))
@@ -1367,7 +1376,8 @@ int decode_get_gpu_presence_resp(const struct nsm_msg *msg, size_t msg_len,
 {
 	uint16_t data_size = 0;
 	int ret = decode_get_fpga_diagnostics_settings_resp(
-	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)presence);
+	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)presence,
+	    sizeof(uint8_t));
 	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
 		return ret;
 	if (data_size < sizeof(uint8_t))
@@ -1389,7 +1399,8 @@ int decode_get_gpu_power_status_resp(const struct nsm_msg *msg, size_t msg_len,
 {
 	uint16_t data_size = 0;
 	int ret = decode_get_fpga_diagnostics_settings_resp(
-	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)power_status);
+	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)power_status,
+	    sizeof(uint8_t));
 	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
 		return ret;
 	if (data_size < sizeof(uint8_t))
@@ -1411,7 +1422,7 @@ int decode_get_gpu_ist_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 {
 	uint16_t data_size = 0;
 	int ret = decode_get_fpga_diagnostics_settings_resp(
-	    msg, msg_len, cc, &data_size, reason_code, mode);
+	    msg, msg_len, cc, &data_size, reason_code, mode, sizeof(uint8_t));
 	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
 		return ret;
 	if (data_size < sizeof(uint8_t))
@@ -2317,6 +2328,14 @@ int decode_get_device_mode_settings_v2_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_LENGTH;
 	}
 
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_device_mode_settings_v2_resp,
+			 mode_data) +
+		(size_t)*current_mode_length + (size_t)*pending_mode_length >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	if (*current_mode_length > 0 && current_mode_data != NULL) {
 		memcpy(current_mode_data, resp->mode_data,
 		       *current_mode_length);
@@ -2391,6 +2410,14 @@ int decode_set_device_mode_settings_v2_req(const struct nsm_msg *msg,
 	*device_mode_index = le32toh(request->device_mode_index);
 	*device_mode_data_length =
 	    request->hdr.data_size - sizeof(request->device_mode_index);
+
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_set_device_mode_settings_v2_req,
+			 device_mode_data) +
+		(size_t)*device_mode_data_length >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 
 	if (*device_mode_data_length > 0 && device_mode_data != NULL) {
 		memcpy(device_mode_data, request->device_mode_data,

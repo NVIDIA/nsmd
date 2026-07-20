@@ -17,6 +17,7 @@
 
 #include "base.h"
 #include "pci-links.h"
+#include <cstddef>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -2507,6 +2508,56 @@ TEST(QueryAvailableAndClearableScalarDataSource, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
+// Regression (Glasswing V18): mask_length is within the destination bound
+// (2 <= NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE) and data_size is self-
+// consistent, so both DATA guards pass and only the msg_len guard can fire.
+// A response truncated by one mask byte must be rejected before the copy
+// loops read past the buffer -- the realistic truncated-response attack.
+TEST(QueryAvailableAndClearableScalarDataSource, testTruncatedMaskMsgLen)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES, // command
+	    0, // completion code
+	    0, // reserved
+	    0, // reserved
+	    5,
+	    0,	// data size = 1 + 2 * mask_length (self-consistent)
+	    2,	// mask length (<= NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE)
+	    25, // available data source
+	    95, // available data source
+	    35, // clearable data source
+	    75	// clearable data source
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint8_t mask_length;
+	bitfield8_t available_source[2];
+	bitfield8_t clearable_source[2];
+
+	// One byte short of the 2 * mask_length mask bytes the copy needs.
+	auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, responseMsg.size() - 1, &cc, &data_size, &reason_code,
+	    &mask_length, (uint8_t *)available_source,
+	    (uint8_t *)clearable_source);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// The full-length response still decodes (no happy-path regression).
+	rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, responseMsg.size(), &cc, &data_size, &reason_code,
+	    &mask_length, (uint8_t *)available_source,
+	    (uint8_t *)clearable_source);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
 TEST(ListAvailablePciePorts, testRequest)
 {
 	testEncodeCommonRequest(&encode_list_available_pcie_ports_req,
@@ -3852,3 +3903,123 @@ TEST(queryVectorGroupTelemetryV2Group1, testBadDecodeResponse)
 	    response, msg_len, &cc, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 } */
+
+// ---------------------------------------------------------------------------
+// Glasswing re-scan regression: wire length/count must be bounded against the
+// destination and msg_len before copy (stack-overflow / OOB guards).
+// ---------------------------------------------------------------------------
+namespace
+{
+constexpr size_t kPcRespDsOff =
+    sizeof(nsm_msg_hdr) + offsetof(nsm_common_resp, data_size);
+void pcU16(std::vector<uint8_t> &b, size_t o, uint16_t v)
+{
+	b[o] = v & 0xFF;
+	b[o + 1] = v >> 8;
+}
+const nsm_msg *pcMsg(const std::vector<uint8_t> &b)
+{
+	return reinterpret_cast<const nsm_msg *>(b.data());
+}
+} // namespace
+
+TEST(PciLinksOverflowGuard, VectorGroup1_OversizedDataSizeRejected)
+{
+	// data_size=64 => cnt=16 uint32s into a 4-byte group-1 buffer; must be
+	// rejected before the copy (stack overflow otherwise).
+	const size_t off =
+	    offsetof(nsm_query_vector_data_sources_v2_resp, data_values);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 64, 0);
+	pcU16(b, kPcRespDsOff, 64);
+	uint8_t cc = 0;
+	uint16_t rc = 0;
+	nsm_query_vector_group_1_data d{};
+	EXPECT_EQ(decode_query_vector_group_telemetry_v2_group1_resp(
+		      pcMsg(b), b.size(), &cc, &rc, &d),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(PciLinksOverflowGuard, VectorGroup1_WellFormedAccepted)
+{
+	const size_t off =
+	    offsetof(nsm_query_vector_data_sources_v2_resp, data_values);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4, 0);
+	pcU16(b, kPcRespDsOff, sizeof(nsm_query_vector_group_1_data));
+	uint8_t cc = 0;
+	uint16_t rc = 0;
+	nsm_query_vector_group_1_data d{};
+	EXPECT_EQ(decode_query_vector_group_telemetry_v2_group1_resp(
+		      pcMsg(b), b.size(), &cc, &rc, &d),
+		  NSM_SW_SUCCESS);
+}
+
+// Regression (Glasswing V17): the group-1 wrapper's fixed-size preamble
+// (sizeof(nsm_query_vector_data_sources_v2_resp) already covers the single
+// data_values[1]) subsumes the inner msg_len guard for group 1, so that guard
+// can only fire when the wire data_size is LARGER than the fixed struct.
+// Exercise it on the generic decoder directly: a declared data_size of two
+// uint32s with the response truncated by one byte passes the fixed-size
+// preamble but must be rejected before the copy walks off the buffer.
+TEST(PciLinksOverflowGuard, VectorGenericDecoderTruncatedMsgLenRejected)
+{
+	const size_t off =
+	    offsetof(nsm_query_vector_data_sources_v2_resp, data_values);
+	const uint16_t declaredDataSize = 8; // two uint32s (> data_values[1])
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + declaredDataSize, 0);
+	pcU16(b, kPcRespDsOff, declaredDataSize);
+	uint8_t cc = 0;
+	uint16_t rc = 0;
+	uint16_t dataSize = 0;
+	uint32_t dst[2] = {};
+
+	// One byte short of the declared data_values: passes the fixed-size
+	// preamble (>= hdr + sizeof(resp)) but must trip the inner msg_len
+	// guard before the copy loop.
+	EXPECT_EQ(
+	    decode_query_vector_group_telemetry_v2_resp(
+		pcMsg(b), b.size() - 1, &cc, &dataSize, &rc, (uint8_t *)dst),
+	    NSM_SW_ERROR_LENGTH);
+
+	// Full-length response still decodes (no happy-path regression).
+	EXPECT_EQ(decode_query_vector_group_telemetry_v2_resp(
+		      pcMsg(b), b.size(), &cc, &dataSize, &rc, (uint8_t *)dst),
+		  NSM_SW_SUCCESS);
+}
+
+TEST(PciLinksOverflowGuard, ScalarMaskLengthTooLargeRejected)
+{
+	const size_t off = offsetof(
+	    nsm_query_available_clearable_scalar_data_sources_v1_resp, data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 600, 0);
+	pcU16(b, kPcRespDsOff, 1 + 2 * 255);
+	b[sizeof(nsm_msg_hdr) +
+	  offsetof(nsm_query_available_clearable_scalar_data_sources_v1_resp,
+		   mask_length)] = 255;
+	uint8_t cc = 0, ml = 0;
+	uint16_t rc = 0, ds = 0;
+	uint8_t a[NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE] = {0};
+	uint8_t c[NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE] = {0};
+	EXPECT_EQ(decode_query_available_clearable_scalar_data_sources_v1_resp(
+		      pcMsg(b), b.size(), &cc, &ds, &rc, &ml, a, c),
+		  NSM_SW_ERROR_DATA);
+}
+
+TEST(PciLinksOverflowGuard, ScalarWellFormedAccepted)
+{
+	const size_t off = offsetof(
+	    nsm_query_available_clearable_scalar_data_sources_v1_resp, data);
+	const uint8_t ml_in = NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE;
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 2 * ml_in, 0);
+	pcU16(b, kPcRespDsOff, 1 + 2 * ml_in);
+	b[sizeof(nsm_msg_hdr) +
+	  offsetof(nsm_query_available_clearable_scalar_data_sources_v1_resp,
+		   mask_length)] = ml_in;
+	uint8_t cc = 0, ml = 0;
+	uint16_t rc = 0, ds = 0;
+	uint8_t a[NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE] = {0};
+	uint8_t c[NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE] = {0};
+	EXPECT_EQ(decode_query_available_clearable_scalar_data_sources_v1_resp(
+		      pcMsg(b), b.size(), &cc, &ds, &rc, &ml, a, c),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(ml, ml_in);
+}

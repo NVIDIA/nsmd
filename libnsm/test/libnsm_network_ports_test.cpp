@@ -17,6 +17,7 @@
 
 #include "base.h"
 #include "network-ports.h"
+#include <cstddef>
 #include <cstring>
 #include <gtest/gtest.h>
 
@@ -4498,4 +4499,25 @@ TEST(getLldpPacket, testEncodeDecodeErrorResponse)
 					 &out_size);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_NE(cc, NSM_SUCCESS);
+}
+
+// Glasswing re-scan regression: port-counter data_size must be bounded against
+// msg_len before the copy (source OOB read otherwise).
+TEST(NetworkPortsOverreadGuard, PortTelemetryCounter_DataSizeBeyondMsgLen)
+{
+	const size_t off = offsetof(nsm_get_port_telemetry_counter_resp, data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4,
+			       0); // 4 payload bytes
+	const size_t dsOff =
+	    sizeof(nsm_msg_hdr) + offsetof(nsm_common_resp, data_size);
+	uint16_t claim = (uint16_t)sizeof(nsm_port_counter_data);
+	b[dsOff] = claim & 0xFF;
+	b[dsOff + 1] = claim >> 8; // claims full struct, only 4 present
+	uint8_t cc = 0;
+	uint16_t rc = 0, ds = 0;
+	nsm_port_counter_data pcd{};
+	EXPECT_EQ(decode_get_port_telemetry_counter_resp(
+		      reinterpret_cast<const nsm_msg *>(b.data()), b.size(),
+		      &cc, &ds, &rc, &pcd),
+		  NSM_SW_ERROR_LENGTH);
 }

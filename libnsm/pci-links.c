@@ -169,7 +169,7 @@ static int validate_query_scalar_group_telemetry_v1_resp_length(
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) +
 		sizeof(struct nsm_query_scalar_group_telemetry_v1_resp)) {
-		return NSM_SW_SUCCESS;
+		return NSM_SW_ERROR_LENGTH;
 	}
 
 	struct nsm_query_scalar_group_telemetry_v1_resp *resp =
@@ -199,7 +199,12 @@ int decode_query_scalar_group_telemetry_v1_group0_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_0));
 	if (rc != NSM_SW_SUCCESS) {
@@ -238,7 +243,12 @@ int decode_query_scalar_group_telemetry_v1_group1_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_1));
 	if (rc != NSM_SW_SUCCESS) {
@@ -277,7 +287,12 @@ int decode_query_scalar_group_telemetry_v1_group2_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_2));
 	if (rc != NSM_SW_SUCCESS) {
@@ -316,7 +331,12 @@ int decode_query_scalar_group_telemetry_v1_group3_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_3));
 	if (rc != NSM_SW_SUCCESS) {
@@ -355,7 +375,12 @@ int decode_query_scalar_group_telemetry_v1_group4_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_4));
 	if (rc != NSM_SW_SUCCESS) {
@@ -395,7 +420,12 @@ int decode_query_scalar_group_telemetry_v1_group5_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_5));
 	if (rc != NSM_SW_SUCCESS) {
@@ -434,7 +464,12 @@ int decode_query_scalar_group_telemetry_v1_group6_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_6));
 	if (rc != NSM_SW_SUCCESS) {
@@ -473,7 +508,12 @@ int decode_query_scalar_group_telemetry_v1_group7_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_7));
 	if (rc != NSM_SW_SUCCESS) {
@@ -512,7 +552,12 @@ int decode_query_scalar_group_telemetry_v1_group8_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_8));
 	if (rc != NSM_SW_SUCCESS) {
@@ -551,7 +596,12 @@ int decode_query_scalar_group_telemetry_v1_group9_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_9));
 	if (rc != NSM_SW_SUCCESS) {
@@ -601,7 +651,12 @@ int decode_query_scalar_group_telemetry_v1_group10_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_10));
 	if (rc != NSM_SW_SUCCESS) {
@@ -630,7 +685,12 @@ int decode_query_scalar_group_telemetry_v1_group10_extended_resp(
 		return NSM_SW_ERROR_NULL;
 	}
 
-	int rc = validate_query_scalar_group_telemetry_v1_resp_length(
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	rc = validate_query_scalar_group_telemetry_v1_resp_length(
 	    msg, msg_len,
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_10_extended));
 	if (rc != NSM_SW_SUCCESS) {
@@ -896,9 +956,26 @@ int decode_query_available_clearable_scalar_data_sources_v1_resp(
 	*data_size = le16toh(resp->hdr.data_size);
 	*mask_length = resp->mask_length;
 
+	/* Bound the wire mask_length against the caller's fixed destination
+	 * buffers before the copies below, and against the bytes actually
+	 * received so the source reads stay within the message. */
+	if (*mask_length > NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE) {
+		return NSM_SW_ERROR_DATA;
+	}
+
 	if (*data_size !=
 	    sizeof(uint8_t) + 2 * (*mask_length) * sizeof(uint8_t)) {
 		return NSM_SW_ERROR_DATA;
+	}
+
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(
+		    struct
+		    nsm_query_available_clearable_scalar_data_sources_v1_resp,
+		    data) +
+		2u * (size_t)(*mask_length) >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
 	}
 
 	uint8_t val;
@@ -1545,6 +1622,17 @@ int decode_query_vector_group_telemetry_v2_resp(const struct nsm_msg *msg,
 	    (struct nsm_query_vector_data_sources_v2_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+	/* Bound the wire data_size against the bytes actually received so the
+	 * source read below cannot run past the end of the message. The
+	 * destination capacity is enforced by the typed group wrappers, which
+	 * reject an unexpected data_size before this copy. */
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_query_vector_data_sources_v2_resp,
+			 data_values) +
+		(size_t)*data_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	int cnt = *data_size / sizeof(uint32_t);
 	uint32_t val;
 	for (int idx = 0; idx < cnt; idx++) {
@@ -1573,6 +1661,28 @@ int decode_query_vector_group_telemetry_v2_group1_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, struct nsm_query_vector_group_1_data *data)
 {
+	if (msg == NULL || cc == NULL || reason_code == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	/* Reject a wire data_size that would overflow the fixed group-1 buffer
+	 * BEFORE the generic decoder copies it; the post-call check below runs
+	 * too late to prevent the overflow. */
+	int prc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (prc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return prc;
+	}
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_query_vector_data_sources_v2_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	const struct nsm_query_vector_data_sources_v2_resp *presp =
+	    (const struct nsm_query_vector_data_sources_v2_resp *)msg->payload;
+	if (le16toh(presp->hdr.data_size) !=
+	    sizeof(struct nsm_query_vector_group_1_data)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	uint16_t data_size = 0;
 	int ret = decode_query_vector_group_telemetry_v2_resp(
 	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)data);

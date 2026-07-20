@@ -633,7 +633,7 @@ TEST(DevConfigBranch4, DecodeGetFpgaDiagSettingsResp_NullCc)
 	uint16_t ds = 0, reason = 0;
 	uint8_t data[32] = {};
 	auto rc = decode_get_fpga_diagnostics_settings_resp(
-	    msg, buf.size(), nullptr, &ds, &reason, data);
+	    msg, buf.size(), nullptr, &ds, &reason, data, sizeof(data));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -644,7 +644,7 @@ TEST(DevConfigBranch4, DecodeGetFpgaDiagSettingsResp_NullData)
 	uint8_t cc = 0;
 	uint16_t ds = 0, reason = 0;
 	auto rc = decode_get_fpga_diagnostics_settings_resp(
-	    msg, buf.size(), &cc, &ds, &reason, nullptr);
+	    msg, buf.size(), &cc, &ds, &reason, nullptr, 0);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 

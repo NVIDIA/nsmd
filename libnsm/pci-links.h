@@ -1130,6 +1130,13 @@ struct nsm_query_available_clearable_scalar_data_sources_v1_req {
 	uint8_t group_id;
 } __attribute__((packed));
 
+/** Maximum scalar data-source mask length libnsm will decode into a caller
+ *  buffer. Bounds the wire mask_length so a malicious response cannot overflow
+ *  the fixed-size destination masks (see decoder). Callers size their
+ *  available/clearable mask buffers to at least this many bytes.
+ */
+#define NSM_MAX_SCALAR_DATA_SOURCE_MASK_SIZE 4
+
 /** @struct nsm_query_available_clearable_scalar_data_sources_v1_resp
  *
  *  Structure representing Query Scalable and Clearable Scalar data sources v1

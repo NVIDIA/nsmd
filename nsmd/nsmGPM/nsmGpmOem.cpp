@@ -687,9 +687,6 @@ uint8_t NsmGPMPerInstance::handleResponseMsg(const nsm_msg* responseMsg,
         rc = decode_aggregate_resp_sample(sampleData, responseLen, &consumedLen,
                                           &tag, &valid, &data, &dataLen);
 
-        responseData += consumedLen;
-        responseLen -= consumedLen;
-
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::debug(
@@ -699,6 +696,17 @@ uint8_t NsmGPMPerInstance::handleResponseMsg(const nsm_msg* responseMsg,
                 "VALID", valid);
             continue;
         }
+
+        if (consumedLen == 0 || consumedLen > responseLen)
+        {
+            // A well-formed sample must not return a consumedLen that
+            // would underflow responseLen or leave the pointer stuck.
+            returnValue = NSM_SW_ERROR_LENGTH;
+            break;
+        }
+
+        responseData += consumedLen;
+        responseLen -= consumedLen;
 
         if (!valid || tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
         {

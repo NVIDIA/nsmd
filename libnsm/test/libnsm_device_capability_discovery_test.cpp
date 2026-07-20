@@ -18,6 +18,7 @@
 #include "base.h"
 #include "common-tests.hpp"
 #include "device-capability-discovery.h"
+#include <cstddef>
 #include <gtest/gtest.h>
 
 TEST(nsm_get_supported_event, testRequest)
@@ -1210,4 +1211,264 @@ TEST(DevCapDiscNullBranch, DecodeGpioStateChangeEvent_NullEventClass)
 	auto rc = decode_nsm_gpio_state_change_event(msg, buf.size(), nullptr,
 						     &event_state, &payload);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// ---------------------------------------------------------------------------
+// Buffer-overread guard regression (Glasswing). Decoders that hand out a
+// pointer/length into the received message must reject an on-wire data_size
+// whose payload would extend past the bytes actually present (msg_len),
+// returning an error instead of an out-of-bounds read. Each guard is covered
+// with the malicious case, the exact boundary, and a well-formed happy path.
+// ---------------------------------------------------------------------------
+namespace
+{
+// data_size field offset: nsm_msg_hdr + nsm_common_resp{cmd:1,cc:1,rsvd:2}.
+constexpr size_t kDataSizeOff = sizeof(nsm_msg_hdr) + 4;
+
+void setU16(std::vector<uint8_t> &buf, size_t off, uint16_t v)
+{
+	buf[off] = static_cast<uint8_t>(v & 0xFF);
+	buf[off + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+}
+const nsm_msg *asMsg(const std::vector<uint8_t> &b)
+{
+	return reinterpret_cast<const nsm_msg *>(b.data());
+}
+} // namespace
+
+// ---- Get Event Log Record V2, first handle (09-HIGH) ----
+
+TEST(DevCapDiscOverreadGuard, EventLogV2First_OversizedRejected)
+{
+	constexpr size_t off =
+	    offsetof(nsm_get_event_log_record_v2_resp_first_handle, event_data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4, 0);
+	setU16(b, kDataSizeOff,
+	       NSM_GET_EVENT_LOG_RECORD_V2_RESP_FIRST_HANDLE_MIN_DATA_SIZE +
+		   40);
+	uint8_t cc = 0;
+	nsm_event_log_record_v2_first_fields out{};
+	EXPECT_EQ(decode_nsm_get_event_log_record_v2_resp_first_handle(
+		      asMsg(b), b.size(), &cc, &out),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DevCapDiscOverreadGuard, EventLogV2First_BoundaryPlusOneRejected)
+{
+	constexpr size_t off =
+	    offsetof(nsm_get_event_log_record_v2_resp_first_handle, event_data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4,
+			       0); // holds 4 bytes
+	setU16(b, kDataSizeOff,
+	       NSM_GET_EVENT_LOG_RECORD_V2_RESP_FIRST_HANDLE_MIN_DATA_SIZE + 5);
+	uint8_t cc = 0;
+	nsm_event_log_record_v2_first_fields out{};
+	EXPECT_EQ(decode_nsm_get_event_log_record_v2_resp_first_handle(
+		      asMsg(b), b.size(), &cc, &out),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DevCapDiscOverreadGuard, EventLogV2First_BoundaryExactAccepted)
+{
+	constexpr size_t off =
+	    offsetof(nsm_get_event_log_record_v2_resp_first_handle, event_data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4, 0);
+	setU16(b, kDataSizeOff,
+	       NSM_GET_EVENT_LOG_RECORD_V2_RESP_FIRST_HANDLE_MIN_DATA_SIZE + 4);
+	uint8_t cc = 0;
+	nsm_event_log_record_v2_first_fields out{};
+	EXPECT_EQ(decode_nsm_get_event_log_record_v2_resp_first_handle(
+		      asMsg(b), b.size(), &cc, &out),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(out.event_data_len, 4);
+	EXPECT_NE(out.event_data, nullptr);
+}
+
+TEST(DevCapDiscOverreadGuard, EventLogV2First_EmptyPayload)
+{
+	constexpr size_t off =
+	    offsetof(nsm_get_event_log_record_v2_resp_first_handle, event_data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4, 0);
+	setU16(b, kDataSizeOff,
+	       NSM_GET_EVENT_LOG_RECORD_V2_RESP_FIRST_HANDLE_MIN_DATA_SIZE);
+	uint8_t cc = 0;
+	nsm_event_log_record_v2_first_fields out{};
+	EXPECT_EQ(decode_nsm_get_event_log_record_v2_resp_first_handle(
+		      asMsg(b), b.size(), &cc, &out),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(out.event_data_len, 0);
+	EXPECT_EQ(out.event_data, nullptr);
+}
+
+TEST(DevCapDiscOverreadGuard, EventLogV2First_HappyPathFields)
+{
+	constexpr size_t off =
+	    offsetof(nsm_get_event_log_record_v2_resp_first_handle, event_data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 2, 0);
+	setU16(b, kDataSizeOff,
+	       NSM_GET_EVENT_LOG_RECORD_V2_RESP_FIRST_HANDLE_MIN_DATA_SIZE + 2);
+	const size_t p = sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp);
+	setU16(b, p, 0x1234);	  // next_transfer_handle
+	setU16(b, p + 2, 0x5678); // event_handle
+	uint8_t cc = 0;
+	nsm_event_log_record_v2_first_fields out{};
+	EXPECT_EQ(decode_nsm_get_event_log_record_v2_resp_first_handle(
+		      asMsg(b), b.size(), &cc, &out),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(out.next_transfer_handle, 0x1234);
+	EXPECT_EQ(out.event_handle, 0x5678);
+	EXPECT_EQ(out.event_data_len, 2);
+}
+
+// ---- Get Event Log Record V2, next handle (09-HIGH) ----
+
+TEST(DevCapDiscOverreadGuard, EventLogV2Next_OversizedRejected)
+{
+	constexpr size_t off =
+	    offsetof(nsm_get_event_log_record_v2_resp_next_handle, event_data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4, 0);
+	setU16(b, kDataSizeOff,
+	       NSM_GET_EVENT_LOG_RECORD_V2_RESP_NEXT_HANDLE_MIN_DATA_SIZE + 40);
+	uint8_t cc = 0;
+	nsm_event_log_record_v2_next_fields out{};
+	EXPECT_EQ(decode_nsm_get_event_log_record_v2_resp_next_handle(
+		      asMsg(b), b.size(), &cc, &out),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DevCapDiscOverreadGuard, EventLogV2Next_BoundaryExactAccepted)
+{
+	constexpr size_t off =
+	    offsetof(nsm_get_event_log_record_v2_resp_next_handle, event_data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4, 0);
+	setU16(b, kDataSizeOff,
+	       NSM_GET_EVENT_LOG_RECORD_V2_RESP_NEXT_HANDLE_MIN_DATA_SIZE + 4);
+	uint8_t cc = 0;
+	nsm_event_log_record_v2_next_fields out{};
+	EXPECT_EQ(decode_nsm_get_event_log_record_v2_resp_next_handle(
+		      asMsg(b), b.size(), &cc, &out),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(out.event_data_len, 4);
+	EXPECT_NE(out.event_data, nullptr);
+}
+
+TEST(DevCapDiscOverreadGuard, EventLogV2Next_EmptyPayload)
+{
+	constexpr size_t off =
+	    offsetof(nsm_get_event_log_record_v2_resp_next_handle, event_data);
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + off + 4, 0);
+	setU16(b, kDataSizeOff,
+	       NSM_GET_EVENT_LOG_RECORD_V2_RESP_NEXT_HANDLE_MIN_DATA_SIZE);
+	uint8_t cc = 0;
+	nsm_event_log_record_v2_next_fields out{};
+	EXPECT_EQ(decode_nsm_get_event_log_record_v2_resp_next_handle(
+		      asMsg(b), b.size(), &cc, &out),
+		  NSM_SW_SUCCESS);
+	EXPECT_EQ(out.event_data_len, 0);
+	EXPECT_EQ(out.event_data, nullptr);
+}
+
+// ---- GPIO state-change event (V16.2) ----
+
+namespace
+{
+constexpr size_t kGpioFixed =
+    sizeof(nsm_gpio_state_change_event_payload) - sizeof(nsm_gpio_event);
+void setEventDataSize(std::vector<uint8_t> &b, uint8_t v)
+{
+	b[sizeof(nsm_msg_hdr) + offsetof(nsm_event, data_size)] = v;
+}
+void setNumGpioEvents(std::vector<uint8_t> &b, uint16_t n)
+{
+	setU16(b, sizeof(nsm_msg_hdr) + offsetof(nsm_event, data) + 8, n);
+}
+} // namespace
+
+TEST(DevCapDiscOverreadGuard, Gpio_DataSizeBelowFixedPrefixRejected)
+{
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN + 10, 0);
+	setEventDataSize(b, 5); // < 10-byte fixed prefix
+	uint8_t ec = 0;
+	uint16_t es = 0;
+	nsm_gpio_state_change_event_payload *p = nullptr;
+	EXPECT_EQ(decode_nsm_gpio_state_change_event(asMsg(b), b.size(), &ec,
+						     &es, &p),
+		  NSM_SW_ERROR_DATA);
+}
+
+TEST(DevCapDiscOverreadGuard, Gpio_DataSizeExceedsMsgLenRejected)
+{
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN + 10, 0);
+	setEventDataSize(b, 110);
+	uint8_t ec = 0;
+	uint16_t es = 0;
+	nsm_gpio_state_change_event_payload *p = nullptr;
+	EXPECT_EQ(decode_nsm_gpio_state_change_event(asMsg(b), b.size(), &ec,
+						     &es, &p),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DevCapDiscOverreadGuard, Gpio_LargeCountShortBufferRejected)
+{
+	// num_gpio_events and data_size are internally consistent, but the
+	// buffer is far too short: the msg_len guard must fire before the loop.
+	std::vector<uint8_t> b(
+	    sizeof(nsm_msg_hdr) + offsetof(nsm_event, data) + kGpioFixed, 0);
+	setEventDataSize(b, static_cast<uint8_t>(kGpioFixed + 50 * 2));
+	setNumGpioEvents(b, 50);
+	uint8_t ec = 0;
+	uint16_t es = 0;
+	nsm_gpio_state_change_event_payload *p = nullptr;
+	EXPECT_EQ(decode_nsm_gpio_state_change_event(asMsg(b), b.size(), &ec,
+						     &es, &p),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DevCapDiscOverreadGuard, Gpio_ExpectedSizeMismatchRejected)
+{
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + offsetof(nsm_event, data) +
+				   kGpioFixed + 2,
+			       0);
+	setEventDataSize(b, static_cast<uint8_t>(kGpioFixed)); // says 0 events
+	setNumGpioEvents(b, 1);				       // but claims 1
+	uint8_t ec = 0;
+	uint16_t es = 0;
+	nsm_gpio_state_change_event_payload *p = nullptr;
+	EXPECT_EQ(decode_nsm_gpio_state_change_event(asMsg(b), b.size(), &ec,
+						     &es, &p),
+		  NSM_SW_ERROR_DATA);
+}
+
+TEST(DevCapDiscOverreadGuard, Gpio_HappyPath)
+{
+	std::vector<uint8_t> b(sizeof(nsm_msg_hdr) + offsetof(nsm_event, data) +
+				   kGpioFixed + 2 * 2,
+			       0);
+	setEventDataSize(b, static_cast<uint8_t>(kGpioFixed + 2 * 2));
+	setNumGpioEvents(b, 2);
+	uint8_t ec = 0;
+	uint16_t es = 0;
+	nsm_gpio_state_change_event_payload *p = nullptr;
+	EXPECT_EQ(decode_nsm_gpio_state_change_event(asMsg(b), b.size(), &ec,
+						     &es, &p),
+		  NSM_SUCCESS);
+	ASSERT_NE(p, nullptr);
+	EXPECT_EQ(p->num_gpio_events, 2);
+}
+
+// Glasswing re-scan regression: device-capabilities-v2 data_len must not
+// underflow at the minimum accepted msg_len (short message rejected).
+TEST(DevCapDiscOverreadGuard, GetDeviceCapabilitiesV2_ShortMsgUnderflowRejected)
+{
+	std::vector<uint8_t> b(8,
+			       0); // hdr(5)+3; below hdr+sizeof(telemetry_resp)
+	b[sizeof(nsm_msg_hdr) +
+	  offsetof(nsm_common_telemetry_resp, telemetry_count)] = 2;
+	uint8_t cc = 0, tg = 0;
+	uint16_t rc = 0;
+	uint32_t mibs = 0;
+	EXPECT_EQ(decode_nsm_get_device_capabilities_v2_resp(
+		      reinterpret_cast<const nsm_msg *>(b.data()), b.size(),
+		      &cc, &rc, &tg, &mibs),
+		  NSM_SW_ERROR_LENGTH);
 }

@@ -1429,6 +1429,14 @@ uint8_t
         rc = decode_aggregate_resp_sample(sampleData, responseLen, &consumedLen,
                                           &tag, &valid, &data, &dataLen);
 
+        if (consumedLen == 0 || consumedLen > responseLen)
+        {
+            // A malformed sample must not underflow responseLen and cascade
+            // into out-of-bounds reads on subsequent iterations. Propagate an
+            // error instead of silently returning the partial result.
+            returnValue = NSM_SW_ERROR_LENGTH;
+            break;
+        }
         responseData += consumedLen;
         responseLen -= consumedLen;
 
@@ -1608,6 +1616,13 @@ uint8_t NsmGetPortECCCounters::handleResponseMsg(const nsm_msg* responseMsg,
         rc = decode_aggregate_resp_sample(sampleData, responseLen, &consumedLen,
                                           &tag, &valid, &data, &dataLen);
 
+        if (consumedLen == 0 || consumedLen > responseLen)
+        {
+            // A malformed sample must not underflow responseLen and cascade
+            // into out-of-bounds reads on subsequent iterations.
+            returnValue = NSM_SW_ERROR_LENGTH;
+            break;
+        }
         responseData += consumedLen;
         responseLen -= consumedLen;
 

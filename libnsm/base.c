@@ -705,6 +705,15 @@ int decode_reason_code_and_cc(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_NULL;
 	}
 
+	/* The completion_code is read below; require at least a full header
+	 * plus the bytes up to and including it, not merely a non-empty
+	 * frame, so a short response cannot cause an out-of-bounds read. */
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  offsetof(struct nsm_common_resp, completion_code) +
+			  sizeof(uint8_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	*cc = ((struct nsm_common_resp *)msg->payload)->completion_code;
 	if (*cc == NSM_SUCCESS || *cc == NSM_ACCEPTED) {
 		return NSM_SW_SUCCESS;
@@ -1632,6 +1641,12 @@ int decode_get_gpio_state_resp(const struct nsm_msg *msg, size_t msg_len,
 	*gpio_values_size = le16toh(resp->hdr.data_size) -
 			    (sizeof(resp->offset) + sizeof(resp->length));
 
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_gpio_state_resp, gpio_values) +
+		(size_t)*gpio_values_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(gpio_values, resp->gpio_values, *gpio_values_size);
 
 	return NSM_SW_SUCCESS;
@@ -1786,6 +1801,12 @@ int decode_set_gpio_state_resp(const struct nsm_msg *msg, size_t msg_len,
 	*gpio_values_size = le16toh(resp->hdr.data_size) -
 			    (sizeof(resp->offset) + sizeof(resp->length));
 
+	if (sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_set_gpio_state_resp, gpio_values) +
+		(size_t)*gpio_values_size >
+	    msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	memcpy(gpio_values, resp->gpio_values, *gpio_values_size);
 
 	return NSM_SW_SUCCESS;

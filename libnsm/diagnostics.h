@@ -1223,7 +1223,9 @@ int encode_set_device_debug_parameters_req(
  *  @param[out] parameter_id - Parameter ID
  *  @param[out] parameter_sub_id - Parameter sub ID
  *  @param[out] data_size - Data size
- *  @param[out] data - Data
+ *  @param[out] data - OUT: on success points into (aliases) msg->payload,
+ *                     not an independent copy; valid only while the caller
+ *                     retains the response message buffer.
  *  @return nsm_completion_codes
  */
 int decode_set_device_debug_parameters_req(

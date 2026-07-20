@@ -38,6 +38,7 @@
 #include <gtest/gtest.h>
 
 using ::testing::_;
+using ::testing::NotNull;
 using ::testing::Return;
 
 /**
@@ -743,8 +744,9 @@ TEST_F(SocketHandlerTest, InKernelHandlerRecvPeekZero)
 
     EXPECT_CALL(*mockIo_, recv(fakeFd, nullptr, 0, MSG_PEEK | MSG_TRUNC))
         .WillOnce(Return(0));
+    // Drain recv: discards the empty datagram and returns.
+    EXPECT_CALL(*mockIo_, recv(fakeFd, NotNull(), 1, 0)).WillOnce(Return(0));
 
-    // peekedLength==0 calls io.get_event().exit(0); must not crash.
     inKernelHandler.handleReceivedMsg(ioSrc, fakeFd, EPOLLIN);
 
     ::close(pipefd[0]);

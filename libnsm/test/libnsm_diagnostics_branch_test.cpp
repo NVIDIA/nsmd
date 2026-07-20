@@ -966,3 +966,106 @@ TEST(DiagBranch, DecodeSetDeviceDebugParametersReq_ReservedNonZero)
 	    msg, buf.size(), &dbg_type, &out_pid, &out_sub, &ds, &out_data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
+
+// ---------------------------------------------------------------------------
+// Buffer-overflow guard regression (nvbug 6232725): each decoder must reject
+// a message whose on-wire payload length exceeds the bytes actually present
+// in msg_len, returning NSM_SW_ERROR_LENGTH instead of an out-of-bounds copy.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+// Payload offset of the data_size field inside struct nsm_common_resp
+// (command:1, completion_code:1, reserved:2, data_size:2).
+constexpr size_t kRespDataSizeOff = sizeof(nsm_msg_hdr) + 4;
+
+void putU16(std::vector<uint8_t> &buf, size_t off, uint16_t v)
+{
+	buf[off] = static_cast<uint8_t>(v & 0xFF);
+	buf[off + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+}
+
+std::vector<uint8_t> oversizedResp(size_t structSize, uint16_t dataSize)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + structSize, 0);
+	putU16(buf, kRespDataSizeOff, dataSize);
+	return buf;
+}
+
+const nsm_msg *asMsg(const std::vector<uint8_t> &buf)
+{
+	return reinterpret_cast<const nsm_msg *>(buf.data());
+}
+} // namespace
+
+TEST(LibnsmOverreadGuard, GetDeviceDiagnosticsResp)
+{
+	auto buf =
+	    oversizedResp(sizeof(nsm_get_device_diagnostics_resp), 0xFFFF);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	uint8_t seg[8] = {0};
+	uint16_t segSize = 0;
+	uint8_t segId = 0;
+	EXPECT_EQ(decode_get_device_diagnostics_resp(
+		      asMsg(buf), buf.size(), &cc, &rc, seg, &segSize, &segId),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, GetNetworkDeviceDebugInfoResp)
+{
+	auto buf = oversizedResp(sizeof(nsm_get_network_device_debug_info_resp),
+				 0xFFFF);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	uint16_t segSize = 0;
+	uint8_t seg[8] = {0};
+	uint32_t next = 0;
+	EXPECT_EQ(decode_get_network_device_debug_info_resp(
+		      asMsg(buf), buf.size(), &cc, &rc, &segSize, seg, &next),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, GetNetworkDeviceLogInfoResp)
+{
+	auto buf =
+	    oversizedResp(sizeof(nsm_get_network_device_log_info_resp), 0xFFFF);
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	uint32_t next = 0;
+	// Backing store comfortably larger than nsm_device_log_info, which
+	// the decoder writes before reaching the guarded log_data copy.
+	std::vector<uint8_t> logInfo(128, 0);
+	auto *li =
+	    reinterpret_cast<nsm_device_log_info_breakdown *>(logInfo.data());
+	uint8_t logData[8] = {0};
+	uint16_t logSize = 0;
+	EXPECT_EQ(
+	    decode_get_network_device_log_info_resp(
+		asMsg(buf), buf.size(), &cc, &rc, &next, li, logData, &logSize),
+	    NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, SetDeviceDebugParametersReq)
+{
+	// Uses decode_common_req_v2, so a valid v2 request header is
+	// required: pci_vendor_id (big-endian 0x10DE), request bit set,
+	// ocp_type=8, ocp_version=9.
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_debug_parameters_req) -
+		1,
+	    0);
+	buf[0] = 0x10;
+	buf[1] = 0xDE;
+	buf[2] = 0x80; // request bit
+	buf[3] = (OCP_TYPE << 4) | OCP_VERSION;
+	buf[sizeof(nsm_msg_hdr) + 7] = 0xFF; // struct data_size = 255
+	uint8_t dct = 0;
+	nsm_debug_parameter_id pid = {};
+	nsm_debug_parameter_sub_id_bitfield psub = {};
+	uint8_t dsz = 0;
+	uint8_t *dptr = nullptr;
+	EXPECT_EQ(decode_set_device_debug_parameters_req(
+		      asMsg(buf), buf.size(), &dct, &pid, &psub, &dsz, &dptr),
+		  NSM_SW_ERROR_LENGTH);
+}

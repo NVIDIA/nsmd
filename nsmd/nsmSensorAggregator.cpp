@@ -59,6 +59,15 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
         const uint8_t* data = nullptr;
         size_t dataLen = 0;
 
+        if (consumedLen == 0 || consumedLen > responseLen)
+        {
+            // A malformed sample must not underflow responseLen and cascade
+            // into out-of-bounds reads on subsequent iterations. Stop
+            // processing instead of advancing past the received bytes.
+            returnValue = NSM_SW_ERROR_LENGTH;
+            break;
+        }
+
         responseLen -= consumedLen;
         responseData += consumedLen;
 
