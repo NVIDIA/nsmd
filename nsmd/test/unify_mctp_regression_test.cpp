@@ -390,8 +390,6 @@ TEST_F(UnifyMctpNsmRegression,
 TEST_F(UnifyMctpNsmRegression, NsmDeviceMatrix_SetAndGet_RoundTrip)
 {
     MockNsmDevice dev(1, 1, "MCTP_UUID", "uuid-roundtrip", 0);
-    // Direct write to the matrix — this is what setCommandCodeSupportedSafe
-    // wraps in N6. The round-trip stays correct on both sides of N6.
     dev.messageTypesToCommandCodeMatrix[2][42] = true;
     EXPECT_TRUE(dev.isCommandSupported(2, 42));
 
@@ -691,98 +689,9 @@ TEST_F(UnifyMctpNsmRegression,
 }
 
 // ============================================================================
-// Commit 6 (N6) — bounds-checked messageTypesToCommandCodeMatrix accessors
-//
-// Closes NvBug 5972182. The pre-N6 raw [messageType][commandCode] indexing
-// at five production sites is replaced by the bounds-checked
-// isCommandCodeSupportedSafe / setCommandCodeSupportedSafe pair. OOB
-// reports are now a logged drop, not UB / SIGABRT.
-// ============================================================================
-
-TEST_F(UnifyMctpNsmRegression, N6_SafeRead_InRange_ReturnsExpected)
-{
-    MockNsmDevice dev(1, 1, "MCTP_UUID", "uuid-safe-r-in", 0);
-    auto v = dev.isCommandCodeSupportedSafe(0, 0);
-    ASSERT_TRUE(v.has_value());
-    EXPECT_FALSE(*v); // default-false
-
-    dev.messageTypesToCommandCodeMatrix[0][7] = true;
-    auto w = dev.isCommandCodeSupportedSafe(0, 7);
-    ASSERT_TRUE(w.has_value());
-    EXPECT_TRUE(*w);
-}
-
-TEST_F(UnifyMctpNsmRegression, N6_SafeRead_OobMessageType_ReturnsNullopt)
-{
-    MockNsmDevice dev(1, 1, "MCTP_UUID", "uuid-safe-r-mt", 0);
-    EXPECT_FALSE(dev.isCommandCodeSupportedSafe(NUM_NSM_TYPES, 0).has_value());
-    EXPECT_FALSE(
-        dev.isCommandCodeSupportedSafe(NUM_NSM_TYPES + 10, 0).has_value());
-    EXPECT_FALSE(dev.isCommandCodeSupportedSafe(255, 0).has_value());
-}
-
-TEST_F(UnifyMctpNsmRegression,
-       N6_SafeRead_OobCommandCode_ReturnsNullopt_NoCrash)
-{
-    // This is the NvBug 5972182 mode — FW reports a commandCode the row
-    // doesn't contain. Pre-N6 this was UB; post-N6 it's a clean nullopt.
-    MockNsmDevice dev(1, 1, "MCTP_UUID", "uuid-safe-r-cc", 0);
-    // Shrink row 0 down to 10 elements so 11 is out of range
-    dev.messageTypesToCommandCodeMatrix[0].resize(10, false);
-    EXPECT_FALSE(dev.isCommandCodeSupportedSafe(0, 11).has_value());
-    EXPECT_FALSE(dev.isCommandCodeSupportedSafe(0, 255).has_value());
-}
-
-TEST_F(UnifyMctpNsmRegression, N6_SafeWrite_InRange_RoundTripsThroughRead)
-{
-    MockNsmDevice dev(1, 1, "MCTP_UUID", "uuid-safe-w-rt", 0);
-    EXPECT_TRUE(dev.setCommandCodeSupportedSafe(2, 42, true));
-    auto v = dev.isCommandCodeSupportedSafe(2, 42);
-    ASSERT_TRUE(v.has_value());
-    EXPECT_TRUE(*v);
-
-    EXPECT_TRUE(dev.setCommandCodeSupportedSafe(2, 42, false));
-    auto w = dev.isCommandCodeSupportedSafe(2, 42);
-    ASSERT_TRUE(w.has_value());
-    EXPECT_FALSE(*w);
-}
-
-TEST_F(UnifyMctpNsmRegression,
-       N6_SafeWrite_OobReports_FromMalformedFw_ReturnsFalseAndDoesNotMutate)
-{
-    // Simulate the v0023.01.0183.0000 mode — FW reports a commandCode
-    // beyond the inner row. setCommandCodeSupportedSafe must:
-    //   (a) return false (drop, no-op)
-    //   (b) not resize the row (downstream code expects fixed dims)
-    //   (c) leave the existing in-range entries untouched
-    MockNsmDevice dev(1, 1, "MCTP_UUID", "uuid-safe-w-fw-oob", 0);
-
-    // Sentinel — in-range entry that must survive the OOB write
-    dev.setCommandCodeSupportedSafe(0, 5, true);
-
-    // Shrink row 0 down to 10 elements
-    dev.messageTypesToCommandCodeMatrix[0].resize(10, false);
-    dev.setCommandCodeSupportedSafe(0, 5, true);
-    auto pre = dev.messageTypesToCommandCodeMatrix[0].size();
-
-    // Now attempt OOB writes
-    EXPECT_FALSE(dev.setCommandCodeSupportedSafe(0, 11, true));
-    EXPECT_FALSE(dev.setCommandCodeSupportedSafe(0, 255, true));
-    EXPECT_FALSE(dev.setCommandCodeSupportedSafe(NUM_NSM_TYPES, 0, true));
-
-    // Row did NOT grow
-    EXPECT_EQ(dev.messageTypesToCommandCodeMatrix[0].size(), pre);
-
-    // Sentinel survives
-    auto sentinel = dev.isCommandCodeSupportedSafe(0, 5);
-    ASSERT_TRUE(sentinel.has_value());
-    EXPECT_TRUE(*sentinel);
-}
-
 // ============================================================================
 // (18) updateMessageTypesToCommandCodeMatrix with OOB messageType is a
-//     silent no-op (pre-existing guard at cpp:155). Pre-N6 pin — N6 adds the
-//     same shape via setCommandCodeSupportedSafe for the other write sites.
+//     silent no-op (pre-existing guard at cpp:155).
 // ============================================================================
 TEST_F(UnifyMctpNsmRegression, NsmDeviceMatrix_UpdateOobMessageType_SilentNoOp)
 {

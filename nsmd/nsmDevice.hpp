@@ -245,28 +245,6 @@ class NsmDevice :
     void updateMessageTypesToCommandCodeMatrix(
         uint8_t messageType, const bitfield8_t supportedCommands[],
         size_t supportedCommandsSize);
-
-    /** @brief Bounds-checked read of messageTypesToCommandCodeMatrix.
-     *         Returns std::nullopt if (messageType, commandCode) is out of
-     *         range. Use this in preference to raw operator[] / direct
-     *         matrix indexing for FW-reported indices.
-     *
-     *  Closes NvBug 5972182 — new GPU SMA FW v0023.01.0183.0000 reports a
-     *  commandCode outside the static 256-wide row, which previously
-     *  dereferenced the inner vector past end (UB → terminate). With this
-     *  accessor, that bad payload becomes a logged drop. */
-    [[nodiscard]] std::optional<bool>
-        isCommandCodeSupportedSafe(uint8_t messageType,
-                                   uint8_t commandCode) const noexcept;
-
-    /** @brief Bounds-checked write of messageTypesToCommandCodeMatrix.
-     *         Returns false (no-op) if (messageType, commandCode) is out
-     *         of range. Resizing is NOT performed — out-of-range FW
-     *         reports are logged and dropped, matching the existing
-     *         updateMessageTypesToCommandCodeMatrix outer guard's shape
-     *         for messageType. */
-    bool setCommandCodeSupportedSafe(uint8_t messageType, uint8_t commandCode,
-                                     bool isSupported) noexcept;
     void addDeviceEvent(std::shared_ptr<NsmEvent> event, NsmType type,
                         NsmEventId eventId)
     {

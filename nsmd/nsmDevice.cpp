@@ -140,50 +140,11 @@ bool NsmDevice::allCommandCodesAreRetrieved()
 
 bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
 {
-    // Route through the bounds-checked accessor so we cannot fall off the
-    // end of the inner row even if commandCode is FW-reported.
-    return isCommandCodeSupportedSafe(messageType, commandCode).value_or(false);
-}
-
-std::optional<bool>
-    NsmDevice::isCommandCodeSupportedSafe(uint8_t messageType,
-                                          uint8_t commandCode) const noexcept
-{
-    if (messageType >= messageTypesToCommandCodeMatrix.size())
+    if (messageType >= NUM_NSM_TYPES)
     {
-        return std::nullopt;
-    }
-    const auto& row = messageTypesToCommandCodeMatrix[messageType];
-    if (commandCode >= row.size())
-    {
-        return std::nullopt;
-    }
-    return row[commandCode];
-}
-
-bool NsmDevice::setCommandCodeSupportedSafe(uint8_t messageType,
-                                            uint8_t commandCode,
-                                            bool isSupported) noexcept
-{
-    if (messageType >= messageTypesToCommandCodeMatrix.size())
-    {
-        lg2::warning(
-            "setCommandCodeSupportedSafe: messageType={MT} out of range (size={MAX}); dropping FW-reported support indicator (NvBug 5972182 class)",
-            "MT", messageType, "MAX",
-            static_cast<int>(messageTypesToCommandCodeMatrix.size()));
         return false;
     }
-    auto& row = messageTypesToCommandCodeMatrix[messageType];
-    if (commandCode >= row.size())
-    {
-        lg2::warning(
-            "setCommandCodeSupportedSafe: commandCode={CC} out of range for messageType={MT} (row size={MAX}); dropping FW-reported support indicator (NvBug 5972182)",
-            "CC", commandCode, "MT", messageType, "MAX",
-            static_cast<int>(row.size()));
-        return false;
-    }
-    row[commandCode] = isSupported;
-    return true;
+    return messageTypesToCommandCodeMatrix[messageType][commandCode];
 }
 
 void NsmDevice::updateMessageTypesToCommandCodeMatrix(
@@ -211,12 +172,7 @@ void NsmDevice::updateMessageTypesToCommandCodeMatrix(
     for (size_t i = 0; i < maxCommandCode; i++)
     {
         auto isSupported = supportedCommands[i / 8].byte & (1 << (i % 8));
-        // setCommandCodeSupportedSafe is a no-op if (messageType, i) falls
-        // outside the matrix — same shape as the outer guard above. This
-        // also closes the FW-payload OOB class (NvBug 5972182) if the row
-        // is ever resized smaller than NUM_COMMAND_CODES.
-        (void)setCommandCodeSupportedSafe(messageType, static_cast<uint8_t>(i),
-                                          static_cast<bool>(isSupported));
+        messageTypesToCommandCodeMatrix[messageType][i] = isSupported;
     }
 }
 
@@ -675,10 +631,7 @@ requester::Coroutine NsmDevice::updateNsmDevice()
         std::stringstream ss;
         for (uint8_t commandCode : supportedCommandCodes)
         {
-            // Bounds-checked write — NvBug 5972182 mitigation. FW reports
-            // outside the matrix dimensions are logged + dropped rather
-            // than UB-indexing past the row.
-            (void)setCommandCodeSupportedSafe(messageType, commandCode, true);
+            messageTypesToCommandCodeMatrix[messageType][commandCode] = true;
             ss << int(commandCode) << " ";
         }
         lg2::info(
@@ -1135,9 +1088,8 @@ requester::Coroutine NsmDevice::refreshCommandMatrix()
 
                 for (uint8_t commandCode : supportedCommandCodes)
                 {
-                    // Bounds-checked write — NvBug 5972182 mitigation.
-                    (void)setCommandCodeSupportedSafe(messageType, commandCode,
-                                                      true);
+                    messageTypesToCommandCodeMatrix[messageType][commandCode] =
+                        true;
                 }
             }
             else
