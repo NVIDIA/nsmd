@@ -901,6 +901,16 @@ NsmPCIeECCGroup10::NsmPCIeECCGroup10(const std::string& name,
     updateMetricOnSharedMemory();
 }
 
+NsmPCIeECCGroup10::~NsmPCIeECCGroup10()
+{
+    if (pcieTransactionCounterIntf)
+    {
+        auto& objServer = SensorManager::getInstance().getObjServer();
+        objServer.remove_interface(pcieTransactionCounterIntf);
+        pcieTransactionCounterIntf.reset();
+    }
+}
+
 uint64_t NsmPCIeECCGroup10::join64BitCounterLowHigh(uint32_t high, uint32_t low)
 {
     return (static_cast<uint64_t>(high) << 32) | low;

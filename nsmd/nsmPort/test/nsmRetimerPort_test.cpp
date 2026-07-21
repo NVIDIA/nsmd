@@ -1286,6 +1286,21 @@ TEST_F(NsmPCIeECCGroup10RetimerFixture, ConstructorMultiPort)
     EXPECT_EQ(group.getType(), type);
 }
 
+TEST_F(NsmPCIeECCGroup10RetimerFixture,
+       DestructorRemovesPCIeTransactionCounterInterface)
+{
+    std::weak_ptr<sdbusplus::asio::dbus_interface> interface;
+
+    {
+        NsmPCIeECCGroup10 group("group10_cleanup", "NSM_PCIeRetimer",
+                                inventoryObjPath, uint8_t(1));
+        interface = group.pcieTransactionCounterIntf;
+        ASSERT_FALSE(interface.expired());
+    }
+
+    EXPECT_TRUE(interface.expired());
+}
+
 TEST_F(NsmPCIeECCGroup10RetimerFixture, HandleResponseMsgSuccess)
 {
     std::string name = "group10_resp";

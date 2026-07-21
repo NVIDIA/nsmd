@@ -293,6 +293,8 @@ class NsmPCIeECCGroup10 : public NsmPcieGroup
                       bool includeInboundCounters = false);
     NsmPCIeECCGroup10() = default;
 
+    ~NsmPCIeECCGroup10() override;
+
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
     void updateMetricOnSharedMemory() override;
