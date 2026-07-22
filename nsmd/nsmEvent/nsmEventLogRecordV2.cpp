@@ -93,6 +93,7 @@ uint8_t NsmEventLogRecordV2::decodeFirstHandleResponseMsg(
     }
     transferHandle = fields.next_transfer_handle;
     nextEventHandle = fields.event_handle;
+    eventVersion = fields.event_version;
 
     return NSM_SW_SUCCESS;
 }
@@ -225,7 +226,8 @@ void NsmEventLogRecordV2::stopPollingAndLogRecord(uint8_t rc)
     auto cperEventPtr = cperEvent.lock();
     if (cperEventPtr)
     {
-        cperEventPtr->logRecordOnRf(eventData, rc, nextEventHandle);
+        cperEventPtr->logRecordOnRf(eventData, rc, nextEventHandle,
+                                    eventVersion);
     }
 }
 
@@ -241,6 +243,7 @@ void NsmEventLogRecordV2::triggerRecordChunkCollection(uint16_t eventHandle,
                                                        uint16_t transferHandle)
 {
     eventData.clear();
+    eventVersion = NSM_EVENT_VERSION;
     mode = NSM_EVENT_LOG_V2_MODE_GET_DATA;
     recordCollectionInProgress = true;
     this->eventHandle = eventHandle;

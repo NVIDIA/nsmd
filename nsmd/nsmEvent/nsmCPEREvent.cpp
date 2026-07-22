@@ -27,6 +27,8 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <limits>
+
 namespace nsm
 {
 
@@ -155,10 +157,31 @@ requester::Coroutine NsmCPEREvent::cperRecordLogger()
 }
 
 void NsmCPEREvent::logRecordOnRf(std::vector<uint8_t>& recordChunk,
-                                 uint8_t returnCode, uint16_t nextEventHandle)
+                                 uint8_t returnCode, uint16_t nextEventHandle,
+                                 uint8_t eventVersion)
 {
-    cperRecordData.insert(cperRecordData.end(), recordChunk.begin(),
-                          recordChunk.end());
+    constexpr size_t maxEventDataLen = std::numeric_limits<uint16_t>::max();
+    if (recordChunk.size() > maxEventDataLen)
+    {
+        lg2::error(
+            "CPER Event: record size {SZ} exceeds max {MAX}; dropping record",
+            "SZ", recordChunk.size(), "MAX", maxEventDataLen);
+        cperRecordData.clear();
+    }
+    else
+    {
+        cperEventFormatVersion = eventVersion;
+        nsm_cper_event_data_header hdr{};
+        hdr.format_version = cperEventFormatVersion;
+        hdr.format_type = DEFAULT_CPER_FORMAT;
+        hdr.event_data_length = static_cast<uint16_t>(recordChunk.size());
+
+        const auto* raw = reinterpret_cast<const uint8_t*>(&hdr);
+        cperRecordData.insert(cperRecordData.end(), raw,
+                              raw + sizeof(nsm_cper_event_data_header));
+        cperRecordData.insert(cperRecordData.end(), recordChunk.begin(),
+                              recordChunk.end());
+    }
     if (returnCode == NSM_SW_SUCCESS)
     {
         if (nextEventHandle == NO_MORE_HANDLES)

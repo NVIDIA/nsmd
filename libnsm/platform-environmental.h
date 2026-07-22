@@ -151,6 +151,15 @@ enum nsm_platform_environmental_events {
 	NSM_CPER_EVENT = 0x02
 };
 
+/** @brief Table 27 – CPEREvent class eventData header (not the UEFI CPER
+ *         record header). Prepended to CPER payload before logging.
+ */
+struct nsm_cper_event_data_header {
+	uint8_t format_version;
+	uint8_t format_type;
+	uint16_t event_data_length;
+} __attribute__((packed));
+
 enum nsm_mnnvlink_peer_type {
 	NSM_PEER_TYPE_DIRECT = 0x00,
 	NSM_PEER_TYPE_BRIDGE = 0x01
