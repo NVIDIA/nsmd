@@ -301,6 +301,14 @@ option(
 )
 
 option(
+    'nvidia-manager-ready-csm',
+    type: 'feature',
+    description: '''Expose NsmServiceReady on /xyz/openbmc_project/NSM.
+                    Disable on platforms that opt out of the CSM readiness handshake (e.g., VR).''',
+    value: 'enabled',
+)
+
+option(
     'enable-dot',
     type: 'feature',
     description: 'Enable DOT (Device Ownership Transfer) objects and interfaces',

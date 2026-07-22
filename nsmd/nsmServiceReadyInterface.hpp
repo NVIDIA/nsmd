@@ -65,16 +65,31 @@ class NsmServiceReadyIntf
 
     bool isStateEnabled() const
     {
+        // When ServiceReady is compiled out, treat the daemon as always
+        // ready so the internal "not enabled yet" retry loop in
+        // SensorManager::checkAllDevicesReady() short-circuits.
+        if (!serviceIntf)
+        {
+            return true;
+        }
         return serviceIntf->state() == ServiceReadyIntf::States::Enabled;
     }
 
     void setStateEnabled()
     {
+        if (!serviceIntf)
+        {
+            return;
+        }
         serviceIntf->state(ServiceReadyIntf::States::Enabled);
     }
 
     void setStateStarting()
     {
+        if (!serviceIntf)
+        {
+            return;
+        }
         serviceIntf->state(ServiceReadyIntf::States::Starting);
     }
 
@@ -84,9 +99,14 @@ class NsmServiceReadyIntf
                         nsm::NsmDeviceTable& nsmDevices) :
         nsmDevices(nsmDevices)
     {
+#ifdef NVIDIA_MANAGER_READY_CSM
         serviceIntf = std::make_unique<ServiceReadyIntf>(bus, path);
         serviceIntf->state(ServiceReadyIntf::States::Starting);
         serviceIntf->serviceType(ServiceReadyIntf::ServiceTypes::NSM);
+#else
+        (void)bus;
+        (void)path;
+#endif
     }
 
     static inline NsmServiceReadyIntf* instance = nullptr;
