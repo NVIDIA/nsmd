@@ -183,7 +183,7 @@ class StateChangeLogger
     template <typename... Args>
     bool shouldLogAndUpdate(StateChangeArgs& stateArgs, Args&&... args)
     {
-        size_t i = 0;
+        [[maybe_unused]] size_t i = 0;
         bool stateChanged = false;
         (shouldLogAndUpdate(stateChanged, stateArgs[i++], args), ...);
         return stateChanged;
@@ -234,7 +234,7 @@ class StateChangeLogger
                          StateChangeArgs& stateArgs, Args&&... args)
     {
         std::string clearedCodes;
-        size_t i = 0;
+        [[maybe_unused]] size_t i = 0;
         (appendClearedCodes(clearedCodes, stateArgs[i++], args), ...);
         if (!clearedCodes.empty())
         {
