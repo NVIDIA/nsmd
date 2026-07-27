@@ -446,7 +446,7 @@ TEST_F(NsmGPMMetricsTestFixture, badTestMissingUUID)
 
     EXPECT_THROW_COROUTINE(
         createNsmGPMMetrics(mockManager, basicIntfName, objPath),
-        std::bad_optional_access);
+        std::out_of_range);
 }
 
 TEST_F(NsmGPMMetricsTestFixture, testGPMMetricsWithMemoryBandwidth)
@@ -631,7 +631,7 @@ TEST_F(NsmGPMMetricsTestFixture, badTestCreateGPMMetricsMissingFields)
 
     EXPECT_THROW_COROUTINE(createNsmGPMMetrics(mockManager, basicIntfName,
                                                objPath + "_incomplete"),
-                           std::bad_optional_access);
+                           std::out_of_range);
 }
 
 // ========== New Branch Coverage Tests ==========

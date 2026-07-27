@@ -512,11 +512,11 @@ struct SkipSignalSpyIntf : public GPIOStateIntf
     }
 };
 
-// NsmGPIOState is a static sensor: every GetGPIO response only seeds LineStates,
-// so it must be published silently (skipSignal=true, no PropertiesChanged) and
-// never be misread as a genuine transition. Genuine transitions are published,
-// with signal, by NsmGPIOStateChangeEvent. Regression guard for nvbug 6437887
-// (spurious HPM_SMA-PCIE_CLKBUF-FAULTY).
+// NsmGPIOState is a static sensor: every GetGPIO response only seeds
+// LineStates, so it must be published silently (skipSignal=true, no
+// PropertiesChanged) and never be misread as a genuine transition. Genuine
+// transitions are published, with signal, by NsmGPIOStateChangeEvent.
+// Regression guard for nvbug 6437887 (spurious HPM_SMA-PCIE_CLKBUF-FAULTY).
 TEST_F(NsmGPIOStateTest, HandleResponseMsg_SeedsLineStatesSilently)
 {
     std::vector<std::tuple<std::string, std::string, std::string>> associations;
@@ -545,10 +545,10 @@ TEST_F(NsmGPIOStateTest, HandleResponseMsg_SeedsLineStatesSilently)
 
     // First poll: bit0 low. Seeded silently (skipSignal=true); value stored.
     auto first = buildResponse(0x00);
-    EXPECT_EQ(sensor->handleResponseMsg(
-                  reinterpret_cast<struct nsm_msg*>(first->data()),
-                  first->size()),
-              NSM_SUCCESS);
+    EXPECT_EQ(
+        sensor->handleResponseMsg(
+            reinterpret_cast<struct nsm_msg*>(first->data()), first->size()),
+        NSM_SUCCESS);
     ASSERT_EQ(spy->skipSignals.size(), 1u);
     EXPECT_TRUE(spy->skipSignals.at(0));
     auto afterFirst = spy->lineStates();
@@ -558,10 +558,10 @@ TEST_F(NsmGPIOStateTest, HandleResponseMsg_SeedsLineStatesSilently)
     // A subsequent poll (e.g. a re-seed on reconnect) is still silent
     // (skipSignal=true), and the stored state reflects the new snapshot.
     auto second = buildResponse(0x01);
-    EXPECT_EQ(sensor->handleResponseMsg(
-                  reinterpret_cast<struct nsm_msg*>(second->data()),
-                  second->size()),
-              NSM_SUCCESS);
+    EXPECT_EQ(
+        sensor->handleResponseMsg(
+            reinterpret_cast<struct nsm_msg*>(second->data()), second->size()),
+        NSM_SUCCESS);
     ASSERT_EQ(spy->skipSignals.size(), 2u);
     EXPECT_TRUE(spy->skipSignals.at(1));
     auto afterSecond = spy->lineStates();

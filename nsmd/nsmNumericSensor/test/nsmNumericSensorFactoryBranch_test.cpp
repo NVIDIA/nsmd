@@ -103,7 +103,7 @@ class MockNumericSensorBuilderFB : public NumericSensorBuilder
   public:
     MOCK_METHOD(std::shared_ptr<NsmNumericSensor>, makeSensor,
                 (const std::string&, const std::string&, sdbusplus::bus::bus&,
-                 const NumericSensorInfo&),
+                 const NumericSensorInfo&, const dbus::PropertyMap&),
                 (override));
     MOCK_METHOD(std::shared_ptr<NsmNumericAggregator>, makeAggregator,
                 (const NumericSensorInfo&), (override));
@@ -175,9 +175,14 @@ TEST_F(NsmNumericSensorFactoryBranchTest,
     utils::MockDbusAsync::propertyMap(objPath,
                                       peakIface)["Aggregated"] = bool(false);
 
+    dbus::PropertyMap peakProps1;
+    peakProps1["SensorId"] = uint64_t(2);
+    peakProps1["Priority"] = bool(false);
+    peakProps1["Aggregated"] = bool(false);
+
     size_t before = nsmDev->roundRobinSensors.size();
-    NumericSensorFactory::makePeakValueAndAdd(interface, objPath, info,
-                                              sensorUuid, nsmDev.get());
+    NumericSensorFactory::makePeakValueAndAdd(
+        interface, objPath, info, sensorUuid, nsmDev.get(), peakProps1);
     EXPECT_GT(nsmDev->roundRobinSensors.size(), before);
 }
 
@@ -194,19 +199,16 @@ TEST_F(NsmNumericSensorFactoryBranchTest,
     info.sensorId = 1;
 
     const std::string tempIface = "xyz.openbmc_project.Configuration.NSM_Temp";
-    const std::string peakIface = tempIface + ".PeakValue";
 
-    utils::MockDbusAsync::propertyMap(objPath,
-                                      peakIface)["SensorId"] = uint64_t(2);
-    utils::MockDbusAsync::propertyMap(objPath,
-                                      peakIface)["Priority"] = bool(false);
-    utils::MockDbusAsync::propertyMap(objPath,
-                                      peakIface)["Aggregated"] = bool(false);
+    dbus::PropertyMap peakProps2;
+    peakProps2["SensorId"] = uint64_t(2);
+    peakProps2["Priority"] = bool(false);
+    peakProps2["Aggregated"] = bool(false);
 
     size_t before = nsmDev->roundRobinSensors.size();
     // Should not crash, just logs error
-    NumericSensorFactory::makePeakValueAndAdd(tempIface, objPath, info,
-                                              sensorUuid, nsmDev.get());
+    NumericSensorFactory::makePeakValueAndAdd(
+        tempIface, objPath, info, sensorUuid, nsmDev.get(), peakProps2);
     // No sensor added for non-Power type
     EXPECT_EQ(nsmDev->roundRobinSensors.size(), before);
 }
@@ -229,7 +231,7 @@ TEST_F(NsmNumericSensorFactoryBranchTest, Make_MissingUUID_Throws)
 
     auto mockBuilder =
         std::make_unique<StrictMock<MockNumericSensorBuilderFB>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _)).Times(0);
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _)).Times(0);
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
     NumericSensorFactory factory(std::move(mockBuilder));
@@ -263,7 +265,7 @@ TEST_F(NsmNumericSensorFactoryBranchTest,
 
     auto mockBuilder =
         std::make_unique<StrictMock<MockNumericSensorBuilderFB>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _)).Times(0);
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _)).Times(0);
 
     NumericSensorFactory factory(std::move(mockBuilder));
     // chassis_association stays empty → co_return NSM_ERROR //
@@ -294,8 +296,14 @@ TEST_F(NsmNumericSensorFactoryBranchTest,
     utils::MockDbusAsync::propertyMap(objPath + "_agg",
                                       peakIface)["Aggregated"] = bool(false);
 
+    dbus::PropertyMap peakProps3;
+    peakProps3["SensorId"] = uint64_t(3);
+    peakProps3["Priority"] = bool(true);
+    peakProps3["Aggregated"] = bool(false);
+
     size_t before = nsmDev->prioritySensors.size();
     NumericSensorFactory::makePeakValueAndAdd(interface, objPath + "_agg", info,
-                                              sensorUuid, nsmDev.get());
+                                              sensorUuid, nsmDev.get(),
+                                              peakProps3);
     EXPECT_GT(nsmDev->prioritySensors.size(), before);
 }

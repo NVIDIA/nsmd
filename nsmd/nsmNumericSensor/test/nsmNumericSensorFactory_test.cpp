@@ -57,7 +57,7 @@ class MockNumericSensorBuilder : public NumericSensorBuilder
   public:
     MOCK_METHOD(std::shared_ptr<NsmNumericSensor>, makeSensor,
                 (const std::string&, const std::string&, sdbusplus::bus::bus&,
-                 const NumericSensorInfo&),
+                 const NumericSensorInfo&, const dbus::PropertyMap&),
                 (override));
     MOCK_METHOD(std::shared_ptr<NsmNumericAggregator>, makeAggregator,
                 (const NumericSensorInfo&), (override));
@@ -268,7 +268,7 @@ TEST_F(NumericSensorFactoryMakeTest, NoChassis_BuilderNotCalled)
     // → chassis_association stays empty → co_return NSM_ERROR //
 
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _)).Times(0);
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _)).Times(0);
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
     NumericSensorFactory factory(std::move(mockBuilder));
@@ -284,7 +284,7 @@ TEST_F(NumericSensorFactoryMakeTest, WithChassis_NotAggregated_SensorAdded)
 
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TestSensor", 1);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(interface, objPath, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(interface, objPath, _, _, _))
         .WillOnce(Return(stubSensor));
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
@@ -302,7 +302,7 @@ TEST_F(NumericSensorFactoryMakeTest, WithChassis_PriorityTrue_InPriorityQueue)
 
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TestSensor", 1);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _))
         .WillOnce(Return(stubSensor));
 
     NumericSensorFactory factory(std::move(mockBuilder));
@@ -333,9 +333,10 @@ TEST_F(NumericSensorFactoryMakeTest, NSMTemp_SensorId0_PrimaryTempAssocAdded)
     std::vector<utils::Association> capturedAssociations;
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TempSensor", 0);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _))
         .WillOnce([&](const std::string&, const std::string&,
-                      sdbusplus::bus::bus&, const NumericSensorInfo& info) {
+                      sdbusplus::bus::bus&, const NumericSensorInfo& info,
+                      const dbus::PropertyMap&) {
         capturedAssociations = info.associations;
         return stubSensor;
     });
@@ -380,9 +381,10 @@ TEST_F(NumericSensorFactoryMakeTest, NSMTemp_NonZeroSensorId_NoPrimaryTempAdded)
     std::vector<utils::Association> capturedAssociations;
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TempSensor2", 1);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _))
         .WillOnce([&](const std::string&, const std::string&,
-                      sdbusplus::bus::bus&, const NumericSensorInfo& info) {
+                      sdbusplus::bus::bus&, const NumericSensorInfo& info,
+                      const dbus::PropertyMap&) {
         capturedAssociations = info.associations;
         return stubSensor;
     });
@@ -426,9 +428,10 @@ TEST_F(NumericSensorFactoryMakeTest,
     std::vector<utils::Association> capturedAssociations;
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TempSensor3", 0);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _))
         .WillOnce([&](const std::string&, const std::string&,
-                      sdbusplus::bus::bus&, const NumericSensorInfo& info) {
+                      sdbusplus::bus::bus&, const NumericSensorInfo& info,
+                      const dbus::PropertyMap&) {
         capturedAssociations = info.associations;
         return stubSensor;
     });
@@ -453,7 +456,7 @@ TEST_F(NumericSensorFactoryMakeTest, Aggregated_NoExistingAgg_AggregatorCreated)
                                                               type, false);
 
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _))
         .WillOnce(Return(stubSensor));
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).WillOnce(Return(stubAgg));
 
@@ -481,7 +484,7 @@ TEST_F(NumericSensorFactoryMakeTest,
 
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TestSensor", 2);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _))
         .WillOnce(Return(stubSensor));
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0); // existing agg used
 
@@ -520,7 +523,7 @@ TEST_F(NumericSensorFactoryMakeTest,
 
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TestSensor", 3);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _))
         .WillOnce(Return(stubSensor));
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
@@ -548,7 +551,7 @@ TEST_F(NumericSensorFactoryMakeTest,
 
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TestSensor", 4);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _))
         .WillOnce(Return(stubSensor));
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
@@ -585,7 +588,7 @@ TEST_F(NumericSensorFactoryMakeTest,
     assocPm["AbsolutePath"] = chassisPath;
 
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _)).Times(0);
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _)).Times(0);
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
     NumericSensorFactory factory(std::move(mockBuilder));
@@ -620,7 +623,7 @@ TEST_F(NumericSensorFactoryMakeTest,
 
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TestSensor", 5);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(interface, altPath, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(interface, altPath, _, _, _))
         .WillOnce(Return(stubSensor));
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
@@ -653,7 +656,7 @@ TEST_F(NumericSensorFactoryMakeTest, Make_WithPhysicalContext_SensorAdded)
 
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("TestSensor", 6);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _))
         .WillOnce(Return(stubSensor));
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
@@ -689,7 +692,7 @@ TEST_F(NumericSensorFactoryMakeTest, Make_MissingName_TakesNameFalseBranch)
 
     auto stubSensor = std::make_shared<StubNsmNumericSensor>("", 7);
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(interface, altPath, _, _))
+    EXPECT_CALL(*mockBuilder, makeSensor(interface, altPath, _, _, _))
         .WillOnce(Return(stubSensor));
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
@@ -1463,7 +1466,7 @@ TEST_F(NumericSensorFactoryMakeNullDeviceTest,
 
     // builder is never invoked when !nsmDevice — use StrictMock to verify
     auto mockBuilder = std::make_unique<StrictMock<MockNumericSensorBuilder>>();
-    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _)).Times(0);
+    EXPECT_CALL(*mockBuilder, makeSensor(_, _, _, _, _)).Times(0);
     EXPECT_CALL(*mockBuilder, makeAggregator(_)).Times(0);
 
     NumericSensorFactory factory(std::move(mockBuilder));
