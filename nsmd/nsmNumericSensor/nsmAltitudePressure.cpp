@@ -110,41 +110,22 @@ requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,
     }
 
     std::unique_ptr<std::string> implementation{};
-    try
-    {
-        implementation = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "Implementation", interface.c_str()));
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("Implementation"))
+        implementation = std::make_unique<std::string>(std::get<std::string>(
+            allCurrentIfaceProperties.at("Implementation")));
 
     double maxAllowableValue{std::numeric_limits<double>::infinity()};
-    try
-    {
-        maxAllowableValue = utils::DBusHandler().getDbusProperty<double>(
-            objPath.c_str(), "MaxAllowableOperatingValue", interface.c_str());
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("MaxAllowableOperatingValue"))
+        maxAllowableValue = std::get<double>(
+            allCurrentIfaceProperties.at("MaxAllowableOperatingValue"));
 
     double maxValue{std::numeric_limits<double>::infinity()};
-    try
-    {
-        maxValue = utils::DBusHandler().getDbusProperty<double>(
-            objPath.c_str(), "MaxValue", interface.c_str());
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("MaxValue"))
+        maxValue = std::get<double>(allCurrentIfaceProperties.at("MaxValue"));
 
     double minValue{-std::numeric_limits<double>::infinity()};
-    try
-    {
-        minValue = utils::DBusHandler().getDbusProperty<double>(
-            objPath.c_str(), "MinValue", interface.c_str());
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("MinValue"))
+        minValue = std::get<double>(allCurrentIfaceProperties.at("MinValue"));
 
     std::vector<utils::Association> associations{};
     co_await utils::coGetAssociations(objPath, interface + ".Associations",

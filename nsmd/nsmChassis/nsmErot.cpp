@@ -154,8 +154,9 @@ requester::Coroutine parseSlots(const std::string& path, uint64_t slotCount,
             slot.fwType = std::get<std::string>(
                 allSlotIfaceProperties.at("FirmwareType"));
         }
-        slot.associations = utils::getAssociations(
-            slotPath, std::string(rotSlotInterface) + ".Associations");
+        co_await utils::coGetAssociations(
+            slotPath, std::string(rotSlotInterface) + ".Associations",
+            slot.associations);
         if (allSlotIfaceProperties.count("ChassisName"))
         {
             slot.chassisName =

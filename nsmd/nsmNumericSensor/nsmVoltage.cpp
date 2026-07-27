@@ -90,11 +90,11 @@ uint8_t NsmVoltage::handleResponseMsg(const struct nsm_msg* responseMsg,
 class VoltageSensorFactory : public NumericSensorBuilder
 {
   public:
-    std::shared_ptr<NsmNumericSensor>
-        makeSensor([[maybe_unused]] const std::string& interface,
-                   [[maybe_unused]] const std::string& objPath,
-                   sdbusplus::bus::bus& bus,
-                   const NumericSensorInfo& info) override
+    std::shared_ptr<NsmNumericSensor> makeSensor(
+        [[maybe_unused]] const std::string& interface,
+        [[maybe_unused]] const std::string& objPath, sdbusplus::bus::bus& bus,
+        const NumericSensorInfo& info,
+        [[maybe_unused]] const dbus::PropertyMap& properties) override
     {
         return std::make_shared<NsmVoltage>(
             bus, info.name, info.type, info.sensorId, info.associations,

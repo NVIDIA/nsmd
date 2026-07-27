@@ -252,14 +252,9 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
     thresholdInfo.sensorId = sensorId;
 
     bool periodicUpdate{false};
-
-    try
-    {
-        periodicUpdate = utils::DBusHandler().getDbusProperty<bool>(
-            objPath.c_str(), "PeriodicUpdate", intfName.c_str());
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("PeriodicUpdate"))
+        periodicUpdate =
+            std::get<bool>(allCurrentIfaceProperties.at("PeriodicUpdate"));
 
     auto sensor = std::make_shared<NsmThreshold>(
         thresholdInfo.name, thresholdInfo.type, thresholdInfo.sensorId,

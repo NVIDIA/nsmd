@@ -21,6 +21,7 @@
 #include "nsmNumericAggregator.hpp"
 #include "nsmNumericSensor.hpp"
 #include "nsmObjectFactory.hpp"
+#include "types.hpp"
 
 #include <string>
 #include <vector>
@@ -64,7 +65,8 @@ class NumericSensorBuilder : public NumericSensorAggregatorBuilder
 
     virtual std::shared_ptr<NsmNumericSensor>
         makeSensor(const std::string& interface, const std::string& objPath,
-                   sdbusplus::bus::bus& bus, const NumericSensorInfo& info) = 0;
+                   sdbusplus::bus::bus& bus, const NumericSensorInfo& info,
+                   const dbus::PropertyMap& properties) = 0;
 
     virtual std::shared_ptr<NsmNumericAggregator>
         makeAggregator(const NumericSensorInfo& info) = 0;
@@ -88,10 +90,10 @@ class NumericSensorFactory
                                    std::shared_ptr<NsmNumericSensor> sensor,
                                    const uuid_t& uuid, NsmDevice* nsmDevice);
 
-    static void makePeakValueAndAdd(const std::string& interface,
-                                    const std::string& objPath,
-                                    const NumericSensorInfo& info,
-                                    const uuid_t& uuid, NsmDevice* nsmDevice);
+    static void makePeakValueAndAdd(
+        const std::string& interface, const std::string& objPath,
+        const NumericSensorInfo& info, const uuid_t& uuid, NsmDevice* nsmDevice,
+        const dbus::PropertyMap& peakValueProperties);
 
   private:
     std::unique_ptr<NumericSensorBuilder> builder;

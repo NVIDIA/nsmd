@@ -113,13 +113,14 @@ requester::Coroutine NsmCPEREvent::cperRecordLogger()
     {
         try
         {
-            auto service = utils::DBusHandler().getService(loggerObj,
-                                                           loggerIntf);
-            if (service.empty())
+            auto mapperResponse = co_await utils::coGetServiceMap(
+                loggerObj, dbus::Interfaces{loggerIntf});
+            if (mapperResponse.empty())
             {
                 lg2::error("Failed to get CPER Logger service");
                 co_return NSM_SW_ERROR;
             }
+            auto service = mapperResponse.begin()->first;
             lg2::debug("CPER Event: Logging record on service: {SERVICE}",
                        "SERVICE", service);
             auto logSuccess = co_await utils::coDbusMethodCall(

@@ -91,10 +91,10 @@ uint8_t NsmPeakPower::handleResponseMsg(const struct nsm_msg* responseMsg,
 std::shared_ptr<NsmNumericSensor> PeakPowerSensorBuilder::makeSensor(
     [[maybe_unused]] const std::string& interface,
     [[maybe_unused]] const std::string& objPath, sdbusplus::bus::bus& bus,
-    const NumericSensorInfo& info)
+    const NumericSensorInfo& info, const dbus::PropertyMap& properties)
 {
-    auto averagingInterval = utils::DBusHandler().getDbusProperty<uint64_t>(
-        objPath.c_str(), "AveragingInterval", interface.c_str());
+    auto averagingInterval =
+        std::get<uint64_t>(properties.at("AveragingInterval"));
 
     auto sensor = std::make_shared<NsmPeakPower>(
         bus, info.name, info.type, info.sensorId, averagingInterval);

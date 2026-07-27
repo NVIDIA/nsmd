@@ -108,22 +108,16 @@ class PowerSensorFactory : public NumericSensorBuilder
     std::shared_ptr<NsmNumericSensor>
         makeSensor([[maybe_unused]] const std::string& interface,
                    [[maybe_unused]] const std::string& objPath,
-                   sdbusplus::bus::bus& bus,
-                   const NumericSensorInfo& info) override
+                   sdbusplus::bus::bus& bus, const NumericSensorInfo& info,
+                   const dbus::PropertyMap& properties) override
     {
-        auto averagingInterval = utils::DBusHandler().getDbusProperty<uint64_t>(
-            objPath.c_str(), "AveragingInterval", interface.c_str());
+        auto averagingInterval =
+            std::get<uint64_t>(properties.at("AveragingInterval"));
 
         std::vector<std::string> candidateForList;
-        try
-        {
-            candidateForList =
-                utils::DBusHandler().getDbusProperty<std::vector<std::string>>(
-                    objPath.c_str(), "CompositeNumericSensors",
-                    interface.c_str());
-        }
-        catch (const sdbusplus::exception::SdBusError& e)
-        {}
+        if (properties.count("CompositeNumericSensors"))
+            candidateForList = std::get<std::vector<std::string>>(
+                properties.at("CompositeNumericSensors"));
 
         auto sensor = std::make_shared<NsmPower>(
             bus, info.name, info.type, info.sensorId, averagingInterval,

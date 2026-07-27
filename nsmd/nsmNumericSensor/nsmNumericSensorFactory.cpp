@@ -86,56 +86,30 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
             allCurrentIfaceProperties.at("PhysicalContext"));
     }
 
-    try
-    {
-        info.implementation = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "Implementation", interface.c_str()));
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("Implementation"))
+        info.implementation =
+            std::make_unique<std::string>(std::get<std::string>(
+                allCurrentIfaceProperties.at("Implementation")));
 
-    try
-    {
-        info.maxAllowableValue = utils::DBusHandler().getDbusProperty<double>(
-            objPath.c_str(), "MaxAllowableOperatingValue", interface.c_str());
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("MaxAllowableOperatingValue"))
+        info.maxAllowableValue = std::get<double>(
+            allCurrentIfaceProperties.at("MaxAllowableOperatingValue"));
 
-    try
-    {
-        info.maxValue = utils::DBusHandler().getDbusProperty<double>(
-            objPath.c_str(), "MaxValue", interface.c_str());
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("MaxValue"))
+        info.maxValue =
+            std::get<double>(allCurrentIfaceProperties.at("MaxValue"));
 
-    try
-    {
-        info.minValue = utils::DBusHandler().getDbusProperty<double>(
-            objPath.c_str(), "MinValue", interface.c_str());
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("MinValue"))
+        info.minValue =
+            std::get<double>(allCurrentIfaceProperties.at("MinValue"));
 
-    try
-    {
-        info.readingBasis = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "ReadingBasis", interface.c_str()));
-    }
-    catch (const std::exception& e)
-    {}
+    if (allCurrentIfaceProperties.count("ReadingBasis"))
+        info.readingBasis = std::make_unique<std::string>(std::get<std::string>(
+            allCurrentIfaceProperties.at("ReadingBasis")));
 
-    try
-    {
+    if (allCurrentIfaceProperties.count("Description"))
         info.description = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "Description", interface.c_str()));
-    }
-    catch (const std::exception& e)
-    {}
+            std::get<std::string>(allCurrentIfaceProperties.at("Description")));
 
     co_await utils::coGetAssociations(objPath, interface + ".Associations",
                                       info.associations);
@@ -196,7 +170,8 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
         co_return NSM_ERROR;
     }
 
-    auto sensor = builder->makeSensor(interface, objPath, bus, info);
+    auto sensor = builder->makeSensor(interface, objPath, bus, info,
+                                      allCurrentIfaceProperties);
     lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
               "UUID", uuid, "NAME", info.name, "TYPE", info.type);
 
@@ -205,7 +180,10 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
 
     try
     {
-        makePeakValueAndAdd(interface, objPath, info, uuid, nsmDevice.get());
+        auto peakValueProperties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, objPath, interface + ".PeakValue");
+        makePeakValueAndAdd(interface, objPath, info, uuid, nsmDevice.get(),
+                            peakValueProperties);
     }
     catch (const std::exception& e)
     {}
@@ -217,11 +195,10 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
     co_return NSM_SUCCESS;
 }
 
-void NumericSensorFactory::makePeakValueAndAdd(const std::string& interface,
-                                               const std::string& objPath,
-                                               const NumericSensorInfo& info,
-                                               const uuid_t& uuid,
-                                               NsmDevice* nsmDevice)
+void NumericSensorFactory::makePeakValueAndAdd(
+    const std::string& interface, const std::string& objPath,
+    const NumericSensorInfo& info, const uuid_t& uuid, NsmDevice* nsmDevice,
+    const dbus::PropertyMap& peakValueProperties)
 {
     auto& bus = utils::DBusHandler::getBus();
 
@@ -230,24 +207,19 @@ void NumericSensorFactory::makePeakValueAndAdd(const std::string& interface,
     NumericSensorInfo peakValueInfo{};
 
     peakValueInfo.name = info.name;
-
     peakValueInfo.type = info.type + "_PeakValue";
-
-    peakValueInfo.sensorId = utils::DBusHandler().getDbusProperty<uint64_t>(
-        objPath.c_str(), "SensorId", peakValueInterface.c_str());
-
-    peakValueInfo.priority = utils::DBusHandler().getDbusProperty<bool>(
-        objPath.c_str(), "Priority", peakValueInterface.c_str());
-
-    peakValueInfo.aggregated = utils::DBusHandler().getDbusProperty<bool>(
-        objPath.c_str(), "Aggregated", peakValueInterface.c_str());
+    peakValueInfo.sensorId =
+        std::get<uint64_t>(peakValueProperties.at("SensorId"));
+    peakValueInfo.priority = std::get<bool>(peakValueProperties.at("Priority"));
+    peakValueInfo.aggregated =
+        std::get<bool>(peakValueProperties.at("Aggregated"));
 
     if (info.type == "NSM_Power")
     {
         PeakPowerSensorBuilder builder;
 
         auto sensor = builder.makeSensor(peakValueInterface, objPath, bus,
-                                         peakValueInfo);
+                                         peakValueInfo, peakValueProperties);
         lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
                   "UUID", uuid, "NAME", peakValueInfo.name, "TYPE",
                   peakValueInfo.type);

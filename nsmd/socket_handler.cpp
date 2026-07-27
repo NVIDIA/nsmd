@@ -460,9 +460,8 @@ int InKernelHandler::sendMsg([[maybe_unused]] uint8_t tag, eid_t eid,
     if (rc == -1)
     {
         int error = -errno;
-        lg2::error(
-            "sendto syscall failed. EID={ED}, RC={RC}", "ED", eid, "RC",
-            strerror(-error));
+        lg2::error("sendto syscall failed. EID={ED}, RC={RC}", "ED", eid, "RC",
+                   strerror(-error));
         return NSM_SW_ERROR;
     }
 

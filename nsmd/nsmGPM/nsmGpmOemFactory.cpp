@@ -82,37 +82,24 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
         "createNsmPerInstanceGPMMetric: interface={INTERFACE}, objPath={OBJPATH}",
         "INTERFACE", interface, "OBJPATH", objPath);
 
-    auto properties = utils::DBusHandler().getDbusProperties(objPath.c_str(),
-                                                             interface.c_str());
-    std::sort(properties.begin(), properties.end());
+    auto properties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath, interface);
 
-    std::string name = utils::getPropertyFromCollection<std::string>(properties,
-                                                                     "Name")
-                           .value();
+    std::string name = std::get<std::string>(properties.at("Name"));
     name = utils::makeDBusNameValid(name);
-    std::string type = utils::getPropertyFromCollection<std::string>(properties,
-                                                                     "Type")
-                           .value();
+    std::string type = std::get<std::string>(properties.at("Type"));
     type = utils::makeDBusNameValid(type);
-    const uint8_t retrievalSource = utils::getPropertyFromCollection<uint64_t>(
-                                        properties, "RetrievalSource")
-                                        .value();
+    const uint8_t retrievalSource = static_cast<uint8_t>(
+        std::get<uint64_t>(properties.at("RetrievalSource")));
     const uint8_t gpuInstance =
-        utils::getPropertyFromCollection<uint64_t>(properties, "GpuInstance")
-            .value();
-    const uint8_t computeInstance = utils::getPropertyFromCollection<uint64_t>(
-                                        properties, "ComputeInstance")
-                                        .value();
-    const std::string metric =
-        utils::getPropertyFromCollection<std::string>(properties, "Metric")
-            .value();
+        static_cast<uint8_t>(std::get<uint64_t>(properties.at("GpuInstance")));
+    const uint8_t computeInstance = static_cast<uint8_t>(
+        std::get<uint64_t>(properties.at("ComputeInstance")));
+    const std::string metric = std::get<std::string>(properties.at("Metric"));
     const uint8_t metricId =
-        utils::getPropertyFromCollection<uint64_t>(properties, "MetricId")
-            .value();
+        static_cast<uint8_t>(std::get<uint64_t>(properties.at("MetricId")));
     const std::vector<uint64_t> instanceBitfield =
-        utils::getPropertyFromCollection<std::vector<uint64_t>>(
-            properties, "InstanceBitfield")
-            .value();
+        std::get<std::vector<uint64_t>>(properties.at("InstanceBitfield"));
     std::vector<bitfield8_t> instanceBitfieldBytes(instanceBitfield.size());
     for (size_t i = 0; i < instanceBitfield.size(); i++)
     {
@@ -177,47 +164,29 @@ requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
 {
     auto& bus = utils::DBusHandler::getBus();
 
-    auto properties = utils::DBusHandler().getDbusProperties(objPath.c_str(),
-                                                             interface.c_str());
-    std::sort(properties.begin(), properties.end());
+    auto properties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath, interface);
 
-    std::string name = utils::getPropertyFromCollection<std::string>(properties,
-                                                                     "Name")
-                           .value();
+    std::string name = std::get<std::string>(properties.at("Name"));
     name = utils::makeDBusNameValid(name);
     const std::string type = interface.substr(interface.find_last_of('.') + 1);
-    const std::string uuid =
-        utils::getPropertyFromCollection<std::string>(properties, "UUID")
-            .value();
-    const uint8_t retrievalSource = utils::getPropertyFromCollection<uint64_t>(
-                                        properties, "RetrievalSource")
-                                        .value();
+    const std::string uuid = std::get<std::string>(properties.at("UUID"));
+    const uint8_t retrievalSource = static_cast<uint8_t>(
+        std::get<uint64_t>(properties.at("RetrievalSource")));
     const uint8_t gpuInstance =
-        utils::getPropertyFromCollection<uint64_t>(properties, "GpuInstance")
-            .value();
-    const uint8_t computeInstance = utils::getPropertyFromCollection<uint64_t>(
-                                        properties, "ComputeInstance")
-                                        .value();
-    const std::vector<uint8_t> metricsBitfield =
-        convertToBytes(utils::getPropertyFromCollection<std::vector<uint64_t>>(
-                           properties, "MetricsBitfield")
-                           .value());
+        static_cast<uint8_t>(std::get<uint64_t>(properties.at("GpuInstance")));
+    const uint8_t computeInstance = static_cast<uint8_t>(
+        std::get<uint64_t>(properties.at("ComputeInstance")));
+    const std::vector<uint8_t> metricsBitfield = convertToBytes(
+        std::get<std::vector<uint64_t>>(properties.at("MetricsBitfield")));
     std::string inventoryObjPath =
-        utils::getPropertyFromCollection<std::string>(properties,
-                                                      "InventoryObjPath")
-            .value();
+        std::get<std::string>(properties.at("InventoryObjPath"));
     inventoryObjPath = utils::makeDBusNameValid(inventoryObjPath);
 
     bool populateMemoryBandwidth{false};
-
-    try
-    {
-        populateMemoryBandwidth = utils::getPropertyFromCollection<bool>(
-                                      properties, "MemoryBandwidth")
-                                      .value();
-    }
-    catch (const std::exception& e)
-    {}
+    if (properties.count("MemoryBandwidth"))
+        populateMemoryBandwidth =
+            std::get<bool>(properties.at("MemoryBandwidth"));
 
     auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
@@ -233,12 +202,11 @@ requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
     std::string memoryInventoryObjPath;
     try
     {
-        if (populateMemoryBandwidth)
+        if (populateMemoryBandwidth &&
+            properties.count("MemoryInventoryObjPath"))
         {
             memoryInventoryObjPath =
-                utils::getPropertyFromCollection<std::string>(
-                    properties, "MemoryInventoryObjPath")
-                    .value();
+                std::get<std::string>(properties.at("MemoryInventoryObjPath"));
             memoryInventoryObjPath =
                 utils::makeDBusNameValid(memoryInventoryObjPath);
 
@@ -307,39 +275,25 @@ requester::Coroutine createNsmPerPortGPMMetrics(SensorManager& manager,
 {
     auto& bus = utils::DBusHandler::getBus();
 
-    auto properties = utils::DBusHandler().getDbusProperties(objPath.c_str(),
-                                                             interface.c_str());
-    std::sort(properties.begin(), properties.end());
+    auto properties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath, interface);
 
-    std::string name = utils::getPropertyFromCollection<std::string>(properties,
-                                                                     "Name")
-                           .value();
+    std::string name = std::get<std::string>(properties.at("Name"));
     name = utils::makeDBusNameValid(name);
     const std::string type = interface.substr(interface.find_last_of('.') + 1);
-    const std::string uuid =
-        utils::getPropertyFromCollection<std::string>(properties, "UUID")
-            .value();
-    const uint8_t retrievalSource = utils::getPropertyFromCollection<uint64_t>(
-                                        properties, "RetrievalSource")
-                                        .value();
+    const std::string uuid = std::get<std::string>(properties.at("UUID"));
+    const uint8_t retrievalSource = static_cast<uint8_t>(
+        std::get<uint64_t>(properties.at("RetrievalSource")));
     const uint8_t gpuInstance =
-        utils::getPropertyFromCollection<uint64_t>(properties, "GpuInstance")
-            .value();
-    const uint8_t computeInstance = utils::getPropertyFromCollection<uint64_t>(
-                                        properties, "ComputeInstance")
-                                        .value();
+        static_cast<uint8_t>(std::get<uint64_t>(properties.at("GpuInstance")));
+    const uint8_t computeInstance = static_cast<uint8_t>(
+        std::get<uint64_t>(properties.at("ComputeInstance")));
     const std::vector<std::string> metrics =
-        utils::getPropertyFromCollection<std::vector<std::string>>(properties,
-                                                                   "Metrics")
-            .value();
+        std::get<std::vector<std::string>>(properties.at("Metrics"));
     std::vector<uint64_t> ports =
-        utils::getPropertyFromCollection<std::vector<uint64_t>>(properties,
-                                                                "Ports")
-            .value();
+        std::get<std::vector<uint64_t>>(properties.at("Ports"));
     const std::vector<uint64_t> instanceBitfield =
-        utils::getPropertyFromCollection<std::vector<uint64_t>>(
-            properties, "InstanceBitfield")
-            .value();
+        std::get<std::vector<uint64_t>>(properties.at("InstanceBitfield"));
     std::vector<bitfield8_t> instanceBitfieldBytes(instanceBitfield.size());
     for (size_t i = 0; i < instanceBitfield.size(); i++)
     {
@@ -347,9 +301,7 @@ requester::Coroutine createNsmPerPortGPMMetrics(SensorManager& manager,
             static_cast<uint8_t>(instanceBitfield[i]);
     }
     std::string inventoryObjPath =
-        utils::getPropertyFromCollection<std::string>(properties,
-                                                      "InventoryObjPath")
-            .value();
+        std::get<std::string>(properties.at("InventoryObjPath"));
     inventoryObjPath = utils::makeDBusNameValid(inventoryObjPath);
 
     auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);

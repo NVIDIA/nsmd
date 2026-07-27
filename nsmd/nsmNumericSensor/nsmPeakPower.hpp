@@ -50,8 +50,8 @@ class PeakPowerSensorBuilder : public NumericSensorBuilder
     std::shared_ptr<NsmNumericSensor>
         makeSensor([[maybe_unused]] const std::string& interface,
                    [[maybe_unused]] const std::string& objPath,
-                   sdbusplus::bus::bus& bus,
-                   const NumericSensorInfo& info) override;
+                   sdbusplus::bus::bus& bus, const NumericSensorInfo& info,
+                   const dbus::PropertyMap& properties) override;
 
     std::shared_ptr<NsmNumericAggregator>
         makeAggregator(const NumericSensorInfo& info) override;

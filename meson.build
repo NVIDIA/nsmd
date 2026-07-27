@@ -154,19 +154,13 @@ if get_option('enable-debug-token').enabled() and not cx8_features
 endif
 
 if get_option('nvidia-manager-ready-csm').enabled()
-    add_project_arguments(
-        '-DNVIDIA_MANAGER_READY_CSM',
-        language: ['cpp'],
-    )
+    add_project_arguments('-DNVIDIA_MANAGER_READY_CSM', language: ['cpp'])
 endif
 
 if get_option('enable-debug-info').enabled() and not cx8_features
     add_project_arguments('-DENABLE_DEBUG_INFO', language: ['cpp', 'c'])
 endif
-conf_data.set10(
-    'NETIR_DUMP_ENABLED',
-    get_option('enable-netir-dump').enabled(),
-)
+conf_data.set10('NETIR_DUMP_ENABLED', get_option('enable-netir-dump').enabled())
 conf_data.set10(
     'DIAGNOSTIC_DUMP_ENABLED',
     get_option('enable-diagnostic-dump').enabled(),

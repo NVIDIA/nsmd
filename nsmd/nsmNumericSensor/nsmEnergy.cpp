@@ -100,11 +100,11 @@ uint8_t NsmEnergy::handleResponseMsg(const struct nsm_msg* responseMsg,
 class EnergySensorFactory : public NumericSensorBuilder
 {
   public:
-    std::shared_ptr<NsmNumericSensor>
-        makeSensor([[maybe_unused]] const std::string& interface,
-                   [[maybe_unused]] const std::string& objPath,
-                   sdbusplus::bus::bus& bus,
-                   const NumericSensorInfo& info) override
+    std::shared_ptr<NsmNumericSensor> makeSensor(
+        [[maybe_unused]] const std::string& interface,
+        [[maybe_unused]] const std::string& objPath, sdbusplus::bus::bus& bus,
+        const NumericSensorInfo& info,
+        [[maybe_unused]] const dbus::PropertyMap& properties) override
     {
         return std::make_shared<NsmEnergy>(
             bus, info.name, info.type, info.sensorId, info.associations,
