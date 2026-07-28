@@ -30,7 +30,7 @@
 // BMC kernel's uapi, so this option may be missing. (SOL_MCTP itself comes from
 // glibc and is always defined.) Remove once linux-libc-headers carries it.
 #ifndef MCTP_OPT_TAG_TIMEOUT_MS
-#define MCTP_OPT_TAG_TIMEOUT_MS 3
+#define MCTP_OPT_TAG_TIMEOUT_MS 4
 #endif
 
 #include <sdbusplus/server.hpp>
