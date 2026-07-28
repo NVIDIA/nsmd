@@ -118,16 +118,18 @@ requester::Coroutine NsmCPEREvent::cperRecordLogger()
             if (mapperResponse.empty())
             {
                 lg2::error("Failed to get CPER Logger service");
-                co_return NSM_SW_ERROR;
             }
-            auto service = mapperResponse.begin()->first;
-            lg2::debug("CPER Event: Logging record on service: {SERVICE}",
-                       "SERVICE", service);
-            auto logSuccess = co_await utils::coDbusMethodCall(
-                service, loggerObj, loggerIntf, "CreateLog", cperRecordData);
-            if (!logSuccess)
+            else
             {
-                lg2::error("Failed to notify CPER Logger");
+                auto service = mapperResponse.begin()->first;
+                lg2::debug("CPER Event: Logging record on service: {SERVICE}",
+                           "SERVICE", service);
+                auto logSuccess = co_await utils::coDbusMethodCall(
+                    service, loggerObj, loggerIntf, "CreateLog", cperRecordData);
+                if (!logSuccess)
+                {
+                    lg2::error("Failed to notify CPER Logger");
+                }
             }
         }
         catch (const std::exception& e)
