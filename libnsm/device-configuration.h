@@ -126,6 +126,7 @@ enum reconfiguration_permissions_v1_index {
 	RP_EGM_MODE = 22,
 	RP_INFOROM_RECREATE_ALLOW_INB = 23,
 	RP_RUNTIME_IN_SYSTEM_TEST = 24,
+	RP_DUAL_PART_NUMBERS = 25,
 };
 
 enum reconfiguration_permissions_v1_setting {
@@ -604,7 +605,16 @@ enum device_mode_index {
 	DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY = 14,
 	DEVICE_MODE_ONE_SHOT_GPU_COPY_SWITCH_POWER_LIMIT = 15,
 	DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT = 16,
+	DEVICE_MODE_ADAPTIVE_TGPMODE = 21,
 	DEVICE_MODE_LLDP = 24,
+};
+
+/** @brief AdaptiveTGPMode (Dual Part Number) data byte values per NSM Type 5
+ *         Device Mode Index 21.
+ */
+enum nsm_adaptive_tgpmode {
+	NSM_ADAPTIVE_TGPMODE_DISABLED = 0,
+	NSM_ADAPTIVE_TGPMODE_ENABLED = 1,
 };
 
 /** @brief LLDP TX/RX sub-mode values per NSM Type 5 Device Mode Index 24

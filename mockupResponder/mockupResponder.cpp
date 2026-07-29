@@ -181,6 +181,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2, {}},
             {RP_EGM_MODE, {}},
             {RP_INFOROM_RECREATE_ALLOW_INB, {}},
+            {RP_DUAL_PART_NUMBERS, {}},
         },     // prcKnobs
         {
             0, // mode
@@ -7148,7 +7149,7 @@ std::optional<std::vector<uint8_t>>
     }
     std::underlying_type_t<reconfiguration_permissions_v1_index> idxRaw{};
     std::memcpy(&idxRaw, &settingsIndex, sizeof(idxRaw));
-    if (idxRaw > RP_RUNTIME_IN_SYSTEM_TEST)
+    if (idxRaw > RP_DUAL_PART_NUMBERS)
     {
         lg2::error(
             "getReconfigurationPermissionsV1Handler: Invalid Settings Index");
@@ -7199,7 +7200,7 @@ std::optional<std::vector<uint8_t>>
     }
     std::underlying_type_t<reconfiguration_permissions_v1_index> idxRaw{};
     std::memcpy(&idxRaw, &settingsIndex, sizeof(idxRaw));
-    if (idxRaw > RP_RUNTIME_IN_SYSTEM_TEST)
+    if (idxRaw > RP_DUAL_PART_NUMBERS)
     {
         lg2::error(
             "setReconfigurationPermissionsV1Handler: Invalid Settings Index");
@@ -8658,6 +8659,13 @@ std::vector<uint8_t>
             data[0] = 1;
             break;
         }
+        case DEVICE_MODE_ADAPTIVE_TGPMODE:
+        {
+            // AdaptiveTGPMode (Dual Part Number): default enabled
+            data.resize(sizeof(uint8_t));
+            data[0] = NSM_ADAPTIVE_TGPMODE_ENABLED;
+            break;
+        }
         case DEVICE_MODE_LLDP:
         {
             /* OOB Miswiring Detection (NVBug 6136040): default mockup
@@ -8793,6 +8801,7 @@ std::optional<std::vector<uint8_t>>
             break;
         case DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED:
         case DEVICE_MODE_SOC_POWER_BRAKE_ENABLED:
+        case DEVICE_MODE_ADAPTIVE_TGPMODE:
             expectedLen = sizeof(uint8_t);
             break;
         case DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX:

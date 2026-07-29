@@ -37,6 +37,7 @@ tests = [
     'nsmOemResetStatisticsBranch_test',
     'nsmFpgaProcessorBranch2_test',
     'nsmProcessorFactoryBranch9_test',
+    'nsmAdaptiveTGPMode_test',
 ]
 
 foreach t : tests
