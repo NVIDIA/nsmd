@@ -1026,6 +1026,7 @@ const std::map<reconfiguration_permissions_v1_index, std::string>
         {RP_EGM_MODE, "Extend GPU Memory Mode"},
         {RP_INFOROM_RECREATE_ALLOW_INB, "InfoROM filesystem recreate"},
         {RP_RUNTIME_IN_SYSTEM_TEST, "Runtime in system test"},
+        {RP_DUAL_PART_NUMBERS, "AdaptiveTGPMode (Dual Part Number)"},
     }};
 class GetReconfigurationPermissionsV1 : public CommandInterface
 {
@@ -1495,7 +1496,8 @@ class GetDeviceModeSettingsV2 : public CommandInterface
             " 13 - One Shot CPU Power Limit GPU Copy\n"
             " 14 - Persistent CPU Power Limit GPU Copy\n"
             " 15 - One Shot GPU Copy Switch Power Limit\n"
-            " 16 - Persistent GPU Copy Switch Power Limit");
+            " 16 - Persistent GPU Copy Switch Power Limit\n"
+            " 21 - AdaptiveTGPMode / Dual Part Number (NvBool)");
         getDeviceModeSettingsV2Group->require_option(1);
     }
 
@@ -1604,7 +1606,8 @@ class SetDeviceModeSettingsV2 : public CommandInterface
             " 11 - One Shot GPU Base Power Limit (NvU32)\n"
             " 12 - Persistent GPU Base Power Limit (NvU32)\n"
             " 13 - One Shot CPU Power Limit GPU Copy (NvU32)\n"
-            " 14 - Persistent CPU Power Limit GPU Copy (NvU32)");
+            " 14 - Persistent CPU Power Limit GPU Copy (NvU32)\n"
+            " 21 - AdaptiveTGPMode / Dual Part Number (NvBool)");
         setDeviceModeSettingsV2Group->add_option("-l, --value", deviceModeValue,
                                                  "Device mode value (uint32)");
         setDeviceModeSettingsV2Group->add_option(
@@ -1627,6 +1630,7 @@ class SetDeviceModeSettingsV2 : public CommandInterface
             case DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED:
             case DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX:
             case DEVICE_MODE_SOC_POWER_BRAKE_ENABLED:
+            case DEVICE_MODE_ADAPTIVE_TGPMODE:
             {
                 payload[0] = static_cast<uint8_t>(
                     static_cast<uint32_t>(deviceModeValue));
