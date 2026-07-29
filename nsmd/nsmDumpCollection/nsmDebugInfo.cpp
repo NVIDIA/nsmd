@@ -144,18 +144,17 @@ requester::Coroutine NsmDebugInfoObject::getDebugInfoAsyncHandler(
         finish(AsyncOperationStatusType::Success,
                packNsmError(NSM_SW_SUCCESS, NSM_SUCCESS, ERR_NULL));
     }
-    else if (nextHandle == currentDebugInfoHandle)
-    {
-        // Device failed to advance the record handle; abort instead of
-        // recursing forever.
-        lg2::error("NsmDebugInfoObject: stuck-loop guard tripped on eid={EID}: "
-                   "device returned nextHandle=0x{HANDLE} matching the request",
-                   "EID", eid, "HANDLE", lg2::hex, currentDebugInfoHandle);
-        finish(AsyncOperationStatusType::InternalFailure,
-               packNsmError(NSM_SW_ERROR, NSM_SUCCESS, ERR_NULL));
-    }
     else
     {
+        if (nextHandle == currentDebugInfoHandle)
+        {
+            // WAR: aborting here breaks devices that legitimately repeat the
+            // record handle; keep fetching until the device-side fix lands.
+            lg2::warning(
+                "NsmDebugInfoObject: eid={EID} returned nextHandle=0x{HANDLE} "
+                "matching the request; continuing",
+                "EID", eid, "HANDLE", lg2::hex, currentDebugInfoHandle);
+        }
         getDebugInfoAsyncHandler(nextHandle);
     }
     // coverity[missing_return]
