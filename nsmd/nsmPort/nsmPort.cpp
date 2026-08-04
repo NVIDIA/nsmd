@@ -3,6 +3,7 @@
 #include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmEvent.hpp"
+#include "nsmInterface.hpp"
 #include "utils.hpp"
 
 #if defined(ENABLE_LLDP)
@@ -10,12 +11,29 @@
 #endif
 
 #include <phosphor-logging/lg2.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationContext/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationReference/server.hpp>
 
+#include <limits>
 #include <optional>
 #include <vector>
 
 namespace nsm
 {
+using PortLocationIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::inventory::decorator::Location>;
+using PortLocationCodeIntf =
+    sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                    inventory::decorator::LocationCode>;
+using PortLocationContextIntf =
+    sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                    inventory::decorator::LocationContext>;
+using PortLocationReferenceIntf =
+    sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                    inventory::decorator::LocationReference>;
+
 std::string getTopologyObjPath(const std::string& deviceName,
                                const uint8_t deviceType)
 {
@@ -1920,6 +1938,13 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
     {
         count = std::get<uint64_t>(allCurrentIfaceProperties.at("Count"));
     }
+    if (count > std::numeric_limits<uint8_t>::max())
+    {
+        lg2::error("Port Count exceeds supported uint8_t range: {COUNT}",
+                   "COUNT", count);
+        // coverity[missing_return]
+        co_return NSM_ERROR;
+    }
     uint64_t deviceType{};
     if (allCurrentIfaceProperties.count("DeviceType"))
     {
@@ -1939,6 +1964,45 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
     {
         supportFECHistogram =
             std::get<bool>(allCurrentIfaceProperties.at("SupportFECHistogram"));
+    }
+
+    std::vector<std::string> portNameMap{};
+    if (allCurrentIfaceProperties.count("PortNameMap"))
+    {
+        portNameMap = std::get<std::vector<std::string>>(
+            allCurrentIfaceProperties.at("PortNameMap"));
+    }
+    if (!portNameMap.empty() && portNameMap.size() != count)
+    {
+        lg2::warning(
+            "Ignoring PortNameMap because its size does not match Count: {COUNT}",
+            "COUNT", count);
+        portNameMap.clear();
+    }
+    std::vector<std::string> portLocationCodeMap{};
+    if (allCurrentIfaceProperties.count("PortLocationCodeMap"))
+    {
+        portLocationCodeMap = std::get<std::vector<std::string>>(
+            allCurrentIfaceProperties.at("PortLocationCodeMap"));
+    }
+    if (!portLocationCodeMap.empty() && portLocationCodeMap.size() != count)
+    {
+        lg2::warning(
+            "Ignoring PortLocationCodeMap because its size does not match Count: {COUNT}",
+            "COUNT", count);
+        portLocationCodeMap.clear();
+    }
+    std::string portLocationContext{};
+    if (allCurrentIfaceProperties.count("PortLocationContext"))
+    {
+        portLocationContext = std::get<std::string>(
+            allCurrentIfaceProperties.at("PortLocationContext"));
+    }
+    std::string portLocationReference{};
+    if (allCurrentIfaceProperties.count("PortLocationReference"))
+    {
+        portLocationReference = std::get<std::string>(
+            allCurrentIfaceProperties.at("PortLocationReference"));
     }
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
@@ -1979,7 +2043,9 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
     for (uint64_t i = 0; i < count; i++)
     {
         uint8_t logicalPortNum = i + 1;
-        std::string portName = name + '_' + std::to_string(i);
+        std::string portName = portNameMap.empty()
+                                   ? name + '_' + std::to_string(i)
+                                   : portNameMap[i];
         std::string objPath = parentObjPath + "/Ports/" + portName;
         std::string nodeGuidObjPath = objPath + "/Infiniband_Node_Guid";
         std::string ethernetMacAddressObjPath = objPath +
@@ -2000,6 +2066,57 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
             lg2::debug(
                 "Topology information not found for object port number: {PNUM} and path: {OBJP}",
                 "PNUM", logicalPortNum, "OBJP", objPath);
+        }
+
+        std::string portLocationCode = portLocationCodeMap.empty()
+                                           ? std::string{}
+                                           : portLocationCodeMap[i];
+        if (!portLocationCode.empty() || !portLocationContext.empty() ||
+            !portLocationReference.empty())
+        {
+            auto location =
+                std::make_shared<NsmInterfaceProvider<PortLocationIntf>>(
+                    portName, type, dbus::Interfaces{objPath});
+            location->invoke(pdiMethod(locationType),
+                             PortLocationIntf::LocationTypes::Connector);
+            nsmDevice->addDeviceSensors(location);
+        }
+        if (!portLocationCode.empty())
+        {
+            auto locationCode =
+                std::make_shared<NsmInterfaceProvider<PortLocationCodeIntf>>(
+                    portName, type, dbus::Interfaces{objPath});
+            locationCode->invoke(pdiMethod(locationCode), portLocationCode);
+            nsmDevice->addDeviceSensors(locationCode);
+        }
+        if (!portLocationContext.empty())
+        {
+            auto locationContext =
+                std::make_shared<NsmInterfaceProvider<PortLocationContextIntf>>(
+                    portName, type, dbus::Interfaces{objPath});
+            locationContext->invoke(pdiMethod(locationContext),
+                                    portLocationContext);
+            nsmDevice->addDeviceSensors(locationContext);
+        }
+        if (!portLocationReference.empty())
+        {
+            try
+            {
+                auto locationReference = std::make_shared<
+                    NsmInterfaceProvider<PortLocationReferenceIntf>>(
+                    portName, type, dbus::Interfaces{objPath});
+                locationReference->invoke(
+                    pdiMethod(locationReference),
+                    PortLocationReferenceIntf::convertReferenceAreasFromString(
+                        portLocationReference));
+                nsmDevice->addDeviceSensors(locationReference);
+            }
+            catch (const sdbusplus::exception::InvalidEnumString&)
+            {
+                lg2::warning(
+                    "Ignoring invalid PortLocationReference: {LOCATION_REFERENCE}",
+                    "LOCATION_REFERENCE", portLocationReference);
+            }
         }
 
         if (enableNetworkPortAddresses)
