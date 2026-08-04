@@ -25,7 +25,13 @@ using namespace ::testing;
 
 #include "utils.hpp"
 
+#include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationContext/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationReference/server.hpp>
+
 #include <filesystem>
+#include <limits>
 
 #define private public
 #define protected public
@@ -39,6 +45,18 @@ using namespace ::testing;
 
 namespace nsm
 {
+using TestPortLocationIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::inventory::decorator::Location>;
+using TestPortLocationCodeIntf =
+    sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                    inventory::decorator::LocationCode>;
+using TestPortLocationContextIntf =
+    sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                    inventory::decorator::LocationContext>;
+using TestPortLocationReferenceIntf =
+    sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                    inventory::decorator::LocationReference>;
+
 requester::Coroutine createNsmPortSensor(SensorManager& manager,
                                          const std::string& interface,
                                          const std::string& objPath,
@@ -2124,6 +2142,39 @@ struct NsmPortSensorCreateTestFixture :
     {
         cleanupDeviceSensors(devices);
     }
+
+    bool hasDeviceSensorNamed(const std::string& name) const
+    {
+        for (const auto& sensor : gpu->deviceSensors)
+        {
+            if (sensor->getName() == name)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template <typename IntfType>
+    std::shared_ptr<NsmInterfaceProvider<IntfType>>
+        findDeviceSensorNamed(const std::string& name) const
+    {
+        for (const auto& sensor : gpu->deviceSensors)
+        {
+            if (sensor->getName() != name)
+            {
+                continue;
+            }
+            auto interfaceSensor =
+                std::dynamic_pointer_cast<NsmInterfaceProvider<IntfType>>(
+                    sensor);
+            if (interfaceSensor)
+            {
+                return interfaceSensor;
+            }
+        }
+        return nullptr;
+    }
 };
 
 TEST_F(NsmPortSensorCreateTestFixture, goodTestCreatePortSensor)
@@ -2148,6 +2199,117 @@ TEST_F(NsmPortSensorCreateTestFixture, goodTestCreatePortSensor)
 
     // Expect multiple sensors per port (Status, Characteristics, Metrics)
     EXPECT_GE(gpu->deviceSensors.size(), 4);
+}
+
+TEST_F(NsmPortSensorCreateTestFixture, rejectsPortCountOutsideUint8Range)
+{
+    dbus::PropertyMap properties = {
+        {"Name", std::string("Port")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t{1}},
+        {"DeviceType", uint64_t{NSM_DEV_ID_GPU}},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0")},
+        {"Priority", false},
+    };
+    properties["Count"] = uint64_t{std::numeric_limits<uint8_t>::max()} +
+                          uint64_t{1};
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap = properties;
+
+    const size_t initialSensorCount = gpu->deviceSensors.size();
+    auto result = createNsmPortSensor(mockManager, basicIntfName, objPath,
+                                      false);
+
+    EXPECT_EQ(result.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount);
+}
+
+TEST_F(NsmPortSensorCreateTestFixture,
+       createsConfiguredPortNamesAndLocationDecorators)
+{
+    dbus::PropertyMap properties = {
+        {"Name", std::string("Port")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t{2}},
+        {"DeviceType", uint64_t{NSM_DEV_ID_GPU}},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0")},
+        {"Priority", false},
+        {"PortNameMap", std::vector<std::string>{"C1_1", "C2_2"}},
+        {"PortLocationCodeMap",
+         std::vector<std::string>{"OSFP-Cage-1", "OSFP-Cage-2"}},
+        {"PortLocationContext", std::string("Chassis_0/Bay-B-Left-Top")},
+        {"PortLocationReference",
+         std::string("xyz.openbmc_project.Inventory.Decorator."
+                     "LocationReference.ReferenceAreas.Left")},
+    };
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap = properties;
+
+    auto result = createNsmPortSensor(mockManager, basicIntfName, objPath,
+                                      false);
+
+    EXPECT_EQ(result.data(), NSM_SUCCESS);
+    EXPECT_TRUE(hasDeviceSensorNamed("C1_1"));
+    EXPECT_TRUE(hasDeviceSensorNamed("C2_2"));
+
+    auto verifyLocationDecorators = [this](const std::string& portName,
+                                           const std::string& locationCode) {
+        auto location = findDeviceSensorNamed<TestPortLocationIntf>(portName);
+        ASSERT_NE(location, nullptr);
+        EXPECT_EQ(TestPortLocationIntf::LocationTypes::Connector,
+                  location->invoke(pdiMethod(locationType)));
+
+        auto code = findDeviceSensorNamed<TestPortLocationCodeIntf>(portName);
+        ASSERT_NE(code, nullptr);
+        EXPECT_EQ(locationCode, code->invoke(pdiMethod(locationCode)));
+
+        auto context =
+            findDeviceSensorNamed<TestPortLocationContextIntf>(portName);
+        ASSERT_NE(context, nullptr);
+        EXPECT_EQ("Chassis_0/Bay-B-Left-Top",
+                  context->invoke(pdiMethod(locationContext)));
+
+        auto reference =
+            findDeviceSensorNamed<TestPortLocationReferenceIntf>(portName);
+        ASSERT_NE(reference, nullptr);
+        EXPECT_EQ(TestPortLocationReferenceIntf::ReferenceAreas::Left,
+                  reference->invoke(pdiMethod(locationReference)));
+    };
+
+    verifyLocationDecorators("C1_1", "OSFP-Cage-1");
+    verifyLocationDecorators("C2_2", "OSFP-Cage-2");
+}
+
+TEST_F(NsmPortSensorCreateTestFixture, fallsBackForInvalidPortConfiguration)
+{
+    dbus::PropertyMap properties = {
+        {"Name", std::string("Port")},
+        {"UUID", gpuUuid},
+        {"Count", uint64_t{1}},
+        {"DeviceType", uint64_t{NSM_DEV_ID_GPU}},
+        {"ParentObjPath",
+         std::string("/xyz/openbmc_project/inventory/system/gpu0")},
+        {"PortNameMap", std::vector<std::string>{"Mapped_0", "Mapped_1"}},
+        {"PortLocationCodeMap", std::vector<std::string>{"Cage_0", "Cage_1"}},
+        {"PortLocationReference", std::string("InvalidReferenceArea")},
+    };
+
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap = properties;
+
+    auto result = createNsmPortSensor(mockManager, basicIntfName, objPath,
+                                      false);
+
+    EXPECT_EQ(result.data(), NSM_SUCCESS);
+    EXPECT_TRUE(hasDeviceSensorNamed("Port_0"));
+    EXPECT_FALSE(hasDeviceSensorNamed("Mapped_0"));
 }
 
 TEST_F(NsmPortSensorCreateTestFixture, badTestMissingUUID)
