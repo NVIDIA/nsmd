@@ -150,7 +150,7 @@ std::unordered_map<uint8_t, EventSource>
 MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
-                                 uint8_t instanceId, bool dumpFailureCycle) :
+                                 uint8_t instanceId, bool failureCycle) :
     event(event), verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
     state({
@@ -216,11 +216,11 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
         {}, // eventSources
     })
 {
-    // Dump failure-cycle replay flag (see --dump_failure_cycle / README).
+    // Dump failure-cycle replay flag (see --failure_cycle / README).
     // When set, the five dump handlers replay kDumpFailureCycle instead of
     // their happy path. The cycle counter starts at the beginning.
-    this->dumpFailureCycle = dumpFailureCycle;
-    if (dumpFailureCycle)
+    this->failureCycle = failureCycle;
+    if (failureCycle)
     {
         lg2::info("MockupResponder: dump failure cycle ENABLED "
                   "({N} cases in kDumpFailureCycle)",
@@ -1526,16 +1526,58 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    // mock data to send
-    struct nsm_port_characteristics_data portCharData;
-    portCharData.port_status.link_state = 1;
+    struct nsm_port_characteristics_data portCharData{};
     portCharData.port_status.sub_link_state = 6;
     portCharData.port_status.rx_detect_state = 1;
-    portCharData.port_status.port_down_reason_code =
-        NSM_PORT_DOWN_REASON_CODE_HI_SER_BER;
     portCharData.nv_port_line_rate_mbps = 2500;
     portCharData.nv_port_data_rate_kbps = 3000;
     portCharData.status_lane_info = 225;
+
+    if (failureCycle)
+    {
+        // Each successive poll advances link_health and attention_trigger
+        // through every defined state, exercising the full health range and
+        // the state-change event path. link_state is UP so health is valid.
+        struct PortHealthCase
+        {
+            uint8_t health;
+            uint8_t trigger;
+        };
+        static constexpr std::array<PortHealthCase, 11> kPortHealthCycle = {{
+            {NSM_LINK_HEALTH_NA, 0},        // Unknown, no trigger
+            {NSM_LINK_HEALTH_ATTENTION, 1}, // Attention: RawBER
+            {NSM_LINK_HEALTH_ATTENTION, 2}, // Attention: EffectiveBER
+            {NSM_LINK_HEALTH_ATTENTION, 3}, // Attention: SymbolBER
+            {NSM_LINK_HEALTH_ATTENTION, 4}, // Attention: PLRTXBandwidthLoss
+            {NSM_LINK_HEALTH_ATTENTION, 5}, // Attention: PLRRXBandwidthLoss
+            {NSM_LINK_HEALTH_ATTENTION, 6}, // Attention: RecoveryBandwidthLoss
+            {NSM_LINK_HEALTH_ATTENTION, 7}, // Attention: PortTotalBandwidthLoss
+            {NSM_LINK_HEALTH_ATTENTION, 8}, // Attention: LinkDownCount
+            {NSM_LINK_HEALTH_ATTENTION, 9}, // Attention: SymbolErrorCount
+            {NSM_LINK_HEALTH_HEALTHY, 0},   // Healthy, no trigger
+        }};
+        const PortHealthCase& hc = kPortHealthCycle[portHealthCycleIndex];
+        portCharData.port_status.link_state = NSM_PORTSTATE_UP;
+        portCharData.port_status.link_health = hc.health;
+        portCharData.port_status.attention_trigger = hc.trigger;
+        if (verbose)
+        {
+            lg2::info("[MOCK-CYCLE] QueryPortCharacteristics case={I} "
+                      "link_health={H} attention_trigger={T}",
+                      "I", portHealthCycleIndex, "H",
+                      static_cast<int>(hc.health), "T",
+                      static_cast<int>(hc.trigger));
+        }
+        portHealthCycleIndex = (portHealthCycleIndex + 1) %
+                               kPortHealthCycle.size();
+    }
+    else
+    {
+        // Legacy fixed response (preserved for non-cycle runs).
+        portCharData.port_status.link_state = 1;
+        portCharData.port_status.port_down_reason_code =
+            NSM_PORT_DOWN_REASON_CODE_HI_SER_BER;
+    }
     uint16_t reason_code = ERR_NULL;
 
     std::vector<uint8_t> response(
@@ -6096,7 +6138,7 @@ std::optional<std::vector<uint8_t>>
     // Happy path (cycle off): 2-segment dump (handle 0 -> 1 -> END=0xFF).
     uint8_t nextHandle = (handle == 0 ? 1 : kMockDiagnosticsEndRecord);
 
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page = nextDumpCyclePage("GetDeviceDiagnostics",
                                                      /*iterative=*/true);
@@ -6182,7 +6224,7 @@ std::optional<std::vector<uint8_t>>
     // Happy path (cycle off): 2-segment dump (handle 0 -> 1 -> END=0).
     uint32_t nextHandle = (handle == 0 ? 1 : kMockDebugInfoEndRecord);
 
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page =
             nextDumpCyclePage("GetNetworkDeviceDebugInfo", /*iterative=*/true);
@@ -6262,7 +6304,7 @@ std::optional<std::vector<uint8_t>>
     // Erase is single-shot (no record-handle iteration), so it walks the
     // cycle as a non-iterative command: silent and non-success-cc pages
     // apply directly, and any multi-page iteration-only case is skipped.
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page = nextDumpCyclePage("EraseTrace",
                                                      /*iterative=*/false);
@@ -6337,7 +6379,7 @@ std::optional<std::vector<uint8_t>>
     // Happy path (cycle off): single-segment dump (END after first call).
     uint32_t nextHandle = kMockLogInfoEndRecord;
 
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page = nextDumpCyclePage("GetNetworkDeviceLogInfo",
                                                      /*iterative=*/true);
@@ -6429,7 +6471,7 @@ std::optional<std::vector<uint8_t>>
     }
 
     // Single-shot, same cycle treatment as eraseTrace (non-iterative).
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page = nextDumpCyclePage("EraseDebugInfo",
                                                      /*iterative=*/false);
