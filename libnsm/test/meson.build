@@ -55,6 +55,7 @@ tests = [
     'libnsm_firmware_utils_branch3_test',
     'libnsm_platform_environmental_branch7_test',
     'libnsm_device_configuration_branch4_test',
+    'libnsm_network_ports_port_health_test',
 ]
 
 foreach t : tests

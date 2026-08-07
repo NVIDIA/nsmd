@@ -528,6 +528,10 @@ class QueryPortCharacteristics : public CommandInterface
                 static_cast<uint32_t>(portCharData.nv_port_data_rate_kbps);
             result["Lane Info Status"] =
                 static_cast<uint32_t>(portCharData.status_lane_info);
+            result["Link Health"] =
+                static_cast<uint32_t>(portCharData.port_status.link_health);
+            result["Attention Trigger"] = static_cast<uint32_t>(
+                portCharData.port_status.attention_trigger);
             nsmtool::helper::DisplayInJson(result);
         }
         else

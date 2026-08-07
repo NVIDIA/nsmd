@@ -20,6 +20,7 @@
 
 #include <telemetry_mrd_producer.hpp>
 #endif
+#include <com/nvidia/NVLink/PortHealthMetrics/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortState/server.hpp>
@@ -47,6 +48,8 @@ using PortMetricsOem2Intf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::PortMetricsOem2>;
 using PortMetricsOem3Intf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::PortMetricsOem3>;
+using PortHealthMetricsIntf = sdbusplus::server::object_t<
+    sdbusplus::server::com::nvidia::nv_link::PortHealthMetrics>;
 using AssociationDefInft = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::association::Definitions>;
 using EthPortIntf = sdbusplus::server::object_t<
@@ -80,6 +83,10 @@ using PossibleLinks =
 
 using LinkDownReasonCodes =
     xyz::openbmc_project::metrics::IBPort::LinkDownReasonCodes;
+using EarlyHealthIndicationValues =
+    com::nvidia::nv_link::PortHealthMetrics::EarlyHealthIndicationValues;
+using AttentionTriggerReasonValues =
+    com::nvidia::nv_link::PortHealthMetrics::AttentionTriggerReasonValues;
 
 class NsmPortStatus : public NsmObject
 {
@@ -108,9 +115,11 @@ class NsmPortCharacteristics : public NsmSensor
   public:
     NsmPortCharacteristics(
         sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
-        const std::string& type,
+        const std::string& type, uint8_t deviceType,
         std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Intf,
-        std::shared_ptr<IBPortIntf> iBPortIntf, std::string& inventoryObjPath);
+        std::shared_ptr<IBPortIntf> iBPortIntf,
+        std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsIntf,
+        std::string& inventoryObjPath);
     NsmPortCharacteristics() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -124,9 +133,14 @@ class NsmPortCharacteristics : public NsmSensor
     std::unique_ptr<PortInfoIntf> portInfoIntf = nullptr;
     std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
     std::shared_ptr<IBPortIntf> iBPortIntf = nullptr;
+    std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsIntf = nullptr;
     uint8_t portNumber;
+    // GPU exposes the full port-characteristics telemetry; a switch exposes
+    // only the health counters. Gates non-health publishes.
+    uint8_t deviceType;
     std::string objPath;
     void updateLinkDownCode(const uint32_t linkDownCode);
+    void decodeAttentionTrigger(uint8_t triggerValue);
 };
 
 class NsmPortMetrics : public NsmSensor

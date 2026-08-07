@@ -372,8 +372,11 @@ TEST(NsmPortCharacteristics, GoodConstructAndGenReq)
         std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
 
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
     nsm::NsmPortCharacteristics sensor(
-        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, objPath);
     EXPECT_EQ(sensor.portName, portName);
 
     auto request = sensor.genRequestMsg(10, 20);
@@ -392,8 +395,11 @@ TEST(NsmPortCharacteristics, BadGenReq_InvalidInstanceId_ReturnsNullopt)
         std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
 
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
     nsm::NsmPortCharacteristics sensor(
-        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, objPath);
     // instanceId > NSM_INSTANCE_MAX -> encode fails -> return nullopt
     auto request = sensor.genRequestMsg(10, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(request.has_value());
@@ -411,8 +417,11 @@ TEST(NsmPortCharacteristics, GoodHandleResponseMsg)
         std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
 
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
     nsm::NsmPortCharacteristics sensor(
-        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, objPath);
 
     struct nsm_port_characteristics_data data = {};
     data.nv_port_line_rate_mbps = 400000;
@@ -444,8 +453,11 @@ TEST(NsmPortCharacteristics, BadHandleResponseMsg)
         std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
 
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
     nsm::NsmPortCharacteristics sensor(
-        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, objPath);
 
     // Error response
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
@@ -469,8 +481,11 @@ TEST(NsmPortCharacteristics, UpdateLinkDownCodeAllCases)
         std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
 
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
     nsm::NsmPortCharacteristics sensor(
-        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, objPath);
 
     // Test all link down reason codes
     const uint32_t codes[] = {
@@ -532,8 +547,11 @@ TEST(NsmPortCharacteristics, HandleResponseWithLinkDownCodes)
         std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
 
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
     nsm::NsmPortCharacteristics sensor(
-        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, objPath);
 
     // Test with various port down reason codes via handleResponseMsg
     uint32_t testCodes[] = {
@@ -2239,9 +2257,11 @@ TEST_F(NsmPortSensorCreateTestFixture, testPortCharacteristicsUpdate)
     auto iBPortIntf = std::make_shared<IBPortIntf>(bus,
                                                    inventoryObjPath.c_str());
 
-    NsmPortCharacteristics portChar(bus, portName, portNum, type,
-                                    portMetricsOem3Intf, iBPortIntf,
-                                    inventoryObjPath);
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<PortHealthMetricsIntf>(bus, inventoryObjPath.c_str());
+    NsmPortCharacteristics portChar(
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, inventoryObjPath);
 
     // Mock port characteristics response
     Response portCharResp(
@@ -2373,9 +2393,11 @@ TEST_F(NsmPortSensorCreateTestFixture, testPortCharacteristicsUpdateError)
     auto iBPortIntf = std::make_shared<IBPortIntf>(bus,
                                                    inventoryObjPath.c_str());
 
-    NsmPortCharacteristics portChar(bus, portName, portNum, type,
-                                    portMetricsOem3Intf, iBPortIntf,
-                                    inventoryObjPath);
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<PortHealthMetricsIntf>(bus, inventoryObjPath.c_str());
+    NsmPortCharacteristics portChar(
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, inventoryObjPath);
 
     // Mock error response
     Response portCharResp(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
@@ -2564,9 +2586,11 @@ TEST_F(NsmPortSensorCreateTestFixture,
     auto iBPortIntf = std::make_shared<IBPortIntf>(bus,
                                                    inventoryObjPath.c_str());
 
-    NsmPortCharacteristics portChar(bus, portName, portNum, type,
-                                    portMetricsOem3Intf, iBPortIntf,
-                                    inventoryObjPath);
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<PortHealthMetricsIntf>(bus, inventoryObjPath.c_str());
+    NsmPortCharacteristics portChar(
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, inventoryObjPath);
 
     // Test various link down reason codes
     std::vector<uint32_t> reasonCodes = {
@@ -2728,8 +2752,11 @@ TEST(NsmPortCharacteristics, HandleResponseMsg_DecodeFail_ReturnsError)
     auto portMetricsOem3Intf =
         std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
     nsm::NsmPortCharacteristics sensor(
-        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, objPath);
 
     std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) + 2, 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -2793,8 +2820,11 @@ TEST(NsmPortCharacteristics, HandleResponseMsg_ErrorCC_CoversBranch)
     auto portMetricsOem3Intf =
         std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
     nsm::NsmPortCharacteristics sensor(
-        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, objPath);
 
     std::vector<uint8_t> response(256, 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
@@ -3329,9 +3359,11 @@ TEST_F(NsmPortSensorCreateTestFixture,
     auto iBPortIntf = std::make_shared<IBPortIntf>(bus,
                                                    inventoryObjPath.c_str());
 
-    NsmPortCharacteristics portChar(bus, portName, portNum, type,
-                                    portMetricsOem3Intf, iBPortIntf,
-                                    inventoryObjPath);
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<PortHealthMetricsIntf>(bus, inventoryObjPath.c_str());
+    NsmPortCharacteristics portChar(
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, inventoryObjPath);
 
     std::vector<uint32_t> reasonCodes = {
         NSM_PORT_DOWN_REASON_CODE_UNKNOWN,
@@ -3798,8 +3830,11 @@ TEST(NsmPortCharacteristics,
     auto portMetricsOem3Intf =
         std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus, objPath.c_str());
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
     nsm::NsmPortCharacteristics sensor(
-        bus, portName, portNum, type, portMetricsOem3Intf, iBPortIntf, objPath);
+        bus, portName, portNum, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsIntfCtor, objPath);
 
     std::vector<uint8_t> buf(
         sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
