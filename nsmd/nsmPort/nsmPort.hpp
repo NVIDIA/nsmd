@@ -134,6 +134,14 @@ class NsmPortCharacteristics : public NsmSensor
     std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
     std::shared_ptr<IBPortIntf> iBPortIntf = nullptr;
     std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsIntf = nullptr;
+    static bool isWarningSeverity(EarlyHealthIndicationValues state)
+    {
+        return state != EarlyHealthIndicationValues::Healthy;
+    }
+
+    EarlyHealthIndicationValues previousEarlyHealthIndication =
+        EarlyHealthIndicationValues::Unknown;
+    bool healthStateInitialized = false;
     uint8_t portNumber;
     // GPU exposes the full port-characteristics telemetry; a switch exposes
     // only the health counters. Gates non-health publishes.
@@ -141,6 +149,10 @@ class NsmPortCharacteristics : public NsmSensor
     std::string objPath;
     void updateLinkDownCode(const uint32_t linkDownCode);
     void decodeAttentionTrigger(uint8_t triggerValue);
+    // Emits NVLinkPortHealthStateChanged on a health-state transition (the
+    // first observation is baselined, not reported). Isolated from
+    // handleResponseMsg for readability and to localize the flood policy.
+    void emitHealthStateChangeEvent(EarlyHealthIndicationValues newHealthState);
 };
 
 class NsmPortMetrics : public NsmSensor

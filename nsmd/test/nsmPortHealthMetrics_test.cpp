@@ -136,6 +136,13 @@ TEST_F(NsmPortHealthMetricsTest, ConstructorSetsDefaultNA)
               AttentionTriggerReasonValues::Unknown);
 }
 
+TEST_F(NsmPortHealthMetricsTest, ConstructorSetsHealthStateNotInitialized)
+{
+    // First poll skip flag must start as false so first handleResponseMsg does
+    // not fire an EventLog entry.
+    EXPECT_FALSE(sensor->healthStateInitialized);
+}
+
 // ===========================================================================
 // 2. link_health → EarlyHealthIndication mapping
 // ===========================================================================
@@ -307,6 +314,64 @@ TEST_F(NsmPortHealthMetricsTest,
 }
 
 // ===========================================================================
+// 4. healthStateInitialized first-poll skip
+// ===========================================================================
+
+TEST_F(NsmPortHealthMetricsTest, FirstPollSetsInitializedFlag)
+{
+    EXPECT_FALSE(sensor->healthStateInitialized);
+
+    auto buf = buildResponse(0x00020000u); // Healthy
+    auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
+    sensor->handleResponseMsg(msg, buf.size());
+
+    EXPECT_TRUE(sensor->healthStateInitialized);
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Healthy);
+}
+
+TEST_F(NsmPortHealthMetricsTest, SecondPollSameStatePreviousStateUpdated)
+{
+    // First poll — no event (initialization)
+    auto buf1 = buildResponse(0x00020000u); // Healthy
+    auto* msg1 = reinterpret_cast<const nsm_msg*>(buf1.data());
+    sensor->handleResponseMsg(msg1, buf1.size());
+    EXPECT_TRUE(sensor->healthStateInitialized);
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Healthy);
+
+    // Second poll — same state (Healthy), no event logged, previous stays
+    // Healthy
+    auto buf2 = buildResponse(0x00020000u);
+    auto* msg2 = reinterpret_cast<const nsm_msg*>(buf2.data());
+    auto rc = sensor->handleResponseMsg(msg2, buf2.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Healthy);
+}
+
+TEST_F(NsmPortHealthMetricsTest,
+       StateChangeUpdatesPreviousEarlyHealthIndication)
+{
+    // First poll: NA (initialization, no event)
+    auto buf1 = buildResponse(0x00000000u);
+    auto* msg1 = reinterpret_cast<const nsm_msg*>(buf1.data());
+    sensor->handleResponseMsg(msg1, buf1.size());
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Unknown);
+
+    // Second poll: Healthy (state change — event fires fire-and-forget, safe in
+    // test)
+    auto buf2 = buildResponse(0x00020000u);
+    auto* msg2 = reinterpret_cast<const nsm_msg*>(buf2.data());
+    sensor->handleResponseMsg(msg2, buf2.size());
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Healthy);
+    EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
+              EarlyHealthIndicationValues::Healthy);
+}
+
+// ===========================================================================
 // 5. Error CC and decode failure paths
 // ===========================================================================
 
@@ -339,4 +404,47 @@ TEST_F(NsmPortHealthMetricsTest, HandleResponse_ErrorCC_PropertiesUnchanged)
               EarlyHealthIndicationValues::Unknown);
     EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
               AttentionTriggerReasonValues::Unknown);
+}
+
+// ===========================================================================
+// 6. Event severity mapping (Warning for Attention/Unknown, OK for Healthy)
+// ===========================================================================
+
+TEST_F(NsmPortHealthMetricsTest, SeverityIsWarningForAttention)
+{
+    EXPECT_TRUE(NsmPortCharacteristics::isWarningSeverity(
+        EarlyHealthIndicationValues::Attention));
+}
+
+TEST_F(NsmPortHealthMetricsTest, SeverityIsWarningForUnknown)
+{
+    // A transition to Unknown is loss of a known health signal -> Warning.
+    EXPECT_TRUE(NsmPortCharacteristics::isWarningSeverity(
+        EarlyHealthIndicationValues::Unknown));
+}
+
+TEST_F(NsmPortHealthMetricsTest, SeverityIsInformationalForHealthy)
+{
+    EXPECT_FALSE(NsmPortCharacteristics::isWarningSeverity(
+        EarlyHealthIndicationValues::Healthy));
+}
+
+// Exercise the event-firing path on a Healthy -> Unknown transition (the new
+// Warning-severity case): first poll initializes, second fires the event.
+TEST_F(NsmPortHealthMetricsTest, TransitionHealthyToUnknownFiresEvent)
+{
+    auto b1 = buildResponse(0x00020000u); // Healthy (init, no event)
+    sensor->handleResponseMsg(reinterpret_cast<const nsm_msg*>(b1.data()),
+                              b1.size());
+    ASSERT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Healthy);
+
+    auto b2 = buildResponse(0x00000000u); // Unknown (state change -> event)
+    auto rc = sensor->handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(b2.data()), b2.size());
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Unknown);
+    EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
+              EarlyHealthIndicationValues::Unknown);
 }

@@ -2,6 +2,7 @@
 
 #include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmEvent.hpp"
 #include "utils.hpp"
 
 #if defined(ENABLE_LLDP)
@@ -436,9 +437,60 @@ uint8_t
     portHealthMetricsIntf->earlyHealthIndication(newHealthState);
     decodeAttentionTrigger(data.port_status.attention_trigger);
 
+    emitHealthStateChangeEvent(newHealthState);
+
     updateMetricOnSharedMemory();
 
     return cc ? cc : rc;
+}
+
+void NsmPortCharacteristics::emitHealthStateChangeEvent(
+    EarlyHealthIndicationValues newHealthState)
+{
+    // Baseline the first observation so a fresh daemon start does not emit a
+    // spurious event.
+    if (!healthStateInitialized)
+    {
+        healthStateInitialized = true;
+        previousEarlyHealthIndication = newHealthState;
+        return;
+    }
+    if (newHealthState == previousEarlyHealthIndication)
+    {
+        return;
+    }
+
+    using NvidiaMetrics = com::nvidia::nv_link::PortHealthMetrics;
+    auto newStateStr =
+        NvidiaMetrics::convertEarlyHealthIndicationValuesToString(
+            newHealthState);
+    auto prevStateStr =
+        NvidiaMetrics::convertEarlyHealthIndicationValuesToString(
+            previousEarlyHealthIndication);
+    auto triggerStr =
+        NvidiaMetrics::convertAttentionTriggerReasonValuesToString(
+            portHealthMetricsIntf->attentionTriggerReason());
+
+    // Warning for Attention and Unknown (loss of a known health signal),
+    // Informational (OK) only for Healthy — see isWarningSeverity().
+    auto severity = isWarningSeverity(newHealthState) ? Level::Warning
+                                                      : Level::Informational;
+
+    logEventAsync("NvidiaMessageRegistry.1.0.NVLinkPortHealthStateChanged",
+                  severity,
+                  {{"REDFISH_MESSAGE_ID",
+                    "NvidiaMessageRegistry.1.0.NVLinkPortHealthStateChanged"},
+                   {"REDFISH_MESSAGE_ARGS",
+                    portName + "," + newStateStr + "," + triggerStr},
+                   // NSM RF-event convention: the affected port travels in
+                   // OriginOfCondition (bmcweb renders the Redfish port URI);
+                   // %1 is the friendly port name, not the D-Bus object path.
+                   {"REDFISH_ORIGIN_OF_CONDITION", objPath},
+                   {"PREVIOUS_STATE", prevStateStr},
+                   {"NEW_STATE", newStateStr},
+                   {"ATTENTION_TRIGGER", triggerStr}});
+
+    previousEarlyHealthIndication = newHealthState;
 }
 
 void NsmPortCharacteristics::updateLinkDownCode(const uint32_t linkDownCode)
