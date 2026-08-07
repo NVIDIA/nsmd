@@ -129,6 +129,25 @@ enum nsm_fm_report_status {
 	NSM_FM_REPORT_STATUS_TIMEOUT = 0x03
 };
 
+enum nsm_link_health_state {
+	NSM_LINK_HEALTH_NA = 0,
+	NSM_LINK_HEALTH_ATTENTION = 1,
+	NSM_LINK_HEALTH_HEALTHY = 2
+};
+
+enum nsm_attention_trigger {
+	NSM_ATTENTION_TRIGGER_NA = 0,
+	NSM_ATTENTION_TRIGGER_RAW_BER = 1,
+	NSM_ATTENTION_TRIGGER_EFFECTIVE_BER = 2,
+	NSM_ATTENTION_TRIGGER_SYMBOL_BER = 3,
+	NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS = 4,
+	NSM_ATTENTION_TRIGGER_PLR_RX_BANDWIDTH_LOSS = 5,
+	NSM_ATTENTION_TRIGGER_RECOVERY_BANDWIDTH_LOSS = 6,
+	NSM_ATTENTION_TRIGGER_PORT_TOTAL_BANDWIDTH_LOSS = 7,
+	NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT = 8,
+	NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT = 9
+};
+
 enum port_down_reason_code {
 	NSM_PORT_DOWN_REASON_CODE_NO_LINK_DOWN = 0x00,
 	NSM_PORT_DOWN_REASON_CODE_UNKNOWN = 0x01,
@@ -340,8 +359,10 @@ struct status {
 	uint32_t link_state : 3;
 	uint32_t sub_link_state : 5;
 	uint32_t rx_detect_state : 2;
-	uint32_t port_down_reason_code : 8;
-	uint32_t unused : 14;
+	uint32_t port_down_reason_code : 6;
+	uint32_t link_health : 2;
+	uint32_t attention_trigger : 8;
+	uint32_t unused : 6;
 } __attribute__((packed));
 
 struct nsm_port_characteristics_data {
