@@ -167,12 +167,12 @@ TEST_F(NsmProcessorModulePowerControlTest, testGenRequestMsgWithDifferentEids)
     EXPECT_TRUE(result3.has_value());
 }
 
-TEST_F(NsmProcessorModulePowerControlTest, testClearPowerCapIntfDefaultPowerCap)
+TEST_F(NsmProcessorModulePowerControlTest, testPowerCapIntfDefaultPowerCap)
 {
     // Test default power cap value
     uint32_t defaultCap = 500;
-    clearPowerCapIntf->defaultPowerCap(defaultCap);
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), defaultCap);
+    powerCapIntf->defaultPowerCap(defaultCap);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), defaultCap);
 }
 
 TEST_F(NsmProcessorModulePowerControlTest, testPowerCapIntfBoundaryValues)
@@ -1119,7 +1119,7 @@ struct NsmDefaultModulePowerLimitTest :
     public SensorManagerTest
 {
     NsmDeviceTable devices;
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf;
+    std::shared_ptr<PowerCapIntf> powerCapIntf;
     std::string name = "DefaultModulePowerLimit";
     std::string type = "NSM_DefaultModulePowerLimit";
     std::string path = "/xyz/openbmc_project/test/default_power_limit";
@@ -1137,7 +1137,7 @@ struct NsmDefaultModulePowerLimitTest :
     void SetUp() override
     {
         auto& bus = utils::DBusHandler::getBus();
-        clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(bus, path);
+        powerCapIntf = std::make_shared<PowerCapIntf>(bus, path.c_str());
         nsmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
         ASSERT_NE(nsmDevice, nullptr);
@@ -1158,8 +1158,8 @@ struct NsmDefaultModulePowerLimitTest :
 
 TEST_F(NsmDefaultModulePowerLimitTest, Constructor_Succeeds)
 {
-    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        name, type, clearPowerCapIntf);
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(name, type,
+                                                               powerCapIntf);
     EXPECT_NE(sensor, nullptr);
     EXPECT_EQ(sensor->getName(), name);
     EXPECT_EQ(sensor->getType(), type);
@@ -1167,8 +1167,8 @@ TEST_F(NsmDefaultModulePowerLimitTest, Constructor_Succeeds)
 
 TEST_F(NsmDefaultModulePowerLimitTest, Update_Success_SetsDefaultPowerCap)
 {
-    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        name, type, clearPowerCapIntf);
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(name, type,
+                                                               powerCapIntf);
 
     uint32_t ratedLimitMw = 600000; // 600 W
     auto responseData = buildInventoryResponse(ratedLimitMw);
@@ -1178,13 +1178,13 @@ TEST_F(NsmDefaultModulePowerLimitTest, Update_Success_SetsDefaultPowerCap)
 
     sensor->update(nsmDevice);
 
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 600u);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), 600u);
 }
 
 TEST_F(NsmDefaultModulePowerLimitTest, Update_InvalidPowerLimit_SetsRawValue)
 {
-    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        name, type, clearPowerCapIntf);
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(name, type,
+                                                               powerCapIntf);
 
     uint32_t ratedLimitMw = INVALID_POWER_LIMIT;
     auto responseData = buildInventoryResponse(ratedLimitMw);
@@ -1194,31 +1194,31 @@ TEST_F(NsmDefaultModulePowerLimitTest, Update_InvalidPowerLimit_SetsRawValue)
 
     sensor->update(nsmDevice);
 
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), INVALID_POWER_LIMIT);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), INVALID_POWER_LIMIT);
 }
 
 TEST_F(NsmDefaultModulePowerLimitTest, Update_SensorIOFailure_DoesNotSetValue)
 {
-    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        name, type, clearPowerCapIntf);
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(name, type,
+                                                               powerCapIntf);
 
-    clearPowerCapIntf->defaultPowerCap(555);
+    powerCapIntf->defaultPowerCap(555);
 
     EXPECT_CALL(*nsmDevice, sensorIO(_, _, _, _, _))
         .WillOnce(mockSensorIO(NSM_ERROR));
 
     sensor->update(nsmDevice);
 
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 555u);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), 555u);
 }
 
 TEST_F(NsmDefaultModulePowerLimitTest,
        Update_ErrorCompletionCode_DoesNotSetValue)
 {
-    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        name, type, clearPowerCapIntf);
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(name, type,
+                                                               powerCapIntf);
 
-    clearPowerCapIntf->defaultPowerCap(777);
+    powerCapIntf->defaultPowerCap(777);
 
     uint32_t ratedLimitMw = 400000;
     uint16_t dataSize = sizeof(ratedLimitMw);
@@ -1234,7 +1234,7 @@ TEST_F(NsmDefaultModulePowerLimitTest,
 
     sensor->update(nsmDevice);
 
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 777u);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), 777u);
 }
 
 // ============================================================================
@@ -1255,8 +1255,8 @@ TEST_F(NsmModulePowerLimitUpdateTest, AddSensorNsmModulePowerLimit)
 
 TEST_F(NsmDefaultModulePowerLimitTest, AddSensorNsmDefaultModulePowerLimit)
 {
-    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        name, type, clearPowerCapIntf);
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(name, type,
+                                                               powerCapIntf);
     size_t before = nsmDevice->deviceSensors.size();
     nsmDevice->addSensor(sensor, PollingType::RoundRobin);
     EXPECT_GT(nsmDevice->deviceSensors.size(), before);
@@ -1332,10 +1332,10 @@ TEST_F(NsmModulePowerLimitUpdateTest, Update_UnknownPropertyId_DefaultCase)
 
 TEST_F(NsmDefaultModulePowerLimitTest, Update_DecodeFail_ShortBuffer)
 {
-    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        name, type, clearPowerCapIntf);
+    auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(name, type,
+                                                               powerCapIntf);
 
-    clearPowerCapIntf->defaultPowerCap(333);
+    powerCapIntf->defaultPowerCap(333);
 
     // Too-short response → decode_get_inventory_information_resp fails
     std::vector<uint8_t> responseData(sizeof(nsm_msg_hdr) + 2, 0);
@@ -1345,7 +1345,7 @@ TEST_F(NsmDefaultModulePowerLimitTest, Update_DecodeFail_ShortBuffer)
 
     sensor->update(nsmDevice);
 
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 333u);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), 333u);
 }
 
 // ===========================================================================

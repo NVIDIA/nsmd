@@ -129,15 +129,14 @@ class NsmPowerLimitRange : public NsmObject
 class NsmDefaultPowerLimit : public NsmObject
 {
   public:
-    NsmDefaultPowerLimit(
-        const std::string& name, const std::string& type,
-        const uint8_t propertyId,
-        std::shared_ptr<NsmClearPowerLimitIntf> clearPowerLimitIntf);
+    NsmDefaultPowerLimit(const std::string& name, const std::string& type,
+                         const uint8_t propertyId,
+                         std::shared_ptr<PowerLimitsIntf> powerLimitsIntf);
     requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     uint8_t propertyId;
-    std::shared_ptr<NsmClearPowerLimitIntf> clearPowerLimitIntf;
+    std::shared_ptr<PowerLimitsIntf> powerLimitsIntf;
     std::string propertyName;
 };
 

@@ -153,7 +153,7 @@ uint32_t NsmPowerControl::defaultPowerCap() const
     for (const auto& powerCapSensor : manager.defaultPowerCapList)
     {
         valueTotal += powerCapSensor->getDefaultPowerCapIntf()
-                          ->ClearPowerCapIntf::defaultPowerCap();
+                          ->PowerCapIntf::defaultPowerCap();
     }
     return valueTotal;
 }

@@ -646,7 +646,7 @@ void createPowerCap(std::shared_ptr<NsmDevice> nsmDevice, sdbusplus::bus_t& bus,
     manager.powerCapList.emplace_back(powerCap);
 
     auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
-        name, type, clearPowerCapIntf, clearPowerCapAsyncIntf);
+        name, type, powerCapIntf, clearPowerCapAsyncIntf);
     manager.defaultPowerCapList.emplace_back(defaultPowerCap);
 
     auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
@@ -2946,15 +2946,15 @@ requester::Coroutine
 
 NsmDefaultPowerCap::NsmDefaultPowerCap(
     std::string& name, std::string& type,
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf,
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
     std::shared_ptr<NsmClearPowerCapAsyncIntf> clearPowerCapAsyncIntf) :
-    NsmObject(name, type), defaultPowerCapIntf(clearPowerCapIntf),
+    NsmObject(name, type), defaultPowerCapIntf(powerCapIntf),
     clearPowerCapAsyncIntf(clearPowerCapAsyncIntf)
 {}
 
 void NsmDefaultPowerCap::updateValue(uint32_t value)
 {
-    defaultPowerCapIntf->defaultPowerCap(value);
+    defaultPowerCapIntf->PowerCapIntf::defaultPowerCap(value);
     lg2::debug("NsmDefaultPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 

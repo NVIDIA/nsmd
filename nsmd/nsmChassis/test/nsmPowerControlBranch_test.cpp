@@ -261,7 +261,7 @@ TEST_F(NsmProcessorModulePowerControlExtTest,
     std::string dlType = "NSM_DefaultModulePowerLimit";
 
     auto defaultLimit = std::make_shared<NsmDefaultModulePowerLimit>(
-        dlName, dlType, clearPowerCapIntf);
+        dlName, dlType, powerCapIntf);
 
     EXPECT_NE(defaultLimit, nullptr);
     EXPECT_EQ(defaultLimit->getName(), dlName);
@@ -274,7 +274,7 @@ TEST_F(NsmProcessorModulePowerControlExtTest,
     std::string dlType = "NSM_DefaultModulePowerLimit";
 
     auto defaultLimit = std::make_shared<NsmDefaultModulePowerLimit>(
-        dlName, dlType, clearPowerCapIntf);
+        dlName, dlType, powerCapIntf);
 
     // Build a valid inventory information response with 4-byte value
     uint32_t ratedPower = 400000; // 400 W in mW
@@ -297,7 +297,7 @@ TEST_F(NsmProcessorModulePowerControlExtTest,
     EXPECT_NO_THROW(defaultLimit->update(gpu));
 
     // Assert: 400000/1000 = 400
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 400u);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), 400u);
 }
 
 TEST_F(NsmProcessorModulePowerControlExtTest,
@@ -307,7 +307,7 @@ TEST_F(NsmProcessorModulePowerControlExtTest,
     std::string dlType = "NSM_DefaultModulePowerLimit";
 
     auto defaultLimit = std::make_shared<NsmDefaultModulePowerLimit>(
-        dlName, dlType, clearPowerCapIntf);
+        dlName, dlType, powerCapIntf);
 
     EXPECT_CALL(*gpu, sensorIO(testing::_, testing::_, testing::_, testing::_,
                                testing::_))
@@ -324,7 +324,7 @@ TEST_F(NsmProcessorModulePowerControlExtTest,
     std::string dlType = "NSM_DefaultModulePowerLimit";
 
     auto defaultLimit = std::make_shared<NsmDefaultModulePowerLimit>(
-        dlName, dlType, clearPowerCapIntf);
+        dlName, dlType, powerCapIntf);
 
     uint32_t ratedPower = INVALID_POWER_LIMIT;
     std::vector<uint8_t> data(4, 0);
@@ -344,7 +344,7 @@ TEST_F(NsmProcessorModulePowerControlExtTest,
     // Act
     EXPECT_NO_THROW(defaultLimit->update(gpu));
 
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), INVALID_POWER_LIMIT);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), INVALID_POWER_LIMIT);
 }
 
 // =============================================================================
@@ -508,7 +508,7 @@ TEST_F(NsmProcessorModulePowerControlExtTest,
     manager.processorModuleToDeviceMap[path] = {gpu};
 
     // Set a default power cap value
-    clearPowerCapIntf->defaultPowerCap(400);
+    powerCapIntf->defaultPowerCap(400);
 
     // Build a valid set_power_limit response
     std::vector<uint8_t> setPowerLimitResp(
@@ -538,7 +538,7 @@ TEST_F(NsmProcessorModulePowerControlExtTest,
     SensorManager& manager = SensorManager::getInstance();
     manager.processorModuleToDeviceMap[path] = {gpu};
 
-    clearPowerCapIntf->defaultPowerCap(400);
+    powerCapIntf->defaultPowerCap(400);
 
     EXPECT_CALL(*gpu,
                 postPatchIO(testing::_, testing::_, testing::_, testing::_))

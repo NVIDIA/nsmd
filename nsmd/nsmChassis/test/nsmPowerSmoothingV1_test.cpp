@@ -129,8 +129,8 @@ class NsmClearPowerCapAsyncIntf :
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_limit_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         auto rc = encode_set_device_power_limit_req(
-            0, DEFAULT_LIMIT, PERSISTENT, clearPowerCapIntf->defaultPowerCap(),
-            requestMsg);
+            0, DEFAULT_LIMIT, PERSISTENT,
+            powerCapIntf->PowerCapIntf::defaultPowerCap(), requestMsg);
 
         if (rc)
         {
@@ -1505,7 +1505,7 @@ TEST_F(NsmClearPowerCapIfaceTest, ClearPowerCapOnDevice_Success_UpdatesPowerCap)
         parents, gpu);
     auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
         bus, "/xyz/openbmc_project/control/clear_power_cap3");
-    clearPowerCapIntf->defaultPowerCap(500);
+    powerCapIntf->PowerCapIntf::defaultPowerCap(500);
 
     auto asyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, "/xyz/openbmc_project/control/clear_power_cap3", gpu, powerCapIntf,
@@ -1549,7 +1549,7 @@ TEST_F(NsmClearPowerCapIfaceTest,
         parents, gpu);
     auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
         bus, "/xyz/openbmc_project/control/clear_power_cap4");
-    clearPowerCapIntf->defaultPowerCap(500);
+    powerCapIntf->PowerCapIntf::defaultPowerCap(500);
 
     auto asyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, "/xyz/openbmc_project/control/clear_power_cap4", gpu, powerCapIntf,
@@ -1578,7 +1578,7 @@ TEST_F(NsmClearPowerCapIfaceTest,
         parents, gpu);
     auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
         bus, "/xyz/openbmc_project/control/clear_power_cap5");
-    clearPowerCapIntf->defaultPowerCap(500);
+    powerCapIntf->PowerCapIntf::defaultPowerCap(500);
 
     auto asyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, "/xyz/openbmc_project/control/clear_power_cap5", gpu, powerCapIntf,
@@ -1616,7 +1616,7 @@ TEST_F(NsmClearPowerCapIfaceTest, DoClearPowerCapOnDevice_Success_StatusSuccess)
         parents, gpu);
     auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
         bus, "/xyz/openbmc_project/control/clear_power_cap6");
-    clearPowerCapIntf->defaultPowerCap(500);
+    powerCapIntf->PowerCapIntf::defaultPowerCap(500);
 
     auto asyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, "/xyz/openbmc_project/control/clear_power_cap6", gpu, powerCapIntf,

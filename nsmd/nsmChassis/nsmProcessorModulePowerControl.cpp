@@ -202,7 +202,7 @@ requester::Coroutine NsmProcessorModulePowerControl::doClearPowerCapOnModule(
 {
     AsyncOperationStatusType status{AsyncOperationStatusType::Success};
     auto rc = co_await updatePowerLimitOnModule(
-        &status, DEFAULT_LIMIT, clearPowerCapIntf->defaultPowerCap());
+        &status, DEFAULT_LIMIT, powerCapIntf->defaultPowerCap());
     statusInterface->status(status);
     co_return rc;
 }
@@ -311,8 +311,8 @@ requester::Coroutine
 
 NsmDefaultModulePowerLimit::NsmDefaultModulePowerLimit(
     const std::string& name, const std::string& type,
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf) :
-    NsmObject(name, type), clearPowerCapIntf(clearPowerCapIntf)
+    std::shared_ptr<PowerCapIntf> powerCapIntf) :
+    NsmObject(name, type), powerCapIntf(powerCapIntf)
 {
     lg2::info("NsmDefaultModulePowerLimit: create sensor:{NAME}", "NAME",
               name.c_str());
@@ -370,7 +370,7 @@ requester::Coroutine
         memcpy(&value, &data[0], sizeof(value));
         uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
                                                           : value / 1000;
-        clearPowerCapIntf->defaultPowerCap(reading);
+        powerCapIntf->defaultPowerCap(reading);
     }
     co_return cc ? cc : rc;
 }
@@ -477,8 +477,7 @@ requester::Coroutine
     auto nsmMinModulePowerLimit = std::make_shared<NsmModulePowerLimit>(
         name, type, MINIMUM_MODULE_POWER_LIMIT, powerCapIntf);
     auto nsmDefaultModulePowerLimit =
-        std::make_shared<NsmDefaultModulePowerLimit>(name, type,
-                                                     clearPowerCapIntf);
+        std::make_shared<NsmDefaultModulePowerLimit>(name, type, powerCapIntf);
 
     nsmDevice->addStaticSensor(nsmMaxModulePowerLimit);
     nsmDevice->addStaticSensor(nsmMinModulePowerLimit);

@@ -222,13 +222,15 @@ TEST_F(NsmPowerControlLoopBodyTest,
     std::string clearType = "NSM_DefaultPowerCap";
     std::string invPath = "/xyz/openbmc_project/inventory/nsmPwrCtrlLoop/def1";
 
-    auto clearPCIntf = std::make_shared<NsmClearPowerCapIntf>(bus,
-                                                              invPath.c_str());
-    clearPCIntf->defaultPowerCap(500);
+    std::string pcName = "DefaultPCLoopCap";
+    std::vector<std::string> parents;
+    auto pcIntf = std::make_shared<NsmPowerCapIntf>(bus, invPath.c_str(),
+                                                    pcName, parents, gpu);
+    pcIntf->PowerCapIntf::defaultPowerCap(500);
 
     // clearPowerCapAsyncIntf not needed for the getter — pass nullptr
     auto defaultPcSensor = std::make_shared<NsmDefaultPowerCap>(
-        clearName, clearType, clearPCIntf, nullptr);
+        clearName, clearType, pcIntf, nullptr);
 
     mockManager.defaultPowerCapList.push_back(defaultPcSensor);
 
@@ -254,15 +256,15 @@ TEST_F(NsmPowerControlLoopBodyTest,
     auto pcIntf = std::make_shared<NsmPowerCapIntf>(bus, invPath.c_str(),
                                                     pcName, parents, gpu);
 
+    pcIntf->PowerCapIntf::defaultPowerCap(300);
+
     auto clearPCIntf = std::make_shared<NsmClearPowerCapIntf>(bus,
                                                               invPath.c_str());
-    clearPCIntf->defaultPowerCap(300);
-
     auto clearAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, invPath.c_str(), gpu, pcIntf, clearPCIntf);
 
     auto defaultPcSensor = std::make_shared<NsmDefaultPowerCap>(
-        clearName, clearType, clearPCIntf, clearAsyncIntf);
+        clearName, clearType, pcIntf, clearAsyncIntf);
 
     mockManager.defaultPowerCapList.push_back(defaultPcSensor);
 
@@ -293,15 +295,15 @@ TEST_F(NsmPowerControlLoopBodyTest,
     auto pcIntf = std::make_shared<NsmPowerCapIntf>(bus, invPath.c_str(),
                                                     pcName, parents, gpu);
 
+    pcIntf->PowerCapIntf::defaultPowerCap(300);
+
     auto clearPCIntf = std::make_shared<NsmClearPowerCapIntf>(bus,
                                                               invPath.c_str());
-    clearPCIntf->defaultPowerCap(300);
-
     auto clearAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, invPath.c_str(), gpu, pcIntf, clearPCIntf);
 
     auto defaultPcSensor = std::make_shared<NsmDefaultPowerCap>(
-        clearName, clearType, clearPCIntf, clearAsyncIntf);
+        clearName, clearType, pcIntf, clearAsyncIntf);
 
     mockManager.defaultPowerCapList.push_back(defaultPcSensor);
 

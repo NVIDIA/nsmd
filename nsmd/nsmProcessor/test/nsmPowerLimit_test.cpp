@@ -397,12 +397,11 @@ TEST(NsmPowerLimitRange, Constructor_UnknownPropertyId)
 // NsmDefaultPowerLimit Tests
 TEST(NsmDefaultPowerLimit, Constructor_RatedPowerLimit)
 {
-    auto clearPowerLimitIntf =
-        std::make_shared<NsmClearPowerLimitIntf>(bus, inventoryObjPath);
+    auto powerLimitsIntf =
+        std::make_shared<PowerLimitsIntf>(bus, inventoryObjPath.c_str());
 
     NsmDefaultPowerLimit sensor(sensorName, sensorType,
-                                RATED_GPU_BASE_POWER_LIMIT,
-                                clearPowerLimitIntf);
+                                RATED_GPU_BASE_POWER_LIMIT, powerLimitsIntf);
 
     EXPECT_EQ(sensor.propertyName, "RATED_GPU_BASE_POWER_LIMIT");
     EXPECT_EQ(sensor.propertyId, RATED_GPU_BASE_POWER_LIMIT);
@@ -410,11 +409,10 @@ TEST(NsmDefaultPowerLimit, Constructor_RatedPowerLimit)
 
 TEST(NsmDefaultPowerLimit, Constructor_UnknownPropertyId)
 {
-    auto clearPowerLimitIntf =
-        std::make_shared<NsmClearPowerLimitIntf>(bus, inventoryObjPath);
+    auto powerLimitsIntf =
+        std::make_shared<PowerLimitsIntf>(bus, inventoryObjPath.c_str());
 
-    NsmDefaultPowerLimit sensor(sensorName, sensorType, 255,
-                                clearPowerLimitIntf);
+    NsmDefaultPowerLimit sensor(sensorName, sensorType, 255, powerLimitsIntf);
 
     EXPECT_EQ(sensor.propertyName, "UNKNOWN");
     EXPECT_EQ(sensor.propertyId, 255);

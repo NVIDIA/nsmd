@@ -457,10 +457,10 @@ TEST_F(NsmPowerLimitBranch3Test, PowerLimitRange_DefaultPropertyId)
 // =============================================================================
 TEST_F(NsmPowerLimitBranch3Test, DefaultPowerLimit_DefaultPropertyId)
 {
-    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
 
     // Use invalid propertyId to hit default case
-    NsmDefaultPowerLimit defLimit("TestDef", "NSM_DEF", 0xFF, cli);
+    NsmDefaultPowerLimit defLimit("TestDef", "NSM_DEF", 0xFF, capIntf);
     EXPECT_EQ(defLimit.propertyName, "UNKNOWN");
 }
 
@@ -633,10 +633,10 @@ TEST_F(NsmPowerLimitBranch3Test, PowerLimitRange_MaxPropertyId_PropertyName)
 // =============================================================================
 TEST_F(NsmPowerLimitBranch3Test, DefaultPowerLimit_RatedPropertyId_PropertyName)
 {
-    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
 
     NsmDefaultPowerLimit defLimit("TestDef", "NSM_DEF",
-                                  RATED_GPU_BASE_POWER_LIMIT, cli);
+                                  RATED_GPU_BASE_POWER_LIMIT, capIntf);
     EXPECT_EQ(defLimit.propertyName, "RATED_GPU_BASE_POWER_LIMIT");
 }
 
@@ -735,9 +735,9 @@ TEST_F(NsmPowerLimitBranch3Test,
 TEST_F(NsmPowerLimitBranch3Test,
        DefaultPowerLimit_Update_SensorIOFails_ReturnsError)
 {
-    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     NsmDefaultPowerLimit sensor("TestDef", "NSM_DEF",
-                                RATED_GPU_BASE_POWER_LIMIT, cli);
+                                RATED_GPU_BASE_POWER_LIMIT, capIntf);
 
     EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
         .WillOnce(mockSensorIO(NSM_ERR_UNSUPPORTED_COMMAND_CODE));
@@ -752,9 +752,9 @@ TEST_F(NsmPowerLimitBranch3Test,
 TEST_F(NsmPowerLimitBranch3Test,
        DefaultPowerLimit_Update_InvalidValue_ReadsZero)
 {
-    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     NsmDefaultPowerLimit sensor("TestDef", "NSM_DEF",
-                                RATED_GPU_BASE_POWER_LIMIT, cli);
+                                RATED_GPU_BASE_POWER_LIMIT, capIntf);
 
     uint32_t limitVal = htole32(INVALID_POWER_LIMIT);
     std::vector<uint8_t> limitData(sizeof(limitVal));
@@ -770,7 +770,7 @@ TEST_F(NsmPowerLimitBranch3Test,
     EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(response));
 
     EXPECT_NO_THROW(sensor.update(gpu));
-    EXPECT_EQ(cli->defaultPowerCap(), 0u);
+    EXPECT_EQ(capIntf->defaultPowerCap(), 0u);
 }
 
 // =============================================================================
@@ -826,9 +826,9 @@ TEST_F(NsmPowerLimitBranch3Test, PowerLimitRange_Update_DecodeError_CcReturned)
 TEST_F(NsmPowerLimitBranch3Test,
        DefaultPowerLimit_Update_DecodeError_CcReturned)
 {
-    auto cli = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     NsmDefaultPowerLimit sensor("TestDef", "NSM_DEF",
-                                RATED_GPU_BASE_POWER_LIMIT, cli);
+                                RATED_GPU_BASE_POWER_LIMIT, capIntf);
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);

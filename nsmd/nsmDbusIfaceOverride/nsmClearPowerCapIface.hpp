@@ -132,8 +132,8 @@ class NsmClearPowerCapAsyncIntf :
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         // first argument instanceid=0 is irrelevant
         auto rc = encode_set_device_power_limit_req(
-            0, DEFAULT_LIMIT, PERSISTENT, clearPowerCapIntf->defaultPowerCap(),
-            requestMsg);
+            0, DEFAULT_LIMIT, PERSISTENT,
+            powerCapIntf->PowerCapIntf::defaultPowerCap(), requestMsg);
 
         if (rc)
         {
@@ -237,6 +237,9 @@ class NsmClearPowerCapAsyncIntf :
   private:
     std::shared_ptr<NsmDevice> device;
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
-    std::shared_ptr<ClearPowerCapIntf> clearPowerCapIntf = nullptr;
+    // Sole owner of the ClearPowerCap interface object; keeps the clear
+    // action published on D-Bus for the lifetime of this sensor.
+    [[maybe_unused]] std::shared_ptr<ClearPowerCapIntf> clearPowerCapIntf =
+        nullptr;
 };
 } // namespace nsm

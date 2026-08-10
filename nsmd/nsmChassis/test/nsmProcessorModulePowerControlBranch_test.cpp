@@ -549,7 +549,7 @@ struct NsmDefaultModulePowerLimitBranchTest :
 {
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf;
+    std::shared_ptr<PowerCapIntf> powerCapIntf;
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
     const std::string path =
         "/xyz/openbmc_project/test/default_module_power_limit_br";
@@ -564,7 +564,7 @@ struct NsmDefaultModulePowerLimitBranchTest :
     void SetUp() override
     {
         auto& bus = utils::DBusHandler::getBus();
-        clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(bus, path);
+        powerCapIntf = std::make_shared<PowerCapIntf>(bus, path.c_str());
     }
 
     ~NsmDefaultModulePowerLimitBranchTest()
@@ -577,7 +577,7 @@ struct NsmDefaultModulePowerLimitBranchTest :
 TEST_F(NsmDefaultModulePowerLimitBranchTest, Update_SensorIOFail_ReturnsError)
 {
     auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        "DefPLBr", "NSM_ModulePowerLimit", clearPowerCapIntf);
+        "DefPLBr", "NSM_ModulePowerLimit", powerCapIntf);
 
     EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
         .WillOnce(mockSensorIO(NSM_ERROR));
@@ -589,7 +589,7 @@ TEST_F(NsmDefaultModulePowerLimitBranchTest, Update_SensorIOFail_ReturnsError)
 TEST_F(NsmDefaultModulePowerLimitBranchTest, Update_Success_SetsDefaultPowerCap)
 {
     auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        "DefPLBr2", "NSM_ModulePowerLimit", clearPowerCapIntf);
+        "DefPLBr2", "NSM_ModulePowerLimit", powerCapIntf);
 
     uint32_t value = 450000; // 450W
     std::vector<uint8_t> data(4, 0);
@@ -606,7 +606,7 @@ TEST_F(NsmDefaultModulePowerLimitBranchTest, Update_Success_SetsDefaultPowerCap)
     EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(response));
 
     sensor->update(gpu);
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 450u);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), 450u);
 }
 
 // Success path with INVALID_POWER_LIMIT ternary
@@ -614,7 +614,7 @@ TEST_F(NsmDefaultModulePowerLimitBranchTest,
        Update_Success_InvalidLimit_SetsInvalidPowerCap)
 {
     auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        "DefPLInv", "NSM_ModulePowerLimit", clearPowerCapIntf);
+        "DefPLInv", "NSM_ModulePowerLimit", powerCapIntf);
 
     uint32_t value = INVALID_POWER_LIMIT;
     std::vector<uint8_t> data(4, 0);
@@ -631,7 +631,7 @@ TEST_F(NsmDefaultModulePowerLimitBranchTest,
     EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(response));
 
     sensor->update(gpu);
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), INVALID_POWER_LIMIT);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), INVALID_POWER_LIMIT);
 }
 
 // Decode success + cc != 0 → does not update
@@ -639,9 +639,9 @@ TEST_F(NsmDefaultModulePowerLimitBranchTest,
        Update_DecodeSuccessNonZeroCC_NoUpdate)
 {
     auto sensor = std::make_shared<NsmDefaultModulePowerLimit>(
-        "DefPLCC", "NSM_ModulePowerLimit", clearPowerCapIntf);
+        "DefPLCC", "NSM_ModulePowerLimit", powerCapIntf);
 
-    clearPowerCapIntf->defaultPowerCap(888);
+    powerCapIntf->defaultPowerCap(888);
 
     std::vector<uint8_t> buf(
         sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
@@ -650,5 +650,5 @@ TEST_F(NsmDefaultModulePowerLimitBranchTest,
     EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(buf));
 
     sensor->update(gpu);
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 888u);
+    EXPECT_EQ(powerCapIntf->defaultPowerCap(), 888u);
 }

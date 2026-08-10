@@ -4668,12 +4668,13 @@ TEST_F(NsmProcessorTest, nsmMinPowerCap_update_BadDataSize)
 
 TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_SensorIOFail)
 {
-    auto clearPowerCapIntf =
-        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
     auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
     auto sensor = std::make_shared<NsmDefaultPowerCap>(
-        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
+        sensorName, sensorType, powerCapIntf, clearPowerCapAsyncIntf);
 
     EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
     auto rc = sensor->update(gpu);
@@ -4682,19 +4683,20 @@ TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_SensorIOFail)
 
 TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_Success)
 {
-    auto clearPowerCapIntf =
-        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
     auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
     auto sensor = std::make_shared<NsmDefaultPowerCap>(
-        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
+        sensorName, sensorType, powerCapIntf, clearPowerCapAsyncIntf);
 
     // 400000 mW → 400 W
     auto response = makeInventoryResp4Bytes(400000);
     EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(response));
     auto rc = sensor->update(gpu);
     EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
-    EXPECT_EQ(clearPowerCapIntf->defaultPowerCap(), 400u);
+    EXPECT_EQ(powerCapIntf->PowerCapIntf::defaultPowerCap(), 400u);
 }
 
 // Helper: build an inventory information response with NSM_ERROR completion
@@ -4804,12 +4806,13 @@ TEST_F(NsmProcessorTest, nsmMinPowerCap_update_ErrorCC_CoversBranch)
 
 TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_ErrorCC_CoversBranch)
 {
-    auto clearPowerCapIntf =
-        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
     auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
     auto sensor = std::make_shared<NsmDefaultPowerCap>(
-        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
+        sensorName, sensorType, powerCapIntf, clearPowerCapAsyncIntf);
     EXPECT_CALL(*gpu, sensorIO)
         .WillOnce(mockSensorIO(makeInventoryRespErrorCC()));
     sensor->update(gpu);
@@ -5280,12 +5283,13 @@ TEST_F(NsmProcessorTest, nsmMaxPowerCap_update_InvalidPowerLimit)
 TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_BadDataSize)
 {
     // Covers shouldLog path: dataSize(2) != sizeof(uint32_t)(4)
-    auto clearPowerCapIntf =
-        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
     auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
     auto sensor = std::make_shared<NsmDefaultPowerCap>(
-        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
+        sensorName, sensorType, powerCapIntf, clearPowerCapAsyncIntf);
 
     auto response = makeInventoryRespBadSize();
     EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(response));
@@ -5297,12 +5301,13 @@ TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_InvalidPowerLimit)
 {
     // Covers ternary: (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT :
     // value/1000
-    auto clearPowerCapIntf =
-        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
     auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
     auto sensor = std::make_shared<NsmDefaultPowerCap>(
-        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
+        sensorName, sensorType, powerCapIntf, clearPowerCapAsyncIntf);
 
     auto response = makeInventoryResp4Bytes(INVALID_POWER_LIMIT);
     EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(response));
@@ -6323,12 +6328,13 @@ TEST_F(NsmProcessorTest, nsmMinPowerCap_update_DecodeFail)
 
 TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_DecodeFail)
 {
-    auto clearPowerCapIntf =
-        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
     auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
     auto sensor = std::make_shared<NsmDefaultPowerCap>(
-        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
+        sensorName, sensorType, powerCapIntf, clearPowerCapAsyncIntf);
     auto response = makeTooShortResponse();
     EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(response));
     auto rc = sensor->update(gpu);
@@ -6515,12 +6521,13 @@ TEST_F(NsmProcessorTest, nsmMinPowerCap_update_InvalidPowerLimit)
 // NsmDefaultPowerCap::update() - cc != NSM_SUCCESS (branch 3 at line 2916)
 TEST_F(NsmProcessorTest, nsmDefaultPowerCap_update_CcError)
 {
-    auto clearPowerCapIntf =
-        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
     auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
     auto sensor = std::make_shared<NsmDefaultPowerCap>(
-        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
+        sensorName, sensorType, powerCapIntf, clearPowerCapAsyncIntf);
     auto response = makeInventoryRespCcError();
     EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(response));
     auto rc = sensor->update(gpu);
@@ -7691,13 +7698,14 @@ TEST_F(NsmProcessorTest, NsmMinPowerCap_GetMinPowerCapIntf_ReturnsIntf)
 // return the stored interfaces (lines 641-647)
 TEST_F(NsmProcessorTest, NsmDefaultPowerCap_GetIntfs_ReturnStoredIntfs)
 {
-    auto clearPowerCapIntf =
-        std::make_shared<NsmClearPowerCapIntf>(bus, inventoryObjPath.c_str());
+    auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+        bus, inventoryObjPath.c_str(), sensorName, std::vector<std::string>{},
+        nullptr);
     auto clearPowerCapAsyncIntf = std::make_shared<NsmClearPowerCapAsyncIntf>(
         bus, inventoryObjPath.c_str(), nullptr, nullptr, nullptr);
     auto sensor = std::make_shared<NsmDefaultPowerCap>(
-        sensorName, sensorType, clearPowerCapIntf, clearPowerCapAsyncIntf);
-    EXPECT_EQ(sensor->getDefaultPowerCapIntf(), clearPowerCapIntf);
+        sensorName, sensorType, powerCapIntf, clearPowerCapAsyncIntf);
+    EXPECT_EQ(sensor->getDefaultPowerCapIntf(), powerCapIntf);
     EXPECT_EQ(sensor->getClearPowerCapAsyncIntf(), clearPowerCapAsyncIntf);
 }
 

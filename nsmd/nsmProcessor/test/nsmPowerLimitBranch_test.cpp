@@ -579,9 +579,9 @@ TEST_F(NsmPowerLimitBranchTest, NsmPowerLimitRange_Update_MinPowerLimit)
 // NsmDefaultPowerLimit: update with sensorIO failure
 TEST_F(NsmPowerLimitBranchTest, NsmDefaultPowerLimit_Update_SensorIOFails)
 {
-    auto clearIntf = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     NsmDefaultPowerLimit sensor("test", "type", RATED_GPU_BASE_POWER_LIMIT,
-                                clearIntf);
+                                capIntf);
 
     EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
         .WillOnce(mockSensorIO(NSM_ERR_UNSUPPORTED_COMMAND_CODE));
@@ -592,9 +592,9 @@ TEST_F(NsmPowerLimitBranchTest, NsmDefaultPowerLimit_Update_SensorIOFails)
 // NsmDefaultPowerLimit: update with success + valid data
 TEST_F(NsmPowerLimitBranchTest, NsmDefaultPowerLimit_Update_Success)
 {
-    auto clearIntf = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     NsmDefaultPowerLimit sensor("test", "type", RATED_GPU_BASE_POWER_LIMIT,
-                                clearIntf);
+                                capIntf);
 
     uint32_t limitVal = htole32(400000); // 400W
     std::vector<uint8_t> limitData3(sizeof(limitVal));
@@ -610,15 +610,15 @@ TEST_F(NsmPowerLimitBranchTest, NsmDefaultPowerLimit_Update_Success)
     EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(response));
 
     EXPECT_NO_THROW(sensor.update(gpu));
-    EXPECT_EQ(clearIntf->defaultPowerCap(), 400u);
+    EXPECT_EQ(capIntf->defaultPowerCap(), 400u);
 }
 
 // NsmDefaultPowerLimit: INVALID_POWER_LIMIT → defaultPowerCap = 0
 TEST_F(NsmPowerLimitBranchTest, NsmDefaultPowerLimit_Update_InvalidLimit)
 {
-    auto clearIntf = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     NsmDefaultPowerLimit sensor("test", "type", RATED_GPU_BASE_POWER_LIMIT,
-                                clearIntf);
+                                capIntf);
 
     uint32_t limitVal4 = htole32(INVALID_POWER_LIMIT);
     std::vector<uint8_t> limitData4(sizeof(limitVal4));
@@ -635,7 +635,7 @@ TEST_F(NsmPowerLimitBranchTest, NsmDefaultPowerLimit_Update_InvalidLimit)
         .WillOnce(mockSensorIO(response4));
 
     EXPECT_NO_THROW(sensor.update(gpu));
-    EXPECT_EQ(clearIntf->defaultPowerCap(), 0u);
+    EXPECT_EQ(capIntf->defaultPowerCap(), 0u);
 }
 
 // NsmPowerLimitRange: value == INVALID_POWER_LIMIT → reading = 0
@@ -681,9 +681,9 @@ TEST_F(NsmPowerLimitBranchTest, NsmPowerLimitRange_Default_PropertyId)
 // Covers: default case in NsmDefaultPowerLimit constructor switch (L413-414)
 TEST_F(NsmPowerLimitBranchTest, NsmDefaultPowerLimit_Default_PropertyId)
 {
-    auto clearIntf = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     // Use an unknown propertyId to trigger the default case
-    NsmDefaultPowerLimit sensor("test", "type", /*propertyId=*/99, clearIntf);
+    NsmDefaultPowerLimit sensor("test", "type", /*propertyId=*/99, capIntf);
     EXPECT_NE(&sensor, nullptr);
 }
 
@@ -874,9 +874,9 @@ TEST_F(NsmPowerLimitBranchTest, NsmPowerLimitRange_Update_ErrorCC)
 // =============================================================================
 TEST_F(NsmPowerLimitBranchTest, NsmDefaultPowerLimit_Update_ErrorCC)
 {
-    auto clearIntf = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     NsmDefaultPowerLimit sensor("test", "type", RATED_GPU_BASE_POWER_LIMIT,
-                                clearIntf);
+                                capIntf);
 
     // Build response with error CC
     std::vector<uint8_t> response(
@@ -994,14 +994,14 @@ TEST_F(NsmPowerLimitBranchTest,
 // NsmDefaultPowerLimit: update with unknown propertyId (not
 // RATED_GPU_BASE_POWER_LIMIT) Covers: encode_get_inventory_information_req
 // with different propertyId, and the decode success path where
-// clearPowerLimitIntf->defaultPowerCap is set regardless of propertyId
+// powerLimitsIntf->defaultPowerCap is set regardless of propertyId
 // =============================================================================
 TEST_F(NsmPowerLimitBranchTest,
        NsmDefaultPowerLimit_Update_UnknownPropertyId_Success)
 {
-    auto clearIntf = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     // propertyId=99 → constructor default case, propertyName="UNKNOWN"
-    NsmDefaultPowerLimit sensor("test", "type", /*propertyId=*/99, clearIntf);
+    NsmDefaultPowerLimit sensor("test", "type", /*propertyId=*/99, capIntf);
 
     uint32_t limitVal = htole32(350000); // 350W
     std::vector<uint8_t> limitData(sizeof(limitVal));
@@ -1017,5 +1017,5 @@ TEST_F(NsmPowerLimitBranchTest,
     EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(response));
 
     EXPECT_NO_THROW(sensor.update(gpu));
-    EXPECT_EQ(clearIntf->defaultPowerCap(), 350u);
+    EXPECT_EQ(capIntf->defaultPowerCap(), 350u);
 }

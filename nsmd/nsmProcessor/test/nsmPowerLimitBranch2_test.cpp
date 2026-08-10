@@ -316,9 +316,9 @@ TEST_F(NsmPowerLimitBranch2Test,
 TEST_F(NsmPowerLimitBranch2Test,
        DefaultPowerLimit_Update_WrongDataSize_NoPropertySet)
 {
-    auto clearIntf = std::make_shared<NsmClearPowerLimitIntf>(bus(), objPath);
+    auto capIntf = std::make_shared<PowerLimitsIntf>(bus(), objPath.c_str());
     NsmDefaultPowerLimit sensor("test", "type", RATED_GPU_BASE_POWER_LIMIT,
-                                clearIntf);
+                                capIntf);
 
     // Build response with 2-byte data (not 4-byte)
     std::vector<uint8_t> shortData = {0x03, 0x04};

@@ -432,9 +432,9 @@ requester::Coroutine
 
 NsmDefaultPowerLimit::NsmDefaultPowerLimit(
     const std::string& name, const std::string& type, const uint8_t propertyId,
-    std::shared_ptr<NsmClearPowerLimitIntf> clearPowerLimitIntf) :
+    std::shared_ptr<PowerLimitsIntf> powerLimitsIntf) :
     NsmObject(name, type), propertyId(propertyId),
-    clearPowerLimitIntf(clearPowerLimitIntf)
+    powerLimitsIntf(powerLimitsIntf)
 {
     switch (propertyId)
     {
@@ -508,7 +508,7 @@ requester::Coroutine
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         uint32_t reading = (value == INVALID_POWER_LIMIT) ? 0 : value / 1000;
-        clearPowerLimitIntf->defaultPowerCap(reading);
+        powerLimitsIntf->defaultPowerCap(reading);
     }
     co_return cc ? cc : rc;
 }
@@ -663,7 +663,7 @@ void createGPUPowerLimit(std::shared_ptr<NsmDevice> nsmDevice,
                                                          nsmPowerLimitSensor,
                                                          nsmDevice});
         auto nsmDefaultPowerLimit = std::make_shared<NsmDefaultPowerLimit>(
-            name, type, RATED_GPU_BASE_POWER_LIMIT, clearPowerLimitIntf);
+            name, type, RATED_GPU_BASE_POWER_LIMIT, powerLimitsIntf);
         nsmDevice->addStaticSensor(nsmDefaultPowerLimit);
         auto nsmMaxPowerLimit = std::make_shared<NsmPowerLimitRange>(
             name, type, MAXIMUM_GPU_BASE_POWER_LIMIT, powerLimitsIntf);

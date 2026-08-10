@@ -96,7 +96,9 @@ class NsmProcessorModulePowerControl : public NsmSensor, ClearPowerCapAsyncIntf
     std::unique_ptr<AssociationDefinitionsIntf> associationDefinitionsIntf =
         nullptr;
     std::shared_ptr<PowerCapIntf> powerCapIntf = nullptr;
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf;
+    // Sole owner of the ClearPowerCap interface object; keeps the clear
+    // action published on D-Bus for the lifetime of this sensor.
+    [[maybe_unused]] std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf;
     std::unique_ptr<DecoratorAreaIntf> decoratorAreaIntf = nullptr;
     bool patchPowerLimitInProgress = false;
     const std::string path;
@@ -119,12 +121,11 @@ class NsmModulePowerLimit : public NsmObject
 class NsmDefaultModulePowerLimit : public NsmObject
 {
   public:
-    NsmDefaultModulePowerLimit(
-        const std::string& name, const std::string& type,
-        std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf);
+    NsmDefaultModulePowerLimit(const std::string& name, const std::string& type,
+                               std::shared_ptr<PowerCapIntf> powerCapIntf);
     requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf;
+    std::shared_ptr<PowerCapIntf> powerCapIntf;
 };
 } // namespace nsm

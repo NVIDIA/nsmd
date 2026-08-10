@@ -642,10 +642,10 @@ class NsmDefaultPowerCap : public NsmObject
   public:
     NsmDefaultPowerCap(
         std::string& name, std::string& type,
-        std::shared_ptr<NsmClearPowerCapIntf> powerCapIntf,
+        std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
         std::shared_ptr<NsmClearPowerCapAsyncIntf> clearPowerCapAsyncIntf);
     requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
-    std::shared_ptr<NsmClearPowerCapIntf> getDefaultPowerCapIntf() const
+    std::shared_ptr<NsmPowerCapIntf> getDefaultPowerCapIntf() const
     {
         return defaultPowerCapIntf;
     }
@@ -655,7 +655,7 @@ class NsmDefaultPowerCap : public NsmObject
     }
 
   private:
-    std::shared_ptr<NsmClearPowerCapIntf> defaultPowerCapIntf = nullptr;
+    std::shared_ptr<NsmPowerCapIntf> defaultPowerCapIntf = nullptr;
     std::shared_ptr<NsmClearPowerCapAsyncIntf> clearPowerCapAsyncIntf = nullptr;
     void updateValue(uint32_t value);
 };
