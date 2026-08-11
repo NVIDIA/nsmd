@@ -1070,9 +1070,6 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
             bus, name, inventoryObjPath, type, uuid);
         device->addStaticSensor(nvSwitchEraseTraceObject);
 
-        auto nvSwitchLogInfoObject = std::make_shared<NsmLogInfoObject>(
-            bus, name, inventoryObjPath, type, uuid);
-        device->addStaticSensor(nvSwitchLogInfoObject);
 #endif
 
         // Device Reset for NVSwitch
