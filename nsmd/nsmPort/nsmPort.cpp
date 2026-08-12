@@ -2046,7 +2046,8 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
         std::string portName = portNameMap.empty()
                                    ? name + '_' + std::to_string(i)
                                    : portNameMap[i];
-        std::string objPath = parentObjPath + "/Ports/" + portName;
+        std::string portPathName = utils::makeDBusNameValid(portName);
+        std::string objPath = parentObjPath + "/Ports/" + portPathName;
         std::string nodeGuidObjPath = objPath + "/Infiniband_Node_Guid";
         std::string ethernetMacAddressObjPath = objPath +
                                                 "/Ethernet_MAC_Address";
@@ -2295,13 +2296,7 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
             std::string histoDbusObjPath = objPath + "/Histograms/" +
                                            histoObjName;
 
-            uint32_t fecHistogramID = 0;
-            fecHistogramID =
-                (static_cast<uint32_t>(NSM_HISTOGRAM_NAMESPACE_ID_ERROR)
-                 << SHIFT_BITS_24) |
-                (static_cast<uint32_t>(NSM_HISTOGRAM_REVISION_ID_0)
-                 << SHIFT_BITS_16) |
-                (static_cast<uint32_t>(NSM_HISTOGRAM_ID_FEC));
+            const uint32_t fecHistogramID = NSM_COMPOSITE_HISTOGRAM_ID_FEC;
 
             auto fecHistoFormatIntf =
                 std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());

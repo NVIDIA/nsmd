@@ -1162,11 +1162,11 @@ requester::Coroutine NsmSwitchLTXMode::setLTXMode(
     co_return NSM_SW_SUCCESS;
 }
 
-inline void createNsmSwitchLTXMode(std::shared_ptr<NsmDevice> device,
-                                   sdbusplus::bus_t& bus,
-                                   const std::string& objPath,
-                                   const std::string& type,
-                                   const std::string& name)
+static inline void createNsmSwitchLTXMode(std::shared_ptr<NsmDevice> device,
+                                          sdbusplus::bus_t& bus,
+                                          const std::string& objPath,
+                                          const std::string& type,
+                                          const std::string& name)
 {
     auto dbusObjPath = objPath + name + "/Oem/Nvidia/LTXMode";
     std::vector<utils::Association> associations{
@@ -1404,11 +1404,11 @@ requester::Coroutine NsmSwitchUPhyMode::setUPhyMode(
     co_return NSM_SW_SUCCESS;
 }
 
-inline void createNsmSwitchUPhyMode(std::shared_ptr<NsmDevice> device,
-                                    sdbusplus::bus_t& bus,
-                                    const std::string& objPath,
-                                    const std::string& type,
-                                    const std::string& name)
+static inline void createNsmSwitchUPhyMode(std::shared_ptr<NsmDevice> device,
+                                           sdbusplus::bus_t& bus,
+                                           const std::string& objPath,
+                                           const std::string& type,
+                                           const std::string& name)
 {
     auto dbusObjPath = objPath + name + "/Oem/Nvidia/UPhyMode";
     std::vector<utils::Association> associations{
@@ -1448,6 +1448,40 @@ inline void createNsmSwitchUPhyMode(std::shared_ptr<NsmDevice> device,
                                "PendingMode",
                                AsyncSetOperationInfo{setUPhyModeHandler,
                                                      nvSwitchUPhyMode, device});
+}
+
+// Register a static Format sensor and a polled Data sensor for one NVSwitch
+// histogram (Power_0, LinkSpeedCapping_0, ...). parentObjPath is the pristine
+// switch inventory path; the NsmHistogramFormat constructor appends
+// "/Histograms/<name>" to the objPath it is given by reference, so callers
+// must not reuse a mutated path across multiple histogram registrations.
+inline void createNvSwitchHistogram(std::shared_ptr<NsmDevice> device,
+                                    sdbusplus::bus_t& bus,
+                                    const std::string& parentObjPath,
+                                    std::string histoObjName,
+                                    const std::string& histoTypeName,
+                                    uint32_t histogramId)
+{
+    std::string histoDbusObjPath = parentObjPath + "/Histograms/" +
+                                   histoObjName;
+    auto histoFormatIntf =
+        std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());
+    auto histoBucketDataIntf =
+        std::make_shared<BucketInfoIntf>(bus, histoDbusObjPath.c_str());
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    associationsList.emplace_back("parent_device", "histograms", parentObjPath);
+    std::string objPathForFormat = parentObjPath;
+    auto getHistoFormatObject = std::make_shared<NsmHistogramFormat>(
+        bus, histoObjName, histoTypeName, histoFormatIntf, histoBucketDataIntf,
+        objPathForFormat, associationsList, histogramId, 0);
+
+    auto getHistoDataObject = std::make_shared<NsmHistogramData>(
+        histoObjName, histoTypeName, histoFormatIntf, histoBucketDataIntf,
+        histogramId, 0);
+
+    device->addStaticSensor(getHistoFormatObject);
+    device->addSensor(getHistoDataObject, false);
 }
 
 requester::Coroutine createNsmSwitchDI(SensorManager& manager,
@@ -1618,37 +1652,27 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
                                       isolationModeSensor, device});
 
 #ifdef NVIDIA_HISTOGRAM
-        // add power histogram
-        std::string histoObjName = "Power_0";
-        std::string histoDbusObjPath = dbusObjPath + "/Histograms/" +
-                                       histoObjName;
-        uint32_t powerHistogramID = 0;
-        powerHistogramID =
-            (static_cast<uint32_t>(NSM_HISTOGRAM_NAMESPACE_ID_POWER)
-             << SHIFT_BITS_24) |
-            (static_cast<uint32_t>(NSM_HISTOGRAM_REVISION_ID_0)
-             << SHIFT_BITS_16) |
-            (static_cast<uint32_t>(NSM_HISTOGRAM_ID_POWER_CONSUMPTION));
+        // Preserve the pristine switch inventory path: createNvSwitchHistogram
+        // mutates the objPath string it is given by reference, so
+        // LinkSpeedCapping_0 must reuse this copy rather than Power_0's
+        // already-appended path.
+        const std::string switchHistoParentPath = dbusObjPath;
+        createNvSwitchHistogram(device, bus, switchHistoParentPath, "Power_0",
+                                "NvSwitch_Power_Histogram",
+                                NSM_COMPOSITE_HISTOGRAM_ID_POWER_CONSUMPTION);
 
-        auto powerHistoFormatIntf =
-            std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());
-        auto powerHistoBucketDataIntf =
-            std::make_shared<BucketInfoIntf>(bus, histoDbusObjPath.c_str());
-        std::vector<std::tuple<std::string, std::string, std::string>>
-            associationsList;
-        associationsList.emplace_back("parent_device", "histograms",
-                                      dbusObjPath);
-        auto getPowerHistoFormatObject = std::make_shared<NsmHistogramFormat>(
-            bus, histoObjName, "NvSwitch_Power_Histogram", powerHistoFormatIntf,
-            powerHistoBucketDataIntf, dbusObjPath, associationsList,
-            powerHistogramID, 0);
-
-        auto getPowerHistoDataObject = std::make_shared<NsmHistogramData>(
-            histoObjName, "NvSwitch_Power_Histogram", powerHistoFormatIntf,
-            powerHistoBucketDataIntf, powerHistogramID, 0);
-
-        device->addStaticSensor(getPowerHistoFormatObject);
-        device->addSensor(getPowerHistoDataObject, false);
+        // MPPGH Link Speed Capping histogram (LinkSpeedCapping_0). Advertise
+        // when EM SupportPowerCappingMode is set; stay present when capping
+        // inactive.
+        const bool supportLinkSpeedCappingHistogram = dbusPropertyMapAsBool(
+            allBaseIfaceProperties, "SupportPowerCappingMode");
+        if (supportLinkSpeedCappingHistogram)
+        {
+            createNvSwitchHistogram(
+                device, bus, switchHistoParentPath, "LinkSpeedCapping_0",
+                "NvSwitch_LinkSpeedCapping_Histogram",
+                NSM_COMPOSITE_HISTOGRAM_ID_LINK_SPEED_CAPPING);
+        }
 #endif
     }
     else if (type == "NSM_PortDisableFuture")

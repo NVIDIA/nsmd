@@ -440,6 +440,31 @@ typedef enum {
 	NSM_HISTOGRAM_NAMESPACE_ID_RESERVED = 0xFF
 } NSM_HISTOGRAM_NAMESPACE_ID;
 
+/**
+ * Build the host value consumed by the histogram request encoders.
+ *
+ * Discovery advertises each ID in wire order as instance (LE16), revision,
+ * namespace. encode_get_histogram_*_req() converts this host value to LE so
+ * requests reproduce those bytes exactly.
+ */
+#define NSM_HISTOGRAM_ID(name_space, revision, instance)                       \
+	(((uint32_t)(name_space) << 24) | ((uint32_t)(revision) << 16) |       \
+	 (uint16_t)(instance))
+
+#define NSM_COMPOSITE_HISTOGRAM_ID_LINK_SPEED_CAPPING                          \
+	NSM_HISTOGRAM_ID(NSM_HISTOGRAM_NAMESPACE_ID_NETWORK,                   \
+			 NSM_HISTOGRAM_REVISION_ID_0,                          \
+			 NSM_HISTOGRAM_ID_LINK_SPEED_CAPPING)
+
+#define NSM_COMPOSITE_HISTOGRAM_ID_FEC                                         \
+	NSM_HISTOGRAM_ID(NSM_HISTOGRAM_NAMESPACE_ID_ERROR,                     \
+			 NSM_HISTOGRAM_REVISION_ID_0, NSM_HISTOGRAM_ID_FEC)
+
+#define NSM_COMPOSITE_HISTOGRAM_ID_POWER_CONSUMPTION                           \
+	NSM_HISTOGRAM_ID(NSM_HISTOGRAM_NAMESPACE_ID_POWER,                     \
+			 NSM_HISTOGRAM_REVISION_ID_0,                          \
+			 NSM_HISTOGRAM_ID_POWER_CONSUMPTION)
+
 // Enum for BucketUnit (unit for bucket info)
 typedef enum {
 	NSM_BUCKET_UNIT_WATTS = 0,

@@ -297,7 +297,13 @@ class GetHistogramFormat : public CommandInterface
         parameter = 0;
         histoFormatOptionGroup->add_option(
             "-i, --histogramId", histogramId,
-            "retrieve histogram format information for histogram Id");
+            "host-packed Type-0 histogram Id. Known Ids: "
+            "LinkSpeedCapping_0 (Network/LinkSpeedCapping)=0x01000000, "
+            "Power_0 (Power/PowerConsumption)=0x02000000, "
+            "FEC_x (Error/FEC)=0x03000000. Use --parameter 0 for "
+            "LinkSpeedCapping_0 and Power_0. Use --parameter <logicalPortNum> "
+            "for FEC_x. The encoder emits discovery wire order: "
+            "instance (LE16), revision, namespace");
         histoFormatOptionGroup->add_option(
             "-p, --parameter", parameter,
             "parameter value for histogram format request");
@@ -490,7 +496,13 @@ class GetHistogramData : public CommandInterface
         parameter = 0;
         histoDataOptionGroup->add_option(
             "-i, --histogramId", histogramId,
-            "retrieve histogram format information for histogram Id");
+            "host-packed Type-0 histogram Id. Known Ids: "
+            "LinkSpeedCapping_0 (Network/LinkSpeedCapping)=0x01000000, "
+            "Power_0 (Power/PowerConsumption)=0x02000000, "
+            "FEC_x (Error/FEC)=0x03000000. Use --parameter 0 for "
+            "LinkSpeedCapping_0 and Power_0. Use --parameter <logicalPortNum> "
+            "for FEC_x. The encoder emits discovery wire order: "
+            "instance (LE16), revision, namespace");
         histoDataOptionGroup->add_option(
             "-p, --parameter", parameter,
             "parameter value for histogram data request");
