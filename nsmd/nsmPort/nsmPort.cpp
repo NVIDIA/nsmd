@@ -2295,13 +2295,7 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
             std::string histoDbusObjPath = objPath + "/Histograms/" +
                                            histoObjName;
 
-            uint32_t fecHistogramID = 0;
-            fecHistogramID =
-                (static_cast<uint32_t>(NSM_HISTOGRAM_NAMESPACE_ID_ERROR)
-                 << SHIFT_BITS_24) |
-                (static_cast<uint32_t>(NSM_HISTOGRAM_REVISION_ID_0)
-                 << SHIFT_BITS_16) |
-                (static_cast<uint32_t>(NSM_HISTOGRAM_ID_FEC));
+            const uint32_t fecHistogramID = NSM_COMPOSITE_HISTOGRAM_ID_FEC;
 
             auto fecHistoFormatIntf =
                 std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());

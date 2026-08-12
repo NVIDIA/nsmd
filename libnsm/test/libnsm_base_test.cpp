@@ -21,6 +21,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <array>
+
 using ::testing::ElementsAre;
 
 TEST(PackNSMMessage, BadPathTest)
@@ -1079,6 +1081,68 @@ TEST(decodeGetHistogramFormatReq, testGoodDecode)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(histogram_id, 0x12345678);
 	EXPECT_EQ(parameter, 0xABCD);
+}
+
+TEST(MppghLinkSpeedCappingHistogramId, CompositeIdFrozenAndRoundTrip)
+{
+	EXPECT_EQ(NSM_COMPOSITE_HISTOGRAM_ID_LINK_SPEED_CAPPING, 0x01000000u);
+	EXPECT_EQ(NSM_HISTOGRAM_NAMESPACE_ID_NETWORK, 0x01);
+	EXPECT_EQ(NSM_HISTOGRAM_ID_LINK_SPEED_CAPPING, 0);
+	EXPECT_EQ(NSM_HISTOGRAM_REVISION_ID_0, 0);
+
+	const std::array<uint32_t, 3> histogramIds = {
+	    NSM_COMPOSITE_HISTOGRAM_ID_LINK_SPEED_CAPPING,
+	    NSM_HISTOGRAM_ID(NSM_HISTOGRAM_NAMESPACE_ID_POWER,
+			     NSM_HISTOGRAM_REVISION_ID_0,
+			     NSM_HISTOGRAM_ID_POWER_CONSUMPTION),
+	    NSM_HISTOGRAM_ID(NSM_HISTOGRAM_NAMESPACE_ID_ERROR,
+			     NSM_HISTOGRAM_REVISION_ID_0,
+			     NSM_HISTOGRAM_ID_FEC)};
+	const std::array<uint8_t, 3> namespaces = {
+	    NSM_HISTOGRAM_NAMESPACE_ID_NETWORK,
+	    NSM_HISTOGRAM_NAMESPACE_ID_POWER, NSM_HISTOGRAM_NAMESPACE_ID_ERROR};
+
+	for (size_t i = 0; i < histogramIds.size(); ++i) {
+		std::vector<uint8_t> requestMsg(
+		    sizeof(nsm_msg_hdr) + sizeof(nsm_get_histogram_format_req));
+		auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+		auto rc = encode_get_histogram_format_req(0, histogramIds[i], 0,
+							  request);
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+		uint32_t histogram_id = 0;
+		uint16_t parameter = 0xFFFF;
+		rc = decode_get_histogram_format_req(request, requestMsg.size(),
+						     &histogram_id, &parameter);
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+		EXPECT_EQ(histogram_id, histogramIds[i]);
+		EXPECT_EQ(parameter, 0);
+
+		auto req = reinterpret_cast<nsm_get_histogram_format_req *>(
+		    request->payload);
+		const uint8_t *wire =
+		    reinterpret_cast<const uint8_t *>(&req->histogram_id);
+		EXPECT_EQ(wire[0], 0x00);
+		EXPECT_EQ(wire[1], 0x00);
+		EXPECT_EQ(wire[2], NSM_HISTOGRAM_REVISION_ID_0);
+		EXPECT_EQ(wire[3], namespaces[i]);
+
+		std::vector<uint8_t> dataRequestMsg(
+		    sizeof(nsm_msg_hdr) + sizeof(nsm_get_histogram_data_req));
+		auto dataRequest =
+		    reinterpret_cast<nsm_msg *>(dataRequestMsg.data());
+		rc = encode_get_histogram_data_req(0, histogramIds[i], 0,
+						   dataRequest);
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+		auto dataReq = reinterpret_cast<nsm_get_histogram_data_req *>(
+		    dataRequest->payload);
+		wire =
+		    reinterpret_cast<const uint8_t *>(&dataReq->histogram_id);
+		EXPECT_EQ(wire[0], 0x00);
+		EXPECT_EQ(wire[1], 0x00);
+		EXPECT_EQ(wire[2], NSM_HISTOGRAM_REVISION_ID_0);
+		EXPECT_EQ(wire[3], namespaces[i]);
+	}
 }
 
 TEST(decodeGetHistogramFormatReq, testBadDecode)
