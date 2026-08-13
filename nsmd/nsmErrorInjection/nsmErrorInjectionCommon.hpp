@@ -24,6 +24,9 @@
 #include "nsmSetAsync/nsmSetErrorInjection.hpp"
 #include "sensorManager.hpp"
 
+#include <memory>
+#include <vector>
+
 namespace nsm
 {
 
@@ -83,13 +86,33 @@ inline void createNsmErrorInjectionSensors(SensorManager& manager,
     device->addStaticSensor(errorInjectionSupported);
     device->addSensor(errorInjectionEnabled, ERROR_INJECTION_PRIORITY);
 
+    // Sole owner of this device's mask; the batch property and every per-type
+    // Enabled property route their read-modify-write through it.
+    auto setErrorInjectionCapabilities =
+        std::make_shared<NsmSetErrorInjectionCapabilities>(
+            "ErrorInjectionCapabilities", manager, interfaces,
+            errorInjectionEnabled);
+    device->addDeviceSensors(setErrorInjectionCapabilities);
+
+    // One Async.Set carries every capability the client changed, so a
+    // multi-type PATCH becomes one device write instead of one per type.
+    errorInjectionDispatcher.addAsyncSetOperation(
+        "com.nvidia.ErrorInjection.ErrorInjection",
+        "ErrorInjectionCapabilitiesEnabled",
+        AsyncSetOperationInfo{
+            std::bind_front(
+                &NsmSetErrorInjectionCapabilities::capabilitiesEnabled,
+                setErrorInjectionCapabilities.get()),
+            errorInjectionEnabled, device});
+
     for (const auto& [path, interface] : interfaces)
     {
         auto pathStr = path.string();
         auto name = pathStr.substr(pathStr.find_last_of('/') + 1);
         auto setErrorInjectionEnabled =
             std::make_shared<NsmSetErrorInjectionEnabled>(
-                name, interface->type(), manager, interfaces);
+                name, interface->type(), interfaces,
+                setErrorInjectionCapabilities);
         auto& asyncDispatcher =
             *AsyncOperationManager::getInstance()->getDispatcher(pathStr);
         asyncDispatcher.addAsyncSetOperation(
@@ -158,11 +181,93 @@ inline bool
     return true;
 }
 
-inline void createErrorInjectionSensorsForType(
-    SensorManager& manager, std::shared_ptr<NsmDevice> device,
-    const path& objPath, ErrorInjectionCapabilityIntf::Type type)
+/**
+ * @brief Per-device error-injection state shared by every capability type.
+ *        A type owning a private single-entry container would be blind to its
+ *        siblings during read-modify-write and zero their bits.
+ */
+struct ErrorInjectionCapabilityContext
 {
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
+    std::shared_ptr<NsmErrorInjectionEnabled> enabledSensor;
+    std::shared_ptr<NsmSetErrorInjectionCapabilities> capabilities;
+};
+
+/**
+ * @brief Creates the shared capability objects for @p types and registers the
+ *        aggregate batch property, mirroring the standard path. Types with no
+ *        injection type/subtype mapping are skipped.
+ */
+inline ErrorInjectionCapabilityContext createErrorInjectionCapabilityContext(
+    SensorManager& manager, std::shared_ptr<NsmDevice> device,
+    const path& objPath,
+    const std::vector<ErrorInjectionCapabilityIntf::Type>& types)
+{
+    ErrorInjectionCapabilityContext context;
+
+    for (auto type : types)
+    {
+        uint16_t errorInjectionType;
+        uint16_t errorInjectionSubtype;
+        if (!getErrorInjectionTypeAndSubtype(type, &errorInjectionType,
+                                             &errorInjectionSubtype))
+        {
+            continue;
+        }
+        auto name = ErrorInjectionCapabilityIntf::convertTypeToString(type);
+        name = name.substr(name.find_last_of('.') + 1);
+        auto path = objPath / "ErrorInjection" / name;
+        auto interface = std::make_shared<ErrorInjectionCapabilityIntf>(
+            utils::DBusHandler::getBus(), path.string().c_str());
+        interface->type(type);
+        context.interfaces.insert(std::make_pair(path, interface));
+    }
+
+    if (context.interfaces.empty())
+    {
+        // NsmInterfaces rejects an empty container, and there is no mask to
+        // own. Per-type registration then finds no interface and skips.
+        lg2::error(
+            "createErrorInjectionCapabilityContext: No mappable capability type, skipping registration. objPath={PATH}",
+            "PATH", objPath.string());
+        return context;
+    }
+
+    auto mcuCapabilitiesProvider =
+        NsmInterfaceProvider<ErrorInjectionCapabilityIntf>(
+            "MCUErrorInjectionCapability", "NSM_MCUErrorInjectionCapability",
+            context.interfaces);
+    device->addStaticSensor(
+        std::make_shared<NsmErrorInjectionSupported>(mcuCapabilitiesProvider));
+    context.enabledSensor =
+        std::make_shared<NsmErrorInjectionEnabled>(mcuCapabilitiesProvider);
+    device->addSensor(context.enabledSensor, ERROR_INJECTION_PRIORITY);
+
+    context.capabilities = std::make_shared<NsmSetErrorInjectionCapabilities>(
+        "ErrorInjectionCapabilities", manager, context.interfaces,
+        context.enabledSensor);
+    device->addDeviceSensors(context.capabilities);
+
+    auto& errorInjectionDispatcher =
+        *AsyncOperationManager::getInstance()->getDispatcher(
+            (objPath / "ErrorInjection"));
+    errorInjectionDispatcher.addAsyncSetOperation(
+        "com.nvidia.ErrorInjection.ErrorInjection",
+        "ErrorInjectionCapabilitiesEnabled",
+        AsyncSetOperationInfo{
+            std::bind_front(
+                &NsmSetErrorInjectionCapabilities::capabilitiesEnabled,
+                context.capabilities.get()),
+            context.enabledSensor, device});
+
+    return context;
+}
+
+inline void createErrorInjectionSensorsForType(
+    SensorManager& manager, std::shared_ptr<NsmDevice> device,
+    const path& objPath, ErrorInjectionCapabilityIntf::Type type,
+    const ErrorInjectionCapabilityContext& context)
+{
     Interfaces<ErrorInjectionPayloadIntf> payloadInterfaces;
 
     uint16_t errorInjectionType;
@@ -180,24 +285,18 @@ inline void createErrorInjectionSensorsForType(
     name = name.substr(name.find_last_of('.') + 1);
     auto path = objPath / "ErrorInjection" / name;
 
+    auto capability = context.interfaces.find(path);
+    if (capability == context.interfaces.end())
+    {
+        lg2::error(
+            "createErrorInjectionSensorsForType: Type absent from the shared capability container. type={TYPE}",
+            "TYPE", static_cast<int>(type));
+        return;
+    }
+
     auto payloadInterface = std::make_shared<ErrorInjectionPayloadIntf>(
         utils::DBusHandler::getBus(), path.string().c_str());
     payloadInterfaces.insert(std::make_pair(path, payloadInterface));
-    auto interface = std::make_shared<ErrorInjectionCapabilityIntf>(
-        utils::DBusHandler::getBus(), path.string().c_str());
-    interface->type(type);
-    interfaces.insert(std::make_pair(path, interface));
-
-    auto mcuCapabilitiesProvider =
-        NsmInterfaceProvider<ErrorInjectionCapabilityIntf>(
-            "MCUErrorInjectionCapability", "NSM_MCUErrorInjectionCapability",
-            interfaces);
-    auto mcuErrorInjectionSupported =
-        std::make_shared<NsmErrorInjectionSupported>(mcuCapabilitiesProvider);
-    device->addStaticSensor(mcuErrorInjectionSupported);
-    auto mcuErrorInjectionEnabled =
-        std::make_shared<NsmErrorInjectionEnabled>(mcuCapabilitiesProvider);
-    device->addSensor(mcuErrorInjectionEnabled, ERROR_INJECTION_PRIORITY);
 
     auto payloadProvider = NsmInterfaceProvider<ErrorInjectionPayloadIntf>(
         "ErrorInjectionPayload", "NSM_ErrorInjectionPayload",
@@ -211,10 +310,12 @@ inline void createErrorInjectionSensorsForType(
     auto activateIntf = std::make_shared<NsmActivateErrorInjectionPayloadIntf>(
         utils::DBusHandler::getBus(), path.string().c_str(), errorInjectionType,
         errorInjectionSubtype, device);
-    // Set Error Injection Enabled
+    // Bound to the shared container and mask owner, so a single-type write
+    // reads its siblings before composing the mask.
     auto setErrorInjectionEnabled =
-        std::make_shared<NsmSetErrorInjectionEnabled>(name, interface->type(),
-                                                      manager, interfaces);
+        std::make_shared<NsmSetErrorInjectionEnabled>(
+            name, capability->second->type(), context.interfaces,
+            context.capabilities);
     auto& asyncDispatcherEnabled =
         *AsyncOperationManager::getInstance()->getDispatcher(pathStr);
     asyncDispatcherEnabled.addAsyncSetOperation(
@@ -222,7 +323,7 @@ inline void createErrorInjectionSensorsForType(
         AsyncSetOperationInfo{
             std::bind_front(&NsmSetErrorInjectionEnabled::enabled,
                             setErrorInjectionEnabled.get()),
-            mcuErrorInjectionEnabled, device});
+            context.enabledSensor, device});
     device->addDeviceSensors(setErrorInjectionEnabled);
     // Set Error Injection Payload
     auto setErrorInjectionPayloadSensor =
@@ -266,28 +367,31 @@ inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
     auto deviceRole = device->getDeviceRole();
 
     // Applicable for all device roles
-    createErrorInjectionSensorsForType(
-        manager, device, objPath,
-        ErrorInjectionCapabilityIntf::Type::FatalErrors);
-    createErrorInjectionSensorsForType(
-        manager, device, objPath,
-        ErrorInjectionCapabilityIntf::Type::PortRecoveryErrors);
-    createErrorInjectionSensorsForType(
-        manager, device, objPath,
-        ErrorInjectionCapabilityIntf::Type::GPIOSpoofingErrors);
+    std::vector<ErrorInjectionCapabilityIntf::Type> types{
+        ErrorInjectionCapabilityIntf::Type::FatalErrors,
+        ErrorInjectionCapabilityIntf::Type::PortRecoveryErrors,
+        ErrorInjectionCapabilityIntf::Type::GPIOSpoofingErrors};
 
     if (deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA ||
         deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_CX_SMA)
     {
-        createErrorInjectionSensorsForType(
-            manager, device, objPath,
+        types.push_back(
             ErrorInjectionCapabilityIntf::Type::LeakDetectionErrors);
     }
     if (deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA)
     {
-        createErrorInjectionSensorsForType(
-            manager, device, objPath,
+        types.push_back(
             ErrorInjectionCapabilityIntf::Type::USBBridgeEmulationErrors);
+    }
+
+    // One container and mask owner for every type this role exposes, so a
+    // per-type write sees its siblings and the batch can address them all.
+    auto context = createErrorInjectionCapabilityContext(manager, device,
+                                                         objPath, types);
+    for (auto type : types)
+    {
+        createErrorInjectionSensorsForType(manager, device, objPath, type,
+                                           context);
     }
     return;
 }
