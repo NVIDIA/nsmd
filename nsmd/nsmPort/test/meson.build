@@ -12,6 +12,7 @@ tests = [
     'nsmZone_test',
     'nsmNetworkAddressAggregator_test',
     'nsmEthPortTelemetryAggregator_test',
+    'nsmOpticalModuleTelemetry_test',
     'nsmPCIeErrors_test',
     'nsmPortAddSensor_test',
     'nsmPCIePort_test',

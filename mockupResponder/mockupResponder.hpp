@@ -801,6 +801,12 @@ class MockupResponder
         getEthPortTelemetryCounterHandler(const nsm_msg* requestMsg,
                                           size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        queryPortTelemetryV2Handler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        queryPortTelemetryCapabilitiesHandler(const nsm_msg* requestMsg,
+                                              size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getPortNetworkAddressesHandler(const nsm_msg* requestMsg,
                                        size_t requestLen);
     std::optional<std::vector<uint8_t>>

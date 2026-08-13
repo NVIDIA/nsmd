@@ -604,6 +604,11 @@ std::optional<Response>
                 case NSM_GET_ETH_PORT_TELEMETRY_COUNTER:
                     return getEthPortTelemetryCounterHandler(request,
                                                              requestLen);
+                case NSM_QUERY_PORT_TELEMETRY_COUNTER_V2:
+                    return queryPortTelemetryV2Handler(request, requestLen);
+                case NSM_QUERY_PORT_TELEMETRY_CAPABILITIES:
+                    return queryPortTelemetryCapabilitiesHandler(request,
+                                                                 requestLen);
                 case NSM_GET_NETWORK_ADDRESSES:
                     return getPortNetworkAddressesHandler(request, requestLen);
                 case NSM_GET_PORT_ECC_COUNTERS:
@@ -1097,7 +1102,8 @@ std::optional<std::vector<uint8_t>>
                  {1,
                   {1, NSM_GET_ETH_PORT_TELEMETRY_COUNTER,
                    NSM_GET_NETWORK_ADDRESSES, NSM_GET_PORT_ECC_COUNTERS,
-                   NSM_GET_LLDP_PACKET}},
+                   NSM_GET_LLDP_PACKET, NSM_QUERY_PORT_TELEMETRY_COUNTER_V2,
+                   NSM_QUERY_PORT_TELEMETRY_CAPABILITIES}},
                  {NSM_TYPE_PCI_LINK,
                   {
                       NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
@@ -8319,6 +8325,193 @@ std::optional<std::vector<uint8_t>>
     }
 
     return ethPortTelemetryCounterResponse;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPortTelemetryV2Handler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("queryPortTelemetryV2Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint16_t portIndex = 0;
+    uint8_t groupId = 0;
+    uint32_t sequenceToken = 0;
+    auto rc = decode_query_port_telemetry_v2_req(
+        requestMsg, requestLen, &portIndex, &groupId, &sequenceToken);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_port_telemetry_v2_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    if (groupId != NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE)
+    {
+        // Mock data is only implemented for the Optical Module group (this
+        // feature's scope); other groups report NSM_ERROR with no samples.
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_query_port_telemetry_v2_resp(requestMsg->hdr.instance_id,
+                                                 NSM_ERROR, 0, responseMsg);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("encode_query_port_telemetry_v2_resp failed: rc={RC}",
+                       "RC", rc);
+            return std::nullopt;
+        }
+        return response;
+    }
+
+    // Optical Module Metrics (group 0x09): 4 metrics x 8 lanes, per NVBug
+    // 6253174. Single-page mock response terminated by a Sequence Token
+    // Record (tag 0xFD) with next_sequence_token = 0.
+    constexpr uint8_t kNumberOfLanes = 8;
+    constexpr uint8_t kMetricBases[] = {
+        NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE,
+        NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE,
+        NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE};
+
+    const size_t maxResponseSize =
+        (kNumberOfLanes * (sizeof(kMetricBases) / sizeof(kMetricBases[0])) +
+         kNumberOfLanes + 1) *
+            (sizeof(nsm_aggregate_resp_sample) + 4) +
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(maxResponseSize);
+
+    uint16_t samplesCount = 0;
+    auto appendSample = [&](uint8_t tag, const uint8_t* data,
+                            size_t dataLen) -> bool {
+        std::array<uint8_t, 256> sampleBuf;
+        auto sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sampleBuf.data());
+        size_t sampleLen = 0;
+        auto rc2 = encode_aggregate_resp_sample(tag, true, data, dataLen,
+                                                sample, &sampleLen);
+        if (rc2 != NSM_SW_SUCCESS)
+        {
+            lg2::error("encode_aggregate_resp_sample failed: tag={TAG} "
+                       "rc={RC}",
+                       "TAG", tag, "RC", rc2);
+            return false;
+        }
+        if (response.size() + sampleLen > response.capacity())
+        {
+            lg2::error("Not enough capacity in optical module telemetry "
+                       "response to insert sample tag={TAG}",
+                       "TAG", tag);
+            return false;
+        }
+        response.insert(
+            response.end(), sampleBuf.begin(),
+            std::next(sampleBuf.begin(), static_cast<long>(sampleLen)));
+        ++samplesCount;
+        return true;
+    };
+
+    // Mock power/bias-current values: NvU16, raw units == the D-Bus
+    // property's mW/mA (see nsmPort.cpp handleSample()).
+    for (uint8_t metricBase : kMetricBases)
+    {
+        for (uint8_t lane = 0; lane < kNumberOfLanes; ++lane)
+        {
+            uint16_t mockValue =
+                htole16(static_cast<uint16_t>(1000 + metricBase + lane));
+            if (!appendSample(static_cast<uint8_t>(metricBase + lane),
+                              reinterpret_cast<uint8_t*>(&mockValue),
+                              sizeof(mockValue)))
+            {
+                return std::nullopt;
+            }
+        }
+    }
+
+    // Mock SNR values: raw PRM value, caller divides by 256 for dB (e.g.
+    // raw 5665 -> 22.13 dB). Vary per lane so mock data is distinguishable.
+    for (uint8_t lane = 0; lane < kNumberOfLanes; ++lane)
+    {
+        uint32_t mockRawValue =
+            htole32(static_cast<uint32_t>(5665 + lane * 100));
+        if (!appendSample(
+                static_cast<uint8_t>(NSM_OPTICAL_MODULE_TAG_SNR_BASE + lane),
+                reinterpret_cast<uint8_t*>(&mockRawValue),
+                sizeof(mockRawValue)))
+        {
+            return std::nullopt;
+        }
+    }
+
+    // Terminating Sequence Token Record (tag 0xFD): next_sequence_token = 0
+    // indicates this mock response is a single, final page.
+    uint32_t nextSequenceToken = htole32(0);
+    if (!appendSample(0xFD, reinterpret_cast<uint8_t*>(&nextSequenceToken),
+                      sizeof(nextSequenceToken)))
+    {
+        return std::nullopt;
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_query_port_telemetry_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_port_telemetry_v2_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPortTelemetryCapabilitiesHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("queryPortTelemetryCapabilitiesHandler: request length="
+                  "{LEN}",
+                  "LEN", requestLen);
+    }
+
+    uint16_t portIndex = 0;
+    auto rc = decode_query_port_telemetry_caps_req(requestMsg, requestLen,
+                                                   &portIndex);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_port_telemetry_caps_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    // Mock: supports all defined groups (0x01-0x09). For group N, bit
+    // ((N-1) % 8) of byte ((N-1) / 8) set => group N supported.
+    std::array<uint8_t, 32> supportedGroupsBitmask{};
+    supportedGroupsBitmask[0] = 0xFF; // groups 1-8
+    supportedGroupsBitmask[1] = 0x01; // group 9 (Optical Module)
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_caps_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_query_port_telemetry_caps_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE,
+        /*max_counter_records_per_resp=*/32, supportedGroupsBitmask.data(),
+        responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_port_telemetry_caps_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
 }
 
 std::optional<std::vector<uint8_t>>
