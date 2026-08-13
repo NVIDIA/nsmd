@@ -60,6 +60,10 @@ enum nsm_network_port_commands {
 	NSM_GET_ETH_PORT_TELEMETRY_COUNTER = 0x0f,
 	NSM_GET_PORT_ECC_COUNTERS = 0x10,
 	NSM_GET_NETWORK_ADDRESSES = 0x11,
+	NSM_QUERY_PORT_TELEMETRY_COUNTER_V2 =
+	    0x14, /* Query Port Telemetry Counter v2 */
+	NSM_QUERY_PORT_TELEMETRY_CAPABILITIES =
+	    0x15, /* Query Port Telemetry Capabilities */
 	NSM_GET_LLDP_PACKET = 0x16,
 	NSM_QUERY_PORTS_AVAILABLE = 0x41,
 	NSM_QUERY_PORT_CHARACTERISTICS = 0x42,
@@ -731,6 +735,80 @@ int encode_aggregate_network_address_data(
 struct nsm_get_port_ecc_counters_req {
 	struct nsm_common_req hdr;
 	uint16_t port_number;
+} __attribute__((packed));
+
+/** @brief NSM Type-1 cmd 0x14/0x15 Telemetry v2 counter group IDs.
+ *
+ * Groups 0x01-0x08 defined in "Telemetry Counters v2" (NSM Type 1 - Network
+ * ports spec, Bracha Hod). Group 0x09 defined in "OOB Optical Modules
+ * Telemetry" (DR-08, Bracha Hod), added for CX-8/CX-9 optical module
+ * telemetry.
+ */
+enum nsm_port_telemetry_v2_group_id {
+	NSM_PORT_TELEMETRY_GROUP_PHY_ERRORS = 0x01,
+	NSM_PORT_TELEMETRY_GROUP_PHY_RECOVERY = 0x02,
+	NSM_PORT_TELEMETRY_GROUP_PHY_PLR = 0x03,
+	NSM_PORT_TELEMETRY_GROUP_LINK_STATE = 0x04,
+	NSM_PORT_TELEMETRY_GROUP_IB_STATISTICS = 0x05,
+	NSM_PORT_TELEMETRY_GROUP_IB_HEALTH_AND_ERRORS = 0x06,
+	NSM_PORT_TELEMETRY_GROUP_ETH_STATISTICS = 0x07,
+	NSM_PORT_TELEMETRY_GROUP_ETH_HEALTH_AND_ERRORS = 0x08,
+	NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE = 0x09,
+};
+
+/** @struct nsm_port_telemetry_v2_plr_counters
+ *
+ * PLR counter group payload (group_id = NSM_PORT_TELEMETRY_GROUP_PHY_PLR in
+ * cmd 0x14).
+ * Each counter is delivered as a separate aggregate sample record.
+ * Field order matches the DR-02 tag assignment for group 0x03.
+ */
+struct nsm_port_telemetry_v2_plr_counters {
+	uint64_t plr_rcv_codes;		     /* tag 0x00 */
+	uint64_t plr_rcv_code_err;	     /* tag 0x01 */
+	uint64_t plr_rcv_uncorrectable_code; /* tag 0x02 */
+	uint64_t plr_xmit_codes;	     /* tag 0x03 */
+	uint64_t plr_xmit_retry_codes;	     /* tag 0x04 */
+	uint64_t plr_xmit_retry_events;	     /* tag 0x05 */
+} __attribute__((packed));
+
+/** @struct nsm_query_port_telemetry_v2_req
+ *
+ * NSM Type-1 cmd 0x14 — Query Port Telemetry Counter v2 request.
+ */
+struct nsm_query_port_telemetry_v2_req {
+	struct nsm_common_req hdr;
+	uint32_t sequence_token; /* 0 for initial; echoed for continuation */
+	uint16_t port_index;	 /* target port, 1-based */
+	uint8_t reserved[2];	 /* must be 0 */
+	uint8_t group_id;	 /* enum nsm_port_telemetry_v2_group_id value */
+} __attribute__((packed));
+
+/** @struct nsm_query_port_telemetry_caps_req
+ *
+ * NSM Type-1 cmd 0x15 — Query Port Telemetry Capabilities request.
+ */
+struct nsm_query_port_telemetry_caps_req {
+	struct nsm_common_req hdr;
+	uint16_t port_index; /* target port, 1-based */
+} __attribute__((packed));
+
+/** @struct nsm_query_port_telemetry_caps_resp
+ *
+ * NSM Type-1 cmd 0x15 — Query Port Telemetry Capabilities response.
+ */
+struct nsm_query_port_telemetry_caps_resp {
+	struct nsm_common_resp hdr;
+	uint8_t max_supported_group_id; /* highest enum
+					 * nsm_port_telemetry_v2_group_id
+					 * value supported by the responder */
+	uint8_t
+	    max_counter_records_per_resp; /* max records per response page */
+	/* NvU8[32]; for group N, bit ((N-1) % 8) of byte ((N-1) / 8) set =>
+	 * group N supported. E.g. group 1 -> byte 0, bit 0; group 9 (Optical
+	 * Module) -> byte 1, bit 0.
+	 */
+	uint8_t supported_groups_bitmask[32];
 } __attribute__((packed));
 
 #ifdef ENABLE_SYSTEM_GUID
@@ -1509,6 +1587,199 @@ int encode_get_lldp_packet_resp(uint8_t instance_id, uint8_t cc,
 int decode_get_lldp_packet_resp(const struct nsm_msg *msg, size_t msg_len,
 				uint8_t *cc, uint16_t *reason_code,
 				uint8_t *data, uint16_t *data_size);
+
+/** @brief Encode Query Port Telemetry Counter v2 request (cmd 0x14).
+ *
+ * @param[in]  instance_id    NSM instance ID
+ * @param[in]  port_index     Target port index (1-based)
+ * @param[in]  group_id       Counter group to query, see
+ *                            enum nsm_port_telemetry_v2_group_id
+ * @param[in]  sequence_token Sequence Token (0x00000000 for initial request)
+ * @param[out] msg            Output NSM message buffer (caller allocates)
+ * @return NSM_SW_SUCCESS on success
+ * @return NSM_SW_ERROR_NULL if msg is NULL
+ * @return NSM_SW_ERROR_DATA if group_id is out of range
+ */
+int encode_query_port_telemetry_v2_req(uint8_t instance_id, uint16_t port_index,
+				       uint8_t group_id,
+				       uint32_t sequence_token,
+				       struct nsm_msg *msg);
+
+/** @brief Decode Query Port Telemetry Counter v2 request (cmd 0x14).
+ *
+ * @param[in]  msg             Incoming NSM message
+ * @param[in]  msg_len         Message length in bytes
+ * @param[out] port_index      Target port index (1-based)
+ * @param[out] group_id        Requested group ID, see
+ *                             enum nsm_port_telemetry_v2_group_id
+ * @param[out] sequence_token  Sequence Token (0x00000000 for initial request)
+ * @return NSM_SW_SUCCESS on success
+ * @return NSM_SW_ERROR_LENGTH on truncated message
+ */
+int decode_query_port_telemetry_v2_req(const struct nsm_msg *msg,
+				       size_t msg_len, uint16_t *port_index,
+				       uint8_t *group_id,
+				       uint32_t *sequence_token);
+
+/** @brief Decode Query Port Telemetry Counter v2 response header (cmd 0x14).
+ *
+ * Validates the response header and extracts telemetry_count.
+ * Per-sample data is iterated by the caller via decode_aggregate_resp_sample().
+ *
+ * @param[in]  msg             Incoming NSM message
+ * @param[in]  msg_len         Message length in bytes
+ * @param[out] cc              Completion code
+ * @param[out] reason_code     Reason code (when cc != NSM_SUCCESS)
+ * @param[out] telemetry_count Number of aggregate sample records in this page
+ * @param[out] consumed_len    Bytes consumed by the response header
+ * @return NSM_SW_SUCCESS on success
+ * @return NSM_SW_ERROR_LENGTH on truncated message
+ */
+int decode_query_port_telemetry_v2_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code,
+					uint16_t *telemetry_count,
+					size_t *consumed_len);
+
+/** @brief Encode Query Port Telemetry Capabilities request (cmd 0x15).
+ *
+ * @param[in]  instance_id  NSM instance ID
+ * @param[in]  port_index   Target port index (1-based)
+ * @param[out] msg          Output NSM message buffer (caller allocates)
+ * @return NSM_SW_SUCCESS on success
+ * @return NSM_SW_ERROR_NULL if msg is NULL
+ */
+int encode_query_port_telemetry_caps_req(uint8_t instance_id,
+					 uint16_t port_index,
+					 struct nsm_msg *msg);
+
+/** @brief Decode Query Port Telemetry Capabilities request (cmd 0x15).
+ *
+ * @param[in]  msg          Incoming NSM message
+ * @param[in]  msg_len      Message length in bytes
+ * @param[out] port_index   Target port index (1-based)
+ * @return NSM_SW_SUCCESS on success
+ * @return NSM_SW_ERROR_LENGTH on truncated message
+ */
+int decode_query_port_telemetry_caps_req(const struct nsm_msg *msg,
+					 size_t msg_len, uint16_t *port_index);
+
+/** @brief Decode Query Port Telemetry Capabilities response (cmd 0x15).
+ *
+ * @param[in]  msg                          Incoming NSM message
+ * @param[in]  msg_len                      Message length in bytes
+ * @param[out] cc                           Completion code
+ * @param[out] max_supported_group_id       Highest supported group ID
+ * @param[out] max_counter_records_per_resp Max records per response page
+ * @param[out] supported_groups_bitmask     Caller-provided 32-byte buffer;
+ *                                          filled with the NvU8[32]
+ *                                          supported-groups bitmask
+ * @return NSM_SW_SUCCESS on success
+ * @return NSM_SW_ERROR_LENGTH on truncated message
+ */
+int decode_query_port_telemetry_caps_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc,
+					  uint8_t *max_supported_group_id,
+					  uint8_t *max_counter_records_per_resp,
+					  uint8_t *supported_groups_bitmask);
+
+/** @brief Encode Query Port Telemetry Capabilities response (cmd 0x15).
+ *
+ * @param[in]  instance_id                  NSM instance ID
+ * @param[in]  cc                           Completion code
+ * @param[in]  reason_code                  Reason code (when cc != NSM_SUCCESS)
+ * @param[in]  max_supported_group_id       Highest supported group ID
+ * @param[in]  max_counter_records_per_resp Max records per response page
+ * @param[in]  supported_groups_bitmask     32-byte NvU8[32] supported-groups
+ *                                          bitmask (caller-owned buffer)
+ * @param[out] msg                          Output NSM message buffer
+ *                                          (caller allocates)
+ * @return NSM_SW_SUCCESS on success
+ * @return NSM_SW_ERROR_NULL if msg, supported_groups_bitmask is NULL
+ */
+int encode_query_port_telemetry_caps_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint8_t max_supported_group_id, uint8_t max_counter_records_per_resp,
+    const uint8_t *supported_groups_bitmask, struct nsm_msg *msg);
+
+/**
+ * Group 0x09 (Optical Module Metrics) aggregate sample tag assignment,
+ * per NVBug 6253174. Tags are laid out as four contiguous 8-lane blocks;
+ * the block base identifies the metric and (tag - base) is the lane index.
+ *
+ *   Tag   Standardized Counter Name
+ *   0x00  tx_power_lane_0            0x08  rx_power_lane_0
+ *   0x01  tx_power_lane_1            0x09  rx_power_lane_1
+ *   0x02  tx_power_lane_2            0x0A  rx_power_lane_2
+ *   0x03  tx_power_lane_3            0x0B  rx_power_lane_3
+ *   0x04  tx_power_lane_4            0x0C  rx_power_lane_4
+ *   0x05  tx_power_lane_5            0x0D  rx_power_lane_5
+ *   0x06  tx_power_lane_6            0x0E  rx_power_lane_6
+ *   0x07  tx_power_lane_7            0x0F  rx_power_lane_7
+ *   0x10  bias_current_lane_0        0x18  snr_lane_0
+ *   0x11  bias_current_lane_1        0x19  snr_lane_1
+ *   0x12  bias_current_lane_2        0x1A  snr_lane_2
+ *   0x13  bias_current_lane_3        0x1B  snr_lane_3
+ *   0x14  bias_current_lane_4        0x1C  snr_lane_4
+ *   0x15  bias_current_lane_5        0x1D  snr_lane_5
+ *   0x16  bias_current_lane_6        0x1E  snr_lane_6
+ *   0x17  bias_current_lane_7        0x1F  snr_lane_7
+ */
+enum nsm_optical_module_tag_base {
+	NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE = 0x00,
+	NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE = 0x08,
+	NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE = 0x10,
+	NSM_OPTICAL_MODULE_TAG_SNR_BASE = 0x18,
+};
+
+/**
+ * Per-lane optical module power/bias-current sample record payload.
+ * Used for group 0x09 tags 0x00-0x17 (TX power, RX power, bias current).
+ */
+struct nsm_optical_module_power_bias_record {
+	uint16_t value_le; /* NvU16, little-endian */
+} __attribute__((packed));
+
+/**
+ * Per-lane optical module SNR sample record payload.
+ * Used for group 0x09 tags 0x18-0x1F (signal-to-noise ratio).
+ *
+ * Raw PRM value; caller must divide by 256 to get dB (e.g. raw 5665 ->
+ * 22.13 dB). Not an IEEE 754 float.
+ */
+struct nsm_optical_module_snr_record {
+	uint32_t raw_value_le; /* raw PRM value, little-endian */
+} __attribute__((packed));
+
+/**
+ * @brief Decode one optical module power/bias-current record from a group
+ * 0x09 sample (tags 0x00-0x17).
+ *
+ * @param[in]  data       Pointer to the sample data field
+ * @param[in]  data_len   Must equal 2 (sizeof NvU16), as derived from the
+ *                        aggregate sample metadata length field
+ * @param[out] out_value  Decoded NvU16 value, host byte order
+ * @return NSM_SW_SUCCESS; NSM_SW_ERROR_LENGTH if data_len != 2
+ */
+int decode_optical_module_power_bias_lane_record(const uint8_t *data,
+						 size_t data_len,
+						 uint16_t *out_value);
+
+/**
+ * @brief Decode one optical module SNR record from a group 0x09 sample
+ * (tags 0x18-0x1F).
+ *
+ * Returns the raw PRM value as received on the wire. The caller must
+ * divide by 256 to convert to dB (e.g. raw 5665 -> 22.13 dB).
+ *
+ * @param[in]  data           Pointer to the sample data field
+ * @param[in]  data_len       Must equal 4 (sizeof raw_value_le), as derived
+ *                            from the aggregate sample metadata length field
+ * @param[out] out_raw_value  Decoded raw PRM value, host byte order
+ * @return NSM_SW_SUCCESS; NSM_SW_ERROR_LENGTH if data_len != 4
+ */
+int decode_optical_module_snr_lane_record(const uint8_t *data, size_t data_len,
+					  uint32_t *out_raw_value);
 
 #ifdef __cplusplus
 }

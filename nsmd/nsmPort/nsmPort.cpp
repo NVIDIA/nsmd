@@ -2136,6 +2136,19 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
             nsmDevice->addDeviceSensors(opticalResetSensor);
         }
 #endif
+        // "OpticalModuleTelemetrySupported": true triggers per-port optical
+        // module telemetry collection (NSM cmd 0x14 group 0x09).
+        if (allCurrentIfaceProperties.count(
+                "OpticalModuleTelemetrySupported") &&
+            std::get<bool>(allCurrentIfaceProperties.at(
+                "OpticalModuleTelemetrySupported")))
+        {
+            auto opticalTelemetrySensor =
+                std::make_shared<NsmOpticalModuleTelemetry>(
+                    bus, portName, type, objPath,
+                    static_cast<uint16_t>(logicalPortNum));
+            nsmDevice->addSensor(opticalTelemetrySensor, priority);
+        }
 
 #ifdef NVIDIA_FEC_HISTOGRAM
         // FEC histogram applicability:
@@ -2195,6 +2208,138 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
+}
+
+NsmOpticalModuleTelemetry::NsmOpticalModuleTelemetry(
+    sdbusplus::bus_t& bus, const std::string& portName, const std::string& type,
+    const std::string& portObjPath, uint16_t portNumber) :
+    NsmSensorAggregatorPaginated(portName, type), portNumber_(portNumber),
+    objPath_(portObjPath)
+{
+    lg2::info(
+        "NsmOpticalModuleTelemetry: create sensor:{NAME} port:{PORT} objpath:{OBJPATH}",
+        "NAME", portName.c_str(), "PORT", portNumber_, "OBJPATH",
+        objPath_.c_str());
+
+    opticalMetricsIntf_ =
+        std::make_unique<PortOpticalModuleMetricsIntf>(bus, objPath_.c_str());
+
+    /* Initialise D-Bus properties to 8-element zero vectors */
+    opticalMetricsIntf_->rxInputPowerMilliWatts(rxPowerMW_);
+    opticalMetricsIntf_->txOutputPowerMilliWatts(txPowerMW_);
+    opticalMetricsIntf_->txBiasCurrentMilliAmps(txBiasmA_);
+    opticalMetricsIntf_->signalToNoiseRatioPerLane(snrDB_);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmOpticalModuleTelemetry::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_query_port_telemetry_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    auto rc = encode_query_port_telemetry_v2_req(
+        instanceId, portNumber_, kGroupId, seqToken, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        if (shouldLog("NsmOpticalModuleTelemetry:genRequestMsg",
+                      nsm_sw_codes(rc)))
+        {
+            lg2::error("NsmOpticalModuleTelemetry: encode request failed."
+                       " eid={EID} rc={RC} port={PORT}",
+                       "EID", eid, "RC", rc, "PORT", portNumber_);
+        }
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+int NsmOpticalModuleTelemetry::handleSample(const TelemetrySample& sample)
+{
+    // Group 0x09 (Optical Module Metrics) tags are four contiguous 8-lane
+    // blocks (NVBug 6253174); block base identifies the metric, and
+    // (tag - base) is the lane index.
+    const uint8_t lane = sample.tag % NUMBER_OF_LANES;
+    const uint8_t metricBase = static_cast<uint8_t>(sample.tag - lane);
+
+    if (metricBase == NSM_OPTICAL_MODULE_TAG_SNR_BASE)
+    {
+        uint32_t rawValue = 0;
+        int rc = decode_optical_module_snr_lane_record(
+            sample.data, sample.data_len, &rawValue);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            if (shouldLog("NsmOpticalModuleTelemetry:decodeSnr",
+                          nsm_sw_codes(rc)))
+            {
+                lg2::error(
+                    "NsmOpticalModuleTelemetry: decode SNR record failed."
+                    " sensor={NAME} tag={TAG} data_len={LEN}",
+                    "NAME", getName().c_str(), "TAG", sample.tag, "LEN",
+                    sample.data_len);
+            }
+            return rc;
+        }
+        /* Raw PRM value -> dB */
+        snrDB_[lane] = static_cast<double>(rawValue) / kSnrRawToDbScale;
+        return NSM_SW_SUCCESS;
+    }
+
+    uint16_t value = 0;
+    int rc = decode_optical_module_power_bias_lane_record(
+        sample.data, sample.data_len, &value);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        if (shouldLog("NsmOpticalModuleTelemetry:decodePowerBias",
+                      nsm_sw_codes(rc)))
+        {
+            lg2::error(
+                "NsmOpticalModuleTelemetry: decode power/bias record failed."
+                " sensor={NAME} tag={TAG} data_len={LEN}",
+                "NAME", getName().c_str(), "TAG", sample.tag, "LEN",
+                sample.data_len);
+        }
+        return rc;
+    }
+
+    switch (metricBase)
+    {
+        case NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE:
+            txPowerMW_[lane] = static_cast<double>(value);
+            break;
+        case NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE:
+            rxPowerMW_[lane] = static_cast<double>(value);
+            break;
+        case NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE:
+            txBiasmA_[lane] = static_cast<double>(value);
+            break;
+        default:
+            if (shouldLog("NsmOpticalModuleTelemetry:unknownTag", true))
+            {
+                lg2::error("NsmOpticalModuleTelemetry: unknown tag={TAG}"
+                           " sensor={NAME}",
+                           "TAG", sample.tag, "NAME", getName().c_str());
+            }
+            return NSM_SW_ERROR_DATA;
+    }
+    return NSM_SW_SUCCESS;
+}
+
+void NsmOpticalModuleTelemetry::postUpdate()
+{
+    opticalMetricsIntf_->rxInputPowerMilliWatts(rxPowerMW_);
+    opticalMetricsIntf_->txOutputPowerMilliWatts(txPowerMW_);
+    opticalMetricsIntf_->txBiasCurrentMilliAmps(txBiasmA_);
+    opticalMetricsIntf_->signalToNoiseRatioPerLane(snrDB_);
+}
+
+void NsmOpticalModuleTelemetry::resetState()
+{
+    rxPowerMW_.assign(NUMBER_OF_LANES, 0.0);
+    txPowerMW_.assign(NUMBER_OF_LANES, 0.0);
+    txBiasmA_.assign(NUMBER_OF_LANES, 0.0);
+    snrDB_.assign(NUMBER_OF_LANES, 0.0);
 }
 
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)

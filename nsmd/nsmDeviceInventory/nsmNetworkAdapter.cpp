@@ -840,19 +840,26 @@ uint8_t NsmNetworkAdapterProtectionOptionsMode::handleResponseMsg(
     auto rc = decode_get_device_mode_settings_v2_resp(
         responseMsg, responseLen, &cc, &reasonCode, nullptr, &currentLength,
         nullptr, &pendingLength);
-    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    if (shouldLog("NsmNetworkAdapterProtectionOptionsMode:decode", reasonCode,
+                  cc, rc))
     {
         lg2::error("NsmNetworkAdapterProtectionOptionsMode: GET decode failed."
                    " cc={CC} reasonCode={RC2} rc={RC}",
                    "CC", cc, "RC2", reasonCode, "RC", rc);
+    }
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
         return cc ? cc : rc;
     }
     if (currentLength != PROTECTION_OPTIONS_MODE_DATA_SIZE)
     {
-        lg2::error("NsmNetworkAdapterProtectionOptionsMode: unexpected payload"
-                   " length {LEN} (expected {EXP})",
-                   "LEN", currentLength, "EXP",
-                   PROTECTION_OPTIONS_MODE_DATA_SIZE);
+        if (shouldLog("NsmNetworkAdapterProtectionOptionsMode:length", true))
+        {
+            lg2::error(
+                "NsmNetworkAdapterProtectionOptionsMode: unexpected payload"
+                " length {LEN} (expected {EXP})",
+                "LEN", currentLength, "EXP", PROTECTION_OPTIONS_MODE_DATA_SIZE);
+        }
         return NSM_SW_ERROR_LENGTH;
     }
 

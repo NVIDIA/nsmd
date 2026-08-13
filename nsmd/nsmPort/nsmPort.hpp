@@ -30,6 +30,7 @@
 #include <xyz/openbmc_project/Metrics/PortECC/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem2/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem3/server.hpp>
+#include <xyz/openbmc_project/Metrics/PortOpticalModuleMetrics/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortPacketCounters/server.hpp>
 #include <xyz/openbmc_project/Network/LinkType/server.hpp>
 #include <xyz/openbmc_project/Network/MACAddress/server.hpp>
@@ -64,6 +65,8 @@ using GuidIntf =
     sdbusplus::server::object_t<sdbusplus::server::com::nvidia::common::GUID>;
 using PortECCIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::PortECC>;
+using PortOpticalModuleMetricsIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::metrics::PortOpticalModuleMetrics>;
 
 using NvidiaResetIntf =
     sdbusplus::server::object_t<sdbusplus::server::com::nvidia::Reset>;
@@ -263,6 +266,64 @@ class NsmGetPortECCCounters : public NsmSensor
     std::string objPath;
     uint16_t portNumber;
     std::unique_ptr<PortECCIntf> portECCIntf = nullptr;
+};
+
+/**
+ * @brief CX optical module per-lane telemetry sensor.
+ *
+ * Collects per-lane RX power (mW), TX power (mW), TX bias current (mA),
+ * and SNR (dB) from CX-9 NIC ports via NSM cmd 0x14 group 0x09.
+ *
+ * Created per-port when Entity Manager publishes
+ * NSM_NVLinkWithNetworkPortAddresses with "OpticalModuleTelemetrySupported":
+ * true.
+ *
+ * Depends on NsmSensorAggregatorPaginated (aggregate-and-page-infra feature).
+ */
+class NsmOpticalModuleTelemetry : public NsmSensorAggregatorPaginated
+{
+  public:
+    NsmOpticalModuleTelemetry(sdbusplus::bus_t& bus,
+                              const std::string& portName,
+                              const std::string& type,
+                              const std::string& portObjPath,
+                              uint16_t portNumber);
+
+  protected:
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+
+    int handleSample(const TelemetrySample& sample) override;
+
+    void postUpdate() override;
+    void resetState() override;
+
+  private:
+    uint16_t portNumber_;
+    std::string objPath_;
+
+    std::unique_ptr<PortOpticalModuleMetricsIntf> opticalMetricsIntf_;
+
+    enum : uint8_t
+    {
+        NUMBER_OF_LANES = 8
+    };
+
+    /* Per-lane accumulation buffers — NUMBER_OF_LANES elements each.
+     * Parenthesized (not braced) init: NUMBER_OF_LANES converts to double
+     * non-narrowingly, so brace-init would select the initializer_list<double>
+     * constructor and produce a 2-element {8.0, 0.0} vector instead of 8
+     * zeros. */
+    std::vector<double> rxPowerMW_ = std::vector<double>(NUMBER_OF_LANES, 0.0);
+    std::vector<double> txPowerMW_ = std::vector<double>(NUMBER_OF_LANES, 0.0);
+    std::vector<double> txBiasmA_ = std::vector<double>(NUMBER_OF_LANES, 0.0);
+    std::vector<double> snrDB_ = std::vector<double>(NUMBER_OF_LANES, 0.0);
+
+    static constexpr uint8_t kGroupId = NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE;
+
+    /* SNR PRM raw value -> dB: raw / kSnrRawToDbScale (e.g. 5665 -> 22.13 dB)
+     */
+    static constexpr double kSnrRawToDbScale = 256.0;
 };
 
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)
