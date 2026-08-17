@@ -14,6 +14,7 @@ tests = [
     'nsmDeviceInventoryBranch_test',
     'nsmPCIeRetimerSwitchDIBranch2_test',
     'nsmNetworkAdapterBranch2_test',
+    'nsmNetworkAdapterBranch3_test',
     'nsmPCIeRetimerFabricsDIBranch_test',
     'nsmSwitchBranch6_test',
 ]

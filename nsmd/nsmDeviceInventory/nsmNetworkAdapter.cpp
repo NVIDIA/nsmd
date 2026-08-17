@@ -39,6 +39,7 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <cstring>
 #include <optional>
 #include <vector>
 
@@ -267,6 +268,7 @@ requester::Coroutine NsmDeviceProtectionOptions::setProtectionOptions(
         asyncPatchInProgress = false;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    *status = AsyncOperationStatusType::Success;
     asyncPatchInProgress = false;
     co_return NSM_SW_SUCCESS;
 }
@@ -796,6 +798,279 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
     co_return NSM_SW_SUCCESS;
 }
 
+// ---- Protection Options Mode V2 (NSM Type 5, Device Mode Index 26) ----
+
+NsmNetworkAdapterProtectionOptionsMode::NsmNetworkAdapterProtectionOptionsMode(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<ProtectionOptionsModeIntf> protectionOptionsModeIntf,
+    std::shared_ptr<AssociationDefinitionsInft> associationDefIntf) :
+    NsmSensor(name, type),
+    protectionOptionsModeIntf(std::move(protectionOptionsModeIntf)),
+    associationDefIntf(std::move(associationDefIntf))
+{}
+
+std::optional<std::vector<uint8_t>>
+    NsmNetworkAdapterProtectionOptionsMode::genRequestMsg(eid_t eid,
+                                                          uint8_t instanceId)
+{
+    std::vector<uint8_t> request(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req), 0);
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_device_mode_settings_v2_req(
+        instanceId, DEVICE_MODE_PROTECTION_OPTIONS_MODE, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug(
+            "encode_get_device_mode_settings_v2_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmNetworkAdapterProtectionOptionsMode::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reasonCode = ERR_NULL;
+    uint8_t currentData[PROTECTION_OPTIONS_MODE_DATA_SIZE] = {};
+    uint16_t currentLength = 0;
+    uint16_t pendingLength = 0;
+
+    // Probe lengths first to guard against an oversized payload.
+    auto rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reasonCode, nullptr, &currentLength,
+        nullptr, &pendingLength);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::error("NsmNetworkAdapterProtectionOptionsMode: GET decode failed."
+                   " cc={CC} reasonCode={RC2} rc={RC}",
+                   "CC", cc, "RC2", reasonCode, "RC", rc);
+        return cc ? cc : rc;
+    }
+    if (currentLength != PROTECTION_OPTIONS_MODE_DATA_SIZE)
+    {
+        lg2::error("NsmNetworkAdapterProtectionOptionsMode: unexpected payload"
+                   " length {LEN} (expected {EXP})",
+                   "LEN", currentLength, "EXP",
+                   PROTECTION_OPTIONS_MODE_DATA_SIZE);
+        return NSM_SW_ERROR_LENGTH;
+    }
+
+    uint16_t dummy = 0;
+    rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reasonCode, currentData, &currentLength,
+        nullptr, &dummy);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+
+    uint16_t bitmask = 0;
+    memcpy(&bitmask, currentData, sizeof(bitmask));
+    bitmask = le16toh(bitmask);
+
+    bool fw = (bitmask >> 0) & 1U;
+    bool cfg = (bitmask >> 1) & 1U;
+    bool txFw = (bitmask >> 2) & 1U;
+    bool txCfg = (bitmask >> 3) & 1U;
+
+    if (protectionOptionsModeIntf)
+    {
+        protectionOptionsModeIntf->hostFirmwareUpdateRestrictionEnabled(fw);
+        protectionOptionsModeIntf->hostConfigurationChangeRestrictionEnabled(
+            cfg);
+        protectionOptionsModeIntf
+            ->hostTransceiverFirmwareUpdateRestrictionEnabled(txFw);
+        protectionOptionsModeIntf
+            ->hostTransceiverConfigurationChangeRestrictionEnabled(txCfg);
+    }
+
+    return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmNetworkAdapterProtectionOptionsMode::setFlag(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device, uint8_t bit)
+{
+    const bool* newVal = std::get_if<bool>(&value);
+    if (!newVal)
+    {
+        lg2::error(
+            "NsmNetworkAdapterProtectionOptionsMode::setFlag: bad value type");
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_DATA;
+    }
+
+    if (asyncPatchInProgress)
+    {
+        lg2::error(
+            "NsmNetworkAdapterProtectionOptionsMode::setFlag: patch in progress");
+        *status = AsyncOperationStatusType::Unavailable;
+        throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+    }
+    asyncPatchInProgress = true;
+
+    bool fw = protectionOptionsModeIntf->hostFirmwareUpdateRestrictionEnabled();
+    bool cfg =
+        protectionOptionsModeIntf->hostConfigurationChangeRestrictionEnabled();
+    bool txFw = protectionOptionsModeIntf
+                    ->hostTransceiverFirmwareUpdateRestrictionEnabled();
+    bool txCfg = protectionOptionsModeIntf
+                     ->hostTransceiverConfigurationChangeRestrictionEnabled();
+
+    switch (bit)
+    {
+        case 0:
+            fw = *newVal;
+            break;
+        case 1:
+            cfg = *newVal;
+            break;
+        case 2:
+            txFw = *newVal;
+            break;
+        case 3:
+            txCfg = *newVal;
+            break;
+        default:
+            lg2::error(
+                "NsmNetworkAdapterProtectionOptionsMode::setFlag: bad bit"
+                " {BIT}",
+                "BIT", bit);
+            asyncPatchInProgress = false;
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_DATA;
+    }
+
+    uint16_t bitmask = (static_cast<uint16_t>(fw) << 0) |
+                       (static_cast<uint16_t>(cfg) << 1) |
+                       (static_cast<uint16_t>(txFw) << 2) |
+                       (static_cast<uint16_t>(txCfg) << 3);
+    uint16_t bitmaskLE = htole16(bitmask);
+    uint8_t modeData[PROTECTION_OPTIONS_MODE_DATA_SIZE] = {};
+    memcpy(modeData, &bitmaskLE, sizeof(bitmaskLE));
+
+    std::vector<uint8_t> request(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req) - 1 +
+            PROTECTION_OPTIONS_MODE_DATA_SIZE,
+        0);
+    auto requestPtr = reinterpret_cast<nsm_msg*>(request.data());
+    auto rc = encode_set_device_mode_settings_v2_req(
+        0, DEVICE_MODE_PROTECTION_OPTIONS_MODE, modeData,
+        PROTECTION_OPTIONS_MODE_DATA_SIZE, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("NsmNetworkAdapterProtectionOptionsMode: encode SET failed."
+                   " rc={RC}",
+                   "RC", rc);
+        asyncPatchInProgress = false;
+        *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await device->postPatchIO(device->getEid(), request,
+                                            responseMsg, responseLen);
+    if (rc_ != NSM_SW_SUCCESS)
+    {
+        lg2::error("NsmNetworkAdapterProtectionOptionsMode: postPatchIO failed."
+                   " eid={EID} rc={RC}",
+                   "EID", device->getEid(), "RC", rc_);
+        asyncPatchInProgress = false;
+        *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
+        co_return rc_;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_set_device_mode_settings_v2_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reason_code);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::error("NsmNetworkAdapterProtectionOptionsMode: SET failed."
+                   " cc={CC} reason={RC2} rc={RC}",
+                   "CC", cc, "RC2", reason_code, "RC", rc);
+        asyncPatchInProgress = false;
+        *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
+        co_return cc ? cc : rc;
+    }
+
+    if (protectionOptionsModeIntf)
+    {
+        protectionOptionsModeIntf->hostFirmwareUpdateRestrictionEnabled(fw);
+        protectionOptionsModeIntf->hostConfigurationChangeRestrictionEnabled(
+            cfg);
+        protectionOptionsModeIntf
+            ->hostTransceiverFirmwareUpdateRestrictionEnabled(txFw);
+        protectionOptionsModeIntf
+            ->hostTransceiverConfigurationChangeRestrictionEnabled(txCfg);
+    }
+
+    lg2::info("NsmNetworkAdapterProtectionOptionsMode: SET succeeded"
+              " bitmask=0x{BITMASK}",
+              "BITMASK", lg2::hex, bitmask);
+    *status = AsyncOperationStatusType::Success;
+    asyncPatchInProgress = false;
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
+}
+
+static void createProtectionOptionsModeSensors(
+    sdbusplus::bus_t& bus, const std::shared_ptr<NsmDevice>& nsmDevice,
+    const std::string& name, const std::string& type,
+    const std::string& networkAdapterObjPath,
+    const std::string& networkAdapterPath)
+{
+    const std::string objPath = networkAdapterObjPath + "ProtectionOptionsMode";
+
+    auto assocIntf =
+        std::make_shared<AssociationDefinitionsInft>(bus, objPath.c_str());
+    assocIntf->associations(
+        {{"network_adapter", "protection_options_mode", networkAdapterPath}});
+
+    auto protectionModeIntf =
+        std::make_shared<ProtectionOptionsModeIntf>(bus, objPath.c_str());
+    protectionModeIntf->hostFirmwareUpdateRestrictionEnabled(false);
+    protectionModeIntf->hostConfigurationChangeRestrictionEnabled(false);
+    protectionModeIntf->hostTransceiverFirmwareUpdateRestrictionEnabled(false);
+    protectionModeIntf->hostTransceiverConfigurationChangeRestrictionEnabled(
+        false);
+
+    auto sensor = std::make_shared<NsmNetworkAdapterProtectionOptionsMode>(
+        name, type, protectionModeIntf, assocIntf);
+
+    nsmDevice->addSensor(sensor, false);
+
+    static constexpr std::array<const char*, 4> propNames = {
+        "HostFirmwareUpdateRestrictionEnabled",
+        "HostConfigurationChangeRestrictionEnabled",
+        "HostTransceiverFirmwareUpdateRestrictionEnabled",
+        "HostTransceiverConfigurationChangeRestrictionEnabled",
+    };
+    for (uint8_t bit = 0; bit < 4; ++bit)
+    {
+        nsm::AsyncSetOperationHandler handler =
+            std::bind(&NsmNetworkAdapterProtectionOptionsMode::setFlag, sensor,
+                      std::placeholders::_1, std::placeholders::_2,
+                      std::placeholders::_3, bit);
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(objPath)
+            ->addAsyncSetOperation(
+                std::string(ProtectionOptionsModeServer::interface),
+                propNames[bit],
+                AsyncSetOperationInfo{handler, sensor, nsmDevice});
+    }
+
+    lg2::info(
+        "createProtectionOptionsModeSensors: registered name={NAME} path={PATH}",
+        "NAME", name, "PATH", objPath);
+}
+
 static std::string getDeviceModeObjectPath(const std::string& inventoryObjPath,
                                            const std::string& objectName)
 {
@@ -1058,6 +1333,14 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
                                  networkAdapterPath);
         }
 #endif
+
+        // Protection Options Mode V2 (NSM Type 5, Device Mode Index 26)
+        if (isModeSupported(DEVICE_MODE_PROTECTION_OPTIONS_MODE))
+        {
+            createProtectionOptionsModeSensors(bus, nsmDevice, name, type,
+                                               networkAdapterObjPath,
+                                               networkAdapterPath);
+        }
     }
 
     // coverity[missing_return]

@@ -607,8 +607,15 @@ enum device_mode_index {
 	DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT = 16,
 	DEVICE_MODE_ADAPTIVE_TGPMODE = 21,
 	DEVICE_MODE_LLDP = 24,
+	DEVICE_MODE_PROTECTION_OPTIONS_MODE = 26,
 	DEVICE_MODE_POWER_CAPPING = 27,
 };
+
+/** @brief Data size (in bytes) of the Protection Options Mode (index 26)
+ * payload. Two-byte little-endian bitmask; bits 0-3 map to the four protection
+ *         flags per NvBug 6307327. Bits 4-15 are reserved.
+ */
+#define PROTECTION_OPTIONS_MODE_DATA_SIZE 2
 
 /** @brief AdaptiveTGPMode (Dual Part Number) data byte values per NSM Type 5
  *         Device Mode Index 21.
