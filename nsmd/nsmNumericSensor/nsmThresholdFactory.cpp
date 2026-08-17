@@ -18,9 +18,11 @@
 #include "nsmThresholdFactory.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "nsmNumericSensor.hpp"
 #include "nsmNumericSensorFactory.hpp"
 #include "nsmThreshold.hpp"
 #include "nsmThresholdAggregator.hpp"
+#include "nsmThresholdEvaluator.hpp"
 #include "nsmThresholdValue.hpp"
 
 using namespace std::string_literals;
@@ -62,25 +64,127 @@ requester::Coroutine NsmThresholdFactory::make()
         co_return result;
     }
 
-    co_await processThresholdsPair<ThresholdWarningIntf,
-                                   NsmThresholdValueWarningLow,
-                                   NsmThresholdValueWarningHigh>(
-        thresholdInterfaces,
-        ThresholdsPairInfo{.lowerThreshold{"LowerCaution"},
-                           .upperThreshold{"UpperCaution"}});
+    // Capture interface objects for evaluator creation, one per tier.
+    std::shared_ptr<ThresholdWarningIntf> warningIntf;
+    std::shared_ptr<ThresholdCriticalIntf> criticalIntf;
 
-    co_await processThresholdsPair<ThresholdCriticalIntf,
-                                   NsmThresholdValueCriticalLow,
-                                   NsmThresholdValueCriticalHigh>(
-        thresholdInterfaces,
-        ThresholdsPairInfo{.lowerThreshold{"LowerCritical"},
-                           .upperThreshold{"UpperCritical"}});
+    if (auto rc = co_await processThresholdsPair<ThresholdWarningIntf,
+                                                 NsmThresholdValueWarningLow,
+                                                 NsmThresholdValueWarningHigh>(
+            thresholdInterfaces,
+            ThresholdsPairInfo{.lowerThreshold{"LowerCaution"},
+                               .upperThreshold{"UpperCaution"}},
+            &warningIntf);
+        rc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "NsmThresholdFactory: {TIER} threshold setup failed for {SENSOR}, rc={RC}",
+            "TIER", std::string("Warning"), "SENSOR", info.name, "RC", rc);
+    }
 
-    co_await processThresholdsPair<ThresholdHardShutdownIntf,
-                                   NsmThresholdValueHardShutdownLow,
-                                   NsmThresholdValueHardShutdownHigh>(
-        thresholdInterfaces, ThresholdsPairInfo{.lowerThreshold{"LowerFatal"},
-                                                .upperThreshold{"UpperFatal"}});
+    if (auto rc = co_await processThresholdsPair<ThresholdCriticalIntf,
+                                                 NsmThresholdValueCriticalLow,
+                                                 NsmThresholdValueCriticalHigh>(
+            thresholdInterfaces,
+            ThresholdsPairInfo{.lowerThreshold{"LowerCritical"},
+                               .upperThreshold{"UpperCritical"}},
+            &criticalIntf);
+        rc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "NsmThresholdFactory: {TIER} threshold setup failed for {SENSOR}, rc={RC}",
+            "TIER", std::string("Critical"), "SENSOR", info.name, "RC", rc);
+    }
+
+    // HardShutdown (NSM Fatal/Non-recoverable tier, confirmed distinct from
+    // Critical). Whether HardShutdown is the spec-sanctioned mapping is
+    // tracked separately.
+    std::shared_ptr<ThresholdHardShutdownIntf> hardShutdownIntf;
+
+    if (auto rc =
+            co_await processThresholdsPair<ThresholdHardShutdownIntf,
+                                           NsmThresholdValueHardShutdownLow,
+                                           NsmThresholdValueHardShutdownHigh>(
+                thresholdInterfaces,
+                ThresholdsPairInfo{.lowerThreshold{"LowerFatal"},
+                                   .upperThreshold{"UpperFatal"}},
+                &hardShutdownIntf);
+        rc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "NsmThresholdFactory: {TIER} threshold setup failed for {SENSOR}, rc={RC}",
+            "TIER", std::string("HardShutdown"), "SENSOR", info.name, "RC", rc);
+    }
+
+    // SoftShutdown and PerformanceLoss (STH-REQ-09, threshold-tier
+    // extensibility): infra-only today — no entity-manager config assigns
+    // either tier to any sensor on any platform. Wired unconditionally so a
+    // future ThermalParameters entry activates evaluation with no further
+    // code change; processThresholdsPair() is a no-op until then.
+    std::shared_ptr<ThresholdSoftShutdownIntf> softShutdownIntf;
+    std::shared_ptr<ThresholdPerformanceLossIntf> perfLossIntf;
+
+    if (auto rc =
+            co_await processThresholdsPair<ThresholdSoftShutdownIntf,
+                                           NsmThresholdValueSoftShutdownLow,
+                                           NsmThresholdValueSoftShutdownHigh>(
+                thresholdInterfaces,
+                ThresholdsPairInfo{.lowerThreshold{"LowerSoftShutdown"},
+                                   .upperThreshold{"UpperSoftShutdown"}},
+                &softShutdownIntf);
+        rc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "NsmThresholdFactory: {TIER} threshold setup failed for {SENSOR}, rc={RC}",
+            "TIER", std::string("SoftShutdown"), "SENSOR", info.name, "RC", rc);
+    }
+
+    if (auto rc = co_await processThresholdsPair<
+            ThresholdPerformanceLossIntf, NsmThresholdValuePerformanceLossLow,
+            NsmThresholdValuePerformanceLossHigh>(
+            thresholdInterfaces,
+            ThresholdsPairInfo{.lowerThreshold{"LowerPerformanceLoss"},
+                               .upperThreshold{"UpperPerformanceLoss"}},
+            &perfLossIntf);
+        rc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "NsmThresholdFactory: {TIER} threshold setup failed for {SENSOR}, rc={RC}",
+            "TIER", std::string("PerformanceLoss"), "SENSOR", info.name, "RC",
+            rc);
+    }
+
+    // Attach threshold evaluator to the sensor's primary D-Bus value object
+    // if at least one tier interface was created.
+    if (warningIntf || criticalIntf || hardShutdownIntf || softShutdownIntf ||
+        perfLossIntf)
+    {
+        auto evaluator = std::make_unique<NsmThresholdEvaluator>(
+            warningIntf, criticalIntf, hardShutdownIntf, softShutdownIntf,
+            perfLossIntf);
+
+        bool evaluatorAttached = false;
+        auto sensorValueObject = numericSensor->getSensorValueObject();
+        if (sensorValueObject)
+        {
+            const auto& objects = sensorValueObject->getObjects();
+            for (const auto& obj : objects)
+            {
+                if (obj->setThresholdEvaluator(evaluator))
+                {
+                    evaluatorAttached = true;
+                    break;
+                }
+            }
+        }
+        if (!evaluatorAttached)
+        {
+            lg2::error(
+                "NsmThresholdFactory: no NsmNumericSensorDbusValue found for {SENSOR} — threshold evaluator not attached",
+                "SENSOR", info.name);
+        }
+    }
+
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
@@ -151,7 +255,8 @@ template <typename DBusIntf,
           std::derived_from<NsmThresholdValue> ThresholdValueHigh>
 requester::Coroutine NsmThresholdFactory::processThresholdsPair(
     const std::unordered_map<std::string, std::string>& thresholdInterfaces,
-    const ThresholdsPairInfo& thresholdsPairInfo)
+    const ThresholdsPairInfo& thresholdsPairInfo,
+    std::shared_ptr<DBusIntf>* outIntf)
 {
     auto lowerThresholdIntf =
         thresholdInterfaces.find(thresholdsPairInfo.lowerThreshold);
@@ -172,9 +277,14 @@ requester::Coroutine NsmThresholdFactory::processThresholdsPair(
             auto thresholdValue = std::make_unique<ThresholdValueLow>(
                 info.name + '_' + thresholdsPairInfo.lowerThreshold,
                 "NSM_ThermalParameter", dbusInterface);
-            co_await createNsmThreshold(lowerThresholdIntf->second,
-                                        thresholdsPairInfo.lowerThreshold,
-                                        std::move(thresholdValue));
+            auto rc = co_await createNsmThreshold(
+                lowerThresholdIntf->second, thresholdsPairInfo.lowerThreshold,
+                std::move(thresholdValue));
+            // Export the created interface to the caller only on success.
+            if (rc == NSM_SUCCESS && outIntf != nullptr)
+            {
+                *outIntf = dbusInterface;
+            }
         }
 
         if (upperThresholdIntf != thresholdInterfaces.end())
@@ -182,9 +292,14 @@ requester::Coroutine NsmThresholdFactory::processThresholdsPair(
             auto thresholdValue = std::make_unique<ThresholdValueHigh>(
                 info.name + '_' + thresholdsPairInfo.upperThreshold,
                 "NSM_ThermalParameter", dbusInterface);
-            co_await createNsmThreshold(upperThresholdIntf->second,
-                                        thresholdsPairInfo.upperThreshold,
-                                        std::move(thresholdValue));
+            auto rc = co_await createNsmThreshold(
+                upperThresholdIntf->second, thresholdsPairInfo.upperThreshold,
+                std::move(thresholdValue));
+            // Export the created interface to the caller only on success.
+            if (rc == NSM_SUCCESS && outIntf != nullptr)
+            {
+                *outIntf = dbusInterface;
+            }
         }
     }
     // coverity[missing_return]

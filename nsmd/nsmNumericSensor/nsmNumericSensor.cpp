@@ -19,6 +19,7 @@
 
 #include "nsmNumericSensor.hpp"
 
+#include "nsmThresholdEvaluator.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
 
@@ -96,6 +97,8 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
     valueIntf.value(previousValue);
 }
 
+NsmNumericSensorDbusValue::~NsmNumericSensorDbusValue() = default;
+
 void NsmNumericSensorDbusValue::updateReading(double value, uint64_t timestamp)
 {
     if (previousValue != value)
@@ -109,11 +112,29 @@ void NsmNumericSensorDbusValue::updateReading(double value, uint64_t timestamp)
         // NaN is written using the HMC wall clock but valid readings use the
         // NSM device clock. Resetting to 0 ensures the next valid update
         // always passes canUpdate regardless of which timebase it uses.
+        // Alarm state is intentionally frozen at its last value: alarm
+        // de-assertion during transient device outages would generate
+        // spurious events.
         nextUpdateTimestamp = 0;
         return;
     }
 
+    if (thresholdEvaluator)
+    {
+        // Pre-conditions satisfied: value is valid (not NaN), which implies
+        // the sensor is available and functional — the polling path writes
+        // NaN on any MCTP error or sensor-unavailable condition.
+        thresholdEvaluator->evaluate(value);
+    }
+
     calculateNextUpdateTimestamp(timestamp, nextUpdateTimestamp);
+}
+
+bool NsmNumericSensorDbusValue::setThresholdEvaluator(
+    std::unique_ptr<NsmThresholdEvaluator>& evaluator)
+{
+    thresholdEvaluator = std::move(evaluator);
+    return true;
 }
 bool NsmNumericSensorDbusValue::canUpdate(const uint64_t& timestamp) const
 {

@@ -89,6 +89,22 @@ class NsmLeakDetection : public NsmSensor
                            const struct nsm_leak_detection_sensors_data* sensor,
                            uint8_t numberOfThresholdLevels);
 
+    /** @brief Evaluate the fresh voltage reading against the sensor's
+     *  Sensor.Threshold.Critical CriticalLow value and update
+     *  CriticalAlarmLow / emit CriticalLowAlarmAsserted|Deasserted on
+     *  state change. This is a dedicated evaluation path for Leak
+     *  Detection sensors, parallel to and independent of
+     *  NsmThresholdEvaluator/NsmThresholdFactory, since
+     *  the Leak Detection value object is not NsmNumericSensorDbusValue
+     *  and CriticalLow is runtime-patchable via D-Bus Set. CriticalLow
+     *  is read fresh from the interface on every call — no caching.
+     *  @param sensorId - The sensor ID to evaluate
+     *  @param sensor - Decoded sensor data for this poll (leak_state used
+     *  to detect an unavailable reading: SENSOR_SHORT / SENSOR_OPEN)
+     */
+    void evaluateCriticalLowThreshold(
+        uint8_t sensorId, const struct nsm_leak_detection_sensors_data* sensor);
+
     std::map<uint8_t, std::tuple<std::shared_ptr<LeakDetectorIntf>,
                                  std::shared_ptr<AssociationDefinitionsInft>,
                                  std::shared_ptr<AreaIntf>>>

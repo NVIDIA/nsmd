@@ -379,6 +379,110 @@ TEST_F(NsmThresholdFactoryTest, Make_UpperFatal_Static_DeviceSensorAdded)
 }
 
 // ============================================================================
+// make() – LowerSoftShutdown, Dynamic=false → static soft-shutdown low
+// threshold (STH-REQ-09 — infra-only tier, no sensor configured with it yet)
+// ============================================================================
+
+TEST_F(NsmThresholdFactoryTest, Make_LowerSoftShutdown_Static_DeviceSensorAdded)
+{
+    const std::string op = objPath("_lss");
+    auto sensor = makeSensor();
+    auto info = makeInfo("_lss");
+    const std::string intf = interface + ".ThermalParameters.LowerSoftShutdown";
+    setupStaticThreshold(op, intf, "LowerSoftShutdown", 65.0);
+
+    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
+                                sensorUuid);
+    size_t before = nsmDev->deviceSensors.size();
+    factory.make();
+
+    ASSERT_GT(nsmDev->deviceSensors.size(), before);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueSoftShutdownLow*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->softShutdownLow(), 65.0);
+}
+
+// ============================================================================
+// make() – UpperSoftShutdown, Dynamic=false → static soft-shutdown high
+// threshold
+// ============================================================================
+
+TEST_F(NsmThresholdFactoryTest, Make_UpperSoftShutdown_Static_DeviceSensorAdded)
+{
+    const std::string op = objPath("_uss");
+    auto sensor = makeSensor();
+    auto info = makeInfo("_uss");
+    const std::string intf = interface + ".ThermalParameters.UpperSoftShutdown";
+    setupStaticThreshold(op, intf, "UpperSoftShutdown", 110.0);
+
+    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
+                                sensorUuid);
+    size_t before = nsmDev->deviceSensors.size();
+    factory.make();
+
+    ASSERT_GT(nsmDev->deviceSensors.size(), before);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueSoftShutdownHigh*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->softShutdownHigh(), 110.0);
+}
+
+// ============================================================================
+// make() – LowerPerformanceLoss, Dynamic=false → static performance-loss low
+// threshold (STH-REQ-09 — infra-only tier, no sensor configured with it yet)
+// ============================================================================
+
+TEST_F(NsmThresholdFactoryTest,
+       Make_LowerPerformanceLoss_Static_DeviceSensorAdded)
+{
+    const std::string op = objPath("_lpl");
+    auto sensor = makeSensor();
+    auto info = makeInfo("_lpl");
+    const std::string intf = interface +
+                             ".ThermalParameters.LowerPerformanceLoss";
+    setupStaticThreshold(op, intf, "LowerPerformanceLoss", 80.0);
+
+    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
+                                sensorUuid);
+    size_t before = nsmDev->deviceSensors.size();
+    factory.make();
+
+    ASSERT_GT(nsmDev->deviceSensors.size(), before);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValuePerformanceLossLow*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->performanceLossLow(), 80.0);
+}
+
+// ============================================================================
+// make() – UpperPerformanceLoss, Dynamic=false → static performance-loss high
+// threshold
+// ============================================================================
+
+TEST_F(NsmThresholdFactoryTest,
+       Make_UpperPerformanceLoss_Static_DeviceSensorAdded)
+{
+    const std::string op = objPath("_upl");
+    auto sensor = makeSensor();
+    auto info = makeInfo("_upl");
+    const std::string intf = interface +
+                             ".ThermalParameters.UpperPerformanceLoss";
+    setupStaticThreshold(op, intf, "UpperPerformanceLoss", 90.0);
+
+    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
+                                sensorUuid);
+    size_t before = nsmDev->deviceSensors.size();
+    factory.make();
+
+    ASSERT_GT(nsmDev->deviceSensors.size(), before);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValuePerformanceLossHigh*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->performanceLossHigh(), 90.0);
+}
+
+// ============================================================================
 // make() – both LowerCaution and UpperCaution → two device sensors added
 // ============================================================================
 

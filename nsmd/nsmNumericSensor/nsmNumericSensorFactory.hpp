@@ -42,10 +42,10 @@ struct NumericSensorInfo
     double maxAllowableValue{std::numeric_limits<double>::infinity()};
     std::unique_ptr<std::string> readingBasis{};
     std::unique_ptr<std::string> description{};
-    double maxValue{
-        std::numeric_limits<double>::infinity()}; // default same as PDI default
-    double minValue{-std::numeric_limits<double>::infinity()}; // default same
-                                                               // as PDI default
+    // NaN means "not configured"; bmcweb omits ReadingRangeMin/Max when NaN.
+    // Set from entity-manager config at sensor init; NaN if the key is absent.
+    double maxValue{std::numeric_limits<double>::quiet_NaN()};
+    double minValue{std::numeric_limits<double>::quiet_NaN()};
 };
 
 class NumericSensorAggregatorBuilder
