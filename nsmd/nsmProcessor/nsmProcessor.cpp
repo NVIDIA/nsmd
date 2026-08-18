@@ -33,6 +33,7 @@
 #include "platform-environmental.h"
 
 #include "../../common/coroutine.hpp"
+#include "../../common/telemetryTombstone.hpp"
 #include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
@@ -1844,6 +1845,9 @@ NsmCurrClockFreq::NsmCurrClockFreq(
 {
     lg2::info("NsmCurrClockFreq: create sensor:{NAME}", "NAME", name.c_str());
     cpuOperatingConfigIntf = cpuConfigIntf;
+    // Seed with the marker so a never-polled property reads as null, not 0.
+    cpuOperatingConfigIntf->CpuOperatingConfigIntf::operatingSpeed(
+        Sentinel<uint32_t>::notAvailable);
     updateMetricOnSharedMemory();
 }
 
@@ -1854,10 +1858,17 @@ void NsmCurrClockFreq::updateMetricOnSharedMemory()
     std::vector<uint8_t> smbusData = {};
 
     std::string propName = "OperatingSpeed";
-    nv::sensor_aggregation::DbusVariantType operatingSpeedVal{
-        cpuOperatingConfigIntf->CpuOperatingConfigIntf::operatingSpeed()};
+    auto speed =
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::operatingSpeed();
+    nv::sensor_aggregation::DbusVariantType operatingSpeedVal{speed};
+    // A maxint reading is the "no data" marker: publish TELEMETRY_NOT_AVAILABLE
+    // so shared memory caches nan (rendered as Redfish null), not raw maxint.
+    uint8_t rc = (speed == Sentinel<uint32_t>::notAvailable)
+                     ? TELEMETRY_NOT_AVAILABLE
+                     : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, operatingSpeedVal);
+        inventoryObjPath, ifaceName, propName, smbusData, operatingSpeedVal, "",
+        rc);
 
 #endif
 }
@@ -1905,7 +1916,26 @@ uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
     {
         updateReading(clockFreq);
     }
+    else
+    {
+        // Poll failed (error cc): publish the no-reading marker instead of a
+        // stale/default value, as per the requirement (bug 5366235).
+        updateReading(Sentinel<uint32_t>::notAvailable);
+    }
     return cc ? cc : rc;
+}
+
+requester::Coroutine
+    NsmCurrClockFreq::update(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    auto rc = co_await NsmSensor::update(nsmDevice);
+    // Transport failure (timeout/no response) skips handleResponseMsg; stamp
+    // the marker so a prior reading is not left stale.
+    if (rc != NSM_SW_SUCCESS)
+    {
+        updateReading(Sentinel<uint32_t>::notAvailable);
+    }
+    co_return rc;
 }
 
 NsmDefaultBaseClockSpeed::NsmDefaultBaseClockSpeed(

@@ -394,6 +394,9 @@ class NsmCurrClockFreq : public NsmSensor
 
     void updateMetricOnSharedMemory() override;
 
+    /** @brief Poll; on transport failure, mark OperatingSpeed unavailable. */
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
+
   private:
     void updateReading(const uint32_t& clockFreq);
 
