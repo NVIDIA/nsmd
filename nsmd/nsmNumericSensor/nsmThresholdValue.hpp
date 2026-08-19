@@ -22,6 +22,8 @@
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Sensor/Threshold/Critical/server.hpp>
 #include <xyz/openbmc_project/Sensor/Threshold/HardShutdown/server.hpp>
+#include <xyz/openbmc_project/Sensor/Threshold/PerformanceLoss/server.hpp>
+#include <xyz/openbmc_project/Sensor/Threshold/SoftShutdown/server.hpp>
 #include <xyz/openbmc_project/Sensor/Threshold/Warning/server.hpp>
 
 using ThresholdWarningIntf =
@@ -30,6 +32,10 @@ using ThresholdCriticalIntf =
     sdbusplus::server::xyz::openbmc_project::sensor::threshold::Critical;
 using ThresholdHardShutdownIntf =
     sdbusplus::server::xyz::openbmc_project::sensor::threshold::HardShutdown;
+using ThresholdSoftShutdownIntf =
+    sdbusplus::server::xyz::openbmc_project::sensor::threshold::SoftShutdown;
+using ThresholdPerformanceLossIntf =
+    sdbusplus::server::xyz::openbmc_project::sensor::threshold::PerformanceLoss;
 
 namespace nsm
 {
@@ -109,6 +115,54 @@ class NsmThresholdValueHardShutdownHigh : public NsmThresholdValue
 
   private:
     std::shared_ptr<ThresholdHardShutdownIntf> intf;
+};
+
+class NsmThresholdValueSoftShutdownLow : public NsmThresholdValue
+{
+  public:
+    NsmThresholdValueSoftShutdownLow(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<ThresholdSoftShutdownIntf> intf);
+    void updateReading(double value, uint64_t timestamp = 0) override;
+
+  private:
+    std::shared_ptr<ThresholdSoftShutdownIntf> intf;
+};
+
+class NsmThresholdValueSoftShutdownHigh : public NsmThresholdValue
+{
+  public:
+    NsmThresholdValueSoftShutdownHigh(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<ThresholdSoftShutdownIntf> intf);
+    void updateReading(double value, uint64_t timestamp = 0) override;
+
+  private:
+    std::shared_ptr<ThresholdSoftShutdownIntf> intf;
+};
+
+class NsmThresholdValuePerformanceLossLow : public NsmThresholdValue
+{
+  public:
+    NsmThresholdValuePerformanceLossLow(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<ThresholdPerformanceLossIntf> intf);
+    void updateReading(double value, uint64_t timestamp = 0) override;
+
+  private:
+    std::shared_ptr<ThresholdPerformanceLossIntf> intf;
+};
+
+class NsmThresholdValuePerformanceLossHigh : public NsmThresholdValue
+{
+  public:
+    NsmThresholdValuePerformanceLossHigh(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<ThresholdPerformanceLossIntf> intf);
+    void updateReading(double value, uint64_t timestamp = 0) override;
+
+  private:
+    std::shared_ptr<ThresholdPerformanceLossIntf> intf;
 };
 
 } // namespace nsm

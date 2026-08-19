@@ -29,6 +29,7 @@
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 
+#include <cmath>
 #include <exception>
 #include <limits>
 #include <map>
@@ -268,6 +269,63 @@ void NsmLeakDetection::updateSensorValue(
     }
 }
 
+void NsmLeakDetection::evaluateCriticalLowThreshold(
+    uint8_t sensorId, const struct nsm_leak_detection_sensors_data* sensor)
+{
+    auto it = sensorValueIntfMap.find(sensorId);
+    if (it == sensorValueIntfMap.end())
+    {
+        return;
+    }
+
+    // Reading unavailable for this poll (sensor-side short/open) — freeze
+    // CriticalAlarmLow at its last value, do not evaluate, no signal.
+    if (sensor->leak_state == NSM_LEAK_STATE_SENSOR_SHORT ||
+        sensor->leak_state == NSM_LEAK_STATE_SENSOR_OPEN)
+    {
+        return;
+    }
+
+    auto& [sensorValueIntf, sensorAssociationIntf,
+           sensorThresholdIntf] = it->second;
+
+    // CriticalLow is runtime-settable via
+    // NsmLeakDetectionThresholdsPatch::setLeakDetectionThresholdsPatch, so
+    // it must be read fresh from the interface on every poll — no caching.
+    const double criticalLow = sensorThresholdIntf->criticalLow();
+    if (std::isnan(criticalLow))
+    {
+        // Not configured — skip silently, no evaluation, no signal.
+        return;
+    }
+
+    const double value = sensorValueIntf->value();
+    const bool newAlarm = (value <= criticalLow);
+    const bool oldAlarm = sensorThresholdIntf->criticalAlarmLow();
+    if (newAlarm == oldAlarm)
+    {
+        return;
+    }
+
+    // Lower/Critical direction only — MinAllowableValue/MaxAllowableValue
+    // are operating-range fields and are never evaluated here.
+    sensorThresholdIntf->criticalAlarmLow(newAlarm);
+    if (newAlarm)
+    {
+        lg2::info(
+            "LeakDetection CriticalAlarmLow asserted: sensorId={SENSOR_ID} value={VALUE} threshold={THRESH}",
+            "SENSOR_ID", sensorId, "VALUE", value, "THRESH", criticalLow);
+        sensorThresholdIntf->criticalLowAlarmAsserted(value);
+    }
+    else
+    {
+        lg2::info(
+            "LeakDetection CriticalAlarmLow deasserted: sensorId={SENSOR_ID} value={VALUE} threshold={THRESH}",
+            "SENSOR_ID", sensorId, "VALUE", value, "THRESH", criticalLow);
+        sensorThresholdIntf->criticalLowAlarmDeasserted(value);
+    }
+}
+
 std::optional<std::vector<uint8_t>>
     NsmLeakDetection::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
@@ -326,6 +384,10 @@ uint8_t NsmLeakDetection::handleResponseMsg(const struct nsm_msg* responseMsg,
 
         // Update sensor value interfaces
         updateSensorValue(sensorId, sensor, numberOfThresholdLevels);
+
+        // Evaluate the fresh reading against CriticalLow — separate
+        // evaluation path for Leak Detection sensors
+        evaluateCriticalLowThreshold(sensorId, sensor);
         ptr += expectedSensorInfoSize;
     }
 

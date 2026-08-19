@@ -26,8 +26,7 @@ NsmThresholdValueWarningLow::NsmThresholdValueWarningLow(
     NsmThresholdValue(name, type), intf(intf)
 {}
 
-void NsmThresholdValueWarningLow::updateReading(double value,
-                                                uint64_t /*timestamp*/)
+void NsmThresholdValueWarningLow::updateReading(double value, uint64_t)
 {
     intf->warningLow(value);
 }
@@ -38,8 +37,7 @@ NsmThresholdValueWarningHigh::NsmThresholdValueWarningHigh(
     NsmThresholdValue(name, type), intf(intf)
 {}
 
-void NsmThresholdValueWarningHigh::updateReading(double value,
-                                                 uint64_t /*timestamp*/)
+void NsmThresholdValueWarningHigh::updateReading(double value, uint64_t)
 {
     intf->warningHigh(value);
 }
@@ -50,8 +48,7 @@ NsmThresholdValueCriticalLow::NsmThresholdValueCriticalLow(
     NsmThresholdValue(name, type), intf(intf)
 {}
 
-void NsmThresholdValueCriticalLow::updateReading(double value,
-                                                 uint64_t /*timestamp*/)
+void NsmThresholdValueCriticalLow::updateReading(double value, uint64_t)
 {
     intf->criticalLow(value);
 }
@@ -62,8 +59,7 @@ NsmThresholdValueCriticalHigh::NsmThresholdValueCriticalHigh(
     NsmThresholdValue(name, type), intf(intf)
 {}
 
-void NsmThresholdValueCriticalHigh::updateReading(double value,
-                                                  uint64_t /*timestamp*/)
+void NsmThresholdValueCriticalHigh::updateReading(double value, uint64_t)
 {
     intf->criticalHigh(value);
 }
@@ -74,8 +70,7 @@ NsmThresholdValueHardShutdownLow::NsmThresholdValueHardShutdownLow(
     NsmThresholdValue(name, type), intf(intf)
 {}
 
-void NsmThresholdValueHardShutdownLow::updateReading(double value,
-                                                     uint64_t /*timestamp*/)
+void NsmThresholdValueHardShutdownLow::updateReading(double value, uint64_t)
 {
     intf->hardShutdownLow(value);
 }
@@ -86,10 +81,53 @@ NsmThresholdValueHardShutdownHigh::NsmThresholdValueHardShutdownHigh(
     NsmThresholdValue(name, type), intf(intf)
 {}
 
-void NsmThresholdValueHardShutdownHigh::updateReading(double value,
-                                                      uint64_t /*timestamp*/)
+void NsmThresholdValueHardShutdownHigh::updateReading(double value, uint64_t)
 {
     intf->hardShutdownHigh(value);
+}
+
+NsmThresholdValueSoftShutdownLow::NsmThresholdValueSoftShutdownLow(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<ThresholdSoftShutdownIntf> intf) :
+    NsmThresholdValue(name, type), intf(intf)
+{}
+
+void NsmThresholdValueSoftShutdownLow::updateReading(double value, uint64_t)
+{
+    intf->softShutdownLow(value);
+}
+
+NsmThresholdValueSoftShutdownHigh::NsmThresholdValueSoftShutdownHigh(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<ThresholdSoftShutdownIntf> intf) :
+    NsmThresholdValue(name, type), intf(intf)
+{}
+
+void NsmThresholdValueSoftShutdownHigh::updateReading(double value, uint64_t)
+{
+    intf->softShutdownHigh(value);
+}
+
+NsmThresholdValuePerformanceLossLow::NsmThresholdValuePerformanceLossLow(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<ThresholdPerformanceLossIntf> intf) :
+    NsmThresholdValue(name, type), intf(intf)
+{}
+
+void NsmThresholdValuePerformanceLossLow::updateReading(double value, uint64_t)
+{
+    intf->performanceLossLow(value);
+}
+
+NsmThresholdValuePerformanceLossHigh::NsmThresholdValuePerformanceLossHigh(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<ThresholdPerformanceLossIntf> intf) :
+    NsmThresholdValue(name, type), intf(intf)
+{}
+
+void NsmThresholdValuePerformanceLossHigh::updateReading(double value, uint64_t)
+{
+    intf->performanceLossHigh(value);
 }
 
 } // namespace nsm

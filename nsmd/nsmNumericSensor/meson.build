@@ -1,6 +1,7 @@
 sources += [
     'nsmNumericSensor/nsmTemp.cpp',
     'nsmNumericSensor/nsmThreshold.cpp',
+    'nsmNumericSensor/nsmThresholdEvaluator.cpp',
     'nsmNumericSensor/nsmThresholdValue.cpp',
     'nsmNumericSensor/nsmPower.cpp',
     'nsmNumericSensor/nsmPeakPower.cpp',

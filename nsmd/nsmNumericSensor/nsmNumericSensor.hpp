@@ -32,6 +32,7 @@
 #include <xyz/openbmc_project/Time/EpochTime/server.hpp>
 
 #include <limits>
+#include <memory>
 
 namespace utils
 {
@@ -41,6 +42,7 @@ struct Association;
 namespace nsm
 {
 class NsmNumericSensorComposite;
+class NsmThresholdEvaluator;
 using SensorUnit = sdbusplus::xyz::openbmc_project::Sensor::server::Value::Unit;
 using ValueIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Sensor::server::Value>;
@@ -76,6 +78,26 @@ class NsmNumericSensorValue
   public:
     virtual ~NsmNumericSensorValue() = default;
     virtual void updateReading(double value, uint64_t timestamp = 0) = 0;
+
+    /**
+     * @brief Attach a threshold evaluator to this sensor value object, if
+     * this concrete type supports one.
+     *
+     * No-op for observers that don't own D-Bus threshold interfaces (e.g.
+     * NsmNumericSensorValueAggregate, NsmNumericSensorShmem). Overridden by
+     * NsmNumericSensorDbusValue, the only type that actually attaches one.
+     *
+     * @param evaluator  Evaluator to attach. Only consumed (moved from) when
+     * this returns true, so callers can keep trying other objects in an
+     * aggregate on false.
+     * @return true if the evaluator was attached, false otherwise.
+     */
+    virtual bool
+        setThresholdEvaluator(std::unique_ptr<NsmThresholdEvaluator>& evaluator)
+    {
+        (void)evaluator;
+        return false;
+    }
 };
 
 class NsmNumericSensorDbusValue : public NsmNumericSensorValue
@@ -89,11 +111,22 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
         const double maxAllowableValue, const double maxValue,
         const double minValue, const std::string* readingBasis,
         const std::string* description);
+    ~NsmNumericSensorDbusValue();
     void updateReading(double value, uint64_t timestamp = 0) override;
     bool canUpdate(const uint64_t& timestamp) const;
 
     static void calculateNextUpdateTimestamp(const uint64_t& timestamp,
                                              uint64_t& nextUpdateTimestamp);
+
+    /**
+     * @brief Attach a threshold evaluator to this sensor value object.
+     *
+     * The evaluator is called from updateReading() on every valid (non-NaN)
+     * reading. Must be called at most once, after D-Bus threshold interfaces
+     * are created by NsmThresholdFactory.
+     */
+    bool setThresholdEvaluator(
+        std::unique_ptr<NsmThresholdEvaluator>& evaluator) override;
 
   private:
     uint64_t nextUpdateTimestamp = 0;
@@ -104,6 +137,10 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
     std::unique_ptr<TypeIntf> typeIntf{};
     std::unique_ptr<ReadingBasisIntf> readingBasisIntf{};
     std::unique_ptr<DescriptionIntf> descriptionIntf{};
+    // Threshold evaluator — null when no threshold interfaces are configured.
+    // Attached by NsmThresholdFactory after the threshold D-Bus interfaces
+    // are created. Evaluate() is called inline on every valid reading.
+    std::unique_ptr<NsmThresholdEvaluator> thresholdEvaluator{};
 };
 
 class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
