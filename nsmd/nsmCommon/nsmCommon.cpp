@@ -404,6 +404,11 @@ requester::Coroutine
     static std::map<eid_t, StateChangeLogger> loggers;
     if (nsmDevice)
     {
+        auto fallbackToMctpUuid = [&nsmDevice, &uuid]() {
+            uuid = nsmDevice->getUuid();
+            nsmDevice->deviceUuid = uuid;
+        };
+
         // Scenario 1:
         // Handle special case for baseboard/FPGA, where we do not event
         // want to send command to device ref bug Invalid NSM data detected
@@ -413,8 +418,7 @@ requester::Coroutine
             lg2::info(
                 "getDeviceUUID::baseboard/FPGA, using mctp uuid eid={EID}",
                 "EID", nsmDevice->getEid());
-            uuid = nsmDevice->getUuid();
-            nsmDevice->deviceUuid = uuid;
+            fallbackToMctpUuid();
             co_return NSM_SW_SUCCESS;
         }
 
@@ -428,10 +432,11 @@ requester::Coroutine
                                                        DEVICE_GUID, requestPtr);
         if (rc != NSM_SW_SUCCESS)
         {
-            lg2::debug(
-                "getDeviceUUID::encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            lg2::info(
+                "getDeviceUUID::encode_get_inventory_information_req failed, assinging mctp uuid eid={EID} rc={RC}",
                 "EID", nsmDevice->getEid(), "RC", rc);
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
+            fallbackToMctpUuid();
+            co_return NSM_SW_SUCCESS;
         }
 
         // Send request and get response
@@ -441,22 +446,22 @@ requester::Coroutine
                                           responseMsg, responseLen, false);
         if (rc)
         {
+            fallbackToMctpUuid();
             // Scenario 2: MessageType 3 or Get Inventory is itself not
             // supported e.g. ERot
             if (rc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
             {
                 // inside this block means Get Inventory is not supported
                 // so fallback to mctp uuid
-                uuid = nsmDevice->getUuid();
-                nsmDevice->deviceUuid = uuid; // falling back to mctp uuid
                 lg2::info(
                     "getDeviceUUID::sensorIO failed with rc not supported, assinging mctp uuid eid={EID} rc={RC}",
                     "EID", nsmDevice->getEid(), "RC", rc);
                 co_return NSM_SW_SUCCESS;
             }
-            lg2::error("getDeviceUUID::sensorIO failed. eid={EID} rc={RC}",
-                       "EID", nsmDevice->getEid(), "RC", rc);
-            co_return rc;
+            lg2::info(
+                "getDeviceUUID::sensorIO failed, assinging mctp uuid eid={EID} rc={RC}",
+                "EID", nsmDevice->getEid(), "RC", rc);
+            co_return NSM_SW_SUCCESS;
         }
 
         // Decode response
@@ -477,7 +482,12 @@ requester::Coroutine
                 "getDeviceUUID::decode_get_inventory_information_resp failed. eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
                 "EID", nsmDevice->getEid(), "CC", cc, "REASONCODE", reason_code,
                 "RC", rc);
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            fallbackToMctpUuid();
+            co_return NSM_SW_SUCCESS;
         }
 
         if (cc == NSM_SUCCESS)
@@ -491,7 +501,8 @@ requester::Coroutine
                 lg2::error(
                     "getDeviceUUID::decode_get_inventory_information_resp invalid property data. eid={EID} property={PROP}",
                     "EID", nsmDevice->getEid(), "PROP", DEVICE_GUID);
-                co_return NSM_SW_ERROR_LENGTH;
+                fallbackToMctpUuid();
+                co_return NSM_SW_SUCCESS;
             }
             memcpy(nvu8ArrVal.data(), data.data(), UUID_INT_SIZE);
             uuid = utils::convertUUIDToString(nvu8ArrVal);
@@ -500,7 +511,8 @@ requester::Coroutine
                 lg2::error(
                     "getDeviceUUID::getInventoryInformation received incorrect GUID for property={PROP} for eid={EID}",
                     "PROP", DEVICE_GUID, "EID", nsmDevice->getEid());
-                co_return NSM_SW_ERROR_COMMAND_FAIL;
+                fallbackToMctpUuid();
+                co_return NSM_SW_SUCCESS;
             }
 
             nsmDevice->deviceUuid = uuid;
@@ -509,22 +521,25 @@ requester::Coroutine
                 "EID", nsmDevice->getEid(), "RC", rc);
             co_return NSM_SW_SUCCESS;
         }
-        // Case 3: Type 3 Get Inventory information is supported but
-        // specific arg (DEVICE_GUID) command is not supported for devices
-        // like cx7 which do not support DEVICE_GUID identifier will return
-        // NSM_ERR_INVALID_DATA.
-        else if (cc == NSM_ERR_INVALID_DATA)
+
+        // Type 3 Get Inventory information is supported, but DEVICE_GUID can
+        // still return a non-success completion code. Use MCTP UUID for any
+        // non-success completion code.
+        if (cc == NSM_ERR_INVALID_DATA)
         {
-            // inside this block means DEVICE_GUID is not supported
-            // so fallback to mctp uuid
             lg2::info(
                 "getDeviceUUID::Got CC value as invalid data, assinging mctp uuid eid={EID} rc={RC}",
                 "EID", nsmDevice->getEid(), "RC", rc);
-            uuid = nsmDevice->getUuid();
-            nsmDevice->deviceUuid = uuid; // falling back to mctp uuid
-            co_return NSM_SW_SUCCESS;
         }
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+        else
+        {
+            lg2::info(
+                "getDeviceUUID::Got non-success CC value, assinging mctp uuid eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
+                "EID", nsmDevice->getEid(), "CC", cc, "REASONCODE", reason_code,
+                "RC", rc);
+        }
+        fallbackToMctpUuid();
+        co_return NSM_SW_SUCCESS;
     }
 
     co_return NSM_SW_ERROR_COMMAND_FAIL;

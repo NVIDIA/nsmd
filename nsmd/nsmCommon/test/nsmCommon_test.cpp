@@ -609,6 +609,25 @@ static mctp::MctpDiscovery& fakeMctpDiscovery()
     return *reinterpret_cast<mctp::MctpDiscovery*>(buf);
 }
 
+static std::shared_ptr<MockNsmDevice>
+    makeDeviceWithMctpUuid(eid_t eid, const uuid_t& mctpUuid)
+{
+    auto dev = std::make_shared<MockNsmDevice>(0, 0, "MCTP_UUID", mctpUuid, 0);
+    dev->eid = eid;
+    return dev;
+}
+
+static std::vector<uint8_t> makeInventoryInfoNonSuccessResp(uint8_t cc)
+{
+    std::vector<uint8_t> respBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto resp = reinterpret_cast<nsm_msg*>(respBuf.data());
+    auto rc = encode_get_inventory_information_resp(0, cc, ERR_NULL, 0, nullptr,
+                                                    resp);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    return respBuf;
+}
+
 // null nsmDevice → if (nsmDevice) false → co_return NSM_SW_ERROR_COMMAND_FAIL
 //
 TEST(GetDeviceUUID, NullDevice_ReturnsCommandFail)
@@ -653,48 +672,67 @@ TEST_F(NsmClockLimitUpdateTest,
 }
 
 // sensorIO fails with generic error (not UNSUPPORTED_COMMAND_CODE) →
-// co_return rc
-TEST_F(NsmClockLimitUpdateTest, GetDeviceUUID_SensorIO_OtherError_ReturnsRc)
+// fallback to mctp uuid, co_return NSM_SW_SUCCESS.
+TEST_F(NsmClockLimitUpdateTest,
+       GetDeviceUUID_SensorIO_OtherError_FallsBackToMctpUuid)
 {
-    auto dev = std::make_shared<MockNsmDevice>(0, 0, "MCTP_EID", "201", 0);
+    const uuid_t mctpUuid = "22222222-3333-4444-5555-666666666666";
+    auto dev = makeDeviceWithMctpUuid(201, mctpUuid);
     EXPECT_CALL(*dev, sensorIO(_, _, _, _, _))
         .WillOnce(mockSensorIO(NSM_ERROR));
 
     uuid_t outUuid;
-    nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
-    // Hits lines 457-459
+    auto rc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(outUuid, mctpUuid);
+    EXPECT_EQ(dev->deviceUuid, mctpUuid);
 }
 
-// sensorIO succeeds; decode response with cc=NSM_ERROR →
-// shouldLog returns true → co_return NSM_SW_ERROR_COMMAND_FAIL //
-
+// sensorIO succeeds; decode response with cc=NSM_ERROR → fallback to mctp uuid.
 TEST_F(NsmClockLimitUpdateTest,
-       GetDeviceUUID_DecodeResp_ErrorCC_ReturnsCommandFail)
+       GetDeviceUUID_DecodeResp_ErrorCC_FallsBackToMctpUuid)
 {
-    auto dev = std::make_shared<MockNsmDevice>(0, 0, "MCTP_EID", "202", 0);
-
-    // Encode response with cc=NSM_ERROR
-    std::vector<uint8_t> data(4, 0); // some data bytes
-    std::vector<uint8_t> respBuf(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_resp) + 4,
-        0);
-    auto resp = reinterpret_cast<nsm_msg*>(respBuf.data());
-    encode_get_inventory_information_resp(0, NSM_ERROR, ERR_NULL, 4,
-                                          data.data(), resp);
+    const uuid_t mctpUuid = "33333333-4444-5555-6666-777777777777";
+    auto dev = makeDeviceWithMctpUuid(202, mctpUuid);
+    auto respBuf = makeInventoryInfoNonSuccessResp(NSM_ERROR);
 
     EXPECT_CALL(*dev, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(respBuf));
 
     uuid_t outUuid;
-    nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
-    // shouldLog returns true → hits lines 472-480
+    auto rc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(outUuid, mctpUuid);
+    EXPECT_EQ(dev->deviceUuid, mctpUuid);
+}
+
+// sensorIO succeeds but decode fails due to an empty response → fallback to
+// mctp uuid, co_return NSM_SW_SUCCESS.
+TEST_F(NsmClockLimitUpdateTest,
+       GetDeviceUUID_DecodeResp_Failure_FallsBackToMctpUuid)
+{
+    const uuid_t mctpUuid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    auto dev = makeDeviceWithMctpUuid(212, mctpUuid);
+
+    EXPECT_CALL(*dev, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(Response()));
+
+    uuid_t outUuid;
+    auto rc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(outUuid, mctpUuid);
+    EXPECT_EQ(dev->deviceUuid, mctpUuid);
 }
 
 // sensorIO succeeds; decode response with cc=NSM_SUCCESS, dataSize < 16 →
-// hits the dataSize-too-small error path
+// fallback to mctp uuid.
 TEST_F(NsmClockLimitUpdateTest,
-       GetDeviceUUID_CcSuccess_DataSizeTooSmall_ReturnsLengthError)
+       GetDeviceUUID_CcSuccess_DataSizeTooSmall_FallsBackToMctpUuid)
 {
-    auto dev = std::make_shared<MockNsmDevice>(0, 0, "MCTP_EID", "203", 0);
+    const uuid_t mctpUuid = "44444444-5555-6666-7777-888888888888";
+    auto dev = makeDeviceWithMctpUuid(203, mctpUuid);
 
     // Encode response with cc=NSM_SUCCESS but only 4 bytes of data (<
     // UUID_INT_SIZE=16)
@@ -703,18 +741,50 @@ TEST_F(NsmClockLimitUpdateTest,
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_resp) + 4,
         0);
     auto resp = reinterpret_cast<nsm_msg*>(respBuf.data());
-    encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, 4,
-                                          data.data(), resp);
+    auto encodeRc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, ERR_NULL, 4, data.data(), resp);
+    EXPECT_EQ(encodeRc, NSM_SW_SUCCESS);
 
     EXPECT_CALL(*dev, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(respBuf));
 
     uuid_t outUuid;
-    nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
-    // shouldLog=false (cc=NSM_SUCCESS), then dataSize=4 < UUID_INT_SIZE=16
-    // → hits lines 486-491
+    auto rc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(outUuid, mctpUuid);
+    EXPECT_EQ(dev->deviceUuid, mctpUuid);
 }
 
-// sensorIO succeeds; cc=NSM_SUCCESS, dataSize>=16, valid UUID bytes →
+// sensorIO succeeds; decode response with cc=NSM_SUCCESS, dataSize > 16 →
+// fallback to mctp uuid.
+TEST_F(NsmClockLimitUpdateTest,
+       GetDeviceUUID_CcSuccess_DataSizeTooLarge_FallsBackToMctpUuid)
+{
+    const uuid_t mctpUuid = "55555555-6666-7777-8888-999999999999";
+    auto dev = makeDeviceWithMctpUuid(211, mctpUuid);
+
+    std::vector<uint8_t> data(UUID_INT_SIZE + 1, 0xAA);
+    std::vector<uint8_t> respBuf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_resp) +
+            data.size(),
+        0);
+    auto resp = reinterpret_cast<nsm_msg*>(respBuf.data());
+    auto encodeRc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, ERR_NULL, static_cast<uint16_t>(data.size()),
+        data.data(), resp);
+    EXPECT_EQ(encodeRc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*dev, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(respBuf));
+
+    uuid_t outUuid;
+    auto rc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(outUuid, mctpUuid);
+    EXPECT_EQ(dev->deviceUuid, mctpUuid);
+}
+
+// sensorIO succeeds; cc=NSM_SUCCESS, dataSize == 16, valid UUID bytes →
 // assigns uuid and co_return NSM_SW_SUCCESS
 TEST_F(NsmClockLimitUpdateTest, GetDeviceUUID_CcSuccess_ValidUuid_AssignsUuid)
 {
@@ -740,41 +810,22 @@ TEST_F(NsmClockLimitUpdateTest, GetDeviceUUID_CcSuccess_ValidUuid_AssignsUuid)
     EXPECT_EQ(dev->deviceUuid, outUuid);
 }
 
-// Two calls with cc=NSM_ERR_INVALID_DATA on the same EID:
-// First call: shouldLog=true (first error → bit set), early return
-// Second call: shouldLog=false (bit already set), cc=NSM_ERR_INVALID_DATA →
-// hits lines 513-522
-TEST_F(NsmClockLimitUpdateTest,
-       GetDeviceUUID_CcInvalidData_SecondCall_FallsBackToMctpUuid)
+// cc=NSM_ERR_INVALID_DATA means DEVICE_GUID is unavailable → fallback to mctp
+// uuid on the first call.
+TEST_F(NsmClockLimitUpdateTest, GetDeviceUUID_CcInvalidData_FallsBackToMctpUuid)
 {
-    auto dev = std::make_shared<MockNsmDevice>(0, 0, "MCTP_EID", "205", 0);
+    const uuid_t mctpUuid = "77777777-8888-9999-aaaa-bbbbbbbbbbbb";
+    auto dev = makeDeviceWithMctpUuid(205, mctpUuid);
+    auto respBuf = makeInventoryInfoNonSuccessResp(NSM_ERR_INVALID_DATA);
 
-    auto makeInvalidDataResp = [&]() {
-        std::vector<uint8_t> data(4, 0);
-        std::vector<uint8_t> respBuf(
-            sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_resp) +
-                4,
-            0);
-        auto resp = reinterpret_cast<nsm_msg*>(respBuf.data());
-        encode_get_inventory_information_resp(0, NSM_ERR_INVALID_DATA, ERR_NULL,
-                                              4, data.data(), resp);
-        return respBuf;
-    };
+    EXPECT_CALL(*dev, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(respBuf));
 
     uuid_t outUuid;
+    auto rc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
 
-    // First call: shouldLog=true (bit newly set) → early return
-    EXPECT_CALL(*dev, sensorIO(_, _, _, _, _))
-        .WillOnce(mockSensorIO(makeInvalidDataResp()));
-    nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
-
-    // Second call: shouldLog=false (bit already set) →
-    // cc=NSM_ERR_INVALID_DATA → fallback to mctp uuid
-    EXPECT_CALL(*dev, sensorIO(_, _, _, _, _))
-        .WillOnce(mockSensorIO(makeInvalidDataResp()));
-    nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
-    // Hits lines 513-522; assigns mctp uuid
-    EXPECT_EQ(outUuid, dev->getUuid());
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(outUuid, mctpUuid);
+    EXPECT_EQ(dev->deviceUuid, mctpUuid);
 }
 
 // NsmMemoryCapacity::genRequestMsg (exercised via NsmTotalMemory which inherits
@@ -788,44 +839,28 @@ TEST(NsmTotalMemory, BadGenReq_InvalidInstanceId_ReturnsNullopt)
     EXPECT_FALSE(request.has_value());
 }
 
-// getDeviceUUID line 524: second call on same device with cc that is neither
-// NSM_SUCCESS nor NSM_ERR_INVALID_DATA.
-// First call  → shouldLog=true  (first time error seen) → co_return at line //
-// 480. Second call → shouldLog=false (no state change) →
-// if/else-if both false
-//               → co_return NSM_SW_ERROR_COMMAND_FAIL at line 524. //
-//
-TEST_F(NsmClockLimitUpdateTest, GetDeviceUUID_SecondCall_OtherCC_HitsLine524)
+// Repeated non-success CCs should still fallback every time; logger state must
+// not affect UUID selection.
+TEST_F(NsmClockLimitUpdateTest,
+       GetDeviceUUID_RepeatedOtherCC_FallsBackToMctpUuid)
 {
-    // Use eid "210" – unique so the static StateChangeLogger map starts clean.
-    auto dev = std::make_shared<MockNsmDevice>(0, 0, "MCTP_EID", "210", 0);
-
-    auto makeNsmErrResp = [&]() {
-        std::vector<uint8_t> data(4, 0);
-        std::vector<uint8_t> respBuf(
-            sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_resp) +
-                4,
-            0);
-        auto resp = reinterpret_cast<nsm_msg*>(respBuf.data());
-        encode_get_inventory_information_resp(0, NSM_ERROR, ERR_NULL, 4,
-                                              data.data(), resp);
-        return respBuf;
-    };
+    const uuid_t mctpUuid = "88888888-9999-aaaa-bbbb-cccccccccccc";
+    auto dev = makeDeviceWithMctpUuid(210, mctpUuid);
 
     uuid_t outUuid;
 
-    // First call: shouldLog=true (newly observed error) → early return line 480
     EXPECT_CALL(*dev, sensorIO(_, _, _, _, _))
-        .WillOnce(mockSensorIO(makeNsmErrResp()));
-    nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
-
-    // Second call: shouldLog=false (same error, no state change) →
-    // cc=NSM_ERROR is not NSM_SUCCESS and not NSM_ERR_INVALID_DATA →
-    // falls through to co_return NSM_SW_ERROR_COMMAND_FAIL at line 524. //
+        .WillOnce(mockSensorIO(makeInventoryInfoNonSuccessResp(NSM_ERROR)));
+    auto firstRc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+    EXPECT_EQ(firstRc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(outUuid, mctpUuid);
 
     EXPECT_CALL(*dev, sensorIO(_, _, _, _, _))
-        .WillOnce(mockSensorIO(makeNsmErrResp()));
-    nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+        .WillOnce(mockSensorIO(makeInventoryInfoNonSuccessResp(NSM_ERROR)));
+    auto secondRc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+    EXPECT_EQ(secondRc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(outUuid, mctpUuid);
+    EXPECT_EQ(dev->deviceUuid, mctpUuid);
 }
 
 // NsmMemoryCapacityUtil::update() – lines 204-211 of nsmCommon.cpp.
