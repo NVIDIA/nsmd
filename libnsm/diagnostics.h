@@ -772,7 +772,8 @@ int decode_reset_network_device_resp(const struct nsm_msg *msg, size_t msgLen,
  *  @param[in] reset_target - Subsystem to reset (enum device_reset_target)
  *  @param[in] trigger      - Reset trigger condition (enum
  * device_reset_trigger)
- *  @param[in] port_index   - 0-based port number; only used when
+ *  @param[in] port_index   - local port index (1-based) per the OOB Device
+ *                            Reset spec; only used when
  *                            reset_target == NSM_RESET_TARGET_OPTICAL_MODULE
  *  @param[out] msg         - Message will be written to this
  *  @return nsm_completion_codes
