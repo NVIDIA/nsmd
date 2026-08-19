@@ -23,6 +23,9 @@
 namespace nsm
 {
 
+using RowRemapFailureState = MemoryRowRemappingIntf::RowRemappingFailureStates;
+using RowRemapPendingState = MemoryRowRemappingIntf::RowRemappingPendingStates;
+
 NsmMemoryErrorCorrection::NsmMemoryErrorCorrection(
     std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf,
     std::string& correctionType, std::string& inventoryObjPath) :
@@ -130,26 +133,32 @@ void NsmRowRemapState::updateMetricOnSharedMemory()
     auto ifaceName = std::string(memoryRowRemappingStateIntf->interface);
     std::vector<uint8_t> smbusData = {};
 
-    nv::sensor_aggregation::DbusVariantType rowRemappingFailureStateVal{
-        memoryRowRemappingStateIntf->rowRemappingFailureState()};
+    // Publish the enum as its D-Bus string; nv-shmem maps True/False/Unknown
+    // to the true/false/null MetricValue. Keeps shmem the same shape as D-Bus.
+    nv::sensor_aggregation::DbusVariantType rowRemappingFailed{
+        memoryRowRemappingStateIntf->convertRowRemappingFailureStatesToString(
+            memoryRowRemappingStateIntf->rowRemappingFailureState())};
     std::string propName = "RowRemappingFailureState";
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData,
-        rowRemappingFailureStateVal);
+        inventoryObjPath, ifaceName, propName, smbusData, rowRemappingFailed);
 
-    nv::sensor_aggregation::DbusVariantType rowRemappingPendingStateVal{
-        memoryRowRemappingStateIntf->rowRemappingPendingState()};
+    nv::sensor_aggregation::DbusVariantType rowRemappingPending{
+        memoryRowRemappingStateIntf->convertRowRemappingPendingStatesToString(
+            memoryRowRemappingStateIntf->rowRemappingPendingState())};
     propName = "RowRemappingPendingState";
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData,
-        rowRemappingPendingStateVal);
+        inventoryObjPath, ifaceName, propName, smbusData, rowRemappingPending);
 #endif
 }
 
 void NsmRowRemapState::updateReading(bitfield8_t flags)
 {
-    memoryRowRemappingStateIntf->rowRemappingFailureState(flags.bits.bit0);
-    memoryRowRemappingStateIntf->rowRemappingPendingState(flags.bits.bit1);
+    memoryRowRemappingStateIntf->rowRemappingFailureState(
+        flags.bits.bit0 ? RowRemapFailureState::True
+                        : RowRemapFailureState::False);
+    memoryRowRemappingStateIntf->rowRemappingPendingState(
+        flags.bits.bit1 ? RowRemapPendingState::True
+                        : RowRemapPendingState::False);
     updateMetricOnSharedMemory();
 }
 

@@ -221,8 +221,10 @@ TEST(NsmRowRemapStateBranch3, HandleResponseMsg_BothFlags)
     rc = sensor.handleResponseMsg(response, responseMsg.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    EXPECT_TRUE(rowRemapIntf->rowRemappingFailureState());
-    EXPECT_TRUE(rowRemapIntf->rowRemappingPendingState());
+    EXPECT_EQ(rowRemapIntf->rowRemappingFailureState(),
+              MemoryRowRemappingIntf::RowRemappingFailureStates::True);
+    EXPECT_EQ(rowRemapIntf->rowRemappingPendingState(),
+              MemoryRowRemappingIntf::RowRemappingPendingStates::True);
 }
 
 // ============================================================================
