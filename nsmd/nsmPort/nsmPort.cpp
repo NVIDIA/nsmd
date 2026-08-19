@@ -2121,9 +2121,12 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
             std::get<bool>(
                 allCurrentIfaceProperties.at("OpticalModuleResetSupported")))
         {
+            // port_index carries the local port index (1-based) as defined by
+            // the OOB Device Reset spec, so pass logicalPortNum (not the
+            // 0-based loop index i).
             auto opticalResetSensor = std::make_shared<NsmOpticalModuleReset>(
                 bus, portName, type, objPath, nsmDevice,
-                static_cast<uint32_t>(i));
+                static_cast<uint32_t>(logicalPortNum));
             nsmDevice->addDeviceSensors(opticalResetSensor);
         }
 #endif
