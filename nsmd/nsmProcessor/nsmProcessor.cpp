@@ -1302,7 +1302,8 @@ NsmEccErrorCounts::NsmEccErrorCounts(std::string& name, std::string& type,
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
     eccErrorCountIntf = eccIntf;
-    updateMetricOnSharedMemory();
+    // Seed the markers so never-polled counts are not published as 0.
+    telemetryNotAvailable();
 }
 void NsmEccErrorCounts::updateMetricOnSharedMemory()
 {
@@ -1310,17 +1311,25 @@ void NsmEccErrorCounts::updateMetricOnSharedMemory()
     auto ifaceName = std::string(eccErrorCountIntf->interface);
     std::vector<uint8_t> smbusData = {};
 
-    nv::sensor_aggregation::DbusVariantType ceCountOnSharedMem{
-        static_cast<int64_t>(eccErrorCountIntf->ceCount())};
+    auto ce = static_cast<int64_t>(eccErrorCountIntf->ceCount());
+    nv::sensor_aggregation::DbusVariantType ceCountOnSharedMem{ce};
     std::string propName = "ceCount";
+    uint8_t ceRc = (ce == Sentinel<int64_t>::notAvailable)
+                       ? TELEMETRY_NOT_AVAILABLE
+                       : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, ceCountOnSharedMem);
+        inventoryObjPath, ifaceName, propName, smbusData, ceCountOnSharedMem,
+        "", ceRc);
 
+    auto ue = static_cast<int64_t>(eccErrorCountIntf->ueCount());
     propName = "ueCount";
-    nv::sensor_aggregation::DbusVariantType ueCountOnSharedMem{
-        static_cast<int64_t>(eccErrorCountIntf->ueCount())};
+    nv::sensor_aggregation::DbusVariantType ueCountOnSharedMem{ue};
+    uint8_t ueRc = (ue == Sentinel<int64_t>::notAvailable)
+                       ? TELEMETRY_NOT_AVAILABLE
+                       : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, ueCountOnSharedMem);
+        inventoryObjPath, ifaceName, propName, smbusData, ueCountOnSharedMem,
+        "", ueRc);
 
     propName = "isThresholdExceeded";
     nv::sensor_aggregation::DbusVariantType isThresholdExceeded{
@@ -1338,6 +1347,15 @@ void NsmEccErrorCounts::updateReading(struct nsm_ECC_error_counts errorCounts)
     eccErrorCountIntf->ueCount(ueCount);
 
     eccErrorCountIntf->isThresholdExceeded(errorCounts.flags.bits.bit0);
+    updateMetricOnSharedMemory();
+}
+
+void NsmEccErrorCounts::telemetryNotAvailable()
+{
+    // Stamp the int64 marker on the int64 D-Bus properties directly; the wire
+    // struct's uint32 fields cannot represent the int64 marker.
+    eccErrorCountIntf->ceCount(Sentinel<int64_t>::notAvailable);
+    eccErrorCountIntf->ueCount(Sentinel<int64_t>::notAvailable);
     updateMetricOnSharedMemory();
 }
 
