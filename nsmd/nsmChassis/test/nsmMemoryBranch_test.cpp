@@ -208,8 +208,10 @@ TEST(NsmRowRemapStateBatch11F, UpdateReading_FlagsSet_UpdatesRemappingStateIntf)
     sensor.updateReading(flags);
 
     // Assert
-    EXPECT_TRUE(rowRemapIntf->rowRemappingFailureState());
-    EXPECT_TRUE(rowRemapIntf->rowRemappingPendingState());
+    EXPECT_EQ(rowRemapIntf->rowRemappingFailureState(),
+              MemoryRowRemappingIntf::RowRemappingFailureStates::True);
+    EXPECT_EQ(rowRemapIntf->rowRemappingPendingState(),
+              MemoryRowRemappingIntf::RowRemappingPendingStates::True);
 }
 
 // -- Test NsmRowRemapState::updateReading with zero flags
@@ -230,8 +232,10 @@ TEST(NsmRowRemapStateBatch11F, UpdateReading_FlagsClear_ClearsRemappingState)
     sensor.updateReading(flags);
 
     // Assert
-    EXPECT_FALSE(rowRemapIntf->rowRemappingFailureState());
-    EXPECT_FALSE(rowRemapIntf->rowRemappingPendingState());
+    EXPECT_EQ(rowRemapIntf->rowRemappingFailureState(),
+              MemoryRowRemappingIntf::RowRemappingFailureStates::False);
+    EXPECT_EQ(rowRemapIntf->rowRemappingPendingState(),
+              MemoryRowRemappingIntf::RowRemappingPendingStates::False);
 }
 
 // -- Test NsmRowRemappingCounts::updateReading directly

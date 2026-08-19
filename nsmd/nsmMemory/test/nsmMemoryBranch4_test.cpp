@@ -103,8 +103,10 @@ TEST_F(NsmMemoryBranch4Test, RowRemapState_HandleResp_Success)
 
     auto result = sensor.handleResponseMsg(msg, resp.size());
     EXPECT_EQ(result, NSM_SUCCESS);
-    EXPECT_TRUE(rrIntf->rowRemappingFailureState());
-    EXPECT_TRUE(rrIntf->rowRemappingPendingState());
+    EXPECT_EQ(rrIntf->rowRemappingFailureState(),
+              MemoryRowRemappingIntf::RowRemappingFailureStates::True);
+    EXPECT_EQ(rrIntf->rowRemappingPendingState(),
+              MemoryRowRemappingIntf::RowRemappingPendingStates::True);
 }
 
 // ============================================================================
