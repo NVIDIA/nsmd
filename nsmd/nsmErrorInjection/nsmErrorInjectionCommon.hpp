@@ -83,13 +83,33 @@ inline void createNsmErrorInjectionSensors(SensorManager& manager,
     device->addStaticSensor(errorInjectionSupported);
     device->addSensor(errorInjectionEnabled, ERROR_INJECTION_PRIORITY);
 
+    // Sole owner of this device's mask; the batch property and every per-type
+    // Enabled property route their read-modify-write through it.
+    auto setErrorInjectionCapabilities =
+        std::make_shared<NsmSetErrorInjectionCapabilities>(
+            "ErrorInjectionCapabilities", manager, interfaces,
+            errorInjectionEnabled);
+    device->addDeviceSensors(setErrorInjectionCapabilities);
+
+    // One Async.Set carries every capability the client changed, so a
+    // multi-type PATCH becomes one device write instead of one per type.
+    errorInjectionDispatcher.addAsyncSetOperation(
+        "com.nvidia.ErrorInjection.ErrorInjection",
+        "ErrorInjectionCapabilitiesEnabled",
+        AsyncSetOperationInfo{
+            std::bind_front(
+                &NsmSetErrorInjectionCapabilities::capabilitiesEnabled,
+                setErrorInjectionCapabilities.get()),
+            errorInjectionEnabled, device});
+
     for (const auto& [path, interface] : interfaces)
     {
         auto pathStr = path.string();
         auto name = pathStr.substr(pathStr.find_last_of('/') + 1);
         auto setErrorInjectionEnabled =
             std::make_shared<NsmSetErrorInjectionEnabled>(
-                name, interface->type(), manager, interfaces);
+                name, interface->type(), interfaces,
+                setErrorInjectionCapabilities);
         auto& asyncDispatcher =
             *AsyncOperationManager::getInstance()->getDispatcher(pathStr);
         asyncDispatcher.addAsyncSetOperation(

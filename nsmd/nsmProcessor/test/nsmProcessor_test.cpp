@@ -2049,10 +2049,12 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     // Total device sensors for type = NSM_Processor:
     // 8 are added as part of createNsmProcessorSensor() (NOTE:
     // NVIDIA_RESET_METRICS & ENABLE_SYSTEM_GUID are disabled during this test
-    // run; GPU no longer exposes NetIR Erase/LogInfo dump objects) and 8 are
-    // added as part of createNsmErrorInjectionSensors()
+    // run; GPU no longer exposes NetIR Erase/LogInfo dump objects) and 9 are
+    // added as part of createNsmErrorInjectionSensors() -- the 9th is the
+    // shared NsmSetErrorInjectionCapabilities that owns the mask
+    // read-modify-write for both the aggregate and per-type patch forms.
     // +1 for msgTypes sensor added at index 0
-    EXPECT_EQ(14 + capabilitiesCount, gpu->deviceSensors.size());
+    EXPECT_EQ(15 + capabilitiesCount, gpu->deviceSensors.size());
 
     int si = 9; // Start after msgTypes sensor at index 0
 
@@ -2073,6 +2075,15 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
         gpu->deviceSensors[si++]);
     EXPECT_NE(nullptr, errorInjectionEnabled);
     EXPECT_EQ(expectedInterfaces, errorInjectionEnabled->interfaces.size());
+
+    // Sole owner of the device mask; registered once, before the per-type
+    // setters, and shared by all of them.
+    auto setErrorInjectionCapabilities =
+        dynamic_pointer_cast<NsmSetErrorInjectionCapabilities>(
+            gpu->deviceSensors[si++]);
+    EXPECT_NE(nullptr, setErrorInjectionCapabilities);
+    EXPECT_EQ(expectedInterfaces,
+              setErrorInjectionCapabilities->interfaces.size());
 
     std::vector<std::shared_ptr<NsmSetErrorInjectionEnabled>>
         setErrorInjectionEnabled(capabilitiesCount, nullptr);
@@ -2166,8 +2177,15 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
     gpu->isDeviceActive = true;
+    // The capability write now performs an in-lock read-back that reuses the
+    // polling sensor's update(), so sensorIO is called twice: once inside the
+    // semaphore and once by setImpl's post-handler refresh. enableResponse is
+    // already a GetCurrentErrorInjectionTypes success response carrying the
+    // ThermalErrors bit, which is what both decode and republish.
     EXPECT_CALL(*gpu, postPatchIO).WillOnce(mockPostPatchIO(setEnableResponse));
-    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(enableResponse));
+    EXPECT_CALL(*gpu, sensorIO)
+        .Times(2)
+        .WillRepeatedly(mockSensorIO(enableResponse));
     const AsyncSetOperationValueType value{};
     auto dispatcher =
         AsyncOperationManager::getInstance()->getDispatcher(thermalErrorsPath);

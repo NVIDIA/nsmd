@@ -9,6 +9,7 @@ tests = [
     'nsmSetECCModeBranch_test',
     'nsmSetErrorInjection_test',
     'nsmSetErrorInjectionBranch_test',
+    'nsmSetErrorInjectionBatch_test',
     'nsmSetEgmMode_test',
     'nsmSetEgmModeBranch_test',
     'nsmSetMigMode_test',
