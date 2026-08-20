@@ -71,6 +71,14 @@ static std::vector<uint8_t> buildResponse(uint32_t statusWord,
     return buf;
 }
 
+// port_status packs link_health at bits 17:16 and attention_trigger at 25:18.
+// Build an Attention status word carrying the given trigger.
+static constexpr uint32_t attentionStatus(uint32_t trigger)
+{
+    return (static_cast<uint32_t>(NSM_LINK_HEALTH_ATTENTION) << 16) |
+           (trigger << 18);
+}
+
 // Build a properly-encoded non-success response using the real encoder
 // so the NSM header is well-formed and the decode path sees a real error CC.
 static std::vector<uint8_t> buildErrorResponse()
@@ -236,14 +244,13 @@ TEST_F(NsmPortHealthMetricsTest, SwitchDeviceExposesHealthOnly)
 TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerNA)
 {
     // Pre-seed a non-NA trigger to confirm it's overwritten
-    auto warmup = buildResponse(0x00050000u); // link=Attention, trigger=RawBER
+    auto warmup = buildResponse(attentionStatus(NSM_ATTENTION_TRIGGER_RAW_BER));
     auto* warmupMsg = reinterpret_cast<const nsm_msg*>(warmup.data());
     EXPECT_EQ(sensor->handleResponseMsg(warmupMsg, warmup.size()), NSM_SUCCESS);
     EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
               AttentionTriggerReasonValues::RawBER);
 
-    // link_health=Attention + attention_trigger=0 (NotApplicable): 0x00010000
-    auto buf = buildResponse(0x00010000u);
+    auto buf = buildResponse(attentionStatus(NSM_ATTENTION_TRIGGER_NA));
     auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
     auto rc = sensor->handleResponseMsg(msg, buf.size());
     EXPECT_EQ(rc, NSM_SUCCESS);
@@ -253,8 +260,7 @@ TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerNA)
 
 TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerRawBER)
 {
-    // link_health=Attention + attention_trigger=1 (RawBER): 0x00050000
-    auto buf = buildResponse(0x00050000u);
+    auto buf = buildResponse(attentionStatus(NSM_ATTENTION_TRIGGER_RAW_BER));
     auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
     sensor->handleResponseMsg(msg, buf.size());
     EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
@@ -263,8 +269,8 @@ TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerRawBER)
 
 TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerEffectiveBER)
 {
-    // attention_trigger=2 (EffectiveBER): 2 << 18 = 0x00080000
-    auto buf = buildResponse(0x00090000u); // link_health=Attention|trigger=2
+    auto buf =
+        buildResponse(attentionStatus(NSM_ATTENTION_TRIGGER_EFFECTIVE_BER));
     auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
     sensor->handleResponseMsg(msg, buf.size());
     EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
@@ -273,9 +279,7 @@ TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerEffectiveBER)
 
 TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerSymbolBER)
 {
-    // attention_trigger=3: 3 << 18 = 0x000C0000 | link_health=Attention (bit
-    // 16) 0x000C0000 | 0x00010000 = 0x000D0000
-    auto buf = buildResponse(0x000D0000u);
+    auto buf = buildResponse(attentionStatus(NSM_ATTENTION_TRIGGER_SYMBOL_BER));
     auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
     sensor->handleResponseMsg(msg, buf.size());
     EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
@@ -284,9 +288,8 @@ TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerSymbolBER)
 
 TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerSymbolErrorCount)
 {
-    // attention_trigger=9: 9 << 18 = 0x00240000 | link_health=Attention (bit
-    // 16) 0x00240000 | 0x00010000 = 0x00250000
-    auto buf = buildResponse(0x00250000u);
+    auto buf = buildResponse(
+        attentionStatus(NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT));
     auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
     sensor->handleResponseMsg(msg, buf.size());
     EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
@@ -297,15 +300,14 @@ TEST_F(NsmPortHealthMetricsTest,
        HandleResponse_TriggerUnknownMapsToNotApplicable)
 {
     // Pre-seed a non-NA trigger to confirm it's overwritten
-    auto warmup = buildResponse(0x00050000u); // link=Attention, trigger=RawBER
+    auto warmup = buildResponse(attentionStatus(NSM_ATTENTION_TRIGGER_RAW_BER));
     auto* warmupMsg = reinterpret_cast<const nsm_msg*>(warmup.data());
     EXPECT_EQ(sensor->handleResponseMsg(warmupMsg, warmup.size()), NSM_SUCCESS);
     EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
               AttentionTriggerReasonValues::RawBER);
 
-    // attention_trigger >= 10 must log error and map to NotApplicable
-    // value 10: 10 << 18 = 0x00280000 | link_health=Attention (bit 16)
-    auto buf = buildResponse(0x00290000u);
+    // 10 is past the last defined trigger: must warn and report Unknown
+    auto buf = buildResponse(attentionStatus(10));
     auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
     auto rc = sensor->handleResponseMsg(msg, buf.size());
     EXPECT_EQ(rc, NSM_SUCCESS);

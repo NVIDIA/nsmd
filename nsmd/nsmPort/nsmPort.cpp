@@ -653,23 +653,23 @@ void NsmPortCharacteristics::decodeAttentionTrigger(uint8_t triggerValue)
         case NSM_ATTENTION_TRIGGER_NA:
             reason = AttentionTriggerReasonValues::Unknown;
             break;
-        case NSM_ATTENTION_TRIGGER_RAW_BER:
-            reason = AttentionTriggerReasonValues::RawBER;
+        case NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS:
+            reason = AttentionTriggerReasonValues::PLRTXBandwidthLoss;
+            break;
+        case NSM_ATTENTION_TRIGGER_RECOVERY_BANDWIDTH_LOSS:
+            reason = AttentionTriggerReasonValues::RecoveryBandwidthLoss;
             break;
         case NSM_ATTENTION_TRIGGER_EFFECTIVE_BER:
             reason = AttentionTriggerReasonValues::EffectiveBER;
             break;
-        case NSM_ATTENTION_TRIGGER_SYMBOL_BER:
-            reason = AttentionTriggerReasonValues::SymbolBER;
+        case NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT:
+            reason = AttentionTriggerReasonValues::SymbolErrorCount;
             break;
-        case NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS:
-            reason = AttentionTriggerReasonValues::PLRTXBandwidthLoss;
+        case NSM_ATTENTION_TRIGGER_RAW_BER:
+            reason = AttentionTriggerReasonValues::RawBER;
             break;
         case NSM_ATTENTION_TRIGGER_PLR_RX_BANDWIDTH_LOSS:
             reason = AttentionTriggerReasonValues::PLRRXBandwidthLoss;
-            break;
-        case NSM_ATTENTION_TRIGGER_RECOVERY_BANDWIDTH_LOSS:
-            reason = AttentionTriggerReasonValues::RecoveryBandwidthLoss;
             break;
         case NSM_ATTENTION_TRIGGER_PORT_TOTAL_BANDWIDTH_LOSS:
             reason = AttentionTriggerReasonValues::PortTotalBandwidthLoss;
@@ -677,8 +677,8 @@ void NsmPortCharacteristics::decodeAttentionTrigger(uint8_t triggerValue)
         case NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT:
             reason = AttentionTriggerReasonValues::LinkDownCount;
             break;
-        case NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT:
-            reason = AttentionTriggerReasonValues::SymbolErrorCount;
+        case NSM_ATTENTION_TRIGGER_SYMBOL_BER:
+            reason = AttentionTriggerReasonValues::SymbolBER;
             break;
         default:
             // Throttled: a stuck out-of-spec trigger would otherwise log every
