@@ -8330,12 +8330,12 @@ std::optional<std::vector<uint8_t>>
         std::vector<uint8_t> response(
             sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-        rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
-                                   NSM_QUERY_PORT_TELEMETRY_COUNTER_V2,
-                                   NSM_ERROR, 0, responseMsg);
+        rc = encode_query_port_telemetry_v2_resp(requestMsg->hdr.instance_id,
+                                                 NSM_ERROR, 0, responseMsg);
         if (rc != NSM_SW_SUCCESS)
         {
-            lg2::error("encode_aggregate_resp failed: rc={RC}", "RC", rc);
+            lg2::error("encode_query_port_telemetry_v2_resp failed: rc={RC}",
+                       "RC", rc);
             return std::nullopt;
         }
         return response;
@@ -8432,12 +8432,12 @@ std::optional<std::vector<uint8_t>>
     }
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
-                               NSM_QUERY_PORT_TELEMETRY_COUNTER_V2, NSM_SUCCESS,
-                               samplesCount, responseMsg);
+    rc = encode_query_port_telemetry_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_aggregate_resp failed: rc={RC}", "RC", rc);
+        lg2::error("encode_query_port_telemetry_v2_resp failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
 

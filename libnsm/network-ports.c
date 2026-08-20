@@ -2308,6 +2308,34 @@ int decode_query_port_telemetry_v2_resp(const struct nsm_msg *msg,
 				     telemetry_count);
 }
 
+int encode_query_port_telemetry_v2_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t telemetry_count,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_aggregate_resp *response =
+	    (struct nsm_aggregate_resp *)msg->payload;
+
+	response->command = NSM_QUERY_PORT_TELEMETRY_COUNTER_V2;
+	response->telemetry_count = htole16(telemetry_count);
+	response->completion_code = cc;
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_query_port_telemetry_caps_req(uint8_t instance_id,
 					 uint16_t port_index,
 					 struct nsm_msg *msg)
@@ -2384,6 +2412,13 @@ int decode_query_port_telemetry_caps_resp(const struct nsm_msg *msg,
 
 	const struct nsm_query_port_telemetry_caps_resp *resp =
 	    (const struct nsm_query_port_telemetry_caps_resp *)msg->payload;
+
+	if (le16toh(resp->hdr.data_size) !=
+	    sizeof(struct nsm_query_port_telemetry_caps_resp) -
+		sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	*max_supported_group_id = resp->max_supported_group_id;
 	*max_counter_records_per_resp = resp->max_counter_records_per_resp;
 	memcpy(supported_groups_bitmask, resp->supported_groups_bitmask,

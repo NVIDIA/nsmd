@@ -1641,6 +1641,24 @@ int decode_query_port_telemetry_v2_resp(const struct nsm_msg *msg,
 					uint16_t *telemetry_count,
 					size_t *consumed_len);
 
+/** @brief Encode Query Port Telemetry Counter v2 response header (cmd 0x14).
+ *
+ * Unlike encode_aggregate_resp() (platform-environmental.c), this stamps the
+ * NSM header with NSM_TYPE_NETWORK_PORT so the wire header matches the
+ * Type-1 Network Ports protocol that cmd 0x14 belongs to. Per-sample data is
+ * appended by the caller via encode_aggregate_resp_sample().
+ *
+ * @param[in]  instance_id     NSM instance ID
+ * @param[in]  cc              Completion code
+ * @param[in]  telemetry_count Number of aggregate sample records in this page
+ * @param[out] msg             Output NSM message buffer (caller allocates)
+ * @return NSM_SW_SUCCESS on success
+ * @return NSM_SW_ERROR_NULL if msg is NULL
+ */
+int encode_query_port_telemetry_v2_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t telemetry_count,
+					struct nsm_msg *msg);
+
 /** @brief Encode Query Port Telemetry Capabilities request (cmd 0x15).
  *
  * @param[in]  instance_id  NSM instance ID

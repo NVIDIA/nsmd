@@ -310,6 +310,43 @@ TEST(OpticalModuleCodec, DecodeQueryPortTelemetryV2Resp_NullParams)
 }
 
 // ===========================================================================
+// encode_query_port_telemetry_v2_resp
+// ===========================================================================
+
+TEST(OpticalModuleCodec, EncodeQueryPortTelemetryV2Resp_NullMsg)
+{
+	auto rc =
+	    encode_query_port_telemetry_v2_resp(0, NSM_SUCCESS, 5, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(OpticalModuleCodec, EncodeQueryPortTelemetryV2Resp_StampsNetworkPortType)
+{
+	// Unlike the generic encode_aggregate_resp() (which hardcodes
+	// NSM_TYPE_PLATFORM_ENVIRONMENTAL), cmd 0x14 belongs to the Type-1
+	// Network Ports protocol, so the wire header must carry
+	// NSM_TYPE_NETWORK_PORT.
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	auto rc = encode_query_port_telemetry_v2_resp(0, NSM_SUCCESS, 5, msg);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, msg->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_RESPONSE, msg->hdr.request);
+
+	uint8_t cc = 0;
+	uint16_t reasonCode = 0xFFFF;
+	uint16_t telemetryCount = 0;
+	size_t consumedLen = 0;
+	rc = decode_query_port_telemetry_v2_resp(
+	    msg, buf.size(), &cc, &reasonCode, &telemetryCount, &consumedLen);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(telemetryCount, 5);
+}
+
+// ===========================================================================
 // encode_query_port_telemetry_caps_req / decode_query_port_telemetry_caps_req
 // ===========================================================================
 
@@ -518,5 +555,34 @@ TEST(OpticalModuleCodec, DecodeQueryPortTelemetryCapsResp_TooShort)
 	uint8_t out[32] = {};
 	auto rc = decode_query_port_telemetry_caps_resp(msg, buf.size(), &cc,
 							&a, &b, out);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(OpticalModuleCodec, DecodeQueryPortTelemetryCapsResp_DataSizeMismatch)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				     sizeof(nsm_query_port_telemetry_caps_resp),
+				 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+
+	uint8_t bitmask[32] = {};
+	auto rc = encode_query_port_telemetry_caps_resp(
+	    0, NSM_SUCCESS, ERR_NULL, NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE,
+	    32, bitmask, msg);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+	// A buffer that is physically long enough (msg_len check passes) but
+	// whose declared data_size does not match the response payload must
+	// still be rejected.
+	auto *resp = reinterpret_cast<nsm_query_port_telemetry_caps_resp *>(
+	    msg->payload);
+	resp->hdr.data_size = 0;
+
+	uint8_t cc = 0;
+	uint8_t a = 0;
+	uint8_t b = 0;
+	uint8_t out[32] = {};
+	rc = decode_query_port_telemetry_caps_resp(msg, buf.size(), &cc, &a, &b,
+						   out);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

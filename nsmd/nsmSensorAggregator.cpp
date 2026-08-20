@@ -184,6 +184,27 @@ requester::Coroutine
             const uint8_t* data = nullptr;
             size_t dataLen = 0;
 
+            if (consumedLen == 0 || consumedLen > responseLen)
+            {
+                // A malformed sample must not underflow responseLen and
+                // cascade into out-of-bounds reads on subsequent iterations.
+                // Abort the whole session instead of advancing past the
+                // received bytes.
+                rc = NSM_SW_ERROR_LENGTH;
+                if (shouldLog("NsmSensorAggregatorPaginated:consumedLen",
+                              nsm_sw_codes(rc)))
+                {
+                    lg2::error(
+                        "NsmSensorAggregatorPaginated: consumedLen out of "
+                        "bounds, name={NAME}, page={PAGE}, rc={RC}",
+                        "NAME", getName(), "PAGE", pageNum, "RC", rc);
+                }
+                resetState();
+                seqToken = 0x00000000;
+                // coverity[missing_return]
+                co_return rc;
+            }
+
             responseLen -= consumedLen;
             responseData += consumedLen;
 
@@ -206,10 +227,14 @@ requester::Coroutine
                 }
                 // consumedLen from a failed decode isn't trustworthy (it's
                 // written before decode_aggregate_resp_sample's own length
-                // check), and the next loop iteration would use it to
-                // advance responseData/responseLen. Stop this page instead
-                // of continuing with a cursor that may be past the buffer.
-                break;
+                // check), and continuing would use it to advance
+                // responseData/responseLen with a cursor that may be past
+                // the buffer. Abort the whole session rather than just this
+                // page.
+                resetState();
+                seqToken = 0x00000000;
+                // coverity[missing_return]
+                co_return rc;
             }
 
             if (tag == static_cast<uint8_t>(SpecialTag::SEQUENCE_TOKEN))
@@ -243,13 +268,16 @@ requester::Coroutine
                     if (shouldLog("NsmSensorAggregatorPaginated:handleSample",
                                   nsm_sw_codes(rc)))
                     {
-                        lg2::error(
-                            "NsmSensorAggregatorPaginated: handleSample "
-                            "failed (non-fatal), name={NAME}, page={PAGE}, "
-                            "tag={TAG}, rc={RC}",
-                            "NAME", getName(), "PAGE", pageNum, "TAG", tag,
-                            "RC", rc);
+                        lg2::error("NsmSensorAggregatorPaginated: handleSample "
+                                   "failed, name={NAME}, page={PAGE}, "
+                                   "tag={TAG}, rc={RC}",
+                                   "NAME", getName(), "PAGE", pageNum, "TAG",
+                                   tag, "RC", rc);
                     }
+                    resetState();
+                    seqToken = 0x00000000;
+                    // coverity[missing_return]
+                    co_return rc;
                 }
             }
         }

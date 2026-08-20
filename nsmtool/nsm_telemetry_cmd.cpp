@@ -495,6 +495,20 @@ class QueryPortTelemetryV2 : public CommandInterface
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
+        if (portIndex == 0)
+        {
+            std::cerr << "Invalid portNum " << portIndex
+                      << " (port index is 1-based)\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        if (groupId < NSM_PORT_TELEMETRY_GROUP_PHY_ERRORS ||
+            groupId > NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE)
+        {
+            std::cerr << "Invalid groupId " << static_cast<unsigned>(groupId)
+                      << " (expected 0x01-0x09)\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+
         std::vector<uint8_t> requestMsg(
             sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_v2_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
