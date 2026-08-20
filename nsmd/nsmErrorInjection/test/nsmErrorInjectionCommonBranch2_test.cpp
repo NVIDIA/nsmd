@@ -100,74 +100,117 @@ TEST_F(NsmErrorInjectionCommonBranch2Test,
 TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateErrorInjectionSensorsForType_MemoryErrors)
 {
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_mem20", {Type::MemoryErrors});
     EXPECT_NO_THROW(createErrorInjectionSensorsForType(
-        mockManager, device, "/xyz/test/ei_mem20", Type::MemoryErrors));
+        mockManager, device, "/xyz/test/ei_mem20", Type::MemoryErrors,
+        context));
     cleanupDeviceSensors(devices);
 }
 
 TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateErrorInjectionSensorsForType_PCIeErrors)
 {
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_pcie20", {Type::PCIeErrors});
     EXPECT_NO_THROW(createErrorInjectionSensorsForType(
-        mockManager, device, "/xyz/test/ei_pcie20", Type::PCIeErrors));
+        mockManager, device, "/xyz/test/ei_pcie20", Type::PCIeErrors, context));
     cleanupDeviceSensors(devices);
 }
 
 TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateErrorInjectionSensorsForType_NVLinkErrors)
 {
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_nvlink20", {Type::NVLinkErrors});
     EXPECT_NO_THROW(createErrorInjectionSensorsForType(
-        mockManager, device, "/xyz/test/ei_nvlink20", Type::NVLinkErrors));
+        mockManager, device, "/xyz/test/ei_nvlink20", Type::NVLinkErrors,
+        context));
     cleanupDeviceSensors(devices);
 }
 
 TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateErrorInjectionSensorsForType_ThermalErrors)
 {
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_thermal20", {Type::ThermalErrors});
     EXPECT_NO_THROW(createErrorInjectionSensorsForType(
-        mockManager, device, "/xyz/test/ei_thermal20", Type::ThermalErrors));
+        mockManager, device, "/xyz/test/ei_thermal20", Type::ThermalErrors,
+        context));
     cleanupDeviceSensors(devices);
 }
 
 TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateErrorInjectionSensorsForType_FatalErrors)
 {
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_fatal20", {Type::FatalErrors});
     EXPECT_NO_THROW(createErrorInjectionSensorsForType(
-        mockManager, device, "/xyz/test/ei_fatal20", Type::FatalErrors));
+        mockManager, device, "/xyz/test/ei_fatal20", Type::FatalErrors,
+        context));
     cleanupDeviceSensors(devices);
 }
 
 TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateErrorInjectionSensorsForType_PortRecoveryErrors)
 {
-    EXPECT_NO_THROW(createErrorInjectionSensorsForType(
+    auto context = createErrorInjectionCapabilityContext(
         mockManager, device, "/xyz/test/ei_portrec20",
-        Type::PortRecoveryErrors));
+        {Type::PortRecoveryErrors});
+    EXPECT_NO_THROW(createErrorInjectionSensorsForType(
+        mockManager, device, "/xyz/test/ei_portrec20", Type::PortRecoveryErrors,
+        context));
     cleanupDeviceSensors(devices);
 }
 
 TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateErrorInjectionSensorsForType_USBBridgeEmulationErrors)
 {
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_usb20",
+        {Type::USBBridgeEmulationErrors});
     EXPECT_NO_THROW(createErrorInjectionSensorsForType(
         mockManager, device, "/xyz/test/ei_usb20",
-        Type::USBBridgeEmulationErrors));
+        Type::USBBridgeEmulationErrors, context));
     cleanupDeviceSensors(devices);
 }
 
 TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateErrorInjectionSensorsForType_LeakDetectionErrors)
 {
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_leak20",
+        {Type::LeakDetectionErrors});
     EXPECT_NO_THROW(createErrorInjectionSensorsForType(
-        mockManager, device, "/xyz/test/ei_leak20", Type::LeakDetectionErrors));
+        mockManager, device, "/xyz/test/ei_leak20", Type::LeakDetectionErrors,
+        context));
     cleanupDeviceSensors(devices);
 }
 
 TEST_F(NsmErrorInjectionCommonBranch2Test,
        CreateErrorInjectionSensorsForType_GPIOSpoofingErrors)
 {
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_gpio20", {Type::GPIOSpoofingErrors});
     EXPECT_NO_THROW(createErrorInjectionSensorsForType(
-        mockManager, device, "/xyz/test/ei_gpio20", Type::GPIOSpoofingErrors));
+        mockManager, device, "/xyz/test/ei_gpio20", Type::GPIOSpoofingErrors,
+        context));
+    cleanupDeviceSensors(devices);
+}
+
+// ============================================================================
+// Regression guard for the shared-container contract: a type that is absent
+// from the context has no PDI to read during read-modify-write, so it must be
+// skipped rather than registered against a container it does not belong to.
+// ============================================================================
+TEST_F(NsmErrorInjectionCommonBranch2Test,
+       CreateErrorInjectionSensorsForType_TypeAbsentFromContext)
+{
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_absent20", {Type::MemoryErrors});
+    EXPECT_NO_THROW(createErrorInjectionSensorsForType(
+        mockManager, device, "/xyz/test/ei_absent20", Type::PCIeErrors,
+        context));
     cleanupDeviceSensors(devices);
 }
 
@@ -187,6 +230,39 @@ TEST_F(NsmErrorInjectionCommonBranch2Test,
 
     EXPECT_NO_THROW(createNsmMCUErrorInjectionSensors(mockManager, hpmDevice,
                                                       "/xyz/test/mcu_hpm21"));
+    cleanupDeviceSensors(devices);
+}
+
+// ============================================================================
+// The point of the shared context: one mask owner for the whole device, not
+// one per type. SetCurrentErrorInjectionTypesV1 writes all 64 bits at once, so
+// a per-type owner rebuilds the mask from a single-entry container and zeroes
+// every sibling's bit. One owner also means the aggregate batch property has
+// something to address.
+// ============================================================================
+TEST_F(NsmErrorInjectionCommonBranch2Test,
+       CreateNsmMCUErrorInjectionSensors_SingleSharedMaskOwner)
+{
+    auto hpmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(
+            "STATIC:768:21:NSM_DEVICE_INSTANCE_NUMBER:21"));
+    ASSERT_NE(hpmDevice, nullptr);
+    hpmDevice->deviceRole = NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA;
+
+    createNsmMCUErrorInjectionSensors(mockManager, hpmDevice,
+                                      "/xyz/test/mcu_shared24");
+
+    size_t maskOwners = 0;
+    for (const auto& sensor : hpmDevice->deviceSensors)
+    {
+        if (std::dynamic_pointer_cast<NsmSetErrorInjectionCapabilities>(sensor))
+        {
+            ++maskOwners;
+        }
+    }
+    // HPM_SMA exposes five capability types; all five share this one owner.
+    EXPECT_EQ(maskOwners, 1u);
+
     cleanupDeviceSensors(devices);
 }
 
