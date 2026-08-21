@@ -211,7 +211,7 @@ NsmRowRemappingCounts::NsmRowRemappingCounts(
               name.c_str());
     memoryRowRemappingCountsIntf = memoryRowRemappingIntf;
     // Seed the markers so never-polled counts are not published as 0.
-    telemetryNotAvailable();
+    publishTelemetryUnavailable();
 }
 
 void NsmRowRemappingCounts::updateMetricOnSharedMemory()
@@ -250,7 +250,7 @@ void NsmRowRemappingCounts::updateReading(uint32_t correctable_error,
     updateMetricOnSharedMemory();
 }
 
-void NsmRowRemappingCounts::telemetryNotAvailable()
+void NsmRowRemappingCounts::publishTelemetryUnavailable()
 {
     memoryRowRemappingCountsIntf->ceRowRemappingCount(
         Sentinel<uint32_t>::notAvailable);
@@ -310,7 +310,7 @@ NsmRemappingAvailabilityBankCount::NsmRemappingAvailabilityBankCount(
     lg2::info("NsmRemappingAvailabilityBankCount: create sensor:{NAME}", "NAME",
               name.c_str());
     // Seed the markers so never-polled counts are not published as 0.
-    telemetryNotAvailable();
+    publishTelemetryUnavailable();
 }
 
 void NsmRemappingAvailabilityBankCount::updateReading(
@@ -324,7 +324,7 @@ void NsmRemappingAvailabilityBankCount::updateReading(
     updateMetricOnSharedMemory();
 }
 
-void NsmRemappingAvailabilityBankCount::telemetryNotAvailable()
+void NsmRemappingAvailabilityBankCount::publishTelemetryUnavailable()
 {
     constexpr auto na = Sentinel<uint16_t>::notAvailable;
     rowRemapIntf->highRemappingAvailablityBankCount(na);
@@ -441,7 +441,7 @@ NsmEccErrorCountsDram::NsmEccErrorCountsDram(
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
     // Seed the markers so never-polled counts are not published as 0.
-    telemetryNotAvailable();
+    publishTelemetryUnavailable();
 }
 
 void NsmEccErrorCountsDram ::updateMetricOnSharedMemory()
@@ -478,7 +478,7 @@ void NsmEccErrorCountsDram::updateReading(
     updateMetricOnSharedMemory();
 }
 
-void NsmEccErrorCountsDram::telemetryNotAvailable()
+void NsmEccErrorCountsDram::publishTelemetryUnavailable()
 {
     // Stamp the int64 marker on the int64 D-Bus properties directly; the wire
     // struct's uint32 fields cannot represent the int64 marker.

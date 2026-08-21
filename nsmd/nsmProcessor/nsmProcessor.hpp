@@ -278,8 +278,8 @@ class NsmEccErrorCounts : public NsmSensor
 
   private:
     void updateReading(struct nsm_ECC_error_counts);
-    /** @brief Seed the no-reading marker on both counts at construction. */
-    void telemetryNotAvailable();
+    /** @brief Publish the no-reading marker on both counts (D-Bus + shmem). */
+    void publishTelemetryUnavailable();
     std::string inventoryObjPath;
 
     std::shared_ptr<EccModeIntf> eccErrorCountIntf = nullptr;

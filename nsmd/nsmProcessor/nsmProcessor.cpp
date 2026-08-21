@@ -1303,7 +1303,7 @@ NsmEccErrorCounts::NsmEccErrorCounts(std::string& name, std::string& type,
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
     eccErrorCountIntf = eccIntf;
     // Seed the markers so never-polled counts are not published as 0.
-    telemetryNotAvailable();
+    publishTelemetryUnavailable();
 }
 void NsmEccErrorCounts::updateMetricOnSharedMemory()
 {
@@ -1350,7 +1350,7 @@ void NsmEccErrorCounts::updateReading(struct nsm_ECC_error_counts errorCounts)
     updateMetricOnSharedMemory();
 }
 
-void NsmEccErrorCounts::telemetryNotAvailable()
+void NsmEccErrorCounts::publishTelemetryUnavailable()
 {
     // Stamp the int64 marker on the int64 D-Bus properties directly; the wire
     // struct's uint32 fields cannot represent the int64 marker.
