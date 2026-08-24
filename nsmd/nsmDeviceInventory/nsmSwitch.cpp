@@ -963,6 +963,493 @@ inline void createNsmSwitchPowerCappingMode(std::shared_ptr<NsmDevice> device,
                                   nvSwitchPowerCappingMode, device});
 }
 
+// Map NSM wire enum8 to LTXModeEnum. Wire Default (0) is resolved to Enabled
+// at D-Bus publish time per the LTX mode contract.
+static std::optional<LTXModeEnum> toLTXModeFromGet(uint8_t nsmMode)
+{
+    switch (nsmMode)
+    {
+        case NSM_LTX_MODE_ENABLED:
+            return LTXModeEnum::Enabled;
+        case NSM_LTX_MODE_DISABLED:
+            return LTXModeEnum::Disabled;
+        case NSM_LTX_MODE_DEFAULT:
+            return LTXModeEnum::Default;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmSwitchLTXMode::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_device_mode_settings_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_device_mode_settings_v2_req(
+        instanceId, DEVICE_MODE_LTX, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug("encode_get_device_mode_settings_v2_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmSwitchLTXMode::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint8_t currentMode = 0;
+    uint8_t pendingMode = 0;
+    uint16_t currentModeLength = 0;
+    uint16_t pendingModeLength = 0;
+
+    /* Probe lengths with null data pointers so decode cannot overflow the
+     * 1-byte mode buffers below on a malformed oversized payload. */
+    auto rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reason_code, nullptr,
+        &currentModeLength, nullptr, &pendingModeLength);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+    if (currentModeLength != LTX_MODE_DATA_SIZE ||
+        (pendingModeLength != 0 && pendingModeLength != LTX_MODE_DATA_SIZE))
+    {
+        return NSM_SW_ERROR_LENGTH;
+    }
+
+    rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reason_code, &currentMode,
+        &currentModeLength, &pendingMode, &pendingModeLength);
+
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        if (currentModeLength != LTX_MODE_DATA_SIZE)
+        {
+            return NSM_SW_ERROR_LENGTH;
+        }
+        auto current = toLTXModeFromGet(currentMode);
+        if (!current)
+        {
+            return NSM_SW_ERROR_DATA;
+        }
+        LTXModeEnum currentResolved = (*current == LTXModeEnum::Default)
+                                          ? LTXModeEnum::Enabled
+                                          : *current;
+        ltxModeIntf->currentMode(currentResolved);
+
+        if (pendingModeLength != 0 && pendingModeLength != LTX_MODE_DATA_SIZE)
+        {
+            return NSM_SW_ERROR_LENGTH;
+        }
+        if (pendingModeLength == LTX_MODE_DATA_SIZE)
+        {
+            auto pending = toLTXModeFromGet(pendingMode);
+            if (!pending)
+            {
+                return NSM_SW_ERROR_DATA;
+            }
+            LTXModeEnum pendingResolved = (*pending == LTXModeEnum::Default)
+                                              ? LTXModeEnum::Enabled
+                                              : *pending;
+            ltxModeIntf->pendingMode(pendingResolved);
+        }
+        else
+        {
+            // No pending override from device; keep Settings in sync.
+            ltxModeIntf->pendingMode(currentResolved);
+        }
+    }
+    return cc ? cc : rc;
+}
+
+requester::Coroutine NsmSwitchLTXMode::setLTXMode(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const std::string* requested = std::get_if<std::string>(&value);
+    if (!requested)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    auto eid = device->getEid();
+    auto mode =
+        LTXModeServer::convertLinkTrainingExtendedModeFromString(*requested);
+
+    uint8_t data = 0;
+    if (mode == LTXModeEnum::Default)
+    {
+        data = NSM_LTX_MODE_DEFAULT;
+    }
+    else if (mode == LTXModeEnum::Enabled)
+    {
+        data = NSM_LTX_MODE_ENABLED;
+    }
+    else if (mode == LTXModeEnum::Disabled)
+    {
+        data = NSM_LTX_MODE_DISABLED;
+    }
+    else
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    if (!ltxModeIntf->isModeConfigurable())
+    {
+        *status = AsyncOperationStatusType::Unavailable;
+        throw sdbusplus::error::xyz::openbmc_project::common::NotAllowed{};
+    }
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_device_mode_settings_v2_req) +
+                    LTX_MODE_DATA_SIZE - 1);
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    auto rc = encode_set_device_mode_settings_v2_req(
+        0, DEVICE_MODE_LTX, &data, LTX_MODE_DATA_SIZE, requestMsg);
+    if (shouldLog("setLTXMode encode", uint16_t(0), uint8_t(0), rc))
+    {
+        lg2::error("Encoding LTX mode failed. eid={EID} rc={RC}", "EID", eid,
+                   "RC", rc);
+    }
+    if (rc)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
+    if (shouldLog("setLTXMode postPatchIO", uint16_t(0), uint8_t(0), rc_))
+    {
+        lg2::error("Setting LTX mode failed. eid={EID} rc={RC}", "EID", eid,
+                   "RC", utils::nsmSwCodeToString(rc_));
+    }
+    if (rc_)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_set_device_mode_settings_v2_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reason_code);
+    if (shouldLog("setLTXMode response", reason_code, cc, rc))
+    {
+        lg2::error(
+            "Setting LTX mode returned an error. eid={EID} cc={CC} reasonCode={REASON} rc={RC}",
+            "EID", eid, "CC", cc, "REASON", reason_code, "RC", rc);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        ltxModeIntf->pendingMode(
+            mode == LTXModeEnum::Default ? LTXModeEnum::Enabled : mode);
+    }
+    else
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
+inline void createNsmSwitchLTXMode(std::shared_ptr<NsmDevice> device,
+                                   sdbusplus::bus_t& bus,
+                                   const std::string& objPath,
+                                   const std::string& type,
+                                   const std::string& name)
+{
+    auto dbusObjPath = objPath + name + "/Oem/Nvidia/LTXMode";
+    std::vector<utils::Association> associations{
+        {"parent_switch", "ltx_mode", objPath + name}};
+    auto ltxModeAssociationIntf =
+        std::make_unique<AssociationDefinitionsInft>(bus, dbusObjPath.c_str());
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    for (const auto& association : associations)
+    {
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
+    }
+    ltxModeAssociationIntf->associations(associationsList);
+
+    auto ltxModeIntf = std::make_shared<LTXModeIntf>(bus, dbusObjPath.c_str());
+    ltxModeIntf->currentMode(LTXModeEnum::Enabled);
+    ltxModeIntf->pendingMode(LTXModeEnum::Enabled);
+    // IsModeConfigurable is sourced solely from the entity-manager
+    // SupportLTXMode capability flag: this factory is only ever invoked from
+    // the createNsmSwitchDI gate when SupportLTXMode == true (see the
+    // supportLTXMode check above createNsmSwitchLTXMode's call site), so
+    // hardcoding true here is equivalent to wiring it from that flag. No
+    // other code path may set IsModeConfigurable.
+    ltxModeIntf->isModeConfigurable(true);
+    auto nvSwitchLTXMode = std::make_shared<NsmSwitchLTXMode>(
+        name, type, ltxModeIntf, std::move(ltxModeAssociationIntf));
+    device->addSensor(nvSwitchLTXMode, false);
+
+    nsm::AsyncSetOperationHandler setLTXModeHandler = std::bind(
+        &NsmSwitchLTXMode::setLTXMode, nvSwitchLTXMode, std::placeholders::_1,
+        std::placeholders::_2, std::placeholders::_3);
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(dbusObjPath)
+        ->addAsyncSetOperation(
+            std::string(LTXModeServer::interface), "PendingMode",
+            AsyncSetOperationInfo{setLTXModeHandler, nvSwitchLTXMode, device});
+}
+
+// Map NSM wire enum8 to UPhyModeEnum. Wire Default (0) is resolved to Enabled
+// at D-Bus publish time per the UPhy mode contract.
+static std::optional<UPhyModeEnum> toUPhyModeFromGet(uint8_t nsmMode)
+{
+    switch (nsmMode)
+    {
+        case NSM_UPHY_MODE_ENABLED:
+            return UPhyModeEnum::Enabled;
+        case NSM_UPHY_MODE_DISABLED:
+            return UPhyModeEnum::Disabled;
+        case NSM_UPHY_MODE_DEFAULT:
+            return UPhyModeEnum::Default;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmSwitchUPhyMode::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_device_mode_settings_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_device_mode_settings_v2_req(
+        instanceId, DEVICE_MODE_UPHY, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug("encode_get_device_mode_settings_v2_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmSwitchUPhyMode::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                             size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint8_t currentMode = 0;
+    uint8_t pendingMode = 0;
+    uint16_t currentModeLength = 0;
+    uint16_t pendingModeLength = 0;
+
+    /* Probe lengths with null data pointers so decode cannot overflow the
+     * 1-byte mode buffers below on a malformed oversized payload. */
+    auto rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reason_code, nullptr,
+        &currentModeLength, nullptr, &pendingModeLength);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+    if (currentModeLength != UPHY_MODE_DATA_SIZE ||
+        (pendingModeLength != 0 && pendingModeLength != UPHY_MODE_DATA_SIZE))
+    {
+        return NSM_SW_ERROR_LENGTH;
+    }
+
+    rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reason_code, &currentMode,
+        &currentModeLength, &pendingMode, &pendingModeLength);
+
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        if (currentModeLength != UPHY_MODE_DATA_SIZE)
+        {
+            return NSM_SW_ERROR_LENGTH;
+        }
+        auto current = toUPhyModeFromGet(currentMode);
+        if (!current)
+        {
+            return NSM_SW_ERROR_DATA;
+        }
+        UPhyModeEnum currentResolved = (*current == UPhyModeEnum::Default)
+                                           ? UPhyModeEnum::Enabled
+                                           : *current;
+        uphyModeIntf->currentMode(currentResolved);
+
+        if (pendingModeLength != 0 && pendingModeLength != UPHY_MODE_DATA_SIZE)
+        {
+            return NSM_SW_ERROR_LENGTH;
+        }
+        if (pendingModeLength == UPHY_MODE_DATA_SIZE)
+        {
+            auto pending = toUPhyModeFromGet(pendingMode);
+            if (!pending)
+            {
+                return NSM_SW_ERROR_DATA;
+            }
+            UPhyModeEnum pendingResolved = (*pending == UPhyModeEnum::Default)
+                                               ? UPhyModeEnum::Enabled
+                                               : *pending;
+            uphyModeIntf->pendingMode(pendingResolved);
+        }
+        else
+        {
+            // No pending override from device; keep Settings in sync.
+            uphyModeIntf->pendingMode(currentResolved);
+        }
+    }
+    return cc ? cc : rc;
+}
+
+requester::Coroutine NsmSwitchUPhyMode::setUPhyMode(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const std::string* requested = std::get_if<std::string>(&value);
+    if (!requested)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    auto eid = device->getEid();
+    auto mode = UPhyModeServer::convertUPhyModeFromString(*requested);
+
+    uint8_t data = 0;
+    if (mode == UPhyModeEnum::Default)
+    {
+        data = NSM_UPHY_MODE_DEFAULT;
+    }
+    else if (mode == UPhyModeEnum::Enabled)
+    {
+        data = NSM_UPHY_MODE_ENABLED;
+    }
+    else if (mode == UPhyModeEnum::Disabled)
+    {
+        data = NSM_UPHY_MODE_DISABLED;
+    }
+    else
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    if (!uphyModeIntf->isModeConfigurable())
+    {
+        *status = AsyncOperationStatusType::Unavailable;
+        throw sdbusplus::error::xyz::openbmc_project::common::NotAllowed{};
+    }
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_device_mode_settings_v2_req) +
+                    UPHY_MODE_DATA_SIZE - 1);
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    auto rc = encode_set_device_mode_settings_v2_req(
+        0, DEVICE_MODE_UPHY, &data, UPHY_MODE_DATA_SIZE, requestMsg);
+    if (shouldLog("setUPhyMode encode", uint16_t(0), uint8_t(0), rc))
+    {
+        lg2::error("Encoding UPhy mode failed. eid={EID} rc={RC}", "EID", eid,
+                   "RC", rc);
+    }
+    if (rc)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
+    if (shouldLog("setUPhyMode postPatchIO", uint16_t(0), uint8_t(0), rc_))
+    {
+        lg2::error("Setting UPhy mode failed. eid={EID} rc={RC}", "EID", eid,
+                   "RC", utils::nsmSwCodeToString(rc_));
+    }
+    if (rc_)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_set_device_mode_settings_v2_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reason_code);
+    if (shouldLog("setUPhyMode response", reason_code, cc, rc))
+    {
+        lg2::error(
+            "Setting UPhy mode returned an error. eid={EID} cc={CC} reasonCode={REASON} rc={RC}",
+            "EID", eid, "CC", cc, "REASON", reason_code, "RC", rc);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        uphyModeIntf->pendingMode(
+            mode == UPhyModeEnum::Default ? UPhyModeEnum::Enabled : mode);
+    }
+    else
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
+inline void createNsmSwitchUPhyMode(std::shared_ptr<NsmDevice> device,
+                                    sdbusplus::bus_t& bus,
+                                    const std::string& objPath,
+                                    const std::string& type,
+                                    const std::string& name)
+{
+    auto dbusObjPath = objPath + name + "/Oem/Nvidia/UPhyMode";
+    std::vector<utils::Association> associations{
+        {"parent_switch", "uphy_mode", objPath + name}};
+    auto uphyModeAssociationIntf =
+        std::make_unique<AssociationDefinitionsInft>(bus, dbusObjPath.c_str());
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    for (const auto& association : associations)
+    {
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
+    }
+    uphyModeAssociationIntf->associations(associationsList);
+
+    auto uphyModeIntf = std::make_shared<UPhyModeIntf>(bus,
+                                                       dbusObjPath.c_str());
+    uphyModeIntf->currentMode(UPhyModeEnum::Enabled);
+    uphyModeIntf->pendingMode(UPhyModeEnum::Enabled);
+    // IsModeConfigurable is sourced solely from the entity-manager
+    // SupportUPhyMode capability flag: this factory is only ever invoked
+    // from the createNsmSwitchDI gate when SupportUPhyMode == true (see the
+    // supportUPhyMode check above createNsmSwitchUPhyMode's call site), so
+    // hardcoding true here is equivalent to wiring it from that flag. No
+    // other code path may set IsModeConfigurable.
+    uphyModeIntf->isModeConfigurable(true);
+    auto nvSwitchUPhyMode = std::make_shared<NsmSwitchUPhyMode>(
+        name, type, uphyModeIntf, std::move(uphyModeAssociationIntf));
+    device->addSensor(nvSwitchUPhyMode, false);
+
+    nsm::AsyncSetOperationHandler setUPhyModeHandler = std::bind(
+        &NsmSwitchUPhyMode::setUPhyMode, nvSwitchUPhyMode,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(dbusObjPath)
+        ->addAsyncSetOperation(std::string(UPhyModeServer::interface),
+                               "PendingMode",
+                               AsyncSetOperationInfo{setUPhyModeHandler,
+                                                     nvSwitchUPhyMode, device});
+}
+
 requester::Coroutine createNsmSwitchDI(SensorManager& manager,
                                        const std::string& interface,
                                        const std::string& objPath)
@@ -1057,6 +1544,30 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         {
             createNsmSwitchPowerCappingMode(device, bus, inventoryObjPath, type,
                                             name);
+        }
+
+        bool supportLTXMode = false;
+        auto ltxModeProperty = allBaseIfaceProperties.find("SupportLTXMode");
+        if (ltxModeProperty != allBaseIfaceProperties.end())
+        {
+            const bool* value = std::get_if<bool>(&ltxModeProperty->second);
+            supportLTXMode = value != nullptr && *value;
+        }
+        if (supportLTXMode)
+        {
+            createNsmSwitchLTXMode(device, bus, inventoryObjPath, type, name);
+        }
+
+        bool supportUPhyMode = false;
+        auto uphyModeProperty = allBaseIfaceProperties.find("SupportUPhyMode");
+        if (uphyModeProperty != allBaseIfaceProperties.end())
+        {
+            const bool* value = std::get_if<bool>(&uphyModeProperty->second);
+            supportUPhyMode = value != nullptr && *value;
+        }
+        if (supportUPhyMode)
+        {
+            createNsmSwitchUPhyMode(device, bus, inventoryObjPath, type, name);
         }
 
 // NVSwitch exposes the full NetIR set (DebugInfo + LogInfo + Erase);

@@ -609,6 +609,8 @@ enum device_mode_index {
 	DEVICE_MODE_LLDP = 24,
 	DEVICE_MODE_PROTECTION_OPTIONS_MODE = 26,
 	DEVICE_MODE_POWER_CAPPING = 27,
+	DEVICE_MODE_UPHY = 28,
+	DEVICE_MODE_LTX = 29,
 };
 
 /** @brief Data size (in bytes) of the Protection Options Mode (index 26)
@@ -637,6 +639,33 @@ enum nsm_power_capping_mode {
 
 /** @brief Data size (in bytes) of the Power Capping Mode (index 27) payload. */
 #define POWER_CAPPING_MODE_DATA_SIZE 1
+
+/** @brief LTX (Link Training Extended) Mode values per NSM Type 5 Device Mode
+ *         Index 29 (DEVICE_MODE_LTX). Single enum8 data byte. Non-volatile;
+ *         requires a link toggle to take effect.
+ */
+enum nsm_ltx_mode {
+	NSM_LTX_MODE_DEFAULT = 0,
+	NSM_LTX_MODE_ENABLED = 1,
+	NSM_LTX_MODE_DISABLED = 2,
+};
+
+/** @brief Data size (in bytes) of the LTX Mode payload. */
+#define LTX_MODE_DATA_SIZE 1
+
+/** @brief UPhy (Unit Physical Layer) Mode values per NSM Type 5 Device Mode
+ *         Index 28 (DEVICE_MODE_UPHY). Single enum8 data byte. Non-volatile;
+ *         requires a link toggle to take effect.
+ */
+enum nsm_uphy_mode {
+	NSM_UPHY_MODE_DEFAULT = 0,
+	NSM_UPHY_MODE_ENABLED = 1,
+	NSM_UPHY_MODE_RESERVED = 2,
+	NSM_UPHY_MODE_DISABLED = 3,
+};
+
+/** @brief Data size (in bytes) of the UPhy Mode payload. */
+#define UPHY_MODE_DATA_SIZE 1
 
 /** @brief LLDP TX/RX sub-mode values per NSM Type 5 Device Mode Index 24
  *         Bits 0:1 (TX) and 2:3 (RX) of the data byte.
