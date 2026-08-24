@@ -106,29 +106,29 @@ TEST(PortHealthStructErrata, AttentionTrigger_NA)
 	EXPECT_EQ(d.port_status.attention_trigger, 0u);
 }
 
-TEST(PortHealthStructErrata, AttentionTrigger_RawBER)
+TEST(PortHealthStructErrata, AttentionTrigger_PLRTxBandwidthLoss)
 {
 	// value 1: 1 << 18 = 0x00040000
-	uint32_t statusWord = 0x00040000u;
-	auto d = makePortData(statusWord);
-	EXPECT_EQ(d.port_status.attention_trigger, 1u);
+	const uint32_t trigger = NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS;
+	auto d = makePortData(trigger << 18u);
+	EXPECT_EQ(d.port_status.attention_trigger, trigger);
 	EXPECT_EQ(d.port_status.link_health, 0u);
 }
 
 TEST(PortHealthStructErrata, AttentionTrigger_EffectiveBER)
 {
-	// value 2: 2 << 18 = 0x00080000
-	uint32_t statusWord = 0x00080000u;
-	auto d = makePortData(statusWord);
-	EXPECT_EQ(d.port_status.attention_trigger, 2u);
+	// value 3: 3 << 18 = 0x000C0000
+	const uint32_t trigger = NSM_ATTENTION_TRIGGER_EFFECTIVE_BER;
+	auto d = makePortData(trigger << 18u);
+	EXPECT_EQ(d.port_status.attention_trigger, trigger);
 }
 
-TEST(PortHealthStructErrata, AttentionTrigger_SymbolErrorCount)
+TEST(PortHealthStructErrata, AttentionTrigger_SymbolBER)
 {
-	// value 9: 9 << 18 = 0x00240000
-	uint32_t statusWord = 0x00240000u;
-	auto d = makePortData(statusWord);
-	EXPECT_EQ(d.port_status.attention_trigger, 9u);
+	// Highest defined trigger, value 9: 9 << 18 = 0x00240000
+	const uint32_t trigger = NSM_ATTENTION_TRIGGER_SYMBOL_BER;
+	auto d = makePortData(trigger << 18u);
+	EXPECT_EQ(d.port_status.attention_trigger, trigger);
 }
 
 TEST(PortHealthStructErrata, AttentionTrigger_AllTenValues)
@@ -151,33 +151,33 @@ TEST(PortHealthStructErrata, AttentionTrigger_AllTenValues)
 
 TEST(PortHealthStructErrata, LinkHealthAndTriggerCombined_AttentionRawBER)
 {
-	// link_health=1 (Attention) + attention_trigger=1 (RawBER)
-	// 0x00010000 | 0x00040000 = 0x00050000
-	uint32_t statusWord = 0x00050000u;
-	auto d = makePortData(statusWord);
+	// link_health=1 (Attention) + attention_trigger=5 (RawBER)
+	// 0x00010000 | 0x00140000 = 0x00150000
+	const uint32_t trigger = NSM_ATTENTION_TRIGGER_RAW_BER;
+	auto d = makePortData(0x00010000u | (trigger << 18u));
 	EXPECT_EQ(d.port_status.link_health, 1u);
-	EXPECT_EQ(d.port_status.attention_trigger, 1u);
+	EXPECT_EQ(d.port_status.attention_trigger, trigger);
 }
 
-TEST(PortHealthStructErrata, LinkHealthAndTriggerCombined_AttentionSymbolError)
+TEST(PortHealthStructErrata, LinkHealthAndTriggerCombined_AttentionSymbolBER)
 {
-	// link_health=1 (Attention) + attention_trigger=9 (SymbolErrorCount)
+	// link_health=1 (Attention) + attention_trigger=9 (SymbolBER)
 	// 0x00010000 | 0x00240000 = 0x00250000
-	uint32_t statusWord = 0x00250000u;
-	auto d = makePortData(statusWord);
+	const uint32_t trigger = NSM_ATTENTION_TRIGGER_SYMBOL_BER;
+	auto d = makePortData(0x00010000u | (trigger << 18u));
 	EXPECT_EQ(d.port_status.link_health, 1u);
-	EXPECT_EQ(d.port_status.attention_trigger, 9u);
+	EXPECT_EQ(d.port_status.attention_trigger, trigger);
 }
 
 TEST(PortHealthStructErrata, AllLinkHealthWithEachTrigger)
 {
-	// Each of the 3 valid link_health values with attention_trigger=5
-	const uint32_t trigger5 = 5u << 18u; // PLRRXBandwidthLoss
+	// Each of the 3 valid link_health values with the same trigger
+	const uint32_t trigger = NSM_ATTENTION_TRIGGER_RAW_BER;
 	for (uint32_t health = 0; health <= 2; ++health) {
-		uint32_t statusWord = (health << 16u) | trigger5;
+		uint32_t statusWord = (health << 16u) | (trigger << 18u);
 		auto d = makePortData(statusWord);
 		EXPECT_EQ(d.port_status.link_health, health);
-		EXPECT_EQ(d.port_status.attention_trigger, 5u);
+		EXPECT_EQ(d.port_status.attention_trigger, trigger);
 	}
 }
 
@@ -244,8 +244,9 @@ TEST(PortHealthStructErrata, RoundTripEncodeDecodeHealthyNoTrigger)
 
 TEST(PortHealthStructErrata, RoundTripEncodeDecodeAttentionRawBER)
 {
-	// link_health=1 (Attention), attention_trigger=1 (RawBER)
-	auto portData = makePortData(0x00050000u, 0, 0, 0);
+	// link_health=1 (Attention), attention_trigger=5 (RawBER)
+	auto portData = makePortData(
+	    0x00010000u | (NSM_ATTENTION_TRIGGER_RAW_BER << 18u), 0, 0, 0);
 	auto responseBuf = buildResponse(portData);
 
 	auto *response = reinterpret_cast<const nsm_msg *>(responseBuf.data());
@@ -261,5 +262,6 @@ TEST(PortHealthStructErrata, RoundTripEncodeDecodeAttentionRawBER)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(decoded.port_status.link_health, 1u);
-	EXPECT_EQ(decoded.port_status.attention_trigger, 1u);
+	EXPECT_EQ(decoded.port_status.attention_trigger,
+		  (uint32_t)NSM_ATTENTION_TRIGGER_RAW_BER);
 }

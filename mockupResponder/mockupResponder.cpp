@@ -1550,17 +1550,22 @@ std::optional<std::vector<uint8_t>>
             uint8_t trigger;
         };
         static constexpr std::array<PortHealthCase, 11> kPortHealthCycle = {{
-            {NSM_LINK_HEALTH_NA, 0},        // Unknown, no trigger
-            {NSM_LINK_HEALTH_ATTENTION, 1}, // Attention: RawBER
-            {NSM_LINK_HEALTH_ATTENTION, 2}, // Attention: EffectiveBER
-            {NSM_LINK_HEALTH_ATTENTION, 3}, // Attention: SymbolBER
-            {NSM_LINK_HEALTH_ATTENTION, 4}, // Attention: PLRTXBandwidthLoss
-            {NSM_LINK_HEALTH_ATTENTION, 5}, // Attention: PLRRXBandwidthLoss
-            {NSM_LINK_HEALTH_ATTENTION, 6}, // Attention: RecoveryBandwidthLoss
-            {NSM_LINK_HEALTH_ATTENTION, 7}, // Attention: PortTotalBandwidthLoss
-            {NSM_LINK_HEALTH_ATTENTION, 8}, // Attention: LinkDownCount
-            {NSM_LINK_HEALTH_ATTENTION, 9}, // Attention: SymbolErrorCount
-            {NSM_LINK_HEALTH_HEALTHY, 0},   // Healthy, no trigger
+            {NSM_LINK_HEALTH_NA, NSM_ATTENTION_TRIGGER_NA},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_RECOVERY_BANDWIDTH_LOSS},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_RAW_BER},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_PLR_RX_BANDWIDTH_LOSS},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_PORT_TOTAL_BANDWIDTH_LOSS},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_SYMBOL_BER},
+            {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA},
         }};
         const PortHealthCase& hc = kPortHealthCycle[portHealthCycleIndex];
         portCharData.port_status.link_state = NSM_PORTSTATE_UP;
