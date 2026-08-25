@@ -28,6 +28,25 @@ foreach t : tests
 endforeach
 
 test(
+    'spawn_test',
+    executable(
+        'spawn_test',
+        'spawn_test.cpp',
+        '../event.cpp',
+        implicit_include_directories: false,
+        include_directories: ['.', '..', '../..'],
+        link_args: dynamic_linker,
+        build_rpath: '',
+        # Real coroutines and a real event loop: do not take tests_deps, whose
+        # coverage args replace co_await/co_return and would stub out the very
+        # deferral this primitive provides.
+        cpp_args: ['-UCOVERAGE_DISABLE_COROUTINES'],
+        dependencies: [deps, gtest, gmock],
+    ),
+    workdir: meson.current_source_dir(),
+)
+
+test(
     'sleep_semaphore_mock_test',
     executable(
         'sleep_semaphore_mock_test',
