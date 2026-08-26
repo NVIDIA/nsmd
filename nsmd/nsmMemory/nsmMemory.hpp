@@ -139,6 +139,8 @@ class NsmRowRemappingCounts : public NsmSensor
   private:
     void updateReading(uint32_t correctable_error,
                        uint32_t uncorrectabale_error);
+    /** @brief Publish the no-reading marker on both counts (D-Bus + shmem). */
+    void publishTelemetryUnavailable();
 
     std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingCountsIntf =
         nullptr;
@@ -162,6 +164,9 @@ class NsmRemappingAvailabilityBankCount : public NsmSensor
 
   private:
     void updateReading(const nsm_row_remap_availability& data);
+    /** @brief Publish the no-reading marker on all bank counts (D-Bus + shmem).
+     */
+    void publishTelemetryUnavailable();
 
     std::shared_ptr<MemoryRowRemappingIntf> rowRemapIntf = nullptr;
     std::string inventoryObjPath;
@@ -187,6 +192,8 @@ class NsmEccErrorCountsDram : public NsmSensor
 
   private:
     void updateReading(struct nsm_ECC_error_counts);
+    /** @brief Publish the no-reading marker on both counts (D-Bus + shmem). */
+    void publishTelemetryUnavailable();
     std::shared_ptr<EccModeIntfDram> eccIntf = nullptr;
     std::string inventoryObjPath;
 };

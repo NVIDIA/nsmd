@@ -22,6 +22,7 @@ tests = [
     'nsmNumericSensorsBranch_test',
     'nsmThresholdFactoryBranch_test',
     'nsmNumericSensorFactoryBranch_test',
+    'nsmThresholdEvaluator_test',
 ]
 
 foreach t : tests

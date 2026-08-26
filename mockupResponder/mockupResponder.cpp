@@ -150,7 +150,7 @@ std::unordered_map<uint8_t, EventSource>
 MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
-                                 uint8_t instanceId, bool dumpFailureCycle) :
+                                 uint8_t instanceId, bool failureCycle) :
     event(event), verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
     state({
@@ -181,6 +181,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2, {}},
             {RP_EGM_MODE, {}},
             {RP_INFOROM_RECREATE_ALLOW_INB, {}},
+            {RP_DUAL_PART_NUMBERS, {}},
         },     // prcKnobs
         {
             0, // mode
@@ -215,11 +216,11 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
         {}, // eventSources
     })
 {
-    // Dump failure-cycle replay flag (see --dump_failure_cycle / README).
+    // Dump failure-cycle replay flag (see --failure_cycle / README).
     // When set, the five dump handlers replay kDumpFailureCycle instead of
     // their happy path. The cycle counter starts at the beginning.
-    this->dumpFailureCycle = dumpFailureCycle;
-    if (dumpFailureCycle)
+    this->failureCycle = failureCycle;
+    if (failureCycle)
     {
         lg2::info("MockupResponder: dump failure cycle ENABLED "
                   "({N} cases in kDumpFailureCycle)",
@@ -603,6 +604,11 @@ std::optional<Response>
                 case NSM_GET_ETH_PORT_TELEMETRY_COUNTER:
                     return getEthPortTelemetryCounterHandler(request,
                                                              requestLen);
+                case NSM_QUERY_PORT_TELEMETRY_COUNTER_V2:
+                    return queryPortTelemetryV2Handler(request, requestLen);
+                case NSM_QUERY_PORT_TELEMETRY_CAPABILITIES:
+                    return queryPortTelemetryCapabilitiesHandler(request,
+                                                                 requestLen);
                 case NSM_GET_NETWORK_ADDRESSES:
                     return getPortNetworkAddressesHandler(request, requestLen);
                 case NSM_GET_PORT_ECC_COUNTERS:
@@ -1096,7 +1102,8 @@ std::optional<std::vector<uint8_t>>
                  {1,
                   {1, NSM_GET_ETH_PORT_TELEMETRY_COUNTER,
                    NSM_GET_NETWORK_ADDRESSES, NSM_GET_PORT_ECC_COUNTERS,
-                   NSM_GET_LLDP_PACKET}},
+                   NSM_GET_LLDP_PACKET, NSM_QUERY_PORT_TELEMETRY_COUNTER_V2,
+                   NSM_QUERY_PORT_TELEMETRY_CAPABILITIES}},
                  {NSM_TYPE_PCI_LINK,
                   {
                       NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
@@ -1525,16 +1532,63 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    // mock data to send
-    struct nsm_port_characteristics_data portCharData;
-    portCharData.port_status.link_state = 1;
+    struct nsm_port_characteristics_data portCharData{};
     portCharData.port_status.sub_link_state = 6;
     portCharData.port_status.rx_detect_state = 1;
-    portCharData.port_status.port_down_reason_code =
-        NSM_PORT_DOWN_REASON_CODE_HI_SER_BER;
     portCharData.nv_port_line_rate_mbps = 2500;
     portCharData.nv_port_data_rate_kbps = 3000;
     portCharData.status_lane_info = 225;
+
+    if (failureCycle)
+    {
+        // Each successive poll advances link_health and attention_trigger
+        // through every defined state, exercising the full health range and
+        // the state-change event path. link_state is UP so health is valid.
+        struct PortHealthCase
+        {
+            uint8_t health;
+            uint8_t trigger;
+        };
+        static constexpr std::array<PortHealthCase, 11> kPortHealthCycle = {{
+            {NSM_LINK_HEALTH_NA, NSM_ATTENTION_TRIGGER_NA},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_RECOVERY_BANDWIDTH_LOSS},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_RAW_BER},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_PLR_RX_BANDWIDTH_LOSS},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_PORT_TOTAL_BANDWIDTH_LOSS},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_SYMBOL_BER},
+            {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA},
+        }};
+        const PortHealthCase& hc = kPortHealthCycle[portHealthCycleIndex];
+        portCharData.port_status.link_state = NSM_PORTSTATE_UP;
+        portCharData.port_status.link_health = hc.health;
+        portCharData.port_status.attention_trigger = hc.trigger;
+        if (verbose)
+        {
+            lg2::info("[MOCK-CYCLE] QueryPortCharacteristics case={I} "
+                      "link_health={H} attention_trigger={T}",
+                      "I", portHealthCycleIndex, "H",
+                      static_cast<int>(hc.health), "T",
+                      static_cast<int>(hc.trigger));
+        }
+        portHealthCycleIndex = (portHealthCycleIndex + 1) %
+                               kPortHealthCycle.size();
+    }
+    else
+    {
+        // Legacy fixed response (preserved for non-cycle runs).
+        portCharData.port_status.link_state = 1;
+        portCharData.port_status.port_down_reason_code =
+            NSM_PORT_DOWN_REASON_CODE_HI_SER_BER;
+    }
     uint16_t reason_code = ERR_NULL;
 
     std::vector<uint8_t> response(
@@ -6071,7 +6125,7 @@ std::optional<std::vector<uint8_t>>
     // Happy path (cycle off): 2-segment dump (handle 0 -> 1 -> END=0xFF).
     uint8_t nextHandle = (handle == 0 ? 1 : kMockDiagnosticsEndRecord);
 
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page = nextDumpCyclePage("GetDeviceDiagnostics",
                                                      /*iterative=*/true);
@@ -6157,7 +6211,7 @@ std::optional<std::vector<uint8_t>>
     // Happy path (cycle off): 2-segment dump (handle 0 -> 1 -> END=0).
     uint32_t nextHandle = (handle == 0 ? 1 : kMockDebugInfoEndRecord);
 
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page =
             nextDumpCyclePage("GetNetworkDeviceDebugInfo", /*iterative=*/true);
@@ -6237,7 +6291,7 @@ std::optional<std::vector<uint8_t>>
     // Erase is single-shot (no record-handle iteration), so it walks the
     // cycle as a non-iterative command: silent and non-success-cc pages
     // apply directly, and any multi-page iteration-only case is skipped.
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page = nextDumpCyclePage("EraseTrace",
                                                      /*iterative=*/false);
@@ -6312,7 +6366,7 @@ std::optional<std::vector<uint8_t>>
     // Happy path (cycle off): single-segment dump (END after first call).
     uint32_t nextHandle = kMockLogInfoEndRecord;
 
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page = nextDumpCyclePage("GetNetworkDeviceLogInfo",
                                                      /*iterative=*/true);
@@ -6404,7 +6458,7 @@ std::optional<std::vector<uint8_t>>
     }
 
     // Single-shot, same cycle treatment as eraseTrace (non-iterative).
-    if (dumpFailureCycle)
+    if (failureCycle)
     {
         const DumpCyclePage page = nextDumpCyclePage("EraseDebugInfo",
                                                      /*iterative=*/false);
@@ -7148,7 +7202,7 @@ std::optional<std::vector<uint8_t>>
     }
     std::underlying_type_t<reconfiguration_permissions_v1_index> idxRaw{};
     std::memcpy(&idxRaw, &settingsIndex, sizeof(idxRaw));
-    if (idxRaw > RP_RUNTIME_IN_SYSTEM_TEST)
+    if (idxRaw > RP_DUAL_PART_NUMBERS)
     {
         lg2::error(
             "getReconfigurationPermissionsV1Handler: Invalid Settings Index");
@@ -7199,7 +7253,7 @@ std::optional<std::vector<uint8_t>>
     }
     std::underlying_type_t<reconfiguration_permissions_v1_index> idxRaw{};
     std::memcpy(&idxRaw, &settingsIndex, sizeof(idxRaw));
-    if (idxRaw > RP_RUNTIME_IN_SYSTEM_TEST)
+    if (idxRaw > RP_DUAL_PART_NUMBERS)
     {
         lg2::error(
             "setReconfigurationPermissionsV1Handler: Invalid Settings Index");
@@ -8253,6 +8307,194 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPortTelemetryV2Handler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("queryPortTelemetryV2Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint16_t portIndex = 0;
+    uint8_t groupId = 0;
+    uint32_t sequenceToken = 0;
+    auto rc = decode_query_port_telemetry_v2_req(
+        requestMsg, requestLen, &portIndex, &groupId, &sequenceToken);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_port_telemetry_v2_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    if (groupId != NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE)
+    {
+        // Mock data is only implemented for the Optical Module group (this
+        // feature's scope); other groups report NSM_ERROR with no samples.
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_query_port_telemetry_v2_resp(requestMsg->hdr.instance_id,
+                                                 NSM_ERROR, 0, responseMsg);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("encode_query_port_telemetry_v2_resp failed: rc={RC}",
+                       "RC", rc);
+            return std::nullopt;
+        }
+        return response;
+    }
+
+    // Optical Module Metrics (group 0x09): 4 metrics x 8 lanes, per NVBug
+    // 6253174. Single-page mock response terminated by a Sequence Token
+    // Record (tag 0xFD) with next_sequence_token = 0.
+    constexpr uint8_t kNumberOfLanes = 8;
+    constexpr uint8_t kMetricBases[] = {
+        NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE,
+        NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE,
+        NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE};
+
+    const size_t maxResponseSize =
+        (kNumberOfLanes * (sizeof(kMetricBases) / sizeof(kMetricBases[0])) +
+         kNumberOfLanes + 1) *
+            (sizeof(nsm_aggregate_resp_sample) + 4) +
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(maxResponseSize);
+
+    uint16_t samplesCount = 0;
+    auto appendSample = [&](uint8_t tag, const uint8_t* data,
+                            size_t dataLen) -> bool {
+        std::array<uint8_t, 256> sampleBuf;
+        auto sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sampleBuf.data());
+        size_t sampleLen = 0;
+        auto rc2 = encode_aggregate_resp_sample(tag, true, data, dataLen,
+                                                sample, &sampleLen,
+                                                /*len_encoding=*/0);
+        if (rc2 != NSM_SW_SUCCESS)
+        {
+            lg2::error("encode_aggregate_resp_sample failed: tag={TAG} "
+                       "rc={RC}",
+                       "TAG", tag, "RC", rc2);
+            return false;
+        }
+        if (response.size() + sampleLen > response.capacity())
+        {
+            lg2::error("Not enough capacity in optical module telemetry "
+                       "response to insert sample tag={TAG}",
+                       "TAG", tag);
+            return false;
+        }
+        response.insert(
+            response.end(), sampleBuf.begin(),
+            std::next(sampleBuf.begin(), static_cast<long>(sampleLen)));
+        ++samplesCount;
+        return true;
+    };
+
+    // Mock power/bias-current values: NvU16, raw units == the D-Bus
+    // property's mW/mA (see nsmPort.cpp handleSample()).
+    for (uint8_t metricBase : kMetricBases)
+    {
+        for (uint8_t lane = 0; lane < kNumberOfLanes; ++lane)
+        {
+            uint16_t mockValue =
+                htole16(static_cast<uint16_t>(1000 + metricBase + lane));
+            if (!appendSample(static_cast<uint8_t>(metricBase + lane),
+                              reinterpret_cast<uint8_t*>(&mockValue),
+                              sizeof(mockValue)))
+            {
+                return std::nullopt;
+            }
+        }
+    }
+
+    // Mock SNR values: raw PRM value, caller divides by 256 for dB (e.g.
+    // raw 5665 -> 22.13 dB). Vary per lane so mock data is distinguishable.
+    for (uint8_t lane = 0; lane < kNumberOfLanes; ++lane)
+    {
+        uint32_t mockRawValue =
+            htole32(static_cast<uint32_t>(5665 + lane * 100));
+        if (!appendSample(
+                static_cast<uint8_t>(NSM_OPTICAL_MODULE_TAG_SNR_BASE + lane),
+                reinterpret_cast<uint8_t*>(&mockRawValue),
+                sizeof(mockRawValue)))
+        {
+            return std::nullopt;
+        }
+    }
+
+    // Terminating Sequence Token Record (tag 0xFD): next_sequence_token = 0
+    // indicates this mock response is a single, final page.
+    uint32_t nextSequenceToken = htole32(0);
+    if (!appendSample(0xFD, reinterpret_cast<uint8_t*>(&nextSequenceToken),
+                      sizeof(nextSequenceToken)))
+    {
+        return std::nullopt;
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_query_port_telemetry_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_port_telemetry_v2_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPortTelemetryCapabilitiesHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("queryPortTelemetryCapabilitiesHandler: request length="
+                  "{LEN}",
+                  "LEN", requestLen);
+    }
+
+    uint16_t portIndex = 0;
+    auto rc = decode_query_port_telemetry_caps_req(requestMsg, requestLen,
+                                                   &portIndex);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_port_telemetry_caps_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    // Mock: supports all defined groups (0x01-0x09). For group N, bit
+    // ((N-1) % 8) of byte ((N-1) / 8) set => group N supported.
+    std::array<uint8_t, 32> supportedGroupsBitmask{};
+    supportedGroupsBitmask[0] = 0xFF; // groups 1-8
+    supportedGroupsBitmask[1] = 0x01; // group 9 (Optical Module)
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_caps_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_query_port_telemetry_caps_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE,
+        /*max_counter_records_per_resp=*/32, supportedGroupsBitmask.data(),
+        responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_port_telemetry_caps_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
     MockupResponder::getPortNetworkAddressesHandler(const nsm_msg* requestMsg,
                                                     size_t requestLen)
 {
@@ -8658,6 +8900,13 @@ std::vector<uint8_t>
             data[0] = 1;
             break;
         }
+        case DEVICE_MODE_ADAPTIVE_TGPMODE:
+        {
+            // AdaptiveTGPMode (Dual Part Number): default enabled
+            data.resize(sizeof(uint8_t));
+            data[0] = NSM_ADAPTIVE_TGPMODE_ENABLED;
+            break;
+        }
         case DEVICE_MODE_LLDP:
         {
             /* OOB Miswiring Detection (NVBug 6136040): default mockup
@@ -8793,6 +9042,7 @@ std::optional<std::vector<uint8_t>>
             break;
         case DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED:
         case DEVICE_MODE_SOC_POWER_BRAKE_ENABLED:
+        case DEVICE_MODE_ADAPTIVE_TGPMODE:
             expectedLen = sizeof(uint8_t);
             break;
         case DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX:
@@ -9784,14 +10034,14 @@ std::optional<std::vector<uint8_t>>
     uint8_t dynamicDataSize = 0;
     uint8_t dynamicData[NSM_DIAG_MAX_DYNAMIC_DATA_SIZE] = {};
 
-    auto rc = decode_diag_set_system_config_req(
+    auto rc = decode_nsm_diag_set_system_config_req(
         requestMsg, requestLen, &configType, &systemTestDuration,
         &dynamicDataSize, dynamicData);
 
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_diag_set_system_config_req failed, rc={RC}", "RC",
-                   rc);
+        lg2::error("decode_nsm_diag_set_system_config_req failed, rc={RC}",
+                   "RC", rc);
         return unsupportedCommandHandler(requestMsg, requestLen);
     }
 
@@ -9847,13 +10097,14 @@ std::optional<std::vector<uint8_t>>
     uint8_t dynamicDataSize = 0;
     uint8_t dynamicData[NSM_DIAG_MAX_DYNAMIC_DATA_SIZE] = {};
 
-    auto rc = decode_diag_set_tid_config_req(
+    auto rc = decode_nsm_diag_set_tid_config_req(
         requestMsg, requestLen, &tid, &tidTestDuration, &loops,
         &consoleLogLevel, &dynamicDataSize, dynamicData);
 
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_diag_set_tid_config_req failed, rc={RC}", "RC", rc);
+        lg2::error("decode_nsm_diag_set_tid_config_req failed, rc={RC}", "RC",
+                   rc);
         return unsupportedCommandHandler(requestMsg, requestLen);
     }
 

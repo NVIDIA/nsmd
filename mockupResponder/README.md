@@ -38,7 +38,7 @@ Options:
  [--eid <EID>] - assign EID to mockup responder
  [--instanceId <InstanceID>] - assign instanceId to mockup responder [default - 0]
  [--deviceType <DeviceType>] - assign DeviceType to mockup responder [GPU, Switch, PCIeBridge, Baseboard, ERot and MCTPBridge]
- [--dump_failure_cycle] - replay the built-in dump-command failure cycle [default - off]
+ [--failure_cycle] - replay the built-in dump-command failure cycle [default - off]
 root@umbriel:~# 
 
 ```
@@ -53,7 +53,7 @@ root@umbriel:~# nsmMockupResponder -e 30 -d "gpu" -i 1 -v
 ...........
 ```
 
-## Dump failure cycle (`--dump_failure_cycle`)
+## Dump failure cycle (`--failure_cycle`)
 
 The mockup ships with a built-in failure cycle for the five NSM Type-4 dump
 commands so developers can walk every device-side failure -> reported status
@@ -61,11 +61,11 @@ mapping without modifying real firmware. Responses are built with the same libns
 `encode_*_resp` helpers a real device uses, so the bytes on the wire are
 bit-accurate.
 
-It is off by default. Start the mockup with `--dump_failure_cycle` to enable
+It is off by default. Start the mockup with `--failure_cycle` to enable
 it:
 
 ```bash
-nsmMockupResponder -e 11 -d gpu -i 0 -v --dump_failure_cycle
+nsmMockupResponder -e 11 -d gpu -i 0 -v --failure_cycle
 ```
 
 ### How it works
@@ -140,7 +140,7 @@ Issue the same raw dump command N times (N = list length) and watch the
 
 ```bash
 # Start the mock with the cycle enabled.
-nsmMockupResponder -e 11 -d gpu -i 0 -v --dump_failure_cycle &
+nsmMockupResponder -e 11 -d gpu -i 0 -v --failure_cycle &
 
 # Each invocation consumes one list entry; repeat to walk the whole cycle.
 for i in $(seq 1 25); do

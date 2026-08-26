@@ -49,12 +49,17 @@ class NsmThresholdFactory
     requester::Coroutine getThresholdInterfacesAsync(
         std::unordered_map<std::string, std::string>& thresholdInterfaces);
 
+    // outIntf, when non-null, receives the created tier D-Bus interface
+    // object (e.g. ThresholdWarningIntf) on success, for use by the caller
+    // in constructing the sensor's NsmThresholdEvaluator. Left untouched if
+    // neither threshold of the pair is present or creation fails.
     template <typename DBusIntf,
               std::derived_from<NsmThresholdValue> ThresholdValueLow,
               std::derived_from<NsmThresholdValue> ThresholdValueHigh>
     requester::Coroutine processThresholdsPair(
         const std::unordered_map<std::string, std::string>& thresholdInterfaces,
-        const ThresholdsPairInfo& thresholdsPairInfo);
+        const ThresholdsPairInfo& thresholdsPairInfo,
+        std::shared_ptr<DBusIntf>* outIntf = nullptr);
 
     requester::Coroutine
         createNsmThreshold(const std::string& intfName,

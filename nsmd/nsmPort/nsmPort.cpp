@@ -2,6 +2,7 @@
 
 #include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmEvent.hpp"
 #include "utils.hpp"
 
 #if defined(ENABLE_LLDP)
@@ -320,21 +321,34 @@ void NsmPortStatus::updateMetricOnSharedMemory()
 
 NsmPortCharacteristics::NsmPortCharacteristics(
     sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
-    const std::string& type,
+    const std::string& type, uint8_t deviceType,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
-    std::shared_ptr<IBPortIntf> iBPortIntf, std::string& inventoryObjPath) :
+    std::shared_ptr<IBPortIntf> iBPortIntf,
+    std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsInterface,
+    std::string& inventoryObjPath) :
     NsmSensor(portName, type), portName(portName), iBPortIntf(iBPortIntf),
-    portNumber(portNum), objPath(inventoryObjPath)
+    portHealthMetricsIntf(portHealthMetricsInterface), portNumber(portNum),
+    deviceType(deviceType), objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortCharacteristics: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
 
-    portInfoIntf = std::make_unique<PortInfoIntf>(bus,
-                                                  inventoryObjPath.c_str());
+    // PortInfo (speed/width) is GPU-only. A switch omits it rather than
+    // publishing defaulted values; only the health properties are exposed.
+    if (deviceType == NSM_DEV_ID_GPU)
+    {
+        portInfoIntf = std::make_unique<PortInfoIntf>(bus,
+                                                      inventoryObjPath.c_str());
+        portInfoIntf->type(PortType::BidirectionalPort);
+        portInfoIntf->protocol(PortProtocol::NVLink);
+    }
     portMetricsOem3Intf = portMetricsOem3Interface;
 
-    portInfoIntf->type(PortType::BidirectionalPort);
-    portInfoIntf->protocol(PortProtocol::NVLink);
+    portHealthMetricsIntf->earlyHealthIndication(
+        EarlyHealthIndicationValues::Unknown);
+    portHealthMetricsIntf->attentionTriggerReason(
+        AttentionTriggerReasonValues::Unknown);
+
     updateMetricOnSharedMemory();
 }
 
@@ -369,10 +383,15 @@ uint8_t
     auto rc = decode_query_port_characteristics_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, &data);
 
-    LG2_ERROR_FLT(
-        "decode_query_port_characteristics_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        LG2_ERROR_FLT(
+            "decode_query_port_characteristics_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        return cc ? cc : rc;
+    }
+
+    if (deviceType == NSM_DEV_ID_GPU)
     {
         auto speedGbps = (data.nv_port_line_rate_mbps) / 1000;
         portInfoIntf->maxSpeed(speedGbps);
@@ -387,9 +406,91 @@ uint8_t
         portMetricsOem3Intf->txWidth(width);
         portMetricsOem3Intf->rxWidth(width);
         updateLinkDownCode(data.port_status.port_down_reason_code);
-        updateMetricOnSharedMemory();
     }
+
+    // Decode link_health (bits 17:16) → EarlyHealthIndication.
+    EarlyHealthIndicationValues newHealthState;
+    switch (static_cast<nsm_link_health_state>(data.port_status.link_health))
+    {
+        case NSM_LINK_HEALTH_NA:
+            newHealthState = EarlyHealthIndicationValues::Unknown;
+            break;
+        case NSM_LINK_HEALTH_ATTENTION:
+            newHealthState = EarlyHealthIndicationValues::Attention;
+            break;
+        case NSM_LINK_HEALTH_HEALTHY:
+            newHealthState = EarlyHealthIndicationValues::Healthy;
+            break;
+        default:
+        {
+            // 0b11 is reserved for a future bitmap extension (not a real
+            // state); any unexpected value is invalid → Unknown. Throttled: a
+            // stuck value would otherwise log every poll.
+            const unsigned int linkHealthValue = data.port_status.link_health;
+            LG2_WARNING_FLT(
+                "NsmPortCharacteristics: link_health=0x{VALUE} is invalid/reserved, reporting Unknown on {PATH}",
+                "VALUE", linkHealthValue, "PATH", objPath);
+            newHealthState = EarlyHealthIndicationValues::Unknown;
+            break;
+        }
+    }
+    portHealthMetricsIntf->earlyHealthIndication(newHealthState);
+    decodeAttentionTrigger(data.port_status.attention_trigger);
+
+    emitHealthStateChangeEvent(newHealthState);
+
+    updateMetricOnSharedMemory();
+
     return cc ? cc : rc;
+}
+
+void NsmPortCharacteristics::emitHealthStateChangeEvent(
+    EarlyHealthIndicationValues newHealthState)
+{
+    // Baseline the first observation so a fresh daemon start does not emit a
+    // spurious event.
+    if (!healthStateInitialized)
+    {
+        healthStateInitialized = true;
+        previousEarlyHealthIndication = newHealthState;
+        return;
+    }
+    if (newHealthState == previousEarlyHealthIndication)
+    {
+        return;
+    }
+
+    using NvidiaMetrics = com::nvidia::nv_link::PortHealthMetrics;
+    auto newStateStr =
+        NvidiaMetrics::convertEarlyHealthIndicationValuesToString(
+            newHealthState);
+    auto prevStateStr =
+        NvidiaMetrics::convertEarlyHealthIndicationValuesToString(
+            previousEarlyHealthIndication);
+    auto triggerStr =
+        NvidiaMetrics::convertAttentionTriggerReasonValuesToString(
+            portHealthMetricsIntf->attentionTriggerReason());
+
+    // Warning for Attention and Unknown (loss of a known health signal),
+    // Informational (OK) only for Healthy — see isWarningSeverity().
+    auto severity = isWarningSeverity(newHealthState) ? Level::Warning
+                                                      : Level::Informational;
+
+    logEventAsync("NvidiaMessageRegistry.1.0.NVLinkPortHealthStateChanged",
+                  severity,
+                  {{"REDFISH_MESSAGE_ID",
+                    "NvidiaMessageRegistry.1.0.NVLinkPortHealthStateChanged"},
+                   {"REDFISH_MESSAGE_ARGS",
+                    portName + "," + newStateStr + "," + triggerStr},
+                   // NSM RF-event convention: the affected port travels in
+                   // OriginOfCondition (bmcweb renders the Redfish port URI);
+                   // %1 is the friendly port name, not the D-Bus object path.
+                   {"REDFISH_ORIGIN_OF_CONDITION", objPath},
+                   {"PREVIOUS_STATE", prevStateStr},
+                   {"NEW_STATE", newStateStr},
+                   {"ATTENTION_TRIGGER", triggerStr}});
+
+    previousEarlyHealthIndication = newHealthState;
 }
 
 void NsmPortCharacteristics::updateLinkDownCode(const uint32_t linkDownCode)
@@ -544,56 +645,130 @@ void NsmPortCharacteristics::updateLinkDownCode(const uint32_t linkDownCode)
     }
 }
 
+void NsmPortCharacteristics::decodeAttentionTrigger(uint8_t triggerValue)
+{
+    AttentionTriggerReasonValues reason;
+    switch (triggerValue)
+    {
+        case NSM_ATTENTION_TRIGGER_NA:
+            reason = AttentionTriggerReasonValues::Unknown;
+            break;
+        case NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS:
+            reason = AttentionTriggerReasonValues::PLRTXBandwidthLoss;
+            break;
+        case NSM_ATTENTION_TRIGGER_RECOVERY_BANDWIDTH_LOSS:
+            reason = AttentionTriggerReasonValues::RecoveryBandwidthLoss;
+            break;
+        case NSM_ATTENTION_TRIGGER_EFFECTIVE_BER:
+            reason = AttentionTriggerReasonValues::EffectiveBER;
+            break;
+        case NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT:
+            reason = AttentionTriggerReasonValues::SymbolErrorCount;
+            break;
+        case NSM_ATTENTION_TRIGGER_RAW_BER:
+            reason = AttentionTriggerReasonValues::RawBER;
+            break;
+        case NSM_ATTENTION_TRIGGER_PLR_RX_BANDWIDTH_LOSS:
+            reason = AttentionTriggerReasonValues::PLRRXBandwidthLoss;
+            break;
+        case NSM_ATTENTION_TRIGGER_PORT_TOTAL_BANDWIDTH_LOSS:
+            reason = AttentionTriggerReasonValues::PortTotalBandwidthLoss;
+            break;
+        case NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT:
+            reason = AttentionTriggerReasonValues::LinkDownCount;
+            break;
+        case NSM_ATTENTION_TRIGGER_SYMBOL_BER:
+            reason = AttentionTriggerReasonValues::SymbolBER;
+            break;
+        default:
+            // Throttled: a stuck out-of-spec trigger would otherwise log every
+            // poll. Reported as Unknown.
+            LG2_WARNING_FLT(
+                "NsmPortCharacteristics: attention_trigger=0x{VALUE} is out of spec, reporting Unknown on {PATH}",
+                "VALUE", triggerValue, "PATH", objPath);
+            reason = AttentionTriggerReasonValues::Unknown;
+            break;
+    }
+    portHealthMetricsIntf->attentionTriggerReason(reason);
+}
+
 void NsmPortCharacteristics::updateMetricOnSharedMemory()
 {
 #ifdef NVIDIA_SHMEM
-    auto ifacePortInfoName = std::string(portInfoIntf->interface);
-    auto ifacePortOem3Name = std::string(portMetricsOem3Intf->interface);
-    auto iBPortIntfName = std::string(iBPortIntf->interface);
     std::vector<uint8_t> rawSmbpbiData = {};
+    std::string propName;
 
-    nv::sensor_aggregation::DbusVariantType variantCS{
-        portInfoIntf->currentSpeed()};
-    std::string propName = "CurrentSpeed";
-    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        objPath, ifacePortInfoName, propName, rawSmbpbiData, variantCS);
+    // Non-health port characteristics are GPU-only (see handleResponseMsg);
+    // NVSwitch has no PortMetricsOem3 interface, so guard these derefs.
+    if (deviceType == NSM_DEV_ID_GPU)
+    {
+        auto ifacePortInfoName = std::string(portInfoIntf->interface);
+        auto ifacePortOem3Name = std::string(portMetricsOem3Intf->interface);
+        auto iBPortIntfName = std::string(iBPortIntf->interface);
 
-    nv::sensor_aggregation::DbusVariantType variantMS{portInfoIntf->maxSpeed()};
-    propName = "MaxSpeed";
-    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        objPath, ifacePortInfoName, propName, rawSmbpbiData, variantMS);
+        nv::sensor_aggregation::DbusVariantType variantCS{
+            portInfoIntf->currentSpeed()};
+        propName = "CurrentSpeed";
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            objPath, ifacePortInfoName, propName, rawSmbpbiData, variantCS);
 
-    nv::sensor_aggregation::DbusVariantType variantTX{
-        portMetricsOem3Intf->txNoProtocolBytes()};
-    propName = "TXNoProtocolBytes";
-    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantTX);
+        nv::sensor_aggregation::DbusVariantType variantMS{
+            portInfoIntf->maxSpeed()};
+        propName = "MaxSpeed";
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            objPath, ifacePortInfoName, propName, rawSmbpbiData, variantMS);
 
-    nv::sensor_aggregation::DbusVariantType variantRX{
-        portMetricsOem3Intf->rxNoProtocolBytes()};
-    propName = "RXNoProtocolBytes";
-    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantRX);
+        nv::sensor_aggregation::DbusVariantType variantTX{
+            portMetricsOem3Intf->txNoProtocolBytes()};
+        propName = "TXNoProtocolBytes";
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantTX);
 
-    nv::sensor_aggregation::DbusVariantType variantTXW{
-        portMetricsOem3Intf->txWidth()};
-    propName = "TXWidth";
-    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantTXW);
+        nv::sensor_aggregation::DbusVariantType variantRX{
+            portMetricsOem3Intf->rxNoProtocolBytes()};
+        propName = "RXNoProtocolBytes";
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantRX);
 
-    nv::sensor_aggregation::DbusVariantType variantRXW{
-        portMetricsOem3Intf->rxWidth()};
-    propName = "RXWidth";
-    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantRXW);
+        nv::sensor_aggregation::DbusVariantType variantTXW{
+            portMetricsOem3Intf->txWidth()};
+        propName = "TXWidth";
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantTXW);
 
-    nv::sensor_aggregation::DbusVariantType linkDownReasonCode{
-        xyz::openbmc_project::metrics::IBPort::
-            convertLinkDownReasonCodesToString(
-                iBPortIntf->linkDownReasonCode())};
-    propName = "LinkDownReasonCode";
+        nv::sensor_aggregation::DbusVariantType variantRXW{
+            portMetricsOem3Intf->rxWidth()};
+        propName = "RXWidth";
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantRXW);
+
+        nv::sensor_aggregation::DbusVariantType linkDownReasonCode{
+            xyz::openbmc_project::metrics::IBPort::
+                convertLinkDownReasonCodesToString(
+                    iBPortIntf->linkDownReasonCode())};
+        propName = "LinkDownReasonCode";
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            objPath, iBPortIntfName, propName, rawSmbpbiData,
+            linkDownReasonCode);
+    }
+
+    auto ifacePortHealthName = std::string(portHealthMetricsIntf->interface);
+
+    nv::sensor_aggregation::DbusVariantType earlyHealth{
+        com::nvidia::nv_link::PortHealthMetrics::
+            convertEarlyHealthIndicationValuesToString(
+                portHealthMetricsIntf->earlyHealthIndication())};
+    propName = "EarlyHealthIndication";
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        objPath, iBPortIntfName, propName, rawSmbpbiData, linkDownReasonCode);
+        objPath, ifacePortHealthName, propName, rawSmbpbiData, earlyHealth);
+
+    nv::sensor_aggregation::DbusVariantType attnTrigger{
+        com::nvidia::nv_link::PortHealthMetrics::
+            convertAttentionTriggerReasonValuesToString(
+                portHealthMetricsIntf->attentionTriggerReason())};
+    propName = "AttentionTriggerReason";
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifacePortHealthName, propName, rawSmbpbiData, attnTrigger);
 #endif
 }
 
@@ -1756,6 +1931,15 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
     {
         uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
     }
+    // Optional per-platform override for FEC histogram support. When present it
+    // takes priority over the default device-type heuristic (irrespective of
+    // device type); when absent the previous behaviour is preserved.
+    std::optional<bool> supportFECHistogram;
+    if (allCurrentIfaceProperties.count("SupportFECHistogram"))
+    {
+        supportFECHistogram =
+            std::get<bool>(allCurrentIfaceProperties.at("SupportFECHistogram"));
+    }
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
@@ -1846,20 +2030,33 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
             std::make_shared<PortMetricsOem2Intf>(bus, objPath.c_str());
         auto portPacketCountersIntf =
             std::make_shared<PortPacketCountersIntf>(bus, objPath.c_str());
-        if (deviceType == NSM_DEV_ID_GPU)
-        {
-            std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf =
-                std::make_shared<PortMetricsOem3Intf>(bus, objPath.c_str());
 
-            auto portStatusSensor = std::make_shared<NsmPortStatus>(
-                bus, portName, logicalPortNum, type, portMetricsOem3Intf,
-                objPath);
-            nsmDevice->addSensor(portStatusSensor, priority);
+        // PortHealthMetrics applies to every NVLink port regardless of EM
+        // "Name". This factory serves only the NSM_NVLink EM types, so PCIe
+        // ports never reach here.
+        if (deviceType == NSM_DEV_ID_GPU || deviceType == NSM_DEV_ID_SWITCH)
+        {
+            std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
+
+            auto portHealthMetricsIntf =
+                std::make_shared<PortHealthMetricsIntf>(bus, objPath.c_str());
+
+            if (deviceType == NSM_DEV_ID_GPU)
+            {
+                portMetricsOem3Intf =
+                    std::make_shared<PortMetricsOem3Intf>(bus, objPath.c_str());
+
+                auto portStatusSensor = std::make_shared<NsmPortStatus>(
+                    bus, portName, logicalPortNum, type, portMetricsOem3Intf,
+                    objPath);
+                nsmDevice->addSensor(portStatusSensor, priority);
+            }
 
             auto portCharacteristicsSensor =
                 std::make_shared<NsmPortCharacteristics>(
-                    bus, portName, logicalPortNum, type, portMetricsOem3Intf,
-                    iBPortIntf, objPath);
+                    bus, portName, logicalPortNum, type, deviceType,
+                    portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
+                    objPath);
             if (!portCharacteristicsSensor)
             {
                 lg2::error(
@@ -1933,15 +2130,48 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
             std::get<bool>(
                 allCurrentIfaceProperties.at("OpticalModuleResetSupported")))
         {
+            // port_index carries the local port index (1-based) as defined by
+            // the OOB Device Reset spec, so pass logicalPortNum (not the
+            // 0-based loop index i).
             auto opticalResetSensor = std::make_shared<NsmOpticalModuleReset>(
                 bus, portName, type, objPath, nsmDevice,
-                static_cast<uint32_t>(i));
+                static_cast<uint32_t>(logicalPortNum));
             nsmDevice->addDeviceSensors(opticalResetSensor);
         }
 #endif
+        // "OpticalModuleTelemetrySupported": true triggers per-port optical
+        // module telemetry collection (NSM cmd 0x14 group 0x09).
+        if (allCurrentIfaceProperties.count(
+                "OpticalModuleTelemetrySupported") &&
+            std::get<bool>(allCurrentIfaceProperties.at(
+                "OpticalModuleTelemetrySupported")))
+        {
+            auto opticalTelemetrySensor =
+                std::make_shared<NsmOpticalModuleTelemetry>(
+                    bus, portName, type, objPath,
+                    static_cast<uint16_t>(logicalPortNum));
+            nsmDevice->addSensor(opticalTelemetrySensor, priority);
+        }
 
-#ifdef NVIDIA_HISTOGRAM
-        if (deviceType != NSM_DEV_ID_PCIE_BRIDGE)
+#ifdef NVIDIA_FEC_HISTOGRAM
+        // FEC histogram applicability:
+        //  - if the EM config override (SupportFECHistogram) is present, honour
+        //  its
+        //    value (true/false) irrespective of device type.
+        //  - otherwise fall back to the default behaviour of adding it for
+        //  every
+        //    non-PCIe-bridge device.
+        bool fecHistogramApplicable;
+        if (supportFECHistogram.has_value())
+        {
+            fecHistogramApplicable = supportFECHistogram.value();
+        }
+        else
+        {
+            fecHistogramApplicable = (deviceType != NSM_DEV_ID_PCIE_BRIDGE);
+        }
+
+        if (fecHistogramApplicable)
         {
             // add FEC histogram
             std::string histoObjName = "FEC_0";
@@ -1981,6 +2211,138 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
+}
+
+NsmOpticalModuleTelemetry::NsmOpticalModuleTelemetry(
+    sdbusplus::bus_t& bus, const std::string& portName, const std::string& type,
+    const std::string& portObjPath, uint16_t portNumber) :
+    NsmSensorAggregatorPaginated(portName, type), portNumber_(portNumber),
+    objPath_(portObjPath)
+{
+    lg2::info(
+        "NsmOpticalModuleTelemetry: create sensor:{NAME} port:{PORT} objpath:{OBJPATH}",
+        "NAME", portName.c_str(), "PORT", portNumber_, "OBJPATH",
+        objPath_.c_str());
+
+    opticalMetricsIntf_ =
+        std::make_unique<PortOpticalModuleMetricsIntf>(bus, objPath_.c_str());
+
+    /* Initialise D-Bus properties to 8-element zero vectors */
+    opticalMetricsIntf_->rxInputPowerMilliWatts(rxPowerMW_);
+    opticalMetricsIntf_->txOutputPowerMilliWatts(txPowerMW_);
+    opticalMetricsIntf_->txBiasCurrentMilliAmps(txBiasmA_);
+    opticalMetricsIntf_->signalToNoiseRatioPerLane(snrDB_);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmOpticalModuleTelemetry::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_query_port_telemetry_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    auto rc = encode_query_port_telemetry_v2_req(
+        instanceId, portNumber_, kGroupId, seqToken, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        if (shouldLog("NsmOpticalModuleTelemetry:genRequestMsg",
+                      nsm_sw_codes(rc)))
+        {
+            lg2::error("NsmOpticalModuleTelemetry: encode request failed."
+                       " eid={EID} rc={RC} port={PORT}",
+                       "EID", eid, "RC", rc, "PORT", portNumber_);
+        }
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+int NsmOpticalModuleTelemetry::handleSample(const TelemetrySample& sample)
+{
+    // Group 0x09 (Optical Module Metrics) tags are four contiguous 8-lane
+    // blocks (NVBug 6253174); block base identifies the metric, and
+    // (tag - base) is the lane index.
+    const uint8_t lane = sample.tag % NUMBER_OF_LANES;
+    const uint8_t metricBase = static_cast<uint8_t>(sample.tag - lane);
+
+    if (metricBase == NSM_OPTICAL_MODULE_TAG_SNR_BASE)
+    {
+        uint32_t rawValue = 0;
+        int rc = decode_optical_module_snr_lane_record(
+            sample.data, sample.data_len, &rawValue);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            if (shouldLog("NsmOpticalModuleTelemetry:decodeSnr",
+                          nsm_sw_codes(rc)))
+            {
+                lg2::error(
+                    "NsmOpticalModuleTelemetry: decode SNR record failed."
+                    " sensor={NAME} tag={TAG} data_len={LEN}",
+                    "NAME", getName().c_str(), "TAG", sample.tag, "LEN",
+                    sample.data_len);
+            }
+            return rc;
+        }
+        /* Raw PRM value -> dB */
+        snrDB_[lane] = static_cast<double>(rawValue) / kSnrRawToDbScale;
+        return NSM_SW_SUCCESS;
+    }
+
+    uint16_t value = 0;
+    int rc = decode_optical_module_power_bias_lane_record(
+        sample.data, sample.data_len, &value);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        if (shouldLog("NsmOpticalModuleTelemetry:decodePowerBias",
+                      nsm_sw_codes(rc)))
+        {
+            lg2::error(
+                "NsmOpticalModuleTelemetry: decode power/bias record failed."
+                " sensor={NAME} tag={TAG} data_len={LEN}",
+                "NAME", getName().c_str(), "TAG", sample.tag, "LEN",
+                sample.data_len);
+        }
+        return rc;
+    }
+
+    switch (metricBase)
+    {
+        case NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE:
+            txPowerMW_[lane] = static_cast<double>(value);
+            break;
+        case NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE:
+            rxPowerMW_[lane] = static_cast<double>(value);
+            break;
+        case NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE:
+            txBiasmA_[lane] = static_cast<double>(value);
+            break;
+        default:
+            if (shouldLog("NsmOpticalModuleTelemetry:unknownTag", true))
+            {
+                lg2::error("NsmOpticalModuleTelemetry: unknown tag={TAG}"
+                           " sensor={NAME}",
+                           "TAG", sample.tag, "NAME", getName().c_str());
+            }
+            return NSM_SW_ERROR_DATA;
+    }
+    return NSM_SW_SUCCESS;
+}
+
+void NsmOpticalModuleTelemetry::postUpdate()
+{
+    opticalMetricsIntf_->rxInputPowerMilliWatts(rxPowerMW_);
+    opticalMetricsIntf_->txOutputPowerMilliWatts(txPowerMW_);
+    opticalMetricsIntf_->txBiasCurrentMilliAmps(txBiasmA_);
+    opticalMetricsIntf_->signalToNoiseRatioPerLane(snrDB_);
+}
+
+void NsmOpticalModuleTelemetry::resetState()
+{
+    rxPowerMW_.assign(NUMBER_OF_LANES, 0.0);
+    txPowerMW_.assign(NUMBER_OF_LANES, 0.0);
+    txBiasmA_.assign(NUMBER_OF_LANES, 0.0);
+    snrDB_.assign(NUMBER_OF_LANES, 0.0);
 }
 
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)

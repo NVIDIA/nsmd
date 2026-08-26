@@ -31,6 +31,25 @@ using namespace ::testing;
 
 using namespace nsm;
 
+namespace
+{
+/** Builds the mask owner that NsmSetErrorInjectionEnabled delegates its
+ *  read-modify-write to. */
+inline std::shared_ptr<NsmSetErrorInjectionCapabilities>
+    makeErrorInjectionCapabilities(
+        SensorManager& manager,
+        const Interfaces<ErrorInjectionCapabilityIntf>& interfaces)
+{
+    // The mask owner reuses this sensor's update() as its post-write read-back.
+    auto enabledSensor = std::make_shared<NsmErrorInjectionEnabled>(
+        NsmInterfaceProvider<ErrorInjectionCapabilityIntf>(
+            "ErrorInjectionCapability", "NSM_ErrorInjectionCapability",
+            interfaces));
+    return std::make_shared<NsmSetErrorInjectionCapabilities>(
+        "ErrorInjectionCapabilities", manager, interfaces, enabledSensor);
+}
+} // namespace
+
 // ============================================================================
 // Fixture
 // ============================================================================
@@ -109,12 +128,13 @@ TEST_F(NsmSetErrorInjectionBranchTest,
     std::filesystem::path eiPath("/test/br_en_df");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(bus,
                                                                eiPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::MemoryErrors);
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[eiPath] = intf;
 
     NsmSetErrorInjectionEnabled sensor(
-        "EiBrDf", ErrorInjectionCapabilityIntf::Type::MemoryErrors, mockManager,
-        interfaces);
+        "EiBrDf", ErrorInjectionCapabilityIntf::Type::MemoryErrors, interfaces,
+        makeErrorInjectionCapabilities(mockManager, interfaces));
 
     EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
         .WillOnce(mockPostPatchIO(makeDecodeFailResp()));

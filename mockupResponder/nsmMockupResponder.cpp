@@ -42,13 +42,13 @@ void optionUsage(void)
         << " [--eid <EID>] - assign EID to mockup responder\n"
         << " [--instanceId <InstanceID>] - assign instanceId to mockup responder [default - 0]\n"
         << " [--device <DeviceType>] - assign DeviceType to mockup responder [GPU, Switch, PCIeBridge, Baseboard, EROT and MCTPBridge]\n"
-        << " [--dump_failure_cycle] - replay the built-in dump-command failure cycle (see README); off by default\n";
+        << " [--failure_cycle] - replay the built-in dump-command failure cycle (see README); off by default\n";
 }
 
-// getopt_long value for the long-only --dump_failure_cycle flag (no short
+// getopt_long value for the long-only --failure_cycle flag (no short
 // equivalent), chosen above the ASCII range so it never collides with a
 // single-character option.
-constexpr int kDumpFailureCycleOpt = 1000;
+constexpr int kFailureCycleOpt = 1000;
 
 int main(int argc, char** argv)
 {
@@ -57,7 +57,7 @@ int main(int argc, char** argv)
     std::string device = "";
     int deviceType = 0;
     int instanceId = 0;
-    bool dumpFailureCycle = false;
+    bool failureCycle = false;
     int argflag;
     static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
@@ -65,7 +65,7 @@ int main(int argc, char** argv)
         {"eid", required_argument, 0, 'e'},
         {"device", required_argument, 0, 'd'},
         {"instanceId", required_argument, 0, 'i'},
-        {"dump_failure_cycle", no_argument, 0, kDumpFailureCycleOpt},
+        {"failure_cycle", no_argument, 0, kFailureCycleOpt},
         {0, 0, 0, 0}};
 
     while ((argflag = getopt_long(argc, argv, "hve:d:i:", long_options,
@@ -132,8 +132,8 @@ int main(int argc, char** argv)
                     exit(EXIT_FAILURE);
                 }
                 break;
-            case kDumpFailureCycleOpt:
-                dumpFailureCycle = true;
+            case kFailureCycleOpt:
+                failureCycle = true;
                 break;
             default:
                 exit(EXIT_FAILURE);
@@ -143,9 +143,9 @@ int main(int argc, char** argv)
     if (verbose)
     {
         lg2::info(
-            "start a Mockup Responder EID={EID} DeviceType={DT} ({DID}) InstanceID={IID} dumpFailureCycle={DFC}",
+            "start a Mockup Responder EID={EID} DeviceType={DT} ({DID}) InstanceID={IID} failureCycle={DFC}",
             "EID", eid, "DT", device, "DID", deviceType, "IID", instanceId,
-            "DFC", dumpFailureCycle);
+            "DFC", failureCycle);
     }
 
     try
@@ -168,7 +168,7 @@ int main(int argc, char** argv)
 
         MockupResponder::MockupResponder mockupResponder(
             verbose, event, objServer, eid, deviceType, instanceId,
-            dumpFailureCycle);
+            failureCycle);
         return event.loop();
     }
     catch (const std::exception& e)

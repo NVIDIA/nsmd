@@ -345,9 +345,9 @@ TEST(DiagPreBootTest, EncodeSetSystemConfigReqValid)
 				    sizeof(dynamic_data));
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_system_config_req(5, NSM_DIAG_CONFIG_TYPE_MB1,
-						   0x02, dynamic_data,
-						   sizeof(dynamic_data), msg);
+	int rc = encode_nsm_diag_set_system_config_req(
+	    5, NSM_DIAG_CONFIG_TYPE_MB1, 0x02, dynamic_data,
+	    sizeof(dynamic_data), msg);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	auto *request =
@@ -361,7 +361,7 @@ TEST(DiagPreBootTest, EncodeSetSystemConfigReqValid)
 TEST(DiagPreBootTest, EncodeSetSystemConfigReqNull)
 {
 	int rc =
-	    encode_diag_set_system_config_req(5, 0, 0, nullptr, 0, nullptr);
+	    encode_nsm_diag_set_system_config_req(5, 0, 0, nullptr, 0, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -373,9 +373,9 @@ TEST(DiagPreBootTest, SetSystemConfigReqRoundTrip)
 				    sizeof(dynamic_data));
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_system_config_req(5, NSM_DIAG_CONFIG_TYPE_TEST,
-						   0x03, dynamic_data,
-						   sizeof(dynamic_data), msg);
+	int rc = encode_nsm_diag_set_system_config_req(
+	    5, NSM_DIAG_CONFIG_TYPE_TEST, 0x03, dynamic_data,
+	    sizeof(dynamic_data), msg);
 	ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
 	uint8_t config_type = 0xFF;
@@ -383,9 +383,9 @@ TEST(DiagPreBootTest, SetSystemConfigReqRoundTrip)
 	uint8_t dyn_data_size = 0xFF;
 	uint8_t dyn_data[3] = {};
 
-	rc = decode_diag_set_system_config_req(msg, reqMsg.size(), &config_type,
-					       &system_test_duration,
-					       &dyn_data_size, dyn_data);
+	rc = decode_nsm_diag_set_system_config_req(
+	    msg, reqMsg.size(), &config_type, &system_test_duration,
+	    &dyn_data_size, dyn_data);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(config_type, NSM_DIAG_CONFIG_TYPE_TEST);
@@ -398,7 +398,7 @@ TEST(DiagPreBootTest, DecodeSetSystemConfigReqNull)
 {
 	uint8_t config_type, duration, dyn_size;
 
-	EXPECT_EQ(decode_diag_set_system_config_req(
+	EXPECT_EQ(decode_nsm_diag_set_system_config_req(
 		      nullptr, 0, &config_type, &duration, &dyn_size, nullptr),
 		  NSM_SW_ERROR_NULL);
 }
@@ -409,9 +409,9 @@ TEST(DiagPreBootTest, DecodeSetSystemConfigReqShortLength)
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 	uint8_t config_type, duration, dyn_size;
 
-	EXPECT_EQ(decode_diag_set_system_config_req(msg, reqMsg.size(),
-						    &config_type, &duration,
-						    &dyn_size, nullptr),
+	EXPECT_EQ(decode_nsm_diag_set_system_config_req(msg, reqMsg.size(),
+							&config_type, &duration,
+							&dyn_size, nullptr),
 		  NSM_SW_ERROR_LENGTH);
 }
 
@@ -427,7 +427,7 @@ TEST(DiagPreBootTest, EncodeSetTidConfigReqValid)
 				    sizeof(dynamic_data));
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_tid_config_req(
+	int rc = encode_nsm_diag_set_tid_config_req(
 	    5, 0x01, 0x02, 100, NSM_DIAG_LOG_ERROR, sizeof(dynamic_data),
 	    dynamic_data, msg);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -441,8 +441,8 @@ TEST(DiagPreBootTest, EncodeSetTidConfigReqValid)
 
 TEST(DiagPreBootTest, EncodeSetTidConfigReqNull)
 {
-	int rc =
-	    encode_diag_set_tid_config_req(5, 0, 0, 0, 0, 0, nullptr, nullptr);
+	int rc = encode_nsm_diag_set_tid_config_req(5, 0, 0, 0, 0, 0, nullptr,
+						    nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -454,7 +454,7 @@ TEST(DiagPreBootTest, SetTidConfigReqRoundTrip)
 				    sizeof(dynamic_data));
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_tid_config_req(
+	int rc = encode_nsm_diag_set_tid_config_req(
 	    5, 0x09, 0x03, 500, NSM_DIAG_LOG_DEBUG, sizeof(dynamic_data),
 	    dynamic_data, msg);
 	ASSERT_EQ(rc, NSM_SW_SUCCESS);
@@ -466,7 +466,7 @@ TEST(DiagPreBootTest, SetTidConfigReqRoundTrip)
 	uint8_t dyn_data_size = 0xFF;
 	uint8_t dyn_data[4] = {};
 
-	rc = decode_diag_set_tid_config_req(
+	rc = decode_nsm_diag_set_tid_config_req(
 	    msg, reqMsg.size(), &tid, &tid_test_duration, &loops,
 	    &console_log_level, &dyn_data_size, dyn_data);
 
@@ -485,16 +485,16 @@ TEST(DiagPreBootTest, SetTidConfigReqEndianness)
 				    sizeof(nsm_diag_set_tid_config_req) - 1);
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_tid_config_req(5, 0x01, 0x01, 0x1234, 0x00, 0,
-						nullptr, msg);
+	int rc = encode_nsm_diag_set_tid_config_req(5, 0x01, 0x01, 0x1234, 0x00,
+						    0, nullptr, msg);
 	ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
 	uint8_t tid, duration, log_level, dyn_size;
 	uint16_t loops;
 
-	rc = decode_diag_set_tid_config_req(msg, reqMsg.size(), &tid, &duration,
-					    &loops, &log_level, &dyn_size,
-					    nullptr);
+	rc = decode_nsm_diag_set_tid_config_req(msg, reqMsg.size(), &tid,
+						&duration, &loops, &log_level,
+						&dyn_size, nullptr);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(loops, 0x1234);
@@ -505,9 +505,9 @@ TEST(DiagPreBootTest, DecodeSetTidConfigReqNull)
 	uint8_t tid, duration, log_level, dyn_size;
 	uint16_t loops;
 
-	EXPECT_EQ(decode_diag_set_tid_config_req(nullptr, 0, &tid, &duration,
-						 &loops, &log_level, &dyn_size,
-						 nullptr),
+	EXPECT_EQ(decode_nsm_diag_set_tid_config_req(
+		      nullptr, 0, &tid, &duration, &loops, &log_level,
+		      &dyn_size, nullptr),
 		  NSM_SW_ERROR_NULL);
 }
 
@@ -518,9 +518,9 @@ TEST(DiagPreBootTest, DecodeSetTidConfigReqShortLength)
 	uint8_t tid, duration, log_level, dyn_size;
 	uint16_t loops;
 
-	EXPECT_EQ(decode_diag_set_tid_config_req(msg, reqMsg.size(), &tid,
-						 &duration, &loops, &log_level,
-						 &dyn_size, nullptr),
+	EXPECT_EQ(decode_nsm_diag_set_tid_config_req(
+		      msg, reqMsg.size(), &tid, &duration, &loops, &log_level,
+		      &dyn_size, nullptr),
 		  NSM_SW_ERROR_LENGTH);
 }
 
@@ -545,8 +545,8 @@ TEST(DiagPreBootTest, EncodeSetSystemConfigReqOversizeDynamicData)
 	std::vector<uint8_t> reqMsg(512);
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_system_config_req(5, 0, 0, bigData,
-						   sizeof(bigData), msg);
+	int rc = encode_nsm_diag_set_system_config_req(5, 0, 0, bigData,
+						       sizeof(bigData), msg);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -558,8 +558,8 @@ TEST(DiagPreBootTest, EncodeSetTidConfigReqOversizeDynamicData)
 	std::vector<uint8_t> reqMsg(512);
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_tid_config_req(5, 0x01, 0, 1, 0,
-						sizeof(bigData), bigData, msg);
+	int rc = encode_nsm_diag_set_tid_config_req(
+	    5, 0x01, 0, 1, 0, sizeof(bigData), bigData, msg);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -570,8 +570,8 @@ TEST(DiagPreBootTest, EncodeSetTidConfigReqAtTidCapBoundary)
 	std::vector<uint8_t> reqMsg(512);
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_tid_config_req(5, 0x01, 0, 1, 0, sizeof(data),
-						data, msg);
+	int rc = encode_nsm_diag_set_tid_config_req(5, 0x01, 0, 1, 0,
+						    sizeof(data), data, msg);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
@@ -623,8 +623,8 @@ TEST(DiagPreBootTest, DecodeSetSystemConfigReqTruncatedDataSize)
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
 	// Encode a valid request first to set up headers
-	int rc =
-	    encode_diag_set_system_config_req(5, 0x00, 0x01, nullptr, 0, msg);
+	int rc = encode_nsm_diag_set_system_config_req(5, 0x00, 0x01, nullptr,
+						       0, msg);
 	ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
 	// Corrupt data_size to be less than the two fixed fields
@@ -635,8 +635,8 @@ TEST(DiagPreBootTest, DecodeSetSystemConfigReqTruncatedDataSize)
 	    0; // less than sizeof(config_type) + sizeof(duration)
 
 	uint8_t config_type, duration, dyn_size;
-	rc = decode_diag_set_system_config_req(msg, reqMsg.size(), &config_type,
-					       &duration, &dyn_size, nullptr);
+	rc = decode_nsm_diag_set_system_config_req(
+	    msg, reqMsg.size(), &config_type, &duration, &dyn_size, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
@@ -647,8 +647,8 @@ TEST(DiagPreBootTest, DecodeSetSystemConfigReqOOBDynamicData)
 				    sizeof(nsm_diag_set_system_config_req) - 1);
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc =
-	    encode_diag_set_system_config_req(5, 0x00, 0x01, nullptr, 0, msg);
+	int rc = encode_nsm_diag_set_system_config_req(5, 0x00, 0x01, nullptr,
+						       0, msg);
 	ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
 	// Corrupt data_size to claim large dynamic data beyond buffer
@@ -659,8 +659,8 @@ TEST(DiagPreBootTest, DecodeSetSystemConfigReqOOBDynamicData)
 
 	uint8_t config_type, duration, dyn_size;
 	uint8_t dyn_data[256] = {};
-	rc = decode_diag_set_system_config_req(msg, reqMsg.size(), &config_type,
-					       &duration, &dyn_size, dyn_data);
+	rc = decode_nsm_diag_set_system_config_req(
+	    msg, reqMsg.size(), &config_type, &duration, &dyn_size, dyn_data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -729,7 +729,7 @@ TEST(DiagPreBootTest, DecodeSetTestResultEventOverProtocolCap)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
-/* C4: decode_diag_set_system_config_req must error when dynamic_data is
+/* C4: decode_nsm_diag_set_system_config_req must error when dynamic_data is
  * NULL but the message claims a non-zero dynamic payload. */
 TEST(DiagPreBootTest, DecodeSetSystemConfigReqNullBufferWithSize)
 {
@@ -739,17 +739,17 @@ TEST(DiagPreBootTest, DecodeSetSystemConfigReqNullBufferWithSize)
 				    sizeof(dynamic_data));
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_system_config_req(5, 0, 0x01, dynamic_data,
-						   sizeof(dynamic_data), msg);
+	int rc = encode_nsm_diag_set_system_config_req(
+	    5, 0, 0x01, dynamic_data, sizeof(dynamic_data), msg);
 	ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
 	uint8_t config_type, duration, dyn_size;
-	rc = decode_diag_set_system_config_req(msg, reqMsg.size(), &config_type,
-					       &duration, &dyn_size, nullptr);
+	rc = decode_nsm_diag_set_system_config_req(
+	    msg, reqMsg.size(), &config_type, &duration, &dyn_size, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
-/* C4: decode_diag_set_tid_config_req must error when dynamic_data is
+/* C4: decode_nsm_diag_set_tid_config_req must error when dynamic_data is
  * NULL but the message claims a non-zero dynamic payload. */
 TEST(DiagPreBootTest, DecodeSetTidConfigReqNullBufferWithSize)
 {
@@ -759,14 +759,70 @@ TEST(DiagPreBootTest, DecodeSetTidConfigReqNullBufferWithSize)
 				    sizeof(dynamic_data));
 	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
 
-	int rc = encode_diag_set_tid_config_req(
+	int rc = encode_nsm_diag_set_tid_config_req(
 	    5, 0x01, 0x01, 1, 0, sizeof(dynamic_data), dynamic_data, msg);
 	ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
 	uint8_t tid, duration, log_level, dyn_size;
 	uint16_t loops;
-	rc = decode_diag_set_tid_config_req(msg, reqMsg.size(), &tid, &duration,
-					    &loops, &log_level, &dyn_size,
-					    nullptr);
+	rc = decode_nsm_diag_set_tid_config_req(msg, reqMsg.size(), &tid,
+						&duration, &loops, &log_level,
+						&dyn_size, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+/* decode_nsm_diag_set_system_config_req derives the dynamic size from
+ * hdr.data_size, which can claim up to 253 dynamic bytes — more than the
+ * NSM_DIAG_MAX_DYNAMIC_DATA_SIZE (251) buffer callers provide. A crafted
+ * message must be rejected before any copy. */
+TEST(DiagPreBootTest, DecodeSetSystemConfigReqOversizeDynamicData)
+{
+	/* Message long enough that the wire-level "available" check alone
+	 * would pass; only the protocol cap catches the oversize claim. */
+	std::vector<uint8_t> reqMsg(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_diag_set_system_config_req) - 1 +
+				    UINT8_MAX);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
+
+	int rc =
+	    encode_nsm_diag_set_system_config_req(5, 0, 0x01, nullptr, 0, msg);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto *request =
+	    reinterpret_cast<struct nsm_diag_set_system_config_req *>(
+		msg->payload);
+	request->hdr.data_size = UINT8_MAX; /* => 253 dynamic bytes */
+
+	uint8_t config_type, duration, dyn_size;
+	uint8_t dyn_data[NSM_DIAG_MAX_DYNAMIC_DATA_SIZE] = {};
+	rc = decode_nsm_diag_set_system_config_req(
+	    msg, reqMsg.size(), &config_type, &duration, &dyn_size, dyn_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+/* Same guard for the TID config decoder: the explicit wire byte can claim
+ * up to 255 dynamic bytes, above the NSM_DIAG_MAX_TID_DYNAMIC_DATA_SIZE
+ * (244) cap. */
+TEST(DiagPreBootTest, DecodeSetTidConfigReqOversizeDynamicData)
+{
+	std::vector<uint8_t> reqMsg(sizeof(nsm_msg_hdr) +
+				    sizeof(nsm_diag_set_tid_config_req) - 1 +
+				    UINT8_MAX);
+	auto *msg = reinterpret_cast<struct nsm_msg *>(reqMsg.data());
+
+	int rc = encode_nsm_diag_set_tid_config_req(5, 0x01, 0x01, 1, 0, 0,
+						    nullptr, msg);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto *request = reinterpret_cast<struct nsm_diag_set_tid_config_req *>(
+	    msg->payload);
+	request->dynamic_data_size = UINT8_MAX;
+
+	uint8_t tid, duration, log_level, dyn_size;
+	uint16_t loops;
+	uint8_t dyn_data[NSM_DIAG_MAX_TID_DYNAMIC_DATA_SIZE] = {};
+	rc = decode_nsm_diag_set_tid_config_req(msg, reqMsg.size(), &tid,
+						&duration, &loops, &log_level,
+						&dyn_size, dyn_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

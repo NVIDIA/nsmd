@@ -1,0 +1,299 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# dgx/bmc/nsmd — self-contained review config.
+# Combines: (a) the generic procedure guidelines (evidence-first, concurrency model,
+# prod-vs-test, cross-repo contracts, severity discipline) from the shared-config
+# proposal, (b) nsmd repo facts (directory roles, NSM wire conventions, linked repos),
+# and (c) the OpenBMC commit-message / contributing-guideline / anti-pattern checks
+# piloted on dgx/bmc/pldm (CM*/CG*/AP* rule IDs shared with that repo).
+# Base settings (tone, profile, chat, summaries, auto_review) inherit from
+# dgx/bmc/coderabbit via inheritance: true.
+
+inheritance: true
+
+reviews:
+    path_filters:
+        - "!subprojects/**"
+
+    path_instructions:
+        - path: "**/*"
+          instructions: |
+              ## Evidence-first review
+
+              Before raising any actionable comment, verify the claim against the
+              full changed file plus relevant declarations, headers, helpers,
+              build configuration, and callers. Do not reason from the diff hunk
+              alone. Quote the specific code, file:line, or documented contract
+              that supports the claim. If you cannot find supporting evidence,
+              ask a non-blocking question instead of asserting a defect.
+
+              Review new or modified behavior. Do not flag pre-existing code
+              unless the MR touches it or the changed code newly depends on it.
+
+              ## Concurrency model
+
+              Determine the runtime concurrency model and execution environment
+              of the component under review before flagging thread-safety issues
+              or suggesting multi-threaded optimizations. nsmd is a
+              single-threaded sdbusplus/asio cooperative-coroutine daemon
+              (multithreading does not compose with systemd D-Bus services);
+              do not flag std::localtime, lazy initialization, check-then-set
+              flags, or shared member state as thread-unsafe unless the changed
+              code introduces a concrete concurrent execution path (std::thread,
+              worker pools, callbacks on different execution contexts, or
+              async/co_await interleaving where inconsistent state is actually
+              observable). If no such path is visible, ask instead of asserting.
+
+              ## Production vs test code
+
+              Identify whether the code under review is production, test, mock,
+              or simulation infrastructure before applying production-grade
+              standards. Do not demand production-level error handling,
+              leak/null-deref hardening, or thread-safety in test, mock, or
+              simulator code unless there is a clear production execution path.
+
+              ## Cross-repo contracts
+
+              D-Bus interface and property types, hardware configuration
+              (entity-manager), and shared-memory contracts are defined in
+              sibling repos. Before flagging a property type, config key name or
+              case, unit, or value as wrong, check the defining repo or ask a
+              non-blocking question; do not assert from the local diff alone.
+
+              ## Severity discipline
+
+              Reserve Major/Critical for provable correctness, security,
+              memory-safety, protocol, or production reliability issues. Style
+              and preference items - const on by-value parameters, naming,
+              comments, Doxygen, local-vs-shared helper choice, refactor
+              preferences, stronger test assertions - are nitpicks only, never
+              Potential issue/Major/Critical.
+
+              ## Commit message checks (applied to every file in the diff)
+
+              **CM1** Subject line must be <= 50 characters.
+              **CM2** Body lines must be <= 72 characters (URLs exempt).
+              **CM3** Subject must start with a component prefix and colon,
+              e.g. `nsmd: fix foo` not `fix foo`.
+              **CM4** Body must explain WHY the change is made, not just what.
+              Flag if the body is absent, or if every sentence starts with
+              an action verb ("Add", "Change", "Fix", "Remove", "Update")
+              with no sentence explaining the motivation or problem being
+              solved.
+              **CM5** A "Tested:" field is required describing how the change
+              was verified (unit tests run, manual steps, hardware used).
+              **CM6** Each commit must make exactly one logical change.
+              Warn if a single commit touches files across more than 2
+              unrelated top-level directories with no explanation of the
+              connection in the commit body.
+              **CM7** Warn if any single commit in this MR adds or removes
+              more than 200 lines, excluding files under `test/` or `tests/`
+              directories, auto-generated files, lock files, and vendored code.
+
+        - path: "**/*.{cpp,hpp,c,h}"
+          instructions: |
+              ## OpenBMC Contributing Guidelines (flag any match in new or modified code)
+
+              **CG1 - SPDX headers**
+              Every new file must have exactly these two lines at the top:
+              `// SPDX-License-Identifier: Apache-2.0`
+              `// SPDX-FileCopyrightText: Copyright OpenBMC Authors`
+              Flag missing, incorrect, or non-SPDX copyright blocks.
+
+              **CG3a - Use `size_t`/`ssize_t` for sizes and counts**
+              Flag `uint32_t`, `uint64_t`, `int`, `long` etc. used for
+              variables or fields whose name indicates a size, count, length,
+              or index (`size`, `count`, `len`, `length`, `num`, `index`,
+              `idx`, `offset`, `stride`). These must use `size_t` or
+              `ssize_t` - not a fixed-width or plain type.
+              Exception: NSM wire-protocol structs and libnsm encode/decode
+              signatures, where field widths are spec-mandated.
+
+              **CG3b - Fixed-width types only at hardware/ABI boundaries**
+              Flag `uint8_t`, `uint16_t`, `uint32_t`, `int64_t` etc. used
+              in general-purpose logic where no hardware register, wire
+              protocol, syscall, or external library ABI is involved.
+              Prefer `int` or `size_t` for ordinary variables. Note: libnsm
+              and NSM message handling ARE wire-protocol boundaries - sized
+              types there are correct by design.
+
+              **CG4 - `static` for internal-only functions**
+              Flag free functions defined in a `.cpp` file that do not appear
+              in any `.hpp` file and are missing the `static` keyword.
+
+              **CG6 - No references to non-public resources**
+              Flag any URLs, bug IDs, or document references that point to
+              internal systems (internal Jira, internal wikis, private repos).
+              Code must build from publicly available sources only.
+
+              **CG7 - D-Bus interface definitions in application code**
+              Flag code that registers or implements a new sdbusplus server
+              interface inline in application code. New interface definitions
+              belong in the phosphor-dbus-interfaces repository.
+              Do not flag caller/consumer code that merely references an
+              existing interface by name string for property reads, method
+              calls, or service map queries.
+
+              **CG8 - Unit tests required with testable changes**
+              Flag if the MR modifies logic files by more than 20 lines but
+              adds no new test files anywhere in the repo. Do not demand tests
+              for private helpers already exercised through public entry
+              points - check callers first.
+
+              **CG11 - Endianness at wire/storage boundaries**
+              Flag reads or writes to/from C types across wire or storage
+              boundaries that lack explicit endian conversion - but check the
+              libnsm encoder/decoder pair first: conversions are usually
+              applied once inside encode_*/decode_* helpers, and callers must
+              NOT convert again. nsmd targets little-endian ARM BMCs; do not
+              flag a missing htole*/le*toh as a defect when the encode/decode
+              layer already handles it.
+
+              ## OpenBMC Anti-patterns (flag any match in new or modified code)
+
+              **AP1 - Custom ArgumentParser**
+              Flag any hand-rolled ArgumentParser class. Resolution: use CLI11.
+
+              **AP5 - Swallowed unexpected exceptions**
+              Flag `catch(...)` or `catch(std::exception&)` blocks that call
+              `commit<>()` or `log()` without a rethrow or `std::terminate`.
+              Resolution: let unexpected exceptions propagate or crash so the
+              system can recover via systemd restart. (Test code is exempt -
+              see the test-path rules.)
+
+              **AP6 - Non-standard debug flags**
+              Flag any CLI flag other than `-v` / `--verbose` used to enable
+              verbose logging. Flag use of `std::cout` / `printf` for debug
+              output instead of `journald` debug level.
+
+              **AP7 - Inline D-Bus interface registration**
+              Flag if the same file both registers a sdbusplus server interface
+              and calls hardware APIs (gpiod, i2c, spi, etc.). Interface
+              definitions belong in phosphor-dbus-interfaces, not inline in
+              application code alongside hardware calls.
+
+              **AP8 - Oversized lambda callbacks**
+              Flag inline lambdas passed to `sdbusplus::asio::`,
+              `boost::asio::`, or any `*_async()` call that exceed more than
+              10 lines. Resolution: extract to a named static/free function
+              and pass via `std::bind_front`.
+
+              **AP9 - Internal headers in a parallel subtree**
+              Flag any `.hpp` file placed under a separate `include/`
+              directory when it is not part of a public API. Internal headers
+              belong alongside their corresponding `.cpp` implementation.
+
+              **AP10 - Ill-structured lg2 messages**
+              Flag ad-hoc metadata encoding inside the MESSAGE string
+              (e.g. `"PATH={X} INTF={Y}"`). Resolution: pass each datum as a
+              structured key-value argument to lg2; interpolate into MESSAGE
+              only for human readability.
+
+              **AP11 - Blocking call in single-threaded daemon**
+              Flag any call to `sleep()`, `usleep()`,
+              `std::this_thread::sleep_for()`, `std::this_thread::sleep_until()`,
+              `getaddrinfo()`, or blocking `read()`/`write()` without
+              `O_NONBLOCK` inside a completion handler, coroutine, or any
+              function reachable from the sdbusplus/asio event loop.
+              nsmd runs a single-threaded event loop; a blocking call freezes
+              the entire daemon. Resolution: use `boost::asio::steady_timer`
+              for delays and async I/O for file descriptors.
+
+        - path: "{nsmd,common,dot,debug-token,requester}/**"
+          instructions: |
+              Repo fact: production nsmd code runs on a single sdbusplus/asio
+              cooperative-coroutine event loop (one OS thread). Apply the
+              concurrency-model guideline with that model in mind.
+
+        - path: "mockupResponder/**"
+          instructions: |
+              Repo fact: mockupResponder is test/simulation infrastructure, not
+              production nsmd. Apply the production-vs-test guideline
+              accordingly. Advertising a command in supportedCommands before its
+              handler exists can be intentional; the default path returns
+              NSM_ERR_UNSUPPORTED_COMMAND_CODE.
+
+        - path: "libnsm/**"
+          instructions: |
+              ## NSM protocol encoder/decoder review
+
+              libnsm implements NSM wire protocol encoders and decoders.
+
+              Enum numeric values, field widths, payload sizes, flexible-array
+              layouts, and endian handling are often protocol-mandated. Do not
+              call these wire breaks without checking the local encoder/decoder
+              pair, caller allocation, and NSM contract.
+
+              Decoders often perform structural validation while semantic
+              validation may live in encoders or callers. Do not demand
+              symmetric semantic validation unless the local contract requires
+              it.
+
+              A trailing [1] or bitfield8_t[1] member means sizeof already
+              includes one element. Flexible-array formulas of the form
+              sizeof(struct) - sizeof(one_element) + N * sizeof(one_element)
+              are expected when the caller allocates that payload size.
+
+        - path: "requester/**"
+          instructions: |
+              Repo fact: failed MCTP send/sendto paths are real delivery
+              failures and may intentionally log at error severity. Do not
+              suggest downgrading failed sends to warnings unless the caller
+              has a documented retry/recovery path.
+
+        - path: "**/test*/**"
+          instructions: |
+              Test code may intentionally be branch-coverage, smoke, or
+              sanitizer-cleanup tests. EXPECT_NO_THROW, empty catch blocks, or
+              asserting only non-zero/non-empty can be acceptable when the
+              purpose is to exercise a path cleanly. Suggest stronger assertions
+              as nitpicks, not defects. Empty or weak tests that pre-date the MR
+              are not the MR's issue.
+
+        - path: "**/*.service"
+          instructions: |
+              ## OpenBMC Anti-patterns - systemd units
+
+              **AP3 - /usr/bin/env in ExecStart**
+              Flag `ExecStart=/usr/bin/env <app>`. Resolution: use the fully
+              qualified path.
+
+              **AP4 - Wrong executable location**
+              If a binary has a corresponding `.service` file it is a daemon
+              and must use `/usr/libexec/<package>/` in `ExecStart`.
+              Flag `ExecStart` pointing to `/usr/bin/` or `/usr/sbin/` for
+              such binaries. Never use `/usr/sbin/`.
+
+              **CG9 - Missing Wants/After dependencies**
+              Flag systemd units that start services with D-Bus or filesystem
+              dependencies but omit `Wants=` / `After=` ordering for them.
+
+        - path: "**/*.md"
+          instructions: |
+              Markdown style issues such as missing fenced-code language tags
+              are nitpicks only. Do not raise Markdown lint/style as Potential
+              issue, Major, or Critical.
+
+knowledge_base:
+    code_guidelines:
+        enabled: true
+        filePatterns:
+            - "docs/nsmd-review-context.md"
+
+    linked_repositories:
+        - repository: "dgx/bmc/phosphor-dbus-interfaces"
+          instructions: >
+              Canonical D-Bus interface and property TYPE definitions that nsmd implements and
+              consumes (e.g. Metric Value is a double). Check the interface YAML here before
+              flagging a D-Bus property type, name, or signature - for example, do not warn about
+              uint64 to double precision loss when the interface type is double.
+        - repository: "dgx/bmc/entity-manager"
+          instructions: >
+              EntityManager hardware configuration JSON that drives nsmd (device-type strings,
+              sensor and threshold config). Check the EM configs here before flagging a config key
+              name, case, or value - for example, DebugTokenDeviceType is "ERoT" (mixed case), not "EROT".
+        - repository: "dgx/bmc/nv-shmem"
+          instructions: >
+              NVIDIA shared-memory namespace and mapping definitions that nsmd publishes telemetry
+              into. Check the shmem namespace/mapping config here before flagging nsmd's
+              updateMetricOnSharedMemory usage or which metrics must be published to shared memory.

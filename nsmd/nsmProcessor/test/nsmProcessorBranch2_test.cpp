@@ -42,6 +42,8 @@ using namespace ::testing;
 #include "device-configuration.h"
 #include "platform-environmental.h"
 
+#include <limits>
+
 #define private public
 #define protected public
 
@@ -634,6 +636,64 @@ TEST_F(NsmProcessorBranch2Test, CurrClockFreq_HandleResp_DecodeFail)
     auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
     auto rc = sensor.handleResponseMsg(msg, buf.size());
     EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmProcessorBranch2Test, CurrClockFreq_Ctor_SeedsSentinel)
+{
+    auto cpuConfigIntf = std::make_shared<CpuOperatingConfigIntf>(
+        bus(), inventoryObjPath.c_str());
+    NsmCurrClockFreq sensor(sensorName, sensorType, cpuConfigIntf,
+                            inventoryObjPath);
+    // Constructor seeds the "not available" marker before any poll.
+    EXPECT_EQ(sensor.cpuOperatingConfigIntf->operatingSpeed(),
+              std::numeric_limits<uint32_t>::max());
+}
+
+TEST_F(NsmProcessorBranch2Test, CurrClockFreq_FailAfterValid_RestoresSentinel)
+{
+    auto cpuConfigIntf = std::make_shared<CpuOperatingConfigIntf>(
+        bus(), inventoryObjPath.c_str());
+    NsmCurrClockFreq sensor(sensorName, sensorType, cpuConfigIntf,
+                            inventoryObjPath);
+
+    // A valid reading first.
+    std::vector<uint8_t> okMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_curr_clock_freq_resp), 0);
+    auto okResp = reinterpret_cast<nsm_msg*>(okMsg.data());
+    uint32_t clockFreq = 1500;
+    ASSERT_EQ(encode_get_curr_clock_freq_resp(0, NSM_SUCCESS, ERR_NULL,
+                                              &clockFreq, okResp),
+              NSM_SW_SUCCESS);
+    ASSERT_EQ(sensor.handleResponseMsg(okResp, okMsg.size()), NSM_SW_SUCCESS);
+    ASSERT_EQ(sensor.cpuOperatingConfigIntf->operatingSpeed(), 1500u);
+
+    // A failed poll must rewrite the property back to the marker.
+    std::vector<uint8_t> errMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_curr_clock_freq_resp), 0);
+    auto errResp = reinterpret_cast<nsm_msg*>(errMsg.data());
+    uint32_t zero = 0;
+    ASSERT_EQ(
+        encode_get_curr_clock_freq_resp(0, NSM_ERROR, ERR_NULL, &zero, errResp),
+        NSM_SW_SUCCESS);
+    sensor.handleResponseMsg(errResp, errMsg.size());
+    EXPECT_EQ(sensor.cpuOperatingConfigIntf->operatingSpeed(),
+              std::numeric_limits<uint32_t>::max());
+}
+
+TEST_F(NsmProcessorBranch2Test, CurrClockFreq_Update_TransportError_Sentinel)
+{
+    auto cpuConfigIntf = std::make_shared<CpuOperatingConfigIntf>(
+        bus(), inventoryObjPath.c_str());
+    NsmCurrClockFreq sensor(sensorName, sensorType, cpuConfigIntf,
+                            inventoryObjPath);
+    // Prior valid reading, then a transport failure (no response): the poll
+    // never reaches handleResponseMsg, so update() must stamp the marker.
+    cpuConfigIntf->operatingSpeed(1500);
+    EXPECT_CALL(*gpu, sensorIO(_, _, _, _, _))
+        .WillOnce(mockSensorIO(NSM_ERROR));
+    EXPECT_NO_THROW(sensor.update(gpu));
+    EXPECT_EQ(sensor.cpuOperatingConfigIntf->operatingSpeed(),
+              std::numeric_limits<uint32_t>::max());
 }
 
 // ============================================================================

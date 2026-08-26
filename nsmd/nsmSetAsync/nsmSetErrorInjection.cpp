@@ -104,56 +104,175 @@ requester::Coroutine
     co_return cc ? cc : rc;
 }
 
-NsmSetErrorInjectionEnabled::NsmSetErrorInjectionEnabled(
-    const std::string& name, ErrorInjectionCapabilityIntf::Type type,
-    SensorManager& manager,
-    const Interfaces<ErrorInjectionCapabilityIntf>& interfaces) :
+NsmSetErrorInjectionCapabilities::NsmSetErrorInjectionCapabilities(
+    const std::string& name, SensorManager& manager,
+    const Interfaces<ErrorInjectionCapabilityIntf>& interfaces,
+    std::shared_ptr<NsmErrorInjectionEnabled> enabledSensor) :
     NsmInterfaceContainer<ErrorInjectionCapabilityIntf>(interfaces),
-    NsmObject(name, "NSM_ErrorInjectionCapability"), type(type),
-    manager(manager)
+    NsmObject(name, "NSM_ErrorInjectionCapability"), manager(manager),
+    enabledSensor(std::move(enabledSensor))
 {
-    if (type == ErrorInjectionCapabilityIntf::Type::Unknown)
+    if (!this->enabledSensor)
     {
         throw std::invalid_argument(
-            "NsmSetErrorInjectionEnabled::ctor: PDI type cannot be Unknown");
+            "NsmSetErrorInjectionCapabilities: enabledSensor cannot be null");
     }
 }
 
-requester::Coroutine NsmSetErrorInjectionEnabled::enabled(
+std::optional<ErrorInjectionCapabilityIntf::Type>
+    NsmSetErrorInjectionCapabilities::resolveTypeName(const std::string& name)
+{
+    // Match against types registered on this device, not the full enum, so a
+    // capability the device does not expose is rejected.
+    std::optional<ErrorInjectionCapabilityIntf::Type> resolved;
+    invoke([&resolved, &name](const auto& pdi) {
+        auto type = pdi.type();
+        if (type == ErrorInjectionCapabilityIntf::Type::Unknown)
+        {
+            return;
+        }
+        auto typeName = ErrorInjectionCapabilityIntf::convertTypeToString(type);
+        typeName = typeName.substr(typeName.find_last_of('.') + 1);
+        if (typeName == name)
+        {
+            resolved = type;
+        }
+    });
+    return resolved;
+}
+
+requester::Coroutine NsmSetErrorInjectionCapabilities::capabilitiesEnabled(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    const auto enabledValue = std::get_if<bool>(&value);
+    const auto* entries = std::get_if<std::vector<
+        std::tuple<std::string, std::variant<bool, uint32_t, double,
+                                             std::vector<uint8_t>>>>>(&value);
 
-    if (!enabledValue)
+    if (!entries)
     {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+        lg2::error(
+            "capabilitiesEnabled: expected an array of (name, bool) entries");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR_DATA;
     }
+
+    if (entries->empty())
+    {
+        lg2::error("capabilitiesEnabled: empty capability list");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR_DATA;
+    }
+
+    // Validate the whole batch before touching the device, tracking conflicts
+    // by mask bit rather than type so aliased types cannot disagree.
+    std::map<ErrorInjectionCapabilityIntf::Type, bool> overrides;
+    std::map<uint8_t, bool> requestedBits;
+    for (const auto& [name, entryValue] : *entries)
+    {
+        const auto* enabledValue = std::get_if<bool>(&entryValue);
+        if (!enabledValue)
+        {
+            lg2::error("capabilitiesEnabled: value for {NAME} is not a boolean",
+                       "NAME", name);
+            *status = AsyncOperationStatusType::InvalidArgument;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_DATA;
+        }
+
+        auto type = resolveTypeName(name);
+        if (!type)
+        {
+            lg2::error(
+                "capabilitiesEnabled: unsupported capability type {NAME}",
+                "NAME", name);
+            *status = AsyncOperationStatusType::InvalidArgument;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_DATA;
+        }
+
+        // One bit asked to be both set and cleared is a conflict; repeating a
+        // bit with the same value stays valid so snapshots are idempotent.
+        auto bitPos = getErrorInjectionBitPosition(*type);
+        auto [bitIt, bitInserted] = requestedBits.emplace(bitPos,
+                                                          *enabledValue);
+        if (!bitInserted && bitIt->second != *enabledValue)
+        {
+            lg2::error(
+                "capabilitiesEnabled: conflicting values requested for capability {NAME}",
+                "NAME", name);
+            *status = AsyncOperationStatusType::InvalidArgument;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_DATA;
+        }
+
+        overrides[*type] = *enabledValue;
+    }
+
     // coverity[missing_return]
-    co_return co_await setEnabled(*enabledValue, *status, device);
+    co_return co_await applyEnabledOverrides(overrides, *status, device);
 }
 
-requester::Coroutine
-    NsmSetErrorInjectionEnabled::setEnabled(bool value,
-                                            AsyncOperationStatusType& status,
-                                            std::shared_ptr<NsmDevice> device)
+requester::Coroutine NsmSetErrorInjectionCapabilities::applyEnabledOverrides(
+    const std::map<ErrorInjectionCapabilityIntf::Type, bool>& overrides,
+    AsyncOperationStatusType& status, std::shared_ptr<NsmDevice> device)
+{
+    // Queue behind any in-flight mask write. writeMask() reads the mask back
+    // and republishes it before releasing, so each waiter seeds from what the
+    // device actually holds rather than from pre-write state.
+    co_await maskSemaphore.acquire(device->getEid());
+    uint8_t rc = NSM_SW_ERROR;
+    try
+    {
+        rc = co_await writeMask(overrides, status, device);
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("applyEnabledOverrides: Exception during writeMask: {ERROR}",
+                   "ERROR", e.what());
+        status = AsyncOperationStatusType::WriteFailure;
+        rc = NSM_SW_ERROR;
+    }
+    // Released on exactly one path, so a throw cannot leak the lock and a
+    // double release cannot hand it to two waiters at once.
+    maskSemaphore.release();
+    // coverity[missing_return]
+    co_return rc;
+}
+
+requester::Coroutine NsmSetErrorInjectionCapabilities::writeMask(
+    const std::map<ErrorInjectionCapabilityIntf::Type, bool>& overrides,
+    AsyncOperationStatusType& status, std::shared_ptr<NsmDevice> device)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_set_error_injection_types_mask_req));
 
     auto eid = manager.getEid(device);
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    // Re-key overrides by mask bit, since several types share one bit. Keying
+    // by type would let an untouched alias whose PDI still reads true OR the
+    // bit back on and drop a disable.
+    std::map<uint8_t, bool> bitOverrides;
+    for (const auto& [type, enabled] : overrides)
+    {
+        bitOverrides[getErrorInjectionBitPosition(type)] = enabled;
+    }
+
+    // Seeded from every sibling's current state; bit positions are EI enum
+    // values, not D-Bus Type ordinals.
     nsm_error_injection_types_mask data = {0, 0, 0, 0, 0, 0, 0, 0};
-    invoke([&data, this, value](const auto& pdi) {
-        // Update the error injection mask using EI enum bit positions (not
-        // D-Bus Type ordinals). Multiple D-Bus types map to the same EI enum
-        // bit (e.g. FatalErrors, PortRecoveryErrors -> EI_DEVICE_ERRORS).
+    invoke([&data, &bitOverrides](const auto& pdi) {
         if (pdi.type() == ErrorInjectionCapabilityIntf::Type::Unknown)
         {
             return;
         }
         auto bitPos = getErrorInjectionBitPosition(pdi.type());
-        auto setValue = int(pdi.type() == this->type ? value : pdi.enabled());
+        auto found = bitOverrides.find(bitPos);
+        auto setValue = int(found != bitOverrides.end() ? found->second
+                                                        : pdi.enabled());
         data.mask[bitPos / 8] |= setValue << (bitPos % 8);
     });
     auto rc = encode_set_current_error_injection_types_v1_req(0, &data,
@@ -177,7 +296,7 @@ requester::Coroutine
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error(
-                "NsmSetErrorInjectionEnabled::setEnabled: postPatchIO failed."
+                "NsmSetErrorInjectionCapabilities::writeMask: postPatchIO failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", utils::nsmSwCodeToString(rc));
         }
@@ -194,12 +313,82 @@ requester::Coroutine
     if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
     {
         lg2::error(
-            "NsmSetErrorInjectionEnabled::setEnabled: decode_set_current_error_injection_types_v1_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NsmSetErrorInjectionCapabilities::writeMask: decode_set_current_error_injection_types_v1_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
     }
+    else
+    {
+        // Reuse the polling sensor's read flow: update() issues the same
+        // GetCurrentErrorInjectionTypes and republishes every PDI from the
+        // response. setImpl runs the same refresh after the handler returns;
+        // repeating it here, inside the lock, is what lets the next waiter
+        // reseed from device state instead of from what we asked for.
+        const auto readRc = co_await enabledSensor->update(device);
+        if (readRc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "NsmSetErrorInjectionCapabilities::writeMask: read-back failed, publishing the acknowledged mask. eid={EID} rc={RC}",
+                "EID", eid, "RC", readRc);
+            invoke([&data](auto& pdi) {
+                if (pdi.type() == ErrorInjectionCapabilityIntf::Type::Unknown)
+                {
+                    return;
+                }
+                auto bitPos = getErrorInjectionBitPosition(pdi.type());
+                pdi.enabled((data.mask[bitPos / 8] & (1 << (bitPos % 8))) != 0);
+            });
+        }
+    }
     // coverity[missing_return]
     co_return cc ? cc : rc;
+}
+
+NsmSetErrorInjectionEnabled::NsmSetErrorInjectionEnabled(
+    const std::string& name, ErrorInjectionCapabilityIntf::Type type,
+    const Interfaces<ErrorInjectionCapabilityIntf>& interfaces,
+    std::shared_ptr<NsmSetErrorInjectionCapabilities> capabilities) :
+    NsmInterfaceContainer<ErrorInjectionCapabilityIntf>(interfaces),
+    NsmObject(name, "NSM_ErrorInjectionCapability"), type(type),
+    capabilities(std::move(capabilities))
+{
+    if (type == ErrorInjectionCapabilityIntf::Type::Unknown)
+    {
+        throw std::invalid_argument(
+            "NsmSetErrorInjectionEnabled::ctor: PDI type cannot be Unknown");
+    }
+    if (!this->capabilities)
+    {
+        throw std::invalid_argument(
+            "NsmSetErrorInjectionEnabled::ctor: capabilities cannot be null");
+    }
+}
+
+requester::Coroutine NsmSetErrorInjectionEnabled::enabled(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const auto enabledValue = std::get_if<bool>(&value);
+
+    if (!enabledValue)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+    // coverity[missing_return]
+    co_return co_await setEnabled(*enabledValue, *status, device);
+}
+
+requester::Coroutine
+    NsmSetErrorInjectionEnabled::setEnabled(bool value,
+                                            AsyncOperationStatusType& status,
+                                            std::shared_ptr<NsmDevice> device)
+{
+    // Single-type patches are just a one-entry batch. Routing them through the
+    // same owner keeps one read-modify-write implementation and one lock, so a
+    // per-type write and a batch write cannot interleave.
+    // coverity[missing_return]
+    co_return co_await capabilities->applyEnabledOverrides({{type, value}},
+                                                           status, device);
 }
 
 NsmSetErrorInjectionPayload::NsmSetErrorInjectionPayload(

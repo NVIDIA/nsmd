@@ -3,6 +3,7 @@
 #include "platform-environmental.h"
 
 #include "../../common/coroutine.hpp"
+#include "../../common/telemetryTombstone.hpp"
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "interfaceWrapper.hpp"
@@ -21,6 +22,9 @@
 
 namespace nsm
 {
+
+using RowRemapFailureState = MemoryRowRemappingIntf::RowRemappingFailureStates;
+using RowRemapPendingState = MemoryRowRemappingIntf::RowRemappingPendingStates;
 
 NsmMemoryErrorCorrection::NsmMemoryErrorCorrection(
     std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf,
@@ -129,26 +133,32 @@ void NsmRowRemapState::updateMetricOnSharedMemory()
     auto ifaceName = std::string(memoryRowRemappingStateIntf->interface);
     std::vector<uint8_t> smbusData = {};
 
-    nv::sensor_aggregation::DbusVariantType rowRemappingFailureStateVal{
-        memoryRowRemappingStateIntf->rowRemappingFailureState()};
+    // Publish the enum as its D-Bus string; nv-shmem maps True/False/Unknown
+    // to the true/false/null MetricValue. Keeps shmem the same shape as D-Bus.
+    nv::sensor_aggregation::DbusVariantType rowRemappingFailed{
+        memoryRowRemappingStateIntf->convertRowRemappingFailureStatesToString(
+            memoryRowRemappingStateIntf->rowRemappingFailureState())};
     std::string propName = "RowRemappingFailureState";
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData,
-        rowRemappingFailureStateVal);
+        inventoryObjPath, ifaceName, propName, smbusData, rowRemappingFailed);
 
-    nv::sensor_aggregation::DbusVariantType rowRemappingPendingStateVal{
-        memoryRowRemappingStateIntf->rowRemappingPendingState()};
+    nv::sensor_aggregation::DbusVariantType rowRemappingPending{
+        memoryRowRemappingStateIntf->convertRowRemappingPendingStatesToString(
+            memoryRowRemappingStateIntf->rowRemappingPendingState())};
     propName = "RowRemappingPendingState";
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData,
-        rowRemappingPendingStateVal);
+        inventoryObjPath, ifaceName, propName, smbusData, rowRemappingPending);
 #endif
 }
 
 void NsmRowRemapState::updateReading(bitfield8_t flags)
 {
-    memoryRowRemappingStateIntf->rowRemappingFailureState(flags.bits.bit0);
-    memoryRowRemappingStateIntf->rowRemappingPendingState(flags.bits.bit1);
+    memoryRowRemappingStateIntf->rowRemappingFailureState(
+        flags.bits.bit0 ? RowRemapFailureState::True
+                        : RowRemapFailureState::False);
+    memoryRowRemappingStateIntf->rowRemappingPendingState(
+        flags.bits.bit1 ? RowRemapPendingState::True
+                        : RowRemapPendingState::False);
     updateMetricOnSharedMemory();
 }
 
@@ -200,7 +210,8 @@ NsmRowRemappingCounts::NsmRowRemappingCounts(
     lg2::info("NsmRowRemappingCount: create sensor:{NAME}", "NAME",
               name.c_str());
     memoryRowRemappingCountsIntf = memoryRowRemappingIntf;
-    updateMetricOnSharedMemory();
+    // Seed the markers so never-polled counts are not published as 0.
+    publishTelemetryUnavailable();
 }
 
 void NsmRowRemappingCounts::updateMetricOnSharedMemory()
@@ -209,17 +220,25 @@ void NsmRowRemappingCounts::updateMetricOnSharedMemory()
     auto ifaceName = std::string(memoryRowRemappingCountsIntf->interface);
     std::vector<uint8_t> smbusData = {};
 
-    nv::sensor_aggregation::DbusVariantType ceRowRemappingCount{
-        memoryRowRemappingCountsIntf->ceRowRemappingCount()};
+    auto ce = memoryRowRemappingCountsIntf->ceRowRemappingCount();
+    nv::sensor_aggregation::DbusVariantType ceRowRemappingCount{ce};
     std::string propName = "ceRowRemappingCount";
+    uint8_t ceRc = (ce == Sentinel<uint32_t>::notAvailable)
+                       ? TELEMETRY_NOT_AVAILABLE
+                       : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, ceRowRemappingCount);
+        inventoryObjPath, ifaceName, propName, smbusData, ceRowRemappingCount,
+        "", ceRc);
 
+    auto ue = memoryRowRemappingCountsIntf->ueRowRemappingCount();
     propName = "ueRowRemappingCount";
-    nv::sensor_aggregation::DbusVariantType ueRowRemappingCount{
-        memoryRowRemappingCountsIntf->ueRowRemappingCount()};
+    nv::sensor_aggregation::DbusVariantType ueRowRemappingCount{ue};
+    uint8_t ueRc = (ue == Sentinel<uint32_t>::notAvailable)
+                       ? TELEMETRY_NOT_AVAILABLE
+                       : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, ueRowRemappingCount);
+        inventoryObjPath, ifaceName, propName, smbusData, ueRowRemappingCount,
+        "", ueRc);
 #endif
 }
 
@@ -228,6 +247,15 @@ void NsmRowRemappingCounts::updateReading(uint32_t correctable_error,
 {
     memoryRowRemappingCountsIntf->ceRowRemappingCount(correctable_error);
     memoryRowRemappingCountsIntf->ueRowRemappingCount(uncorrectable_error);
+    updateMetricOnSharedMemory();
+}
+
+void NsmRowRemappingCounts::publishTelemetryUnavailable()
+{
+    memoryRowRemappingCountsIntf->ceRowRemappingCount(
+        Sentinel<uint32_t>::notAvailable);
+    memoryRowRemappingCountsIntf->ueRowRemappingCount(
+        Sentinel<uint32_t>::notAvailable);
     updateMetricOnSharedMemory();
 }
 
@@ -281,7 +309,8 @@ NsmRemappingAvailabilityBankCount::NsmRemappingAvailabilityBankCount(
 {
     lg2::info("NsmRemappingAvailabilityBankCount: create sensor:{NAME}", "NAME",
               name.c_str());
-    updateMetricOnSharedMemory();
+    // Seed the markers so never-polled counts are not published as 0.
+    publishTelemetryUnavailable();
 }
 
 void NsmRemappingAvailabilityBankCount::updateReading(
@@ -292,6 +321,18 @@ void NsmRemappingAvailabilityBankCount::updateReading(
     rowRemapIntf->lowRemappingAvailablityBankCount(data.low_remapping);
     rowRemapIntf->noRemappingAvailablityBankCount(data.no_remapping);
     rowRemapIntf->partialRemappingAvailablityBankCount(data.partial_remapping);
+    updateMetricOnSharedMemory();
+}
+
+void NsmRemappingAvailabilityBankCount::publishTelemetryUnavailable()
+{
+    constexpr auto na = Sentinel<uint16_t>::notAvailable;
+    rowRemapIntf->highRemappingAvailablityBankCount(na);
+    rowRemapIntf->maxRemappingAvailablityBankCount(na);
+    rowRemapIntf->lowRemappingAvailablityBankCount(na);
+    rowRemapIntf->noRemappingAvailablityBankCount(na);
+    rowRemapIntf->partialRemappingAvailablityBankCount(na);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -328,7 +369,6 @@ uint8_t NsmRemappingAvailabilityBankCount::handleResponseMsg(
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(data);
-        updateMetricOnSharedMemory();
     }
     return cc ? cc : rc;
 }
@@ -338,42 +378,57 @@ void NsmRemappingAvailabilityBankCount::updateMetricOnSharedMemory()
 #ifdef NVIDIA_SHMEM
     auto ifaceName = std::string(rowRemapIntf->interface);
     std::vector<uint8_t> smbusData = {};
+    constexpr auto na = Sentinel<uint16_t>::notAvailable;
 
+    auto maxVal = rowRemapIntf->maxRemappingAvailablityBankCount();
     nv::sensor_aggregation::DbusVariantType maxRemappingAvailablityBankCount{
-        rowRemapIntf->maxRemappingAvailablityBankCount()};
+        maxVal};
     std::string propName = "MaxRemappingAvailablityBankCount";
+    uint8_t maxRc = (maxVal == na) ? TELEMETRY_NOT_AVAILABLE
+                                   : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
-        maxRemappingAvailablityBankCount);
+        maxRemappingAvailablityBankCount, "", maxRc);
 
+    auto highVal = rowRemapIntf->highRemappingAvailablityBankCount();
     propName = "HighRemappingAvailablityBankCount";
     nv::sensor_aggregation::DbusVariantType highRemappingAvailablityBankCount{
-        rowRemapIntf->highRemappingAvailablityBankCount()};
+        highVal};
+    uint8_t highRc = (highVal == na) ? TELEMETRY_NOT_AVAILABLE
+                                     : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
-        highRemappingAvailablityBankCount);
+        highRemappingAvailablityBankCount, "", highRc);
 
+    auto lowVal = rowRemapIntf->lowRemappingAvailablityBankCount();
     propName = "LowRemappingAvailablityBankCount";
     nv::sensor_aggregation::DbusVariantType lowRemappingAvailablityBankCount{
-        rowRemapIntf->lowRemappingAvailablityBankCount()};
+        lowVal};
+    uint8_t lowRc = (lowVal == na) ? TELEMETRY_NOT_AVAILABLE
+                                   : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
-        lowRemappingAvailablityBankCount);
+        lowRemappingAvailablityBankCount, "", lowRc);
 
+    auto partialVal = rowRemapIntf->partialRemappingAvailablityBankCount();
     propName = "PartialRemappingAvailablityBankCount";
     nv::sensor_aggregation::DbusVariantType
-        partialRemappingAvailablityBankCount{
-            rowRemapIntf->partialRemappingAvailablityBankCount()};
+        partialRemappingAvailablityBankCount{partialVal};
+    uint8_t partialRc = (partialVal == na) ? TELEMETRY_NOT_AVAILABLE
+                                           : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
-        partialRemappingAvailablityBankCount);
+        partialRemappingAvailablityBankCount, "", partialRc);
 
+    auto noVal = rowRemapIntf->noRemappingAvailablityBankCount();
     propName = "NoRemappingAvailablityBankCount";
     nv::sensor_aggregation::DbusVariantType noRemappingAvailablityBankCount{
-        rowRemapIntf->noRemappingAvailablityBankCount()};
+        noVal};
+    uint8_t noRc = (noVal == na) ? TELEMETRY_NOT_AVAILABLE
+                                 : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
-        noRemappingAvailablityBankCount);
+        noRemappingAvailablityBankCount, "", noRc);
 
 #endif
 }
@@ -385,7 +440,8 @@ NsmEccErrorCountsDram::NsmEccErrorCountsDram(
 
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
-    updateMetricOnSharedMemory();
+    // Seed the markers so never-polled counts are not published as 0.
+    publishTelemetryUnavailable();
 }
 
 void NsmEccErrorCountsDram ::updateMetricOnSharedMemory()
@@ -394,16 +450,23 @@ void NsmEccErrorCountsDram ::updateMetricOnSharedMemory()
     auto ifaceName = std::string(eccIntf->interface);
     std::vector<uint8_t> smbusData = {};
 
+    auto ce = static_cast<int64_t>(eccIntf->ceCount());
     std::string propName = "ceCount";
-    nv::sensor_aggregation::DbusVariantType ceCount{
-        static_cast<int64_t>(eccIntf->ceCount())};
+    nv::sensor_aggregation::DbusVariantType ceCount{ce};
+    uint8_t ceRc = (ce == Sentinel<int64_t>::notAvailable)
+                       ? TELEMETRY_NOT_AVAILABLE
+                       : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, ceCount);
+        inventoryObjPath, ifaceName, propName, smbusData, ceCount, "", ceRc);
+
+    auto ue = static_cast<int64_t>(eccIntf->ueCount());
     propName = "ueCount";
-    nv::sensor_aggregation::DbusVariantType ueCount{
-        static_cast<int64_t>(eccIntf->ueCount())};
+    nv::sensor_aggregation::DbusVariantType ueCount{ue};
+    uint8_t ueRc = (ue == Sentinel<int64_t>::notAvailable)
+                       ? TELEMETRY_NOT_AVAILABLE
+                       : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, ueCount);
+        inventoryObjPath, ifaceName, propName, smbusData, ueCount, "", ueRc);
 #endif
 }
 
@@ -412,6 +475,15 @@ void NsmEccErrorCountsDram::updateReading(
 {
     eccIntf->ceCount(errorCounts.dram_corrected);
     eccIntf->ueCount(errorCounts.dram_uncorrected);
+    updateMetricOnSharedMemory();
+}
+
+void NsmEccErrorCountsDram::publishTelemetryUnavailable()
+{
+    // Stamp the int64 marker on the int64 D-Bus properties directly; the wire
+    // struct's uint32 fields cannot represent the int64 marker.
+    eccIntf->ceCount(Sentinel<int64_t>::notAvailable);
+    eccIntf->ueCount(Sentinel<int64_t>::notAvailable);
     updateMetricOnSharedMemory();
 }
 
@@ -602,19 +674,22 @@ NsmMemCurrClockFreq::NsmMemCurrClockFreq(const std::string& name,
 {
     lg2::info("NsmMemCurrClockFreq: create sensor:{NAME}", "NAME",
               name.c_str());
-    updateMetricOnSharedMemory();
+    updateReading(Sentinel<uint16_t>::notAvailable);
 }
 
 void NsmMemCurrClockFreq::updateMetricOnSharedMemory()
 {
 #ifdef NVIDIA_SHMEM
     auto ifaceName = std::string(dimmIntf->interface);
-    nv::sensor_aggregation::DbusVariantType valueVariant{
-        dimmIntf->memoryConfiguredSpeedInMhz()};
+    auto speed = dimmIntf->memoryConfiguredSpeedInMhz();
+    nv::sensor_aggregation::DbusVariantType valueVariant{speed};
     std::vector<uint8_t> smbusData = {};
     std::string propName = "MemoryConfiguredSpeedInMhz";
+    uint8_t rc = (speed == Sentinel<uint16_t>::notAvailable)
+                     ? TELEMETRY_NOT_AVAILABLE
+                     : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
+        inventoryObjPath, ifaceName, propName, smbusData, valueVariant, "", rc);
 #endif
 }
 

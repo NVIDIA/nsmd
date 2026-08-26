@@ -12,6 +12,9 @@
 #include "nsmd/nsmCommon/nsmCommon.hpp"
 #include "utils.hpp"
 
+#include <com/nvidia/DeviceMode/LTXMode/server.hpp>
+#include <com/nvidia/DeviceMode/PowerCappingMode/server.hpp>
+#include <com/nvidia/DeviceMode/UPhyRecoveryMode/server.hpp>
 #include <com/nvidia/PowerMode/server.hpp>
 #include <com/nvidia/SwitchIsolation/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
@@ -38,6 +41,17 @@ using ResetDeviceIntf = sdbusplus::server::object_t<
 using L1PowerModeIntf = object_t<sdbusplus::com::nvidia::server::PowerMode>;
 using SwitchIsolationIntf =
     object_t<sdbusplus::server::com::nvidia::SwitchIsolation>;
+using PowerCappingModeServer =
+    sdbusplus::com::nvidia::DeviceMode::server::PowerCappingMode;
+using PowerCappingModeIntf = object_t<PowerCappingModeServer>;
+using PowerCapMode = PowerCappingModeServer::PowerCapMode;
+using LTXModeServer = sdbusplus::com::nvidia::DeviceMode::server::LTXMode;
+using LTXModeIntf = object_t<LTXModeServer>;
+using LTXModeEnum = LTXModeServer::LinkTrainingExtendedMode;
+using UPhyModeServer =
+    sdbusplus::com::nvidia::DeviceMode::server::UPhyRecoveryMode;
+using UPhyModeIntf = object_t<UPhyModeServer>;
+using UPhyModeEnum = UPhyModeServer::UPhyMode;
 using EnableIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::object::Enable>;
 
@@ -153,5 +167,88 @@ class NsmSwitchL1PredictionMode : public NsmSensor
     std::shared_ptr<EnableIntf> enableIntf;
     std::shared_ptr<AssociationDefinitionsInft> associationDefIntf;
     bool asyncPatchInProgress{false};
+};
+
+/** @brief Power-capping mode using NSM Type 5 Device Mode index 27. */
+class NsmSwitchPowerCappingMode : public NsmSensor
+{
+  public:
+    NsmSwitchPowerCappingMode(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<PowerCappingModeIntf> powerCappingModeIntf,
+        std::shared_ptr<AssociationDefinitionsInft> associationDefIntf) :
+        NsmSensor(name, type), powerCappingModeIntf(powerCappingModeIntf),
+        associationDefIntf(associationDefIntf)
+    {}
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+    requester::Coroutine
+        setPowerCappingMode(const AsyncSetOperationValueType& value,
+                            [[maybe_unused]] AsyncOperationStatusType* status,
+                            std::shared_ptr<NsmDevice> device);
+
+  private:
+    std::shared_ptr<PowerCappingModeIntf> powerCappingModeIntf;
+    std::shared_ptr<AssociationDefinitionsInft> associationDefIntf;
+};
+
+/** @brief LTX (Link Training Extended) mode using NSM Type 5 Device Mode
+ *         index 29 (DEVICE_MODE_LTX). */
+class NsmSwitchLTXMode : public NsmSensor
+{
+  public:
+    NsmSwitchLTXMode(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<LTXModeIntf> ltxModeIntf,
+        std::shared_ptr<AssociationDefinitionsInft> associationDefIntf) :
+        NsmSensor(name, type), ltxModeIntf(ltxModeIntf),
+        associationDefIntf(associationDefIntf)
+    {}
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+    requester::Coroutine
+        setLTXMode(const AsyncSetOperationValueType& value,
+                   [[maybe_unused]] AsyncOperationStatusType* status,
+                   std::shared_ptr<NsmDevice> device);
+
+  private:
+    std::shared_ptr<LTXModeIntf> ltxModeIntf;
+    std::shared_ptr<AssociationDefinitionsInft> associationDefIntf;
+};
+
+/** @brief UPhy (Unit Physical Layer) mode using NSM Type 5 Device Mode
+ *         index 28 (DEVICE_MODE_UPHY). */
+class NsmSwitchUPhyMode : public NsmSensor
+{
+  public:
+    NsmSwitchUPhyMode(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<UPhyModeIntf> uphyModeIntf,
+        std::shared_ptr<AssociationDefinitionsInft> associationDefIntf) :
+        NsmSensor(name, type), uphyModeIntf(uphyModeIntf),
+        associationDefIntf(associationDefIntf)
+    {}
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+    requester::Coroutine
+        setUPhyMode(const AsyncSetOperationValueType& value,
+                    [[maybe_unused]] AsyncOperationStatusType* status,
+                    std::shared_ptr<NsmDevice> device);
+
+  private:
+    std::shared_ptr<UPhyModeIntf> uphyModeIntf;
+    std::shared_ptr<AssociationDefinitionsInft> associationDefIntf;
 };
 } // namespace nsm

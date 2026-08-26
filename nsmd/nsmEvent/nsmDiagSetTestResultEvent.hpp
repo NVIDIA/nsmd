@@ -22,16 +22,22 @@
 namespace nsm
 {
 
+class NsmDevice;
+
 /// Per-device handler for NSM Type 4, Event ID 0x02 (Set Diag Test Result).
 /// Decodes the per-TID test result and pushes a ResultReceived App.Notify
 /// carrying TID, error code, and result mask to prebootdiag.
 class NsmDiagSetTestResultEvent : public NsmEvent
 {
   public:
-    NsmDiagSetTestResultEvent(const std::string& name, const std::string& type);
+    NsmDiagSetTestResultEvent(const std::string& name, const std::string& type,
+                              std::weak_ptr<NsmDevice> device);
 
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) final;
+
+  private:
+    std::weak_ptr<NsmDevice> device;
 };
 
 } // namespace nsm

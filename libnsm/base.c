@@ -705,7 +705,11 @@ int decode_reason_code_and_cc(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (msg_len == 0) {
+	// Reject a response too short to hold completion_code, so a truncated
+	// buffer returns a length error instead of reading out of bounds.
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  offsetof(struct nsm_common_resp, completion_code) +
+			  sizeof(uint8_t)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 

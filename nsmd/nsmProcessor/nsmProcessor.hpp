@@ -62,6 +62,7 @@
 #ifdef ENABLE_SYSTEM_GUID
 #include <com/nvidia/SysGUID/SysGUID/server.hpp>
 #endif
+#include <com/nvidia/AdaptiveTGPMode/server.hpp>
 #include <com/nvidia/CCMode/server.hpp>
 #include <com/nvidia/ResetCounters/ResetCounterMetrics/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
@@ -277,6 +278,8 @@ class NsmEccErrorCounts : public NsmSensor
 
   private:
     void updateReading(struct nsm_ECC_error_counts);
+    /** @brief Publish the no-reading marker on both counts (D-Bus + shmem). */
+    void publishTelemetryUnavailable();
     std::string inventoryObjPath;
 
     std::shared_ptr<EccModeIntf> eccErrorCountIntf = nullptr;
@@ -392,6 +395,9 @@ class NsmCurrClockFreq : public NsmSensor
                               size_t responseLen) override;
 
     void updateMetricOnSharedMemory() override;
+
+    /** @brief Poll; on transport failure, mark OperatingSpeed unavailable. */
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     void updateReading(const uint32_t& clockFreq);
@@ -761,6 +767,32 @@ class NsmEgmMode : public NsmSensor
   private:
     void updateReading(bitfield8_t flags);
     std::unique_ptr<EgmModeIntf> egmModeIntf = nullptr;
+    std::string inventoryObjPath;
+};
+
+using AdaptiveTGPModeIntf = sdbusplus::server::object_t<
+    sdbusplus::server::com::nvidia::AdaptiveTGPMode>;
+
+class NsmAdaptiveTGPMode : public NsmSensor
+{
+  public:
+    NsmAdaptiveTGPMode(sdbusplus::bus_t& bus, std::string& name,
+                       std::string& type, std::string& inventoryObjPath);
+    NsmAdaptiveTGPMode() = delete;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+    requester::Coroutine
+        patchAdaptiveTGPMode(const AsyncSetOperationValueType& value,
+                             AsyncOperationStatusType* status,
+                             std::shared_ptr<NsmDevice> device);
+
+  private:
+    void updateReading(bool enabled, bool pendingEnabled);
+    std::unique_ptr<AdaptiveTGPModeIntf> adaptiveTGPModeIntf = nullptr;
     std::string inventoryObjPath;
 };
 

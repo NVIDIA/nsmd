@@ -126,6 +126,7 @@ enum reconfiguration_permissions_v1_index {
 	RP_EGM_MODE = 22,
 	RP_INFOROM_RECREATE_ALLOW_INB = 23,
 	RP_RUNTIME_IN_SYSTEM_TEST = 24,
+	RP_DUAL_PART_NUMBERS = 25,
 };
 
 enum reconfiguration_permissions_v1_setting {
@@ -604,8 +605,67 @@ enum device_mode_index {
 	DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY = 14,
 	DEVICE_MODE_ONE_SHOT_GPU_COPY_SWITCH_POWER_LIMIT = 15,
 	DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT = 16,
+	DEVICE_MODE_ADAPTIVE_TGPMODE = 21,
 	DEVICE_MODE_LLDP = 24,
+	DEVICE_MODE_PROTECTION_OPTIONS_MODE = 26,
+	DEVICE_MODE_POWER_CAPPING = 27,
+	DEVICE_MODE_UPHY = 28,
+	DEVICE_MODE_LTX = 29,
 };
+
+/** @brief Data size (in bytes) of the Protection Options Mode (index 26)
+ * payload. Two-byte little-endian bitmask; bits 0-3 map to the four protection
+ *         flags per NvBug 6307327. Bits 4-15 are reserved.
+ */
+#define PROTECTION_OPTIONS_MODE_DATA_SIZE 2
+
+/** @brief AdaptiveTGPMode (Dual Part Number) data byte values per NSM Type 5
+ *         Device Mode Index 21.
+ */
+enum nsm_adaptive_tgpmode {
+	NSM_ADAPTIVE_TGPMODE_DISABLED = 0,
+	NSM_ADAPTIVE_TGPMODE_ENABLED = 1,
+};
+
+/** @brief Power Capping Mode values per NSM Type 5 Device Mode Index 27.
+ *         Single enum8 data byte. Non-volatile; requires a device reset to
+ *         take effect.
+ */
+enum nsm_power_capping_mode {
+	NSM_POWER_CAPPING_MODE_DEFAULT = 0,
+	NSM_POWER_CAPPING_MODE_ENABLED = 1,
+	NSM_POWER_CAPPING_MODE_DISABLED = 2,
+};
+
+/** @brief Data size (in bytes) of the Power Capping Mode (index 27) payload. */
+#define POWER_CAPPING_MODE_DATA_SIZE 1
+
+/** @brief LTX (Link Training Extended) Mode values per NSM Type 5 Device Mode
+ *         Index 29 (DEVICE_MODE_LTX). Single enum8 data byte. Non-volatile;
+ *         requires a link toggle to take effect.
+ */
+enum nsm_ltx_mode {
+	NSM_LTX_MODE_DEFAULT = 0,
+	NSM_LTX_MODE_ENABLED = 1,
+	NSM_LTX_MODE_DISABLED = 2,
+};
+
+/** @brief Data size (in bytes) of the LTX Mode payload. */
+#define LTX_MODE_DATA_SIZE 1
+
+/** @brief UPhy (Unit Physical Layer) Mode values per NSM Type 5 Device Mode
+ *         Index 28 (DEVICE_MODE_UPHY). Single enum8 data byte. Non-volatile;
+ *         requires a link toggle to take effect.
+ */
+enum nsm_uphy_mode {
+	NSM_UPHY_MODE_DEFAULT = 0,
+	NSM_UPHY_MODE_ENABLED = 1,
+	NSM_UPHY_MODE_RESERVED = 2,
+	NSM_UPHY_MODE_DISABLED = 3,
+};
+
+/** @brief Data size (in bytes) of the UPhy Mode payload. */
+#define UPHY_MODE_DATA_SIZE 1
 
 /** @brief LLDP TX/RX sub-mode values per NSM Type 5 Device Mode Index 24
  *         Bits 0:1 (TX) and 2:3 (RX) of the data byte.

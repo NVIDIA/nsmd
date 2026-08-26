@@ -28,6 +28,7 @@
 #include "nsmd/socket_manager.hpp"
 #include "request.hpp"
 #include "request_timeout_tracker.hpp"
+#include "response_mismatch_tracker.hpp"
 
 #include <function2/function2.hpp>
 #include <phosphor-logging/lg2.hpp>
@@ -47,6 +48,13 @@ namespace requester
 
 using ResponseHandler = fu2::unique_function<void(
     eid_t eid, const nsm_msg* response, size_t respMsgLen)>;
+
+enum class MatchResult : uint8_t
+{
+    Accepted,
+    TypeCmdRejected, // instanceId matched but type/cmd wrong
+    NotFound,        // no outstanding request matched
+};
 
 /** @class Handler
  *
@@ -177,9 +185,18 @@ class Handler
                                           requestMsg.size());
         }
 
-        auto request = std::make_unique<RequestInterface>(
-            sockManager.getSocket(eid), eid, tag, event, socketHandler,
-            std::move(requestMsg), numRetries, responseTimeOut, verbose);
+        std::unique_ptr<RequestInterface> request;
+        try
+        {
+            request = std::make_unique<RequestInterface>(
+                sockManager.getSocket(eid), eid, tag, event, socketHandler,
+                std::move(requestMsg), numRetries, responseTimeOut, verbose);
+        }
+        catch (const std::invalid_argument& e)
+        {
+            lg2::error("Failed to create NSM request: {ERR}", "ERR", e.what());
+            return NSM_SW_ERROR;
+        }
         auto timer = std::make_unique<sdbusplus::Timer>(
             event.get(), instanceIdExpiryCallBack);
 
@@ -276,43 +293,46 @@ class Handler
      *  @param[in] respMsgLen - length of the response message
      */
     void handleResponse(uint8_t tag, eid_t eid, uint8_t instanceId,
-                        [[maybe_unused]] uint8_t type,
-                        [[maybe_unused]] uint8_t command,
-                        const nsm_msg* response, size_t respMsgLen)
+                        uint8_t type, uint8_t command, const nsm_msg* response,
+                        size_t respMsgLen)
     {
-        // Check if response is for Regular request
-        auto requestFound = handleResponseImpl(eid, instanceId, type, command,
-                                               response, respMsgLen, handlers,
-                                               instanceIdExpiryInterval);
-
-        if (!requestFound)
+        auto result = handleResponseImpl(eid, instanceId, type, command,
+                                         response, respMsgLen, handlers,
+                                         instanceIdExpiryInterval);
+        if (result == MatchResult::NotFound)
         {
-            std::vector<uint8_t> reconstructed(
-                reinterpret_cast<const uint8_t*>(response),
-                reinterpret_cast<const uint8_t*>(response) + respMsgLen);
-            std::string msg = utils::requestMsgToHexString(reconstructed);
-            lg2::error("Received response {RESP} doesn't match any request. "
-                       "Tag={TAG}, EID={EID}, Type={TYPE}, Command={CMD}.",
-                       "RESP", msg, "TAG", tag, "EID", eid, "TYPE", type, "CMD",
-                       command);
+            ResponseMismatchTracker::recordNotFound(
+                eid, tag, instanceId, type, command,
+                reinterpret_cast<const uint8_t*>(response), respMsgLen);
         }
+        // TypeCmdRejected: already recorded inside handleResponseImpl where
+        // the request bytes are accessible.
+        // Accepted: no action needed.
     }
 
-    bool handleResponseImpl(eid_t eid, uint8_t instanceId,
-                            [[maybe_unused]] uint8_t type,
-                            [[maybe_unused]] uint8_t command,
-                            const nsm_msg* response, size_t respMsgLen,
-                            std::unordered_map<eid_t, RequestQueue>& handlers,
-                            std::chrono::seconds instanceIdExpiryInterval)
+    MatchResult
+        handleResponseImpl(eid_t eid, uint8_t instanceId, uint8_t type,
+                           uint8_t command, const nsm_msg* response,
+                           size_t respMsgLen,
+                           std::unordered_map<eid_t, RequestQueue>& handlers,
+                           std::chrono::seconds instanceIdExpiryInterval)
     {
-        bool requestFound{false};
-
         if (handlers.contains(eid) && !handlers[eid].empty())
         {
             auto& [request, responseHandler, timerInstance,
                    valid] = handlers[eid].front();
             if (request->getInstanceId() == instanceId)
             {
+                if (request->getMsgType() != type ||
+                    request->getCommandCode() != command)
+                {
+                    ResponseMismatchTracker::recordTypeCmdRejected(
+                        eid, instanceId, request->getMsgType(),
+                        request->getCommandCode(), type, command,
+                        request->requestData(),
+                        reinterpret_cast<const uint8_t*>(response), respMsgLen);
+                    return MatchResult::TypeCmdRejected;
+                }
                 // Note1: timeOutTracker can be updated through TimeoutEvent or
                 // a succesfull responseMsg, for better handling please refer
                 // instanceIdExpiryCallBack as well
@@ -335,13 +355,13 @@ class Handler
                 instanceIdDb.free(eid, request->getInstanceId());
                 handlers[eid].pop();
                 unique_handler(eid, response, respMsgLen);
-                requestFound = true;
+                runRegisteredRequest(eid, handlers, instanceIdExpiryInterval);
+                return MatchResult::Accepted;
             }
         }
 
         runRegisteredRequest(eid, handlers, instanceIdExpiryInterval);
-
-        return requestFound;
+        return MatchResult::NotFound;
     }
 
     void setSocketHandler(const mctp_socket::Handler* handler)

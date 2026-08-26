@@ -39,6 +39,7 @@
 #include <coroutine>
 #include <functional>
 #include <iostream>
+#include <stdexcept>
 
 #ifdef LTTNG_TRACING
 #include "tracepoints/nsmd-tp.h"
@@ -157,7 +158,21 @@ class RequestBase
   public:
     RequestBase(eid_t eid, uint8_t tag, RequestMsg&& requestMsg) :
         eid(eid), tag(tag), requestMsg(std::move(requestMsg))
-    {}
+    {
+        if (this->requestMsg.size() <= sizeof(nsm_msg_hdr))
+        {
+            std::string hex = utils::requestMsgToHexString(this->requestMsg);
+            throw std::invalid_argument(
+                "NSM request message too short to contain command code: "
+                "EID=" +
+                std::to_string(eid) + " bytes=" + hex);
+        }
+    }
+
+    const RequestMsg& requestData() const
+    {
+        return requestMsg;
+    }
 };
 
 /** @class Request
@@ -202,6 +217,18 @@ class Request final : public RequestBase, public RequestRetryTimer
     {
         auto nsmMsg = reinterpret_cast<nsm_msg*>(requestMsg.data());
         return nsmMsg->hdr.instance_id;
+    }
+
+    uint8_t getMsgType() const
+    {
+        auto nsmMsg = reinterpret_cast<const nsm_msg*>(requestMsg.data());
+        return nsmMsg->hdr.nvidia_msg_type;
+    }
+
+    uint8_t getCommandCode() const
+    {
+        auto nsmMsg = reinterpret_cast<const nsm_msg*>(requestMsg.data());
+        return nsmMsg->payload[0];
     }
 
     void setInstanceId(uint8_t instanceId)

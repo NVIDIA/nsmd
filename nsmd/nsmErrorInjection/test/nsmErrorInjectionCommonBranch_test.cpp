@@ -208,10 +208,13 @@ TEST_F(NsmErrorInjectionCommonTest,
        CreateErrorInjectionSensorsForType_Unknown_EarlyReturn)
 {
     // Unknown type → getErrorInjectionTypeAndSubtype returns false →
-    // early return path; no sensors added, no crash
+    // early return path; no sensors added, no crash. Baseline is taken after
+    // the shared context exists so it measures only the early return.
+    auto context = createErrorInjectionCapabilityContext(
+        mockManager, device, "/xyz/test/ei_unk0", {Type::Unknown});
     const size_t before = device->deviceSensors.size();
     EXPECT_NO_THROW(createErrorInjectionSensorsForType(
-        mockManager, device, "/xyz/test/ei_unk0", Type::Unknown));
+        mockManager, device, "/xyz/test/ei_unk0", Type::Unknown, context));
     // No sensors should have been added
     EXPECT_EQ(device->deviceSensors.size(), before);
 }

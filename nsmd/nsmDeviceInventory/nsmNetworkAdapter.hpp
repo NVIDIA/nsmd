@@ -3,6 +3,8 @@
 #include "device-configuration.h"
 #include "libnsm/diagnostics.h"
 
+#include <functional>
+
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)
 #include "nsmDbusIfaceOverride/nsmResetIface.hpp"
 #endif
@@ -17,6 +19,7 @@
 #include <com/nvidia/DeviceMode/PCIeControlledEWTraffic/server.hpp>
 #include <com/nvidia/DeviceMode/PCIeMultiSocket/server.hpp>
 #include <com/nvidia/DeviceProtection/server.hpp>
+#include <com/nvidia/Software/ProtectionOptionsMode/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Control/Reset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/NetworkInterface/server.hpp>
@@ -50,6 +53,24 @@ using PCIeDeviceModeIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::DeviceMode::server::PCIeControlledEWTraffic,
     sdbusplus::com::nvidia::DeviceMode::server::PCIeBifurcation,
     Association::server::Definitions>;
+
+using ProtectionOptionsModeServer =
+    sdbusplus::com::nvidia::Software::server::ProtectionOptionsMode;
+
+// ProtectionOptionsModeServer has a pure-virtual setProtectionOptions() because
+// the PDI YAML declares a SetProtectionOptions method. bmcweb uses individual
+// bool property writes via AsyncOperationManager instead of the method, so the
+// concrete class below implements the pure virtual by throwing NotAllowed.
+class ProtectionOptionsModeIntf : public object_t<ProtectionOptionsModeServer>
+{
+  public:
+    using object_t<ProtectionOptionsModeServer>::object_t;
+
+    void setProtectionOptions(bool, bool, bool, bool) override
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::NotAllowed{};
+    }
+};
 using PCIeMultiSocketServer =
     sdbusplus::com::nvidia::DeviceMode::server::PCIeMultiSocket;
 using PCIeControlledEWTrafficServer =
@@ -270,6 +291,39 @@ class NsmPCIeDeviceModeDeviceModeSettingsV2Set :
                                 uint8_t bifurcationRawMode);
 
     std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf;
+};
+
+// ---- Protection Options Mode V2 (NSM Type 5, Device Mode Index 26) ----
+
+class NsmNetworkAdapterProtectionOptionsMode : public NsmSensor
+{
+  public:
+    NsmNetworkAdapterProtectionOptionsMode(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<ProtectionOptionsModeIntf> protectionOptionsModeIntf,
+        std::shared_ptr<AssociationDefinitionsInft> associationDefIntf);
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+    // AsyncSetOperationHandler for one boolean property write (bit index:
+    // 0=HostFirmwareUpdateRestrictionEnabled,
+    // 1=HostConfigurationChangeRestrictionEnabled,
+    // 2=HostTransceiverFirmwareUpdateRestrictionEnabled,
+    // 3=HostTransceiverConfigurationChangeRestrictionEnabled).
+    // Reads the other three current values, substitutes the new value, packs
+    // the 16-bit bitmask, and sends NSM Set Device Mode Settings V2 (idx 26).
+    requester::Coroutine setFlag(const AsyncSetOperationValueType& value,
+                                 AsyncOperationStatusType* status,
+                                 std::shared_ptr<NsmDevice> device,
+                                 uint8_t bit);
+
+  private:
+    std::shared_ptr<ProtectionOptionsModeIntf> protectionOptionsModeIntf;
+    std::shared_ptr<AssociationDefinitionsInft> associationDefIntf;
+    bool asyncPatchInProgress{false};
 };
 
 } // namespace nsm

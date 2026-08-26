@@ -411,6 +411,25 @@ This helps you track when issues are resolved without manual success logging.
 - Logger entries are automatically removed when all states return to success
 - Argument count and types must remain consistent for each logger name
 
+## Telemetry "no reading" / sentinel handling
+
+When a numeric property can be absent (never polled, bad CC, timeout),
+publish an explicit marker instead of a misleading `0`:
+
+- Add a private `publishTelemetryUnavailable()` - the single entry point
+  for the "no reading" state. It stamps `Sentinel<T>::notAvailable`
+  (`common/telemetryTombstone.hpp`) on every owned D-Bus property using
+  the property's exact type width, then calls
+  `updateMetricOnSharedMemory()`.
+- In `updateMetricOnSharedMemory()`, pass `rc = value ==
+  Sentinel<T>::notAvailable ? TELEMETRY_NOT_AVAILABLE :
+  TELEMETRY_AVAILABLE` so nv-shmem caches `nan` for MetricReports.
+- Call `publishTelemetryUnavailable()` from the constructor (numeric
+  properties), and from failure paths when required. Enum properties
+  with PDI `default: Unknown` need only `updateMetricOnSharedMemory()`;
+  publish the enum FQN string and map it in nv-shmem
+  `metric_report_utils.hpp`.
+
 ## Progress Counters
 
 The NSM daemon tracks various sensor polling operations using progress counters. These counters are stored in a memory-mapped file descriptor (memfd) and can be accessed via D-Bus for duming, monitoring and debugging purposes.

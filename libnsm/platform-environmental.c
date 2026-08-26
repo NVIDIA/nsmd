@@ -7032,3 +7032,18 @@ int decode_set_leak_detection_thresholds_resp(const struct nsm_msg *msg,
 
 	return NSM_SW_SUCCESS;
 }
+
+int decode_sequence_token_record(const uint8_t *data, size_t data_len,
+				 uint32_t *next_token)
+{
+	if (data == NULL || next_token == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (data_len < sizeof(struct nsm_sequence_token_record)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	const struct nsm_sequence_token_record *rec =
+	    (const struct nsm_sequence_token_record *)data;
+	*next_token = le32toh(rec->next_sequence_token);
+	return NSM_SW_SUCCESS;
+}

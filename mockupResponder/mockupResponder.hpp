@@ -132,7 +132,7 @@ const std::unordered_map<uint8_t, uint64_t> adminOverrideMockTable = {
 // =====================================================================
 // Dump-command failure cycle (Type 4 cmds 0x40/0x50/0x51/0x52/0x59).
 //
-// When the mockup is started with --dump_failure_cycle, the five dump
+// When the mockup is started with --failure_cycle, the five dump
 // handlers stop returning the happy-path response and instead replay a
 // fixed, ordered list of device responses — one list entry per dump —
 // covering every NSM error -> AsyncOperationStatus mapping. A single
@@ -298,7 +298,7 @@ class MockupResponder
     MockupResponder(bool verbose, sdeventplus::Event& event,
                     sdbusplus::asio::object_server& server, eid_t eid,
                     uint8_t deviceType, uint8_t instanceId,
-                    bool dumpFailureCycle = false);
+                    bool failureCycle = false);
     ~MockupResponder();
 
     int initSocket();
@@ -801,6 +801,12 @@ class MockupResponder
         getEthPortTelemetryCounterHandler(const nsm_msg* requestMsg,
                                           size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        queryPortTelemetryV2Handler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        queryPortTelemetryCapabilitiesHandler(const nsm_msg* requestMsg,
+                                              size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getPortNetworkAddressesHandler(const nsm_msg* requestMsg,
                                        size_t requestLen);
     std::optional<std::vector<uint8_t>>
@@ -905,15 +911,19 @@ class MockupResponder
             eventSources;
     } state;
 
-    // Dump failure-cycle state (see --dump_failure_cycle / kDumpFailureCycle).
-    // When dumpFailureCycle is false the dump handlers run their happy path.
+    // Dump failure-cycle state (see --failure_cycle / kDumpFailureCycle).
+    // When failureCycle is false the dump handlers run their happy path.
     // When true, a single global counter walks kDumpFailureCycle: cyclePage-
     // Index selects the page within the current case, cycleCaseIndex selects
     // the case. The pair is advanced by nextDumpCyclePage() on every dump
     // request and wraps at the end of the list.
-    bool dumpFailureCycle = false;
+    bool failureCycle = false;
     uint32_t cycleCaseIndex = 0;
     uint32_t cyclePageIndex = 0;
+
+    // Port-characteristics health-cycle index (see --failure_cycle /
+    // queryPortCharacteristicsHandler). Per-instance so each mock starts at 0.
+    size_t portHealthCycleIndex = 0;
 
     // Resolve the page for the current cycle position, log it, and advance
     // the global counter. iterative is true for the page-based commands

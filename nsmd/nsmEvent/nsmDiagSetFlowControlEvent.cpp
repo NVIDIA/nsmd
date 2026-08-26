@@ -22,7 +22,6 @@
 #include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
 #include "nsmPreBootDiagStateClient.hpp"
-#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 
 #include <nlohmann/json.hpp>
@@ -32,7 +31,8 @@ namespace nsm
 {
 
 NsmDiagSetFlowControlEvent::NsmDiagSetFlowControlEvent(
-    const std::string& name, const std::string& type) : NsmEvent(name, type)
+    const std::string& name, const std::string& type,
+    std::weak_ptr<NsmDevice> device) : NsmEvent(name, type), device(device)
 {}
 
 int NsmDiagSetFlowControlEvent::handle(eid_t eid, NsmType /*type*/,
@@ -43,8 +43,7 @@ int NsmDiagSetFlowControlEvent::handle(eid_t eid, NsmType /*type*/,
     uint16_t eventState{};
     uint8_t flowCtrlStatus{};
 
-    auto nsmDevice =
-        mctp::MctpDiscovery::getInstance().getNsmDeviceFromEid(eid);
+    auto nsmDevice = device.lock();
 
     auto rc = decode_nsm_diag_set_flow_control_event(
         event, eventLen, &eventClass, &eventState, &flowCtrlStatus);
@@ -120,7 +119,8 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    auto event = std::make_shared<NsmDiagSetFlowControlEvent>(name, type);
+    auto event = std::make_shared<NsmDiagSetFlowControlEvent>(name, type,
+                                                              nsmDevice);
     nsmDevice->addDeviceEvent(event, NSM_TYPE_DIAGNOSTIC,
                               NSM_DIAG_SET_FLOW_CONTROL_EVENT);
     lg2::info(

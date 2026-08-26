@@ -9502,7 +9502,7 @@ TEST_F(MockupResponderTest, testUpdateMinSecurityVersionDecodeFailure)
 
 // ===========================================================================
 // Dump failure-cycle tests.
-// Verifies the --dump_failure_cycle replay added to the 5 dump handlers:
+// Verifies the --failure_cycle replay added to the 5 dump handlers:
 //   getDeviceDiagnostics (0x40), getNetworkDeviceDebugInfo (0x50),
 //   eraseTrace (0x51), getNetworkDeviceLogInfo (0x52),
 //   eraseDebugInfo (0x59).
@@ -9526,13 +9526,13 @@ class MockupDumpCycleTest : public Test
     }
 
     // Build a fresh mock with the dump failure cycle on or off.
-    void buildMock(bool dumpFailureCycle, uint8_t deviceType = NSM_DEV_ID_GPU)
+    void buildMock(bool failureCycle, uint8_t deviceType = NSM_DEV_ID_GPU)
     {
         systemBus = std::make_shared<sdbusplus::asio::connection>(io);
         objServer = std::make_shared<sdbusplus::asio::object_server>(systemBus);
         mockupResponder = std::make_shared<MockupResponder::MockupResponder>(
             true, event, *objServer, /*eid=*/30, deviceType, /*instanceId=*/0,
-            dumpFailureCycle);
+            failureCycle);
     }
 
     // Index of a cycle case by its stable id (test positioning helper).
@@ -9634,7 +9634,7 @@ static uint16_t respReasonCode(const std::vector<uint8_t>& resp)
 
 TEST_F(MockupDumpCycleTest, CycleOff_ReturnsSuccessByDefault)
 {
-    buildMock(/*dumpFailureCycle=*/false);
+    buildMock(/*failureCycle=*/false);
     auto req = makeDebugInfoReq(instanceId, 0);
     auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
     auto resp = mockupResponder->getNetworkDeviceDebugInfoHandler(reqMsg,
@@ -9652,7 +9652,7 @@ TEST_F(MockupDumpCycleTest, CycleOff_ReturnsSuccessByDefault)
 
 TEST_F(MockupDumpCycleTest, CycleOn_FirstEntryIsSuccess)
 {
-    buildMock(/*dumpFailureCycle=*/true);
+    buildMock(/*failureCycle=*/true);
     EXPECT_EQ(mockupResponder->cycleCaseIndex, 0u);
 
     auto req = makeDebugInfoReq(instanceId, 0);
@@ -9670,7 +9670,7 @@ TEST_F(MockupDumpCycleTest, CycleOn_FirstEntryIsSuccess)
 
 TEST_F(MockupDumpCycleTest, CycleOn_AdvancesGlobally)
 {
-    buildMock(/*dumpFailureCycle=*/true);
+    buildMock(/*failureCycle=*/true);
 
     // 0x40 consumes entry 0 (SUCCESS).
     {
@@ -9708,7 +9708,7 @@ TEST_F(MockupDumpCycleTest, CycleOn_AdvancesGlobally)
 
 TEST_F(MockupDumpCycleTest, CycleOn_WrapsAtEnd)
 {
-    buildMock(/*dumpFailureCycle=*/true);
+    buildMock(/*failureCycle=*/true);
 
     // Total device responses across all cases (single + multi page).
     uint32_t totalPages = 0;
@@ -9755,7 +9755,7 @@ TEST_F(MockupDumpCycleTest, CycleOn_AllCcCases)
     // Build the mock once; rebuilding inside the loop would create a second
     // asio object_server on the same io_context/EID and fail with
     // "assign: File exists". Each iteration just repositions the cycle cursor.
-    buildMock(/*dumpFailureCycle=*/true);
+    buildMock(/*failureCycle=*/true);
     for (const auto& e : ccCases)
     {
         // Position the global counter at this case.
@@ -9796,7 +9796,7 @@ TEST_F(MockupDumpCycleTest, CycleOn_AllReasonCases)
 
     // Build the mock once (see CycleOn_AllCcCases); rebuilding per iteration
     // collides on the asio object_server ("assign: File exists").
-    buildMock(/*dumpFailureCycle=*/true);
+    buildMock(/*failureCycle=*/true);
     for (const auto& e : reasonCases)
     {
         mockupResponder->cycleCaseIndex = caseIndexOf(e.id);
@@ -9817,7 +9817,7 @@ TEST_F(MockupDumpCycleTest, CycleOn_AllReasonCases)
 
 TEST_F(MockupDumpCycleTest, CycleOn_NoResponseEmitsNothing)
 {
-    buildMock(/*dumpFailureCycle=*/true);
+    buildMock(/*failureCycle=*/true);
     mockupResponder->cycleCaseIndex = caseIndexOf("NO_RESPONSE_TIMEOUT");
     mockupResponder->cyclePageIndex = 0;
 
@@ -9835,7 +9835,7 @@ TEST_F(MockupDumpCycleTest, CycleOn_NoResponseEmitsNothing)
 
 TEST_F(MockupDumpCycleTest, CycleOn_StuckHandlePages)
 {
-    buildMock(/*dumpFailureCycle=*/true);
+    buildMock(/*failureCycle=*/true);
     const uint32_t stuckIdx = caseIndexOf("PROTO_STUCK_HANDLE");
     mockupResponder->cycleCaseIndex = stuckIdx;
     mockupResponder->cyclePageIndex = 0;
@@ -9876,7 +9876,7 @@ TEST_F(MockupDumpCycleTest, CycleOn_StuckHandlePages)
 
 TEST_F(MockupDumpCycleTest, CycleOn_EraseCmdSkipsIterationOnlyCase)
 {
-    buildMock(/*dumpFailureCycle=*/true);
+    buildMock(/*failureCycle=*/true);
     const uint32_t stuckIdx = caseIndexOf("PROTO_STUCK_HANDLE");
     mockupResponder->cycleCaseIndex = stuckIdx;
     mockupResponder->cyclePageIndex = 0;
@@ -9922,4 +9922,85 @@ class MockupResponderProcessCleanup : public ::testing::Environment
 
 const ::testing::Environment* const mockupResponderProcessCleanupEnv =
     ::testing::AddGlobalTestEnvironment(new MockupResponderProcessCleanup);
+
+// =============================================================================
+// QueryPortCharacteristics failure-cycle (NVLink health-agent replay)
+// =============================================================================
+
+TEST_F(MockupDumpCycleTest, testQueryPortCharacteristicsFailureCycle)
+{
+    buildMock(/*failureCycle=*/true);
+
+    std::vector<std::pair<int, int>> seen;
+    for (int i = 0; i < 12; ++i)
+    {
+        Request request(sizeof(nsm_msg_hdr) +
+                        sizeof(nsm_query_port_characteristics_req));
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(request.data());
+        ASSERT_EQ(encode_query_port_characteristics_req(instanceId, 0, reqMsg),
+                  NSM_SW_SUCCESS);
+        auto resp = mockupResponder->queryPortCharacteristicsHandler(
+            reqMsg, request.size());
+        ASSERT_TRUE(resp.has_value());
+
+        auto* respMsg = reinterpret_cast<const nsm_msg*>(resp->data());
+        uint8_t cc = 0xff;
+        uint16_t reason = 0;
+        uint16_t dataSize = 0;
+        struct nsm_port_characteristics_data data{};
+        ASSERT_EQ(decode_query_port_characteristics_resp(
+                      respMsg, resp->size(), &cc, &reason, &dataSize, &data),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(cc, NSM_SUCCESS);
+
+        uint32_t linkState = data.port_status.link_state;
+        uint32_t linkHealth = data.port_status.link_health;
+        uint32_t trigger = data.port_status.attention_trigger;
+        // link_state forced UP so link_health is meaningful.
+        EXPECT_EQ(linkState, static_cast<uint32_t>(NSM_PORTSTATE_UP));
+        seen.emplace_back(static_cast<int>(linkHealth),
+                          static_cast<int>(trigger));
+    }
+
+    // Per-instance index starts at 0: NA, Attention/1..9, Healthy, then wraps.
+    EXPECT_EQ(seen[0].first, static_cast<int>(NSM_LINK_HEALTH_NA));
+    EXPECT_EQ(seen[0].second, 0);
+    for (int i = 1; i <= 9; ++i)
+    {
+        EXPECT_EQ(seen[i].first, static_cast<int>(NSM_LINK_HEALTH_ATTENTION))
+            << "step " << i;
+        EXPECT_EQ(seen[i].second, i) << "step " << i;
+    }
+    EXPECT_EQ(seen[10].first, static_cast<int>(NSM_LINK_HEALTH_HEALTHY));
+    EXPECT_EQ(seen[10].second, 0);
+    EXPECT_EQ(seen[11], seen[0]); // 12th poll wraps to the first case
+}
+
+TEST_F(MockupDumpCycleTest, testQueryPortCharacteristicsNoCycleLegacy)
+{
+    buildMock(/*failureCycle=*/false);
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_port_characteristics_req));
+    auto* reqMsg = reinterpret_cast<nsm_msg*>(request.data());
+    ASSERT_EQ(encode_query_port_characteristics_req(instanceId, 0, reqMsg),
+              NSM_SW_SUCCESS);
+    auto resp = mockupResponder->queryPortCharacteristicsHandler(
+        reqMsg, request.size());
+    ASSERT_TRUE(resp.has_value());
+
+    auto* respMsg = reinterpret_cast<const nsm_msg*>(resp->data());
+    uint8_t cc = 0xff;
+    uint16_t reason = 0;
+    uint16_t dataSize = 0;
+    struct nsm_port_characteristics_data data{};
+    ASSERT_EQ(decode_query_port_characteristics_resp(respMsg, resp->size(), &cc,
+                                                     &reason, &dataSize, &data),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(cc, NSM_SUCCESS);
+
+    uint32_t linkState = data.port_status.link_state;
+    EXPECT_EQ(linkState, 1u); // legacy fixed response: link_state DOWN
+}
+
 } // namespace

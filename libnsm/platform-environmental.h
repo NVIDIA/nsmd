@@ -600,6 +600,27 @@ struct nsm_aggregate_resp_sample {
 	uint8_t data[1];
 } __attribute__((packed));
 
+/** @struct nsm_aggregate_paginated_req_prefix
+ *
+ * Sequence Token prefix prepended to paginated aggregate command payloads.
+ * seq_token = 0x00000000 for the initial request;
+ * echo the value from tag 0xFD of the previous response for continuations.
+ */
+struct nsm_aggregate_paginated_req_prefix {
+	uint32_t sequence_token; /* little-endian, opaque page handle */
+} __attribute__((packed));
+
+/** @struct nsm_sequence_token_record
+ *
+ * Data field of the Sequence Token Record (tag 0xFD).
+ * Tag = 0xFD, B = 0, Length = 2 (data size = 2^2 = 4 bytes), Valid = 1.
+ * next_sequence_token != 0 means additional pages remain.
+ * next_sequence_token == 0 means this is the final page.
+ */
+struct nsm_sequence_token_record {
+	uint32_t next_sequence_token; /* little-endian */
+} __attribute__((packed));
+
 struct nsm_clock_limit {
 	uint32_t requested_limit_min;
 	uint32_t requested_limit_max;
@@ -2177,6 +2198,20 @@ int decode_aggregate_resp_sample(const struct nsm_aggregate_resp_sample *sample,
 				 size_t msg_len, size_t *consumed_len,
 				 uint8_t *tag, bool *valid,
 				 const uint8_t **data, size_t *data_len);
+
+/** @brief Decode the data field of a Sequence Token Record (tag 0xFD).
+ *
+ * Called when decode_aggregate_resp_sample() returns tag == 0xFD.
+ *
+ * @param[in]  data       Pointer to sample data (from
+ * decode_aggregate_resp_sample)
+ * @param[in]  data_len   Length of data field; must be >= 4
+ * @param[out] next_token Next Sequence Token; 0x00000000 = final page
+ * @return NSM_SW_SUCCESS on success
+ * @return NSM_SW_ERROR_LENGTH if data_len < 4
+ */
+int decode_sequence_token_record(const uint8_t *data, size_t data_len,
+				 uint32_t *next_token);
 
 /** @brief Encode data of a Get temperature readings response message
  *

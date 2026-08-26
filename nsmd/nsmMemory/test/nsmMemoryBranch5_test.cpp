@@ -254,8 +254,10 @@ TEST_F(NsmMemoryBranch5Test, RowRemapState_HandleResp_FlagsZero)
 
     auto result = sensor.handleResponseMsg(msg, resp.size());
     EXPECT_EQ(result, NSM_SUCCESS);
-    EXPECT_FALSE(rrIntf->rowRemappingFailureState());
-    EXPECT_FALSE(rrIntf->rowRemappingPendingState());
+    EXPECT_EQ(rrIntf->rowRemappingFailureState(),
+              MemoryRowRemappingIntf::RowRemappingFailureStates::False);
+    EXPECT_EQ(rrIntf->rowRemappingPendingState(),
+              MemoryRowRemappingIntf::RowRemappingPendingStates::False);
 }
 
 // ============================================================================
@@ -585,8 +587,10 @@ TEST_F(NsmMemoryBranch5Test, RowRemapState_HandleResp_FailureOnlyFlag)
 
     auto result = sensor.handleResponseMsg(msg, resp.size());
     EXPECT_EQ(result, NSM_SUCCESS);
-    EXPECT_TRUE(rrIntf->rowRemappingFailureState());
-    EXPECT_FALSE(rrIntf->rowRemappingPendingState());
+    EXPECT_EQ(rrIntf->rowRemappingFailureState(),
+              MemoryRowRemappingIntf::RowRemappingFailureStates::True);
+    EXPECT_EQ(rrIntf->rowRemappingPendingState(),
+              MemoryRowRemappingIntf::RowRemappingPendingStates::False);
 }
 
 // ============================================================================
@@ -611,8 +615,10 @@ TEST_F(NsmMemoryBranch5Test, RowRemapState_HandleResp_PendingOnlyFlag)
 
     auto result = sensor.handleResponseMsg(msg, resp.size());
     EXPECT_EQ(result, NSM_SUCCESS);
-    EXPECT_FALSE(rrIntf->rowRemappingFailureState());
-    EXPECT_TRUE(rrIntf->rowRemappingPendingState());
+    EXPECT_EQ(rrIntf->rowRemappingFailureState(),
+              MemoryRowRemappingIntf::RowRemappingFailureStates::False);
+    EXPECT_EQ(rrIntf->rowRemappingPendingState(),
+              MemoryRowRemappingIntf::RowRemappingPendingStates::True);
 }
 
 // ============================================================================

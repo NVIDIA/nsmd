@@ -236,6 +236,20 @@ TEST(ConfigBranch, GetReconfigurationPermissionsV1_AllSettings)
 }
 
 // ===========================================================================
+// Config commands continued (post-registerCommand, per the registration
+// order in nsm_config_cmd.cpp::registerCommand):
+//   [18] SetDeviceConfig
+//   [19] GetDeviceConfig
+//   [20] GetLLDPMode
+//   [21] SetLLDPMode
+//   [22] GetPowerCappingMode
+//   [23] SetPowerCappingMode
+//   [24] GetLTXMode
+//   [25] SetLTXMode
+//   [26] GetUPhyMode
+//   [27] SetUPhyMode
+
+// ===========================================================================
 // GetDeviceModeSettingsV2 — currentModeLength/pendingModeLength branches
 // ===========================================================================
 
@@ -547,6 +561,174 @@ TEST(ConfigBranch, EnableDisableGpuIstMode_AllGpus)
 
     auto [rc, reqMsg] = commands[9]->createRequestMsg();
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+// ===========================================================================
+// GetLTXMode / SetLTXMode — LTX Mode Enable/Disable feature
+// (NSM Type 5 idx DEVICE_MODE_LTX). Mirrors the GetDeviceModeSettingsV2 /
+// SetDeviceModeSettingsV2 coverage above, which targets the same underlying
+// Get/Set Device Mode Settings v2 command.
+// ===========================================================================
+
+TEST(ConfigBranch, GetLTXMode_ValidResponse_PrintsCurrentAndPendingMode)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    parseSubcmdArgs(app, "GetLTXMode");
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_get_device_mode_settings_v2_resp) +
+                             LTX_MODE_DATA_SIZE * 2);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t currentMode = NSM_LTX_MODE_ENABLED;
+    uint8_t pendingMode = NSM_LTX_MODE_DISABLED;
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, &currentMode, LTX_MODE_DATA_SIZE,
+        &pendingMode, LTX_MODE_DATA_SIZE, msg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    testing::internal::CaptureStdout();
+    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
+    std::string output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("CurrentMode"), std::string::npos);
+    EXPECT_NE(output.find("PendingMode"), std::string::npos);
+    EXPECT_NE(output.find("Enabled"), std::string::npos);
+    EXPECT_NE(output.find("Disabled"), std::string::npos);
+}
+
+// Primary regression test for the review correction: a missing/short
+// CurrentMode must be reported as an error, not printed as a partial
+// success. Matches NsmSwitchLTXMode::handleResponseMsg's hard-error rule.
+TEST(ConfigBranch, GetLTXMode_CurrentLengthZero_ReturnsError)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    parseSubcmdArgs(app, "GetLTXMode");
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_get_device_mode_settings_v2_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, nullptr, 0, nullptr, 0, msg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    testing::internal::CaptureStdout();
+    testing::internal::CaptureStderr();
+    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
+    std::string stdoutput = testing::internal::GetCapturedStdout();
+    std::string stderrOutput = testing::internal::GetCapturedStderr();
+    // No partial-success JSON on stdout ...
+    EXPECT_TRUE(stdoutput.empty());
+    // ... and an explicit error is reported instead.
+    EXPECT_NE(stderrOutput.find("LTX mode payload invalid"), std::string::npos);
+}
+
+TEST(ConfigBranch, SetLTXMode_Success)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    parseSubcmdArgs(app, "SetLTXMode", {"-M", "Enabled"});
+
+    auto [rc, reqMsg] = commands[25]->createRequestMsg();
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_set_device_mode_settings_v2_resp(0, NSM_SUCCESS, ERR_NULL, msg);
+    EXPECT_NO_THROW(commands[25]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(ConfigBranch, SetLTXMode_InvalidMode_ReturnsError)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    parseSubcmdArgs(app, "SetLTXMode", {"-M", "NotAMode"});
+
+    auto [rc, reqMsg] = commands[25]->createRequestMsg();
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+    EXPECT_TRUE(reqMsg.empty());
+}
+
+// ===========================================================================
+// GetUPhyMode / SetUPhyMode — LTX Mode Enable/Disable feature
+// (NSM Type 5 idx DEVICE_MODE_UPHY). Parallel to GetLTXMode / SetLTXMode.
+// ===========================================================================
+
+TEST(ConfigBranch, GetUPhyMode_ValidResponse_PrintsCurrentAndPendingMode)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    parseSubcmdArgs(app, "GetUPhyMode");
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_get_device_mode_settings_v2_resp) +
+                             UPHY_MODE_DATA_SIZE * 2);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    uint8_t currentMode = NSM_UPHY_MODE_ENABLED;
+    uint8_t pendingMode = NSM_UPHY_MODE_DISABLED;
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, &currentMode, UPHY_MODE_DATA_SIZE,
+        &pendingMode, UPHY_MODE_DATA_SIZE, msg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    testing::internal::CaptureStdout();
+    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
+    std::string output = testing::internal::GetCapturedStdout();
+    EXPECT_NE(output.find("CurrentMode"), std::string::npos);
+    EXPECT_NE(output.find("PendingMode"), std::string::npos);
+    EXPECT_NE(output.find("Enabled"), std::string::npos);
+    EXPECT_NE(output.find("Disabled"), std::string::npos);
+}
+
+// Primary regression test for the review correction: same tightened
+// payload-length validation as GetLTXMode, for UPhy mode.
+TEST(ConfigBranch, GetUPhyMode_CurrentLengthZero_ReturnsError)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    parseSubcmdArgs(app, "GetUPhyMode");
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_get_device_mode_settings_v2_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, nullptr, 0, nullptr, 0, msg);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    testing::internal::CaptureStdout();
+    testing::internal::CaptureStderr();
+    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
+    std::string stdoutput = testing::internal::GetCapturedStdout();
+    std::string stderrOutput = testing::internal::GetCapturedStderr();
+    EXPECT_TRUE(stdoutput.empty());
+    EXPECT_NE(stderrOutput.find("UPhy mode payload invalid"),
+              std::string::npos);
+}
+
+TEST(ConfigBranch, SetUPhyMode_Success)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    parseSubcmdArgs(app, "SetUPhyMode", {"-M", "Enabled"});
+
+    auto [rc, reqMsg] = commands[27]->createRequestMsg();
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_set_device_mode_settings_v2_resp(0, NSM_SUCCESS, ERR_NULL, msg);
+    EXPECT_NO_THROW(commands[27]->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(ConfigBranch, SetUPhyMode_InvalidMode_ReturnsError)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    parseSubcmdArgs(app, "SetUPhyMode", {"-M", "NotAMode"});
+
+    auto [rc, reqMsg] = commands[27]->createRequestMsg();
+    EXPECT_NE(rc, NSM_SW_SUCCESS);
+    EXPECT_TRUE(reqMsg.empty());
 }
 
 } // namespace nsmtool::config

@@ -17,6 +17,8 @@
 
 #include "network-ports.h"
 
+#include "platform-environmental.h"
+
 #include <endian.h>
 #include <stdio.h>
 #include <string.h>
@@ -2220,5 +2222,277 @@ int decode_get_lldp_packet_resp(const struct nsm_msg *msg, size_t msg_len,
 		memcpy(data, &(resp->data[0]), reported_size);
 	}
 	*data_size = reported_size;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_port_telemetry_v2_req(uint8_t instance_id, uint16_t port_index,
+				       uint8_t group_id,
+				       uint32_t sequence_token,
+				       struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (group_id < NSM_PORT_TELEMETRY_GROUP_PHY_ERRORS ||
+	    group_id > NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_query_port_telemetry_v2_req *req =
+	    (struct nsm_query_port_telemetry_v2_req *)msg->payload;
+	req->hdr.command = NSM_QUERY_PORT_TELEMETRY_COUNTER_V2;
+	req->hdr.data_size = sizeof(*req) - sizeof(req->hdr);
+	req->sequence_token = htole32(sequence_token);
+	req->port_index = htole16(port_index);
+	req->reserved[0] = 0;
+	req->reserved[1] = 0;
+	req->group_id = group_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_port_telemetry_v2_req(const struct nsm_msg *msg,
+				       size_t msg_len, uint16_t *port_index,
+				       uint8_t *group_id,
+				       uint32_t *sequence_token)
+{
+	if (msg == NULL || port_index == NULL || group_id == NULL ||
+	    sequence_token == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_query_port_telemetry_v2_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_query_port_telemetry_v2_req *req =
+	    (const struct nsm_query_port_telemetry_v2_req *)msg->payload;
+
+	if (req->hdr.data_size < sizeof(*req) - sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*sequence_token = le32toh(req->sequence_token);
+	*port_index = le16toh(req->port_index);
+	*group_id = req->group_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_port_telemetry_v2_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code,
+					uint16_t *telemetry_count,
+					size_t *consumed_len)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL ||
+	    telemetry_count == NULL || consumed_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	/* Aggregate response header does not carry a reason_code field */
+	*reason_code = 0;
+	/* Reuse decode_aggregate_resp which handles the aggregate header format
+	 */
+	return decode_aggregate_resp(msg, msg_len, consumed_len, cc,
+				     telemetry_count);
+}
+
+int encode_query_port_telemetry_v2_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t telemetry_count,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_aggregate_resp *response =
+	    (struct nsm_aggregate_resp *)msg->payload;
+
+	response->command = NSM_QUERY_PORT_TELEMETRY_COUNTER_V2;
+	response->telemetry_count = htole16(telemetry_count);
+	response->completion_code = cc;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_port_telemetry_caps_req(uint8_t instance_id,
+					 uint16_t port_index,
+					 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_query_port_telemetry_caps_req *req =
+	    (struct nsm_query_port_telemetry_caps_req *)msg->payload;
+	req->hdr.command = NSM_QUERY_PORT_TELEMETRY_CAPABILITIES;
+	req->hdr.data_size = sizeof(*req) - sizeof(req->hdr);
+	req->port_index = htole16(port_index);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_port_telemetry_caps_req(const struct nsm_msg *msg,
+					 size_t msg_len, uint16_t *port_index)
+{
+	if (msg == NULL || port_index == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_query_port_telemetry_caps_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_query_port_telemetry_caps_req *req =
+	    (const struct nsm_query_port_telemetry_caps_req *)msg->payload;
+
+	if (req->hdr.data_size < sizeof(*req) - sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_index = le16toh(req->port_index);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_port_telemetry_caps_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc,
+					  uint8_t *max_supported_group_id,
+					  uint8_t *max_counter_records_per_resp,
+					  uint8_t *supported_groups_bitmask)
+{
+	if (msg == NULL || cc == NULL || max_supported_group_id == NULL ||
+	    max_counter_records_per_resp == NULL ||
+	    supported_groups_bitmask == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint16_t reason_code = 0;
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, &reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_query_port_telemetry_caps_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_query_port_telemetry_caps_resp *resp =
+	    (const struct nsm_query_port_telemetry_caps_resp *)msg->payload;
+
+	if (le16toh(resp->hdr.data_size) !=
+	    sizeof(struct nsm_query_port_telemetry_caps_resp) -
+		sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	*max_supported_group_id = resp->max_supported_group_id;
+	*max_counter_records_per_resp = resp->max_counter_records_per_resp;
+	memcpy(supported_groups_bitmask, resp->supported_groups_bitmask,
+	       sizeof(resp->supported_groups_bitmask));
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_port_telemetry_caps_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint8_t max_supported_group_id, uint8_t max_counter_records_per_resp,
+    const uint8_t *supported_groups_bitmask, struct nsm_msg *msg)
+{
+	if (msg == NULL || supported_groups_bitmask == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_QUERY_PORT_TELEMETRY_CAPABILITIES,
+					  msg);
+	}
+
+	struct nsm_query_port_telemetry_caps_resp *resp =
+	    (struct nsm_query_port_telemetry_caps_resp *)msg->payload;
+
+	resp->hdr.command = NSM_QUERY_PORT_TELEMETRY_CAPABILITIES;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size =
+	    htole16(sizeof(struct nsm_query_port_telemetry_caps_resp) -
+		    sizeof(struct nsm_common_resp));
+	resp->max_supported_group_id = max_supported_group_id;
+	resp->max_counter_records_per_resp = max_counter_records_per_resp;
+	memcpy(resp->supported_groups_bitmask, supported_groups_bitmask,
+	       sizeof(resp->supported_groups_bitmask));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_optical_module_power_bias_lane_record(const uint8_t *data,
+						 size_t data_len,
+						 uint16_t *out_value)
+{
+	if (!data || !out_value)
+		return NSM_SW_ERROR_NULL;
+	if (data_len != sizeof(struct nsm_optical_module_power_bias_record))
+		return NSM_SW_ERROR_LENGTH;
+
+	uint16_t raw;
+	memcpy(&raw, data, sizeof(raw));
+	*out_value = le16toh(raw);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_optical_module_snr_lane_record(const uint8_t *data, size_t data_len,
+					  uint32_t *out_raw_value)
+{
+	if (!data || !out_raw_value)
+		return NSM_SW_ERROR_NULL;
+	if (data_len != sizeof(struct nsm_optical_module_snr_record))
+		return NSM_SW_ERROR_LENGTH;
+
+	uint32_t raw;
+	memcpy(&raw, data, sizeof(raw));
+	*out_raw_value = le32toh(raw);
 	return NSM_SW_SUCCESS;
 }

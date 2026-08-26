@@ -140,6 +140,8 @@ reconfiguration_permissions_v1_index
             return RP_INFOROM_RECREATE_ALLOW_INB;
         case ReconfigSettingsIntf::FeatureType::RISTDiagnostic:
             return RP_RUNTIME_IN_SYSTEM_TEST;
+        case ReconfigSettingsIntf::FeatureType::AdaptiveTGPMode:
+            return RP_DUAL_PART_NUMBERS;
         default:
             throw std::invalid_argument("Invalid feature :" +
                                         std::to_string(uint64_t(feature)));

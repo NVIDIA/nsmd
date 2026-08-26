@@ -9,6 +9,7 @@ sources = [
     '../requester/mctp_endpoint_prober.cpp',
     '../requester/mctp_endpoint_discovery.cpp',
     '../requester/request_timeout_tracker.cpp',
+    '../requester/response_mismatch_tracker.cpp',
     'sensorManager.cpp',
     'socket_handler.cpp',
     'nsmDevice.cpp',

@@ -861,15 +861,16 @@ TEST_F(NsmDebugInfoSensorTest, GetDebugInfoAsyncHandler_EndRecord_Success)
     close(fd);
 }
 
-// getDebugInfoAsyncHandler: stuck-loop guard — device returns the same
-// nextHandle on consecutive calls → finish(InternalFailure).
+// getDebugInfoAsyncHandler: WAR — device repeats the same nextHandle; the
+// transfer continues instead of aborting and completes once END arrives.
 TEST_F(NsmDebugInfoSensorTest,
-       GetDebugInfoAsyncHandler_StuckHandle_InternalFailure)
+       GetDebugInfoAsyncHandler_RepeatedHandle_Continues)
 {
     auto obj = makeDebugInfo("_stuck");
     EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
         .WillOnce(mockPostPatchIO(makeDebugInfoResp(NSM_SUCCESS, 7)))
-        .WillOnce(mockPostPatchIO(makeDebugInfoResp(NSM_SUCCESS, 7)));
+        .WillOnce(mockPostPatchIO(makeDebugInfoResp(NSM_SUCCESS, 7)))
+        .WillOnce(mockPostPatchIO(makeDebugInfoResp(NSM_SUCCESS, 0)));
 
     int fd = open("/dev/null", O_WRONLY);
     ASSERT_GE(fd, 0);
@@ -877,7 +878,7 @@ TEST_F(NsmDebugInfoSensorTest,
         obj->getDebugInfo(nsm::DebugInformationType::DeviceInformation,
                           sdbusplus::message::unix_fd{fd}));
     EXPECT_EQ(obj->statusInterface->status(),
-              AsyncOperationStatusType::InternalFailure);
+              AsyncOperationStatusType::Success);
     close(fd);
 }
 

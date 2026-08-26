@@ -43,6 +43,25 @@ using namespace ::testing;
 
 using namespace nsm;
 
+namespace
+{
+/** Builds the mask owner that NsmSetErrorInjectionEnabled delegates its
+ *  read-modify-write to. */
+inline std::shared_ptr<NsmSetErrorInjectionCapabilities>
+    makeErrorInjectionCapabilities(
+        SensorManager& manager,
+        const Interfaces<ErrorInjectionCapabilityIntf>& interfaces)
+{
+    // The mask owner reuses this sensor's update() as its post-write read-back.
+    auto enabledSensor = std::make_shared<NsmErrorInjectionEnabled>(
+        NsmInterfaceProvider<ErrorInjectionCapabilityIntf>(
+            "ErrorInjectionCapability", "NSM_ErrorInjectionCapability",
+            interfaces));
+    return std::make_shared<NsmSetErrorInjectionCapabilities>(
+        "ErrorInjectionCapabilities", manager, interfaces, enabledSensor);
+}
+} // namespace
+
 static auto& testBus = utils::DBusHandler::getBus();
 
 // =============================================================================
@@ -73,13 +92,15 @@ TEST(NsmSetErrorInjectionEnabled, Constructor_ValidType_Succeeds)
     std::filesystem::path objPath("/test/ei/cap");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(testBus,
                                                                objPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::FatalErrors);
 
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[objPath] = intf;
 
     EXPECT_NO_THROW(NsmSetErrorInjectionEnabled sensor(
         "ErrorInjectionCap", ErrorInjectionCapabilityIntf::Type::FatalErrors,
-        smTest.mockManager, interfaces));
+        interfaces,
+        makeErrorInjectionCapabilities(smTest.mockManager, interfaces)));
 }
 
 TEST(NsmSetErrorInjectionEnabled, Constructor_UnknownType_Throws)
@@ -90,15 +111,17 @@ TEST(NsmSetErrorInjectionEnabled, Constructor_UnknownType_Throws)
     std::filesystem::path objPath("/test/ei/cap_unknown");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(testBus,
                                                                objPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::MemoryErrors);
 
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[objPath] = intf;
 
-    EXPECT_THROW(NsmSetErrorInjectionEnabled sensor(
-                     "ErrorInjectionCap",
-                     ErrorInjectionCapabilityIntf::Type::Unknown,
-                     smTest.mockManager, interfaces),
-                 std::invalid_argument);
+    EXPECT_THROW(
+        NsmSetErrorInjectionEnabled sensor(
+            "ErrorInjectionCap", ErrorInjectionCapabilityIntf::Type::Unknown,
+            interfaces,
+            makeErrorInjectionCapabilities(smTest.mockManager, interfaces)),
+        std::invalid_argument);
 }
 
 TEST(NsmSetErrorInjectionEnabled, Constructor_NameAndType)
@@ -109,13 +132,15 @@ TEST(NsmSetErrorInjectionEnabled, Constructor_NameAndType)
     std::filesystem::path objPath("/test/ei/cap2");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(testBus,
                                                                objPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::MemoryErrors);
 
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[objPath] = intf;
 
     NsmSetErrorInjectionEnabled sensor(
         "EiCapSensor", ErrorInjectionCapabilityIntf::Type::MemoryErrors,
-        smTest.mockManager, interfaces);
+        interfaces,
+        makeErrorInjectionCapabilities(smTest.mockManager, interfaces));
 
     EXPECT_EQ(sensor.getName(), "EiCapSensor");
     EXPECT_EQ(sensor.getType(), "NSM_ErrorInjectionCapability");
@@ -231,19 +256,29 @@ TEST_F(NsmSetErrorInjectionCoroutineTest, SetEnabled_Success_CoversFalseBranch)
     std::filesystem::path eiPath("/test/ei_enabled_succ");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(bus,
                                                                eiPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::MemoryErrors);
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[eiPath] = intf;
 
     NsmSetErrorInjectionEnabled sensor(
         "EiEnabled", ErrorInjectionCapabilityIntf::Type::MemoryErrors,
-        mockManager, interfaces);
+        interfaces, makeErrorInjectionCapabilities(mockManager, interfaces));
 
     std::vector<uint8_t> resp(256, 0);
     auto msg = reinterpret_cast<nsm_msg*>(resp.data());
     ASSERT_EQ(encode_set_current_error_injection_types_v1_resp(0, NSM_SUCCESS,
                                                                ERR_NULL, msg),
               NSM_SW_SUCCESS);
+    // The write is followed by the in-lock read-back, which reuses the polling
+    // sensor's update() and therefore goes through sensorIO, not postPatchIO.
+    std::vector<uint8_t> readBackResp(256, 0);
+    auto readBackMsg = reinterpret_cast<nsm_msg*>(readBackResp.data());
+    nsm_error_injection_types_mask readBackMask{};
+    ASSERT_EQ(encode_get_current_error_injection_types_v1_resp(
+                  0, NSM_SUCCESS, ERR_NULL, &readBackMask, readBackMsg),
+              NSM_SW_SUCCESS);
     EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(mockPostPatchIO(resp));
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(readBackResp));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
     sensor.setEnabled(true, status, gpu);
@@ -258,12 +293,13 @@ TEST_F(NsmSetErrorInjectionCoroutineTest, SetEnabled_ErrorCC_CoversTrueBranch)
     std::filesystem::path eiPath("/test/ei_enabled_err");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(bus,
                                                                eiPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::MemoryErrors);
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[eiPath] = intf;
 
     NsmSetErrorInjectionEnabled sensor(
         "EiEnabled", ErrorInjectionCapabilityIntf::Type::MemoryErrors,
-        mockManager, interfaces);
+        interfaces, makeErrorInjectionCapabilities(mockManager, interfaces));
 
     std::vector<uint8_t> resp(256, 0);
     auto msg = reinterpret_cast<nsm_msg*>(resp.data());
@@ -390,19 +426,29 @@ TEST_F(NsmSetErrorInjectionCoroutineTest, Enabled_ValidBool_CallsSetEnabled)
     std::filesystem::path eiPath("/test/ei_en_via_enabled");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(bus,
                                                                eiPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::MemoryErrors);
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[eiPath] = intf;
 
     NsmSetErrorInjectionEnabled sensor(
         "EiEnabledViaEnabled", ErrorInjectionCapabilityIntf::Type::MemoryErrors,
-        mockManager, interfaces);
+        interfaces, makeErrorInjectionCapabilities(mockManager, interfaces));
 
     std::vector<uint8_t> resp(256, 0);
     auto msg = reinterpret_cast<nsm_msg*>(resp.data());
     ASSERT_EQ(encode_set_current_error_injection_types_v1_resp(0, NSM_SUCCESS,
                                                                ERR_NULL, msg),
               NSM_SW_SUCCESS);
+    // The write is followed by the in-lock read-back, which reuses the polling
+    // sensor's update() and therefore goes through sensorIO, not postPatchIO.
+    std::vector<uint8_t> readBackResp(256, 0);
+    auto readBackMsg = reinterpret_cast<nsm_msg*>(readBackResp.data());
+    nsm_error_injection_types_mask readBackMask{};
+    ASSERT_EQ(encode_get_current_error_injection_types_v1_resp(
+                  0, NSM_SUCCESS, ERR_NULL, &readBackMask, readBackMsg),
+              NSM_SW_SUCCESS);
     EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(mockPostPatchIO(resp));
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(readBackResp));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
     AsyncSetOperationValueType value = bool{true};
@@ -419,12 +465,13 @@ TEST_F(NsmSetErrorInjectionCoroutineTest, Enabled_NonBool_ThrowsInvalidArgument)
     std::filesystem::path eiPath("/test/ei_en_nonbool");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(bus,
                                                                eiPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::MemoryErrors);
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[eiPath] = intf;
 
     NsmSetErrorInjectionEnabled sensor(
         "EiEnabledNonBool", ErrorInjectionCapabilityIntf::Type::MemoryErrors,
-        mockManager, interfaces);
+        interfaces, makeErrorInjectionCapabilities(mockManager, interfaces));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
     AsyncSetOperationValueType value = uint32_t{42};
@@ -481,12 +528,13 @@ TEST_F(NsmSetErrorInjectionCoroutineTest,
     std::filesystem::path eiPath("/test/ei_sio_fail");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(bus,
                                                                eiPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::MemoryErrors);
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[eiPath] = intf;
 
     NsmSetErrorInjectionEnabled sensor(
         "EiSioFail", ErrorInjectionCapabilityIntf::Type::MemoryErrors,
-        mockManager, interfaces);
+        interfaces, makeErrorInjectionCapabilities(mockManager, interfaces));
 
     EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
         .WillOnce(mockPostPatchIO(NSM_ERROR));
@@ -503,12 +551,13 @@ TEST_F(NsmSetErrorInjectionCoroutineTest,
     std::filesystem::path eiPath("/test/ei_unsup");
     auto intf = std::make_shared<ErrorInjectionCapabilityIntf>(bus,
                                                                eiPath.c_str());
+    intf->type(ErrorInjectionCapabilityIntf::Type::MemoryErrors);
     Interfaces<ErrorInjectionCapabilityIntf> interfaces;
     interfaces[eiPath] = intf;
 
     NsmSetErrorInjectionEnabled sensor(
         "EiUnsupported", ErrorInjectionCapabilityIntf::Type::MemoryErrors,
-        mockManager, interfaces);
+        interfaces, makeErrorInjectionCapabilities(mockManager, interfaces));
 
     EXPECT_CALL(*gpu, postPatchIO(_, _, _, _))
         .WillOnce(mockPostPatchIO(static_cast<nsm_completion_codes>(

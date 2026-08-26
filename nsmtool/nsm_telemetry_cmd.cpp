@@ -32,6 +32,7 @@
 
 #include "cmd_helper.hpp"
 #include "gpm_metrics_list.hpp"
+#include "nsm_base.hpp"
 #include "utils.hpp"
 
 #include <CLI/CLI.hpp>
@@ -460,6 +461,229 @@ class GetLLDPPacket : public CommandInterface
     uint8_t direction{0};
 };
 
+class QueryPortTelemetryV2 : public CommandInterface
+{
+  public:
+    ~QueryPortTelemetryV2() = default;
+    QueryPortTelemetryV2() = delete;
+    QueryPortTelemetryV2(const QueryPortTelemetryV2&) = delete;
+    QueryPortTelemetryV2(QueryPortTelemetryV2&&) = default;
+    QueryPortTelemetryV2& operator=(const QueryPortTelemetryV2&) = delete;
+    QueryPortTelemetryV2& operator=(QueryPortTelemetryV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit QueryPortTelemetryV2(const char* type, const char* name,
+                                  CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto g = app->add_option_group(
+            "Required", "Query Port Telemetry Counter v2 (Type 1 cmd 0x14)");
+        g->add_option("-p,--portNum", portIndex,
+                      "Port index on the network port (1-based)");
+        g->add_option(
+            "-g,--groupId", groupId,
+            "Telemetry group ID (0x01-0x09); see enum "
+            "nsm_port_telemetry_v2_group_id. Accepts decimal or 0x-prefixed "
+            "hex");
+        g->require_option(2);
+        app->add_option(
+            "-s,--seqToken", sequenceToken,
+            "Sequence Token to continue a paginated query (0 for initial "
+            "request; this tool fetches a single page per invocation)");
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        if (portIndex == 0)
+        {
+            std::cerr << "Invalid portNum " << portIndex
+                      << " (port index is 1-based)\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        if (groupId < NSM_PORT_TELEMETRY_GROUP_PHY_ERRORS ||
+            groupId > NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE)
+        {
+            std::cerr << "Invalid groupId " << static_cast<unsigned>(groupId)
+                      << " (expected 0x01-0x09)\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_v2_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_query_port_telemetry_v2_req(
+            instanceId, portIndex, groupId, sequenceToken, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        QueryPortTelemetryV2AggregateResponseParser{groupId}
+            .parseAggregateResponse(responsePtr, payloadLength);
+    }
+
+  private:
+    class QueryPortTelemetryV2AggregateResponseParser :
+        public AggregateResponseParser
+    {
+      public:
+        explicit QueryPortTelemetryV2AggregateResponseParser(uint8_t groupId) :
+            groupId(groupId)
+        {}
+
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            if (groupId != NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE)
+            {
+                // Tag-to-metric mapping is only implemented for the Optical
+                // Module group; other groups print the raw sample bytes.
+                ordered_json bytes = ordered_json::array();
+                for (size_t i = 0; i < data_len; ++i)
+                {
+                    bytes.push_back(data[i]);
+                }
+                sample_json["Tag"] = tag;
+                sample_json["RawData"] = std::move(bytes);
+                return NSM_SW_SUCCESS;
+            }
+
+            // Group 0x09 tags are four contiguous 8-lane blocks (NVBug
+            // 6253174); block base identifies the metric, and (tag - base)
+            // is the lane index.
+            const uint8_t lane = static_cast<uint8_t>(tag % 8);
+            const uint8_t metricBase = static_cast<uint8_t>(tag - lane);
+
+            if (metricBase == NSM_OPTICAL_MODULE_TAG_SNR_BASE)
+            {
+                uint32_t rawValue = 0;
+                int rc = decode_optical_module_snr_lane_record(data, data_len,
+                                                               &rawValue);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Lane"] = lane;
+                sample_json["Metric"] = "SignalToNoiseRatio";
+                sample_json["ValueDb"] = static_cast<double>(rawValue) / 256.0;
+                return NSM_SW_SUCCESS;
+            }
+
+            uint16_t value = 0;
+            int rc = decode_optical_module_power_bias_lane_record(
+                data, data_len, &value);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                return rc;
+            }
+            sample_json["Lane"] = lane;
+            switch (metricBase)
+            {
+                case NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE:
+                    sample_json["Metric"] = "TXOutputPowerMilliWatts";
+                    break;
+                case NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE:
+                    sample_json["Metric"] = "RXInputPowerMilliWatts";
+                    break;
+                case NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE:
+                    sample_json["Metric"] = "TXBiasCurrentMilliAmps";
+                    break;
+                default:
+                    sample_json["Metric"] = "Unknown";
+                    break;
+            }
+            sample_json["Value"] = value;
+            return NSM_SW_SUCCESS;
+        }
+
+        uint8_t groupId;
+    };
+
+    uint16_t portIndex = 0;
+    uint8_t groupId = NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE;
+    uint32_t sequenceToken = 0;
+};
+
+class QueryPortTelemetryCapabilities : public CommandInterface
+{
+  public:
+    ~QueryPortTelemetryCapabilities() = default;
+    QueryPortTelemetryCapabilities() = delete;
+    QueryPortTelemetryCapabilities(const QueryPortTelemetryCapabilities&) =
+        delete;
+    QueryPortTelemetryCapabilities(QueryPortTelemetryCapabilities&&) = default;
+    QueryPortTelemetryCapabilities&
+        operator=(const QueryPortTelemetryCapabilities&) = delete;
+    QueryPortTelemetryCapabilities&
+        operator=(QueryPortTelemetryCapabilities&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit QueryPortTelemetryCapabilities(const char* type, const char* name,
+                                            CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto g = app->add_option_group(
+            "Required", "Query Port Telemetry Capabilities (Type 1 cmd 0x15)");
+        g->add_option("-p,--portNum", portIndex,
+                      "Port index on the network port (1-based)");
+        g->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_caps_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_query_port_telemetry_caps_req(instanceId, portIndex,
+                                                       request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint8_t maxSupportedGroupId = 0;
+        uint8_t maxCounterRecordsPerResp = 0;
+        uint8_t supportedGroupsBitmask[32] = {};
+
+        auto rc = decode_query_port_telemetry_caps_resp(
+            responsePtr, payloadLength, &cc, &maxSupportedGroupId,
+            &maxCounterRecordsPerResp, supportedGroupsBitmask);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr
+                << "Response message error: decode_query_port_telemetry_caps_resp "
+                << "failed rc=" << rc << ", cc=" << static_cast<int>(cc)
+                << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Port Index"] = portIndex;
+        result["Max Supported Group ID"] = maxSupportedGroupId;
+        result["Max Counter Records Per Response"] = maxCounterRecordsPerResp;
+
+        ordered_json supportedGroups = ordered_json::array();
+        for (int groupId = 1; groupId <= maxSupportedGroupId; ++groupId)
+        {
+            int byteIdx = (groupId - 1) / 8;
+            int bitIdx = (groupId - 1) % 8;
+            if (supportedGroupsBitmask[byteIdx] & (1u << bitIdx))
+            {
+                supportedGroups.push_back(groupId);
+            }
+        }
+        result["Supported Groups"] = std::move(supportedGroups);
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint16_t portIndex = 0;
+};
+
 class QueryPortCharacteristics : public CommandInterface
 {
   public:
@@ -528,6 +752,10 @@ class QueryPortCharacteristics : public CommandInterface
                 static_cast<uint32_t>(portCharData.nv_port_data_rate_kbps);
             result["Lane Info Status"] =
                 static_cast<uint32_t>(portCharData.status_lane_info);
+            result["Link Health"] =
+                static_cast<uint32_t>(portCharData.port_status.link_health);
+            result["Attention Trigger"] = static_cast<uint32_t>(
+                portCharData.port_status.attention_trigger);
             nsmtool::helper::DisplayInJson(result);
         }
         else
@@ -7010,6 +7238,19 @@ void registerCommand(CLI::App& app)
         "Get raw LLDP frame for a (port, direction) on a PCIe Bridge device (Type 0 NSM_DEV_ID_PCIE_BRIDGE; Type 1 cmd 0x16)");
     commands.push_back(std::make_unique<GetLLDPPacket>(
         "telemetry", "GetLLDPPacket", getLldpPacket));
+
+    auto queryPortTelemetryV2 = telemetry->add_subcommand(
+        "QueryPortTelemetryV2",
+        "Query Port Telemetry Counter v2 (Type 1 cmd 0x14)");
+    commands.push_back(std::make_unique<QueryPortTelemetryV2>(
+        "telemetry", "QueryPortTelemetryV2", queryPortTelemetryV2));
+
+    auto queryPortTelemetryCapabilities = telemetry->add_subcommand(
+        "QueryPortTelemetryCapabilities",
+        "Query Port Telemetry Capabilities (Type 1 cmd 0x15)");
+    commands.push_back(std::make_unique<QueryPortTelemetryCapabilities>(
+        "telemetry", "QueryPortTelemetryCapabilities",
+        queryPortTelemetryCapabilities));
 }
 
 } // namespace telemetry

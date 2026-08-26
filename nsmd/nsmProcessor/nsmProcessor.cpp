@@ -33,6 +33,7 @@
 #include "platform-environmental.h"
 
 #include "../../common/coroutine.hpp"
+#include "../../common/telemetryTombstone.hpp"
 #include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
@@ -63,6 +64,7 @@
 #include <telemetry_mrd_producer.hpp>
 #endif
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
@@ -660,6 +662,26 @@ void createPowerCap(std::shared_ptr<NsmDevice> nsmDevice, sdbusplus::bus_t& bus,
     nsmDevice->addStaticSensor(minPowerCap);
 }
 
+void createAdaptiveTGPMode(std::shared_ptr<NsmDevice> nsmDevice,
+                           sdbusplus::bus_t& bus, std::string& name,
+                           std::string& type, std::string& inventoryObjPath)
+{
+    bool priority = false;
+
+    auto sensor = std::make_shared<NsmAdaptiveTGPMode>(bus, name, type,
+                                                       inventoryObjPath);
+    nsmDevice->addSensor(sensor, priority);
+
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(inventoryObjPath)
+        ->addAsyncSetOperation(
+            "com.nvidia.AdaptiveTGPMode", "AdaptiveTGPModeEnabled",
+            AsyncSetOperationInfo{
+                std::bind_front(&NsmAdaptiveTGPMode::patchAdaptiveTGPMode,
+                                sensor),
+                sensor, nsmDevice});
+}
+
 void createReconfigPermissions(std::shared_ptr<NsmDevice> nsmDevice,
                                sdbusplus::bus_t& bus, std::string& name,
                                [[maybe_unused]] std::string& type,
@@ -682,6 +704,19 @@ void createReconfigPermissions(std::shared_ptr<NsmDevice> nsmDevice,
             "com.nvidia.InbandReconfigSettings.FeatureType." + featureName);
         features[feature] = featureName;
     }
+
+    // The AdaptiveTGPMode (Dual Part Number) sensor is only created when the
+    // device advertises the DUAL_PART_NUMBERS PRC knob, i.e. when
+    // "AdaptiveTGPMode" is listed in the ReconfigPermissions Features property.
+    // It is not driven by a separate EM configuration interface.
+    if (std::find(featuresNames.begin(), featuresNames.end(),
+                  "AdaptiveTGPMode") != featuresNames.end())
+    {
+        std::string adaptiveTGPModeType{"NSM_AdaptiveTGPMode"};
+        createAdaptiveTGPMode(nsmDevice, bus, name, adaptiveTGPModeType,
+                              inventoryObjPath);
+    }
+
     for (auto [feature, featureName] : features)
     {
         auto hostConfigPdiPath = inventoryObjPath +
@@ -1267,7 +1302,8 @@ NsmEccErrorCounts::NsmEccErrorCounts(std::string& name, std::string& type,
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
     eccErrorCountIntf = eccIntf;
-    updateMetricOnSharedMemory();
+    // Seed the markers so never-polled counts are not published as 0.
+    publishTelemetryUnavailable();
 }
 void NsmEccErrorCounts::updateMetricOnSharedMemory()
 {
@@ -1275,17 +1311,25 @@ void NsmEccErrorCounts::updateMetricOnSharedMemory()
     auto ifaceName = std::string(eccErrorCountIntf->interface);
     std::vector<uint8_t> smbusData = {};
 
-    nv::sensor_aggregation::DbusVariantType ceCountOnSharedMem{
-        static_cast<int64_t>(eccErrorCountIntf->ceCount())};
+    auto ce = static_cast<int64_t>(eccErrorCountIntf->ceCount());
+    nv::sensor_aggregation::DbusVariantType ceCountOnSharedMem{ce};
     std::string propName = "ceCount";
+    uint8_t ceRc = (ce == Sentinel<int64_t>::notAvailable)
+                       ? TELEMETRY_NOT_AVAILABLE
+                       : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, ceCountOnSharedMem);
+        inventoryObjPath, ifaceName, propName, smbusData, ceCountOnSharedMem,
+        "", ceRc);
 
+    auto ue = static_cast<int64_t>(eccErrorCountIntf->ueCount());
     propName = "ueCount";
-    nv::sensor_aggregation::DbusVariantType ueCountOnSharedMem{
-        static_cast<int64_t>(eccErrorCountIntf->ueCount())};
+    nv::sensor_aggregation::DbusVariantType ueCountOnSharedMem{ue};
+    uint8_t ueRc = (ue == Sentinel<int64_t>::notAvailable)
+                       ? TELEMETRY_NOT_AVAILABLE
+                       : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, ueCountOnSharedMem);
+        inventoryObjPath, ifaceName, propName, smbusData, ueCountOnSharedMem,
+        "", ueRc);
 
     propName = "isThresholdExceeded";
     nv::sensor_aggregation::DbusVariantType isThresholdExceeded{
@@ -1303,6 +1347,15 @@ void NsmEccErrorCounts::updateReading(struct nsm_ECC_error_counts errorCounts)
     eccErrorCountIntf->ueCount(ueCount);
 
     eccErrorCountIntf->isThresholdExceeded(errorCounts.flags.bits.bit0);
+    updateMetricOnSharedMemory();
+}
+
+void NsmEccErrorCounts::publishTelemetryUnavailable()
+{
+    // Stamp the int64 marker on the int64 D-Bus properties directly; the wire
+    // struct's uint32 fields cannot represent the int64 marker.
+    eccErrorCountIntf->ceCount(Sentinel<int64_t>::notAvailable);
+    eccErrorCountIntf->ueCount(Sentinel<int64_t>::notAvailable);
     updateMetricOnSharedMemory();
 }
 
@@ -1810,6 +1863,9 @@ NsmCurrClockFreq::NsmCurrClockFreq(
 {
     lg2::info("NsmCurrClockFreq: create sensor:{NAME}", "NAME", name.c_str());
     cpuOperatingConfigIntf = cpuConfigIntf;
+    // Seed with the marker so a never-polled property reads as null, not 0.
+    cpuOperatingConfigIntf->CpuOperatingConfigIntf::operatingSpeed(
+        Sentinel<uint32_t>::notAvailable);
     updateMetricOnSharedMemory();
 }
 
@@ -1820,10 +1876,17 @@ void NsmCurrClockFreq::updateMetricOnSharedMemory()
     std::vector<uint8_t> smbusData = {};
 
     std::string propName = "OperatingSpeed";
-    nv::sensor_aggregation::DbusVariantType operatingSpeedVal{
-        cpuOperatingConfigIntf->CpuOperatingConfigIntf::operatingSpeed()};
+    auto speed =
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::operatingSpeed();
+    nv::sensor_aggregation::DbusVariantType operatingSpeedVal{speed};
+    // A maxint reading is the "no data" marker: publish TELEMETRY_NOT_AVAILABLE
+    // so shared memory caches nan (rendered as Redfish null), not raw maxint.
+    uint8_t rc = (speed == Sentinel<uint32_t>::notAvailable)
+                     ? TELEMETRY_NOT_AVAILABLE
+                     : TELEMETRY_AVAILABLE;
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
-        inventoryObjPath, ifaceName, propName, smbusData, operatingSpeedVal);
+        inventoryObjPath, ifaceName, propName, smbusData, operatingSpeedVal, "",
+        rc);
 
 #endif
 }
@@ -1871,7 +1934,26 @@ uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
     {
         updateReading(clockFreq);
     }
+    else
+    {
+        // Poll failed (error cc): publish the no-reading marker instead of a
+        // stale/default value, as per the requirement (bug 5366235).
+        updateReading(Sentinel<uint32_t>::notAvailable);
+    }
     return cc ? cc : rc;
+}
+
+requester::Coroutine
+    NsmCurrClockFreq::update(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    auto rc = co_await NsmSensor::update(nsmDevice);
+    // Transport failure (timeout/no response) skips handleResponseMsg; stamp
+    // the marker so a prior reading is not left stale.
+    if (rc != NSM_SW_SUCCESS)
+    {
+        updateReading(Sentinel<uint32_t>::notAvailable);
+    }
+    co_return rc;
 }
 
 NsmDefaultBaseClockSpeed::NsmDefaultBaseClockSpeed(
@@ -3428,6 +3510,157 @@ uint8_t NsmEgmMode::handleResponseMsg(const struct nsm_msg* responseMsg,
     }
 
     return cc ? cc : rc;
+}
+
+NsmAdaptiveTGPMode::NsmAdaptiveTGPMode(sdbusplus::bus_t& bus, std::string& name,
+                                       std::string& type,
+                                       std::string& inventoryObjPath) :
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
+{
+    lg2::info("NsmAdaptiveTGPMode: create sensor:{NAME}", "NAME", name.c_str());
+    adaptiveTGPModeIntf =
+        std::make_unique<AdaptiveTGPModeIntf>(bus, inventoryObjPath.c_str());
+}
+
+// AdaptiveTGPMode is not a member of any MetricReportDefinition, so the
+// properties are served from D-Bus only and are not cached to shared memory.
+
+void NsmAdaptiveTGPMode::updateReading(bool enabled, bool pendingEnabled)
+{
+    adaptiveTGPModeIntf->AdaptiveTGPModeIntf::adaptiveTGPModeEnabled(enabled);
+    adaptiveTGPModeIntf->AdaptiveTGPModeIntf::pendingAdaptiveTGPMode(
+        pendingEnabled);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmAdaptiveTGPMode::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req), 0);
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_device_mode_settings_v2_req(
+        instanceId, static_cast<uint32_t>(DEVICE_MODE_ADAPTIVE_TGPMODE),
+        requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        LG2_ERROR_FLT("NsmAdaptiveTGPMode: "
+                      "encode_get_device_mode_settings_v2_req "
+                      "failed. eid={EID} rc={RC}",
+                      "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+// Decodes a single device-mode byte. Any non-zero value means the mode is
+// enabled, so out-of-spec values do not silently read as disabled.
+static bool isAdaptiveTGPModeEnabled(uint8_t modeByte)
+{
+    return modeByte != NSM_ADAPTIVE_TGPMODE_DISABLED;
+}
+
+uint8_t NsmAdaptiveTGPMode::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                              size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reasonCode = ERR_NULL;
+    constexpr size_t maxModeBytes = 16;
+    uint8_t currentData[maxModeBytes] = {};
+    uint8_t pendingData[maxModeBytes] = {};
+    uint16_t currentLength = 0;
+    uint16_t pendingLength = 0;
+
+    auto rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reasonCode, currentData, &currentLength,
+        pendingData, &pendingLength);
+
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && currentLength >= 1 &&
+        pendingLength >= 1)
+    {
+        updateReading(isAdaptiveTGPModeEnabled(currentData[0]),
+                      isAdaptiveTGPModeEnabled(pendingData[0]));
+    }
+    else
+    {
+        LG2_ERROR_FLT("decode_get_device_mode_settings_v2_resp failure | "
+                      "reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, "
+                      "currentLength: {LEN}, pendingLength: {PENDLEN}",
+                      "REASONCODE", reasonCode, "CC", cc, "RC", rc, "LEN",
+                      currentLength, "PENDLEN", pendingLength);
+    }
+
+    return cc ? cc : rc;
+}
+
+requester::Coroutine NsmAdaptiveTGPMode::patchAdaptiveTGPMode(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const bool* enabled = std::get_if<bool>(&value);
+    if (!enabled)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    auto eid = device->getEid();
+
+    lg2::info(
+        "NsmAdaptiveTGPMode::patchAdaptiveTGPMode for EID: {EID} value={VAL}",
+        "EID", eid, "VAL", *enabled);
+
+    uint8_t modeData = *enabled ? NSM_ADAPTIVE_TGPMODE_ENABLED
+                                : NSM_ADAPTIVE_TGPMODE_DISABLED;
+    std::vector<uint8_t> request(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_settings_v2_req), 0);
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_set_device_mode_settings_v2_req(
+        0, static_cast<uint32_t>(DEVICE_MODE_ADAPTIVE_TGPMODE), &modeData,
+        sizeof(modeData), requestPtr);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("NsmAdaptiveTGPMode: encode_set_device_mode_settings_v2_req "
+                   "failed. eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmAdaptiveTGPMode::patchAdaptiveTGPMode postPatchIO failed. "
+            "eid={EID} rc={RC}",
+            "EID", eid, "RC", utils::nsmSwCodeToString(rc));
+        *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reasonCode = ERR_NULL;
+    rc = decode_set_device_mode_settings_v2_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reasonCode);
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info("NsmAdaptiveTGPMode::patchAdaptiveTGPMode for EID: {EID} "
+                  "successful",
+                  "EID", eid);
+    }
+    else
+    {
+        lg2::error("NsmAdaptiveTGPMode::patchAdaptiveTGPMode "
+                   "decode_set_device_mode_settings_v2_resp failed. "
+                   "eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
+                   "EID", eid, "CC", cc, "REASONCODE", reasonCode, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+    }
+    // coverity[missing_return]
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine createNsmProcessorSensor(SensorManager& manager,

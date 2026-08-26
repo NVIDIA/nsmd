@@ -26,6 +26,7 @@ tests = [
     'libnsm_platform_environmental_line_test',
     'libnsm_platform_environmental_error_paths_test',
     'libnsm_network_ports_test',
+    'libnsm_network_ports_optical_module_test',
     'libnsm_pci_links_test',
     'libnsm_powersmoothing_v2_test',
     'libnsm_remaining_coverage_test',
@@ -55,6 +56,7 @@ tests = [
     'libnsm_firmware_utils_branch3_test',
     'libnsm_platform_environmental_branch7_test',
     'libnsm_device_configuration_branch4_test',
+    'libnsm_network_ports_port_health_test',
 ]
 
 foreach t : tests

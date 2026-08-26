@@ -325,8 +325,11 @@ TEST_P(NsmLinkDownCodeTest, UpdateLinkDownCode_Case)
         std::make_shared<PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<IBPortIntf>(bus, objPath.c_str());
 
-    NsmPortCharacteristics sensor(bus, portName, portNum, type,
-                                  portMetricsOem3Intf, iBPortIntf, objPath);
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<PortHealthMetricsIntf>(bus, objPath.c_str());
+    NsmPortCharacteristics sensor(bus, portName, portNum, type, NSM_DEV_ID_GPU,
+                                  portMetricsOem3Intf, iBPortIntf,
+                                  portHealthMetricsIntfCtor, objPath);
 
     auto param = GetParam();
 
@@ -1338,8 +1341,11 @@ TEST_F(NsmPortBranch2Test, PortCharacteristics_HandleResponseMsg_DecodeFail)
         std::make_shared<PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<IBPortIntf>(bus, objPath.c_str());
 
-    NsmPortCharacteristics sensor(bus, portName, portNum, type,
-                                  portMetricsOem3Intf, iBPortIntf, objPath);
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<PortHealthMetricsIntf>(bus, objPath.c_str());
+    NsmPortCharacteristics sensor(bus, portName, portNum, type, NSM_DEV_ID_GPU,
+                                  portMetricsOem3Intf, iBPortIntf,
+                                  portHealthMetricsIntfCtor, objPath);
 
     std::vector<uint8_t> shortResp(
         sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
@@ -1645,8 +1651,11 @@ TEST_F(NsmPortBranch2Test, PortCharacteristics_GenRequestMsg_EncodeFail)
         std::make_shared<PortMetricsOem3Intf>(bus, objPath.c_str());
     auto iBPortIntf = std::make_shared<IBPortIntf>(bus, objPath.c_str());
 
-    NsmPortCharacteristics sensor(bus, portName, portNum, type,
-                                  portMetricsOem3Intf, iBPortIntf, objPath);
+    auto portHealthMetricsIntfCtor =
+        std::make_shared<PortHealthMetricsIntf>(bus, objPath.c_str());
+    NsmPortCharacteristics sensor(bus, portName, portNum, type, NSM_DEV_ID_GPU,
+                                  portMetricsOem3Intf, iBPortIntf,
+                                  portHealthMetricsIntfCtor, objPath);
 
     auto genResult = sensor.genRequestMsg(0, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(genResult.has_value());
