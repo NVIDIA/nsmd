@@ -128,9 +128,21 @@ requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
     }
     if (cc == NSM_SUCCESS)
     {
+        // Refresh the on-device token status BEFORE reporting success, so a
+        // status read issued immediately after the operation observes the new
+        // state instead of the stale pre-operation value. The device has
+        // already reported the operation itself as successful, so a failed
+        // refresh does not change the outcome, but it does leave the
+        // published status stale and is logged for that reason.
+        auto refreshRc = co_await queryTokenHandler(device);
+        if (refreshRc != NSM_SW_SUCCESS)
+        {
+            lg2::error("DebugToken: eraseToken: status refresh failed "
+                       "eid={EID} rc={RC}; published status may be stale",
+                       "EID", eid, "RC", refreshRc);
+        }
         valueIntf->value(std::make_tuple(static_cast<uint16_t>(cc), "Success"));
         statusIntf->status(AsyncOperationStatusType::Success);
-        queryTokenHandler(device).detach();
     }
     else
     {
@@ -399,10 +411,17 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
     {
         if (info->offset == info->totalSize)
         {
+            // Refresh the on-device token status BEFORE reporting success.
+            auto refreshRc = co_await queryTokenHandler(device);
+            if (refreshRc != NSM_SW_SUCCESS)
+            {
+                lg2::error("DebugToken: installToken: status refresh failed "
+                           "eid={EID} rc={RC}; published status may be stale",
+                           "EID", eid, "RC", refreshRc);
+            }
             valueIntf->value(
                 std::make_tuple(static_cast<uint16_t>(cc), "Success"));
             statusIntf->status(AsyncOperationStatusType::Success);
-            queryTokenHandler(device).detach();
         }
         else
         {
@@ -628,8 +647,16 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenDirect(
         }
     }
 
-    // Installation complete - update token status
-    queryTokenHandler(device).detach();
+    // Installation complete - refresh the on-device token status BEFORE
+    // returning success, so the aggregate caller cannot report Task completion
+    // ahead of TokenInstalled being published.
+    auto refreshRc = co_await queryTokenHandler(device);
+    if (refreshRc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DebugToken: installTokenDirect: status refresh failed "
+                   "eid={EID} rc={RC}; published status may be stale",
+                   "EID", eid, "RC", refreshRc);
+    }
 
     errorCode = 0;
     errorMessage = "Success";
