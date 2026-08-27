@@ -8,6 +8,7 @@ tests = [
     'nsmDebugTokenUnifiedBranch_test',
     'nsmDebugTokenUnifiedBranch4_test',
     'nsmDebugTokenUnifiedMultiRecord_test',
+    'nsmDebugTokenUnifiedMultiCycle_test',
     'nsmDebugTokenAggregation_test',
     'nsmDebugTokenAggregationBranch_test',
     'nsmDebugTokenNICBranch2_test',
