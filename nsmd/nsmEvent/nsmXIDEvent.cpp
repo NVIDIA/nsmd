@@ -31,8 +31,9 @@ namespace nsm
 {
 
 NsmXIDEvent::NsmXIDEvent(const std::string& name, const std::string& type,
-                         const NsmEventInfo info) :
-    NsmEvent(name, type), info(info)
+                         const NsmEventInfo info,
+                         std::weak_ptr<NsmDevice> device) :
+    NsmEvent(name, type), info(info), device(device)
 {}
 
 int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
@@ -94,10 +95,12 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
                 "ARG", messageArg, "ERROR", e, "SRC", eid, "UUID", info.uuid);
         }
     }
+    const auto deviceUuid = getEventDeviceUuid(device);
+
     if (!formattedMessageArgs.empty())
     {
         formattedMessageArgs[0] =
-            replaceGpuMessageArgDeviceName(info, formattedMessageArgs[0]);
+            replaceGpuMessageArgDeviceName(deviceUuid, formattedMessageArgs[0]);
     }
 
     std::string messageArgs{};
@@ -113,7 +116,7 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
         messageArgs += formattedMessageArgs[i];
     }
 
-    std::map<std::string, std::string> eventData{
+    eventData = {
         {"REDFISH_ORIGIN_OF_CONDITION", info.originOfCondition},
         {"REDFISH_MESSAGE_ARGS", messageArgs},
         {"REDFISH_MESSAGE_ID", info.messageId},
@@ -129,7 +132,7 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
     if (!info.impactedComponent.empty())
     {
         eventData["DEVICE_NAME"] =
-            replaceGpuMessageArgDeviceName(info, info.impactedComponent);
+            replaceGpuMessageArgDeviceName(deviceUuid, info.impactedComponent);
     }
 
     // Launch async logging without blocking the handle method
@@ -228,7 +231,7 @@ requester::Coroutine createNsmXIDEvent(SensorManager& manager,
         co_return NSM_ERROR;
     }
 
-    auto event = std::make_shared<NsmXIDEvent>(name, type, info);
+    auto event = std::make_shared<NsmXIDEvent>(name, type, info, nsmDevice);
 
     lg2::info("Created NSM XID Event : UUID={UUID}, Name={NAME}, Type={TYPE}",
               "UUID", info.uuid, "NAME", name, "TYPE", type);

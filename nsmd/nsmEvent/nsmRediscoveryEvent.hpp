@@ -28,13 +28,15 @@ class NsmRediscoveryEvent : public NsmEvent
 {
   public:
     NsmRediscoveryEvent(const std::string& name, const std::string& type,
-                        const NsmEventInfo info);
+                        const NsmEventInfo info,
+                        std::weak_ptr<NsmDevice> device = {});
 
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) final;
 
   private:
     const NsmEventInfo info;
+    std::weak_ptr<NsmDevice> device;
     std::map<std::string, std::string> eventData;
     std::string messageArgs{};
     requester::Coroutine

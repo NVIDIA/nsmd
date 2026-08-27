@@ -26,12 +26,16 @@ class NsmXIDEvent : public NsmEvent
 {
   public:
     NsmXIDEvent(const std::string& name, const std::string& type,
-                const NsmEventInfo info);
+                const NsmEventInfo info, std::weak_ptr<NsmDevice> device = {});
 
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) final;
 
   private:
     const NsmEventInfo info;
+    std::weak_ptr<NsmDevice> device;
+    /** @brief Payload submitted by the most recent handle(). Assembled per
+     *  event because the XID text is decoded from the wire each time. */
+    std::map<std::string, std::string> eventData;
 };
 } // namespace nsm

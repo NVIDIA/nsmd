@@ -95,16 +95,37 @@ TEST(NsmRediscoveryEvent, Constructor_MultipleMessageArgs_JoinedWithComma)
 }
 
 #ifdef ENABLE_EVENT_GPU_UUID_LABEL
-TEST(NsmRediscoveryEvent, Constructor_GpuMessageArg_UsesUuid)
+// NsmEventInfo::uuid is the entity-manager static device-identification key
+// (STATIC:d:d:s:s), never a device identity. It must never leak into the event
+// label; see NVBug 6659807.
+TEST(NsmRediscoveryEvent, Constructor_GpuMessageArg_DoesNotUseStaticUuid)
 {
     auto info = makeRediscoveryInfo();
     info.uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
     info.messageArgs = {"GPU_1 Rediscovery", "arg2"};
     NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info);
 
-    EXPECT_EQ(
-        event.messageArgs,
-        "GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1 Rediscovery,arg2");
+    EXPECT_EQ(event.messageArgs, "GPU_1 Rediscovery,arg2");
+    EXPECT_EQ(event.messageArgs.find("STATIC:"), std::string::npos);
+}
+
+TEST(NsmRediscoveryEvent, MessageArgs_WithDeviceUuid_UsesDeviceUuid)
+{
+    auto info = makeRediscoveryInfo();
+    info.uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+    info.messageArgs = {"GPU_1 Rediscovery", "arg2"};
+
+    EXPECT_EQ(getUuidMessageArgs(info, "6463b098-ca8d-55c1-a65a-4d03c14fb86d"),
+              "GPU UUID 6463b098-ca8d-55c1-a65a-4d03c14fb86d Rediscovery,arg2");
+}
+
+TEST(NsmRediscoveryEvent, MessageArgs_UnresolvedDeviceUuid_KeepsConfiguredName)
+{
+    auto info = makeRediscoveryInfo();
+    info.uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+    info.messageArgs = {"GPU_1 Rediscovery", "arg2"};
+
+    EXPECT_EQ(getUuidMessageArgs(info, ""), "GPU_1 Rediscovery,arg2");
 }
 #endif // ENABLE_EVENT_GPU_UUID_LABEL
 
@@ -300,6 +321,42 @@ struct HandleRediscovery_WithGpuDriverFixture :
         cleanupDeviceSensors(devices);
     }
 };
+
+// Emitted-payload coverage. handle() logs before it resolves the device from
+// the MctpDiscovery singleton, so the payload is recorded even though the
+// singleton then throws in a unit-test context.
+TEST_F(HandleRediscovery_WithGpuDriverFixture,
+       Handle_EmittedPayloadUsesDeviceGuid)
+{
+    const uuid_t deviceGuid = "6463b098-ca8d-55c1-a65a-4d03c14fb86d";
+
+    mockDevice->deviceUuid = deviceGuid;
+
+    auto info = makeRediscoveryInfo(true); // logging enabled
+    info.uuid = gpuUuid; // static EM key - must not be emitted
+    info.messageArgs = {"GPU_1", "rediscovery"};
+
+    NsmRediscoveryEvent event("rediscovery", "NSM_Rediscovery", info,
+                              mockDevice);
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_nsm_rediscovery_event(0, false, msg);
+    const auto* cmsg = reinterpret_cast<const nsm_msg*>(buf.data());
+
+    EXPECT_THROW(event.handle(5, {}, {}, cmsg, buf.size()), std::runtime_error);
+
+    const auto& data = event.eventData;
+    ASSERT_NE(data.find("REDFISH_MESSAGE_ARGS"), data.end());
+
+    EXPECT_EQ(data.at("REDFISH_MESSAGE_ARGS").find("STATIC:"),
+              std::string::npos);
+
+#ifdef ENABLE_EVENT_GPU_UUID_LABEL
+    EXPECT_EQ(data.at("REDFISH_MESSAGE_ARGS"),
+              "GPU UUID " + deviceGuid + ",rediscovery");
+#endif
+}
 
 TEST_F(HandleRediscovery_WithGpuDriverFixture,
        HandleRediscovery_Required_WithGpuDriver_CallsDriverUpdate)

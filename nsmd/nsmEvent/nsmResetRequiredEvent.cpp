@@ -31,10 +31,14 @@ namespace nsm
 
 NsmResetRequiredEvent::NsmResetRequiredEvent(const std::string& name,
                                              const std::string& type,
-                                             const NsmEventInfo info) :
-    NsmEvent(name, type), info(info)
+                                             const NsmEventInfo info,
+                                             std::weak_ptr<NsmDevice> device) :
+    NsmEvent(name, type), info(info), device(device)
 {
-    messageArgs = getUuidMessageArgs(info);
+    // The GPU UUID label is resolved at emission time in handle(); the device
+    // identity is read from the hardware asynchronously and is generally not
+    // available yet while the event is being constructed from EM config.
+    messageArgs = getUuidMessageArgs(info, {});
 
     eventData = {
         {"REDFISH_ORIGIN_OF_CONDITION", info.originOfCondition},
@@ -50,8 +54,7 @@ NsmResetRequiredEvent::NsmResetRequiredEvent(const std::string& name,
     }
     if (!info.impactedComponent.empty())
     {
-        eventData["DEVICE_NAME"] =
-            replaceGpuMessageArgDeviceName(info, info.impactedComponent);
+        eventData["DEVICE_NAME"] = info.impactedComponent;
     }
 };
 
@@ -74,6 +77,16 @@ int NsmResetRequiredEvent::handle(eid_t eid, NsmType /*type*/,
             "RC", rc, "SRC", eid, "NAME", getName());
 
         return rc;
+    }
+
+    // Resolve the label now that the device identity is known. Written back
+    // into eventData so the emitted payload is inspectable.
+    const auto deviceUuid = getEventDeviceUuid(device);
+    eventData["REDFISH_MESSAGE_ARGS"] = getUuidMessageArgs(info, deviceUuid);
+    if (!info.impactedComponent.empty())
+    {
+        eventData["DEVICE_NAME"] =
+            replaceGpuMessageArgDeviceName(deviceUuid, info.impactedComponent);
     }
 
     // Launch async logging without blocking the handle method
@@ -167,7 +180,8 @@ requester::Coroutine createNsmResetRequiredEvent(SensorManager& manager,
         co_return NSM_ERROR;
     }
 
-    auto event = std::make_shared<NsmResetRequiredEvent>(name, type, info);
+    auto event = std::make_shared<NsmResetRequiredEvent>(name, type, info,
+                                                         nsmDevice);
 
     lg2::info(
         "Created NSM Reset Required Event : UUID={UUID}, Name={NAME}, Type={TYPE}",

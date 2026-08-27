@@ -30,10 +30,14 @@ namespace nsm
 
 NsmRediscoveryEvent::NsmRediscoveryEvent(const std::string& name,
                                          const std::string& type,
-                                         const NsmEventInfo info) :
-    NsmEvent(name, type), info(info)
+                                         const NsmEventInfo info,
+                                         std::weak_ptr<NsmDevice> device) :
+    NsmEvent(name, type), info(info), device(device)
 {
-    messageArgs = getUuidMessageArgs(info);
+    // The GPU UUID label is resolved at emission time in handle(); the device
+    // identity is read from the hardware asynchronously and is generally not
+    // available yet while the event is being constructed from EM config.
+    messageArgs = getUuidMessageArgs(info, {});
 
     eventData = {
         {"REDFISH_ORIGIN_OF_CONDITION", info.originOfCondition},
@@ -72,6 +76,11 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
 
     if (info.logging)
     {
+        // Resolve the label now that the device identity is known. Written
+        // back into eventData so the emitted payload is inspectable.
+        eventData["REDFISH_MESSAGE_ARGS"] =
+            getUuidMessageArgs(info, getEventDeviceUuid(device));
+
         // Launch async logging without blocking the handle method
         auto loggingTask = logEventAsync("NsmRediscoveryEvent", info.severity,
                                          eventData);
@@ -212,7 +221,8 @@ requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    auto event = std::make_shared<NsmRediscoveryEvent>(name, type, info);
+    auto event = std::make_shared<NsmRediscoveryEvent>(name, type, info,
+                                                       nsmDevice);
 
     lg2::info(
         "Created NSM Rediscovery Event : UUID={UUID}, Name={NAME}, Type={TYPE}",
