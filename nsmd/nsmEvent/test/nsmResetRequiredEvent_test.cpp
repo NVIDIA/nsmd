@@ -100,15 +100,28 @@ TEST(NsmResetRequiredEvent, Constructor_MultipleMessageArgs_JoinedWithComma)
 }
 
 #ifdef ENABLE_EVENT_GPU_UUID_LABEL
-TEST(NsmResetRequiredEvent, Constructor_GpuMessageArg_UsesUuid)
+// NsmEventInfo::uuid is the entity-manager static device-identification key
+// (STATIC:d:d:s:s), never a device identity. It must never leak into the event
+// label; see NVBug 6659807.
+TEST(NsmResetRequiredEvent, Constructor_GpuMessageArg_DoesNotUseStaticUuid)
 {
     auto info = makeResetRequiredInfo();
     info.uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
     info.messageArgs = {"GPU_1", "ForceRestart"};
     NsmResetRequiredEvent event("reset_event", "NSM_ResetRequired", info);
 
-    EXPECT_EQ(event.messageArgs,
-              "GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1,ForceRestart");
+    EXPECT_EQ(event.messageArgs, "GPU_1,ForceRestart");
+    EXPECT_EQ(event.messageArgs.find("STATIC:"), std::string::npos);
+}
+
+TEST(NsmResetRequiredEvent, MessageArgs_WithDeviceUuid_UsesDeviceUuid)
+{
+    auto info = makeResetRequiredInfo();
+    info.uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+    info.messageArgs = {"GPU_1", "ForceRestart"};
+
+    EXPECT_EQ(getUuidMessageArgs(info, "6463b098-ca8d-55c1-a65a-4d03c14fb86d"),
+              "GPU UUID 6463b098-ca8d-55c1-a65a-4d03c14fb86d,ForceRestart");
 }
 #endif // ENABLE_EVENT_GPU_UUID_LABEL
 
@@ -136,7 +149,7 @@ TEST(NsmResetRequiredEvent, Constructor_ImpactedComponent_AddsDeviceName)
 }
 
 #ifdef ENABLE_EVENT_GPU_UUID_LABEL
-TEST(NsmResetRequiredEvent, Constructor_ImpactedComponentWithUuid_AddsUuid)
+TEST(NsmResetRequiredEvent, Constructor_ImpactedComponent_DoesNotUseStaticUuid)
 {
     auto info = makeResetRequiredInfo();
     info.uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
@@ -145,20 +158,21 @@ TEST(NsmResetRequiredEvent, Constructor_ImpactedComponentWithUuid_AddsUuid)
 
     auto it = event.eventData.find("DEVICE_NAME");
     ASSERT_NE(it, event.eventData.end());
-    EXPECT_EQ(it->second, "GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1");
+    EXPECT_EQ(it->second, "GPU_1_Component");
 }
 
-TEST(NsmResetRequiredEvent,
-     Constructor_NonGpuImpactedComponentWithUuid_Unchanged)
+TEST(NsmResetRequiredEvent, DeviceName_WithDeviceUuid_UsesDeviceUuid)
 {
-    auto info = makeResetRequiredInfo();
-    info.uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
-    info.impactedComponent = "NVSwitch_0";
-    NsmResetRequiredEvent event("reset_event", "NSM_ResetRequired", info);
+    EXPECT_EQ(replaceGpuMessageArgDeviceName(
+                  "6463b098-ca8d-55c1-a65a-4d03c14fb86d", "GPU_1_Component"),
+              "GPU UUID 6463b098-ca8d-55c1-a65a-4d03c14fb86d");
+}
 
-    auto it = event.eventData.find("DEVICE_NAME");
-    ASSERT_NE(it, event.eventData.end());
-    EXPECT_EQ(it->second, "NVSwitch_0");
+TEST(NsmResetRequiredEvent, DeviceName_NonGpuComponentWithDeviceUuid_Unchanged)
+{
+    EXPECT_EQ(replaceGpuMessageArgDeviceName(
+                  "6463b098-ca8d-55c1-a65a-4d03c14fb86d", "NVSwitch_0"),
+              "NVSwitch_0");
 }
 #endif // ENABLE_EVENT_GPU_UUID_LABEL
 
@@ -250,6 +264,46 @@ struct NsmResetRequiredEventFactoryTest :
 };
 
 // Full property map with valid UUID → event registered on device
+// Emitted-payload coverage for REDFISH_MESSAGE_ARGS and DEVICE_NAME - see the
+// equivalent test in nsmXIDEvent_test.cpp for why the return code alone is not
+// enough.
+TEST_F(NsmResetRequiredEventFactoryTest, Handle_EmittedPayloadUsesDeviceGuid)
+{
+    const uuid_t deviceGuid = "6463b098-ca8d-55c1-a65a-4d03c14fb86d";
+
+    gpu->deviceUuid = deviceGuid;
+
+    auto info = makeResetRequiredInfo();
+    info.uuid = gpuUuid; // static EM lookup key - must never be emitted
+    info.messageArgs = {"GPU_1", "ForceRestart"};
+    info.impactedComponent = "GPU_1";
+
+    NsmResetRequiredEvent event("reset_event", "NSM_ResetRequired", info, gpu);
+
+    auto buf = buildResetRequiredEvent();
+    auto msg = reinterpret_cast<const nsm_msg*>(buf.data());
+    ASSERT_EQ(event.handle(gpu->getEid(), NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                           NSM_RESET_REQUIRED_EVENT, msg, buf.size()),
+              NSM_SW_SUCCESS);
+
+    const auto& data = event.eventData;
+    ASSERT_NE(data.find("REDFISH_MESSAGE_ARGS"), data.end());
+    ASSERT_NE(data.find("DEVICE_NAME"), data.end());
+
+    EXPECT_EQ(data.at("REDFISH_MESSAGE_ARGS").find("STATIC:"),
+              std::string::npos);
+    EXPECT_EQ(data.at("DEVICE_NAME").find("STATIC:"), std::string::npos);
+
+#ifdef ENABLE_EVENT_GPU_UUID_LABEL
+    EXPECT_NE(data.at("REDFISH_MESSAGE_ARGS").find(deviceGuid),
+              std::string::npos);
+    EXPECT_NE(data.at("DEVICE_NAME").find(deviceGuid), std::string::npos);
+    // The second configured argument must survive.
+    EXPECT_NE(data.at("REDFISH_MESSAGE_ARGS").find("ForceRestart"),
+              std::string::npos);
+#endif
+}
+
 TEST_F(NsmResetRequiredEventFactoryTest, Factory_CreateEvent_Success)
 {
     auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,

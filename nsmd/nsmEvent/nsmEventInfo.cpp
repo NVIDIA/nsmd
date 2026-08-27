@@ -15,27 +15,29 @@
  * limitations under the License.
  */
 
-#pragma once
-
 #include "nsmEventInfo.hpp"
+
+#include "nsmDevice.hpp"
 
 namespace nsm
 {
 
-class NsmResetRequiredEvent : public NsmEvent
+std::string getEventDeviceUuid(const std::weak_ptr<NsmDevice>& device)
 {
-  public:
-    NsmResetRequiredEvent(const std::string& name, const std::string& type,
-                          const NsmEventInfo info,
-                          std::weak_ptr<NsmDevice> device = {});
+    auto nsmDevice = device.lock();
+    if (!nsmDevice)
+    {
+        return {};
+    }
 
-    int handle(eid_t eid, NsmType type, NsmEventId eventId,
-               const nsm_msg* event, size_t eventLen) final;
+    // utils::convertUUIDToString() builds a UUID_LEN + 1 byte string and does
+    // not shrink it, so deviceUuid carries a trailing NUL. That stays invisible
+    // while the value crosses D-Bus on its own, because sdbusplus sends it via
+    // c_str(). This label is concatenated with a suffix, so the NUL would land
+    // mid-string and truncate REDFISH_MESSAGE_ARGS at the UUID, dropping every
+    // argument after it. Trim to the first NUL.
+    const auto& deviceUuid = nsmDevice->deviceUuid;
+    return deviceUuid.substr(0, deviceUuid.find('\0'));
+}
 
-  private:
-    const NsmEventInfo info;
-    std::weak_ptr<NsmDevice> device;
-    std::map<std::string, std::string> eventData;
-    std::string messageArgs{};
-};
 } // namespace nsm

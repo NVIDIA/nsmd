@@ -1,4 +1,5 @@
 sources += [
+    'nsmEvent/nsmEventInfo.cpp',
     'nsmEvent/nsmLongRunningEventHandler.cpp',
     'nsmEvent/nsmLongRunningEvent.cpp',
     'nsmEvent/nsmEventLogRecordV2.cpp',

@@ -204,11 +204,9 @@ TEST_F(NsmEventBranchTest, ResetRequiredEvent_Ctor_WithAllFields)
     // Verify impactedComponent
     auto it2 = event.eventData.find("DEVICE_NAME");
     EXPECT_NE(it2, event.eventData.end());
-#ifdef ENABLE_EVENT_GPU_UUID_LABEL
-    EXPECT_EQ(it2->second, "GPU UUID STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0");
-#else
+    // Constructor keeps the configured name; the GPU UUID label is applied at
+    // emission time in handle(), once the device identity is known.
     EXPECT_EQ(it2->second, "GPU_0");
-#endif
 }
 
 TEST_F(NsmEventBranchTest, ResetRequiredEvent_Ctor_EmptyMessageArgs)
