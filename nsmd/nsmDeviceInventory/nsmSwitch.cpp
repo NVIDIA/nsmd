@@ -1206,8 +1206,8 @@ inline void createNsmSwitchLTXMode(std::shared_ptr<NsmDevice> device,
             AsyncSetOperationInfo{setLTXModeHandler, nvSwitchLTXMode, device});
 }
 
-// Map NSM wire enum8 to UPhyModeEnum. Wire Default (0) is resolved to Enabled
-// at D-Bus publish time per the UPhy mode contract.
+// Map NSM wire enum8 to UPhyModeEnum. Wire Default (0) is resolved to
+// Disabled at D-Bus publish time per the UPhy mode contract.
 static std::optional<UPhyModeEnum> toUPhyModeFromGet(uint8_t nsmMode)
 {
     switch (nsmMode)
@@ -1282,7 +1282,7 @@ uint8_t NsmSwitchUPhyMode::handleResponseMsg(const struct nsm_msg* responseMsg,
             return NSM_SW_ERROR_DATA;
         }
         UPhyModeEnum currentResolved = (*current == UPhyModeEnum::Default)
-                                           ? UPhyModeEnum::Enabled
+                                           ? UPhyModeEnum::Disabled
                                            : *current;
         uphyModeIntf->currentMode(currentResolved);
 
@@ -1298,7 +1298,7 @@ uint8_t NsmSwitchUPhyMode::handleResponseMsg(const struct nsm_msg* responseMsg,
                 return NSM_SW_ERROR_DATA;
             }
             UPhyModeEnum pendingResolved = (*pending == UPhyModeEnum::Default)
-                                               ? UPhyModeEnum::Enabled
+                                               ? UPhyModeEnum::Disabled
                                                : *pending;
             uphyModeIntf->pendingMode(pendingResolved);
         }
@@ -1394,7 +1394,7 @@ requester::Coroutine NsmSwitchUPhyMode::setUPhyMode(
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         uphyModeIntf->pendingMode(
-            mode == UPhyModeEnum::Default ? UPhyModeEnum::Enabled : mode);
+            mode == UPhyModeEnum::Default ? UPhyModeEnum::Disabled : mode);
     }
     else
     {
@@ -1426,8 +1426,8 @@ inline void createNsmSwitchUPhyMode(std::shared_ptr<NsmDevice> device,
 
     auto uphyModeIntf = std::make_shared<UPhyModeIntf>(bus,
                                                        dbusObjPath.c_str());
-    uphyModeIntf->currentMode(UPhyModeEnum::Enabled);
-    uphyModeIntf->pendingMode(UPhyModeEnum::Enabled);
+    uphyModeIntf->currentMode(UPhyModeEnum::Disabled);
+    uphyModeIntf->pendingMode(UPhyModeEnum::Disabled);
     // IsModeConfigurable is sourced solely from the entity-manager
     // SupportUPhyMode capability flag: this factory is only ever invoked
     // from the createNsmSwitchDI gate when SupportUPhyMode == true (see the
