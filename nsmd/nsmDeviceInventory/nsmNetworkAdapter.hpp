@@ -308,17 +308,19 @@ class NsmNetworkAdapterProtectionOptionsMode : public NsmSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
-    // AsyncSetOperationHandler for one boolean property write (bit index:
-    // 0=HostFirmwareUpdateRestrictionEnabled,
-    // 1=HostConfigurationChangeRestrictionEnabled,
-    // 2=HostTransceiverFirmwareUpdateRestrictionEnabled,
-    // 3=HostTransceiverConfigurationChangeRestrictionEnabled).
-    // Reads the other three current values, substitutes the new value, packs
-    // the 16-bit bitmask, and sends NSM Set Device Mode Settings V2 (idx 26).
-    requester::Coroutine setFlag(const AsyncSetOperationValueType& value,
-                                 AsyncOperationStatusType* status,
-                                 std::shared_ptr<NsmDevice> device,
-                                 uint8_t bit);
+    // AsyncSetOperationHandler for a batch of boolean flag writes from a
+    // single PATCH. Expects the std::vector<std::tuple<std::string,
+    // uint32_t>> alternative of AsyncSetOperationValueType, keyed by
+    // property name (HostFirmwareUpdateRestrictionEnabled,
+    // HostConfigurationChangeRestrictionEnabled,
+    // HostTransceiverFirmwareUpdateRestrictionEnabled,
+    // HostTransceiverConfigurationChangeRestrictionEnabled). Any flag not
+    // present in the batch keeps its current value. Packs all four into one
+    // 16-bit bitmask and sends a single NSM Set Device Mode Settings V2
+    // (idx 26) request, so a multi-flag PATCH applies atomically.
+    requester::Coroutine setFlags(const AsyncSetOperationValueType& value,
+                                  AsyncOperationStatusType* status,
+                                  std::shared_ptr<NsmDevice> device);
 
   private:
     std::shared_ptr<ProtectionOptionsModeIntf> protectionOptionsModeIntf;
