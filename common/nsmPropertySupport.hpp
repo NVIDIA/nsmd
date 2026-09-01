@@ -47,6 +47,16 @@ inline std::unordered_set<nsm_inventory_property_identifiers>
     return {};
 }
 
+// SKU is not a per-device FRU attribute for baseboard-class devices: a logical
+// Zone or a ProcessorModule aggregates other FRUs and has no SKU of its own.
+// Report it as unsupported based on device type so nsmd tombstones the value
+// (NOT_SUPPORTED) and bmcweb omits it, rather than publishing the default "NA".
+// See nvbug 6339053.
+inline bool isSkuUnsupported(uint8_t deviceType)
+{
+    return deviceType == NSM_DEV_ID_BASEBOARD;
+}
+
 template <typename IntfType>
 void markAssetPropertiesNotSupported(
     NsmInterfaceProvider<IntfType>& asset,

@@ -74,6 +74,8 @@ void createAsset(
     const dbus::PropertyMap& allCurrentIfaceProperties,
     const std::unordered_set<nsm_inventory_property_identifiers>& unsupported);
 void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name);
+NsmDeviceIdentification getConfiguredDeviceType(
+    const dbus::PropertyMap& allBaseIfaceProperties, const std::string& name);
 void createFPGAAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
                      const dbus::PropertyMap& allCurrentIfaceProperties);
 void createDimension(std::shared_ptr<NsmDevice> device,
@@ -408,6 +410,97 @@ TEST_F(NsmChassisBranch4Test, CreateChassisAttributes_AssetInfoPresentButFalse)
 
     EXPECT_NO_THROW(createChassisAttributes(
         device, mockManager, bus, name, deviceUuid, currentProps, baseProps));
+}
+
+// ============================================================================
+// createChassisAttributes: the configured logical chassis type, rather than
+// the hosting endpoint type, determines SKU support.
+// ============================================================================
+
+TEST_F(NsmChassisBranch4Test,
+       CreateChassisAttributes_ConfiguredBaseboardTombstonesSkuOnMctpBridge)
+{
+    const uuid_t mctpBridgeUuid =
+        "STATIC:5:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto mctpBridge = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(mctpBridgeUuid));
+    ASSERT_NE(mctpBridge, nullptr);
+    ASSERT_EQ(mctpBridge->getDeviceType(), NSM_DEV_ID_MCTP_BRIDGE);
+
+    auto& bus = utils::DBusHandler::getBus();
+    dbus::PropertyMap currentProps;
+    currentProps["AssetInformationAvailable"] = bool(false);
+    dbus::PropertyMap baseProps;
+    baseProps["DeviceType"] = uint64_t(NSM_DEV_ID_BASEBOARD);
+
+    const size_t before = mctpBridge->deviceSensors.size();
+    EXPECT_NO_THROW(createChassisAttributes(mctpBridge, mockManager, bus, name,
+                                            mctpBridgeUuid, currentProps,
+                                            baseProps));
+
+    std::shared_ptr<NsmChassis<NsmApSkuIdIntf>> skuSensor;
+    for (size_t i = before; i < mctpBridge->deviceSensors.size(); ++i)
+    {
+        skuSensor =
+            std::dynamic_pointer_cast<NsmChassis<NsmApSkuIdIntf>>(
+                mctpBridge->deviceSensors[i]);
+        if (skuSensor != nullptr)
+        {
+            break;
+        }
+    }
+    ASSERT_NE(skuSensor, nullptr);
+    EXPECT_EQ(propertyNotSupported, skuSensor->invoke(pdiMethod(sku)));
+}
+
+TEST_F(NsmChassisBranch4Test,
+       CreateChassisAttributes_ConfiguredMctpBridgeKeepsSku)
+{
+    const uuid_t mctpBridgeUuid =
+        "STATIC:5:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto mctpBridge = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(mctpBridgeUuid));
+    ASSERT_NE(mctpBridge, nullptr);
+
+    auto& bus = utils::DBusHandler::getBus();
+    dbus::PropertyMap currentProps;
+    currentProps["AssetInformationAvailable"] = bool(false);
+    dbus::PropertyMap baseProps;
+    baseProps["DeviceType"] = uint64_t(NSM_DEV_ID_MCTP_BRIDGE);
+
+    const size_t before = mctpBridge->deviceSensors.size();
+    EXPECT_NO_THROW(createChassisAttributes(mctpBridge, mockManager, bus, name,
+                                            mctpBridgeUuid, currentProps,
+                                            baseProps));
+
+    std::shared_ptr<NsmChassis<NsmApSkuIdIntf>> skuSensor;
+    for (size_t i = before; i < mctpBridge->deviceSensors.size(); ++i)
+    {
+        skuSensor =
+            std::dynamic_pointer_cast<NsmChassis<NsmApSkuIdIntf>>(
+                mctpBridge->deviceSensors[i]);
+        if (skuSensor != nullptr)
+        {
+            break;
+        }
+    }
+    ASSERT_NE(skuSensor, nullptr);
+    EXPECT_NE(propertyNotSupported, skuSensor->invoke(pdiMethod(sku)));
+}
+
+TEST_F(NsmChassisBranch4Test, GetConfiguredDeviceType_InvalidUsesUnknown)
+{
+    dbus::PropertyMap missingDeviceType;
+    EXPECT_EQ(getConfiguredDeviceType(missingDeviceType, name),
+              NSM_DEV_ID_UNKNOWN);
+
+    dbus::PropertyMap wrongVariant;
+    wrongVariant["DeviceType"] = std::string("3");
+    EXPECT_EQ(getConfiguredDeviceType(wrongVariant, name), NSM_DEV_ID_UNKNOWN);
+
+    dbus::PropertyMap outOfRange;
+    outOfRange["DeviceType"] = uint64_t(256);
+    EXPECT_EQ(getConfiguredDeviceType(outOfRange, name), NSM_DEV_ID_UNKNOWN);
 }
 
 // ============================================================================

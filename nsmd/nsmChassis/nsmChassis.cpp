@@ -36,6 +36,7 @@
 #include "nsmWriteProtectedJumper.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 
+#include <limits>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -83,10 +84,49 @@ void createAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
     }
 }
 
-void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name)
+void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name,
+               bool notSupported)
 {
     auto chassisSKU = std::make_shared<NsmChassis<NsmApSkuIdIntf>>(name);
+    if (notSupported)
+    {
+        // Tombstone the placeholder SKU so bmcweb omits it from Redfish,
+        // rather than advertising the default "NA" on chassis that have no SKU
+        // (e.g. a logical Zone). "NA" remains reserved for genuine read/FRU
+        // failures. See nvbug 6339053.
+        chassisSKU->invoke(pdiMethod(sku), std::string(propertyNotSupported));
+    }
     device->addStaticSensor(chassisSKU);
+}
+
+void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name)
+{
+    createSKU(device, name, false);
+}
+
+NsmDeviceIdentification getConfiguredDeviceType(
+    const dbus::PropertyMap& allBaseIfaceProperties, const std::string& name)
+{
+    const auto deviceTypeIt = allBaseIfaceProperties.find("DeviceType");
+    if (deviceTypeIt == allBaseIfaceProperties.end())
+    {
+        lg2::error(
+            "DeviceType is missing from the NSM_Chassis configuration for {NAME}",
+            "NAME", name);
+        return NSM_DEV_ID_UNKNOWN;
+    }
+
+    const auto* deviceType = std::get_if<uint64_t>(&deviceTypeIt->second);
+    if (deviceType == nullptr ||
+        *deviceType > std::numeric_limits<uint8_t>::max())
+    {
+        lg2::error(
+            "DeviceType is invalid in the NSM_Chassis configuration for {NAME}",
+            "NAME", name);
+        return NSM_DEV_ID_UNKNOWN;
+    }
+
+    return static_cast<NsmDeviceIdentification>(*deviceType);
 }
 
 void createFPGAAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
@@ -356,7 +396,14 @@ void createChassisAttributes(std::shared_ptr<NsmDevice> device,
             device->getDeviceType(), device->getDeviceRole());
         createAsset(device, name, allCurrentIfaceProperties, unsupported);
     }
-    createSKU(device, name);
+    // DeviceType in the base interface describes the logical chassis being
+    // created. device->getDeviceType() describes its physical NSM endpoint;
+    // for example, HGX_Chassis_0 is a baseboard-class logical Zone hosted by
+    // an MCTP-bridge HPM SMA. Use the configured type so that logical
+    // baseboard-class chassis tombstone their unsupported SKU.
+    const auto configuredDeviceType =
+        getConfiguredDeviceType(allBaseIfaceProperties, name);
+    createSKU(device, name, isSkuUnsupported(configuredDeviceType));
     // Handle Location and LocationCode from ChassisAttributes
     if (allCurrentIfaceProperties.count("LocationType"))
     {
