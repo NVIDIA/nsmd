@@ -247,45 +247,67 @@ TEST_F(ProtectionOptionsModeV2Test, HandleResponse_ReservedBits_Ignored)
 }
 
 // ============================================================================
-// setFlag — per-property async handler
+// setFlags — batched async handler (single combined NSM Set per PATCH)
 // ============================================================================
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_BadValueType_ReturnsError)
+static AsyncSetOperationValueType
+    makeBatch(std::vector<std::tuple<std::string, uint32_t>> entries)
+{
+    return AsyncSetOperationValueType{std::move(entries)};
+}
+
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_BadValueType_ThrowsInvalidArgument)
 {
     auto sensor = makeSensor("set_bad_type");
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    // Pass a string instead of bool — wrong variant type
+    // Pass a string instead of the vector<tuple<string,uint32_t>> batch type
     AsyncSetOperationValueType badValue = std::string("true");
-    auto coro = sensor->setFlag(badValue, &status, device, 0);
-    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+
+    EXPECT_THROW_COROUTINE(
+        sensor->setFlags(badValue, &status, device),
+        sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
     EXPECT_FALSE(sensor->asyncPatchInProgress);
 }
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_PatchInProgress_ThrowsUnavailable)
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_EmptyBatch_ThrowsInvalidArgument)
+{
+    auto sensor = makeSensor("set_empty_batch");
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = makeBatch({});
+
+    EXPECT_THROW_COROUTINE(
+        sensor->setFlags(value, &status, device),
+        sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
+    EXPECT_FALSE(sensor->asyncPatchInProgress);
+}
+
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_PatchInProgress_ThrowsUnavailable)
 {
     auto sensor = makeSensor("set_in_prog");
     sensor->asyncPatchInProgress = true;
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    AsyncSetOperationValueType value = bool(true);
+    AsyncSetOperationValueType value =
+        makeBatch({{"HostFirmwareUpdateRestrictionEnabled", 1}});
 
     EXPECT_THROW_COROUTINE(
-        sensor->setFlag(value, &status, device, 0),
+        sensor->setFlags(value, &status, device),
         sdbusplus::error::xyz::openbmc_project::common::Unavailable);
 }
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_BadBitIndex_ReturnsError)
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_UnknownKey_ThrowsInvalidArgument)
 {
-    auto sensor = makeSensor("set_bad_bit");
+    auto sensor = makeSensor("set_bad_key");
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    AsyncSetOperationValueType value = bool(true);
+    AsyncSetOperationValueType value = makeBatch({{"NotARealFlag", 1}});
 
-    auto coro = sensor->setFlag(value, &status, device, 99);
-    EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
+    EXPECT_THROW_COROUTINE(
+        sensor->setFlags(value, &status, device),
+        sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
     EXPECT_FALSE(sensor->asyncPatchInProgress);
 }
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_PostPatchIOFails_FlagCleared)
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_PostPatchIOFails_FlagCleared)
 {
     auto sensor = makeSensor("set_pio_fail");
 
@@ -293,8 +315,9 @@ TEST_F(ProtectionOptionsModeV2Test, SetFlag_PostPatchIOFails_FlagCleared)
         .WillOnce(mockPostPatchIO(NSM_ERROR));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    AsyncSetOperationValueType value = bool(true);
-    sensor->setFlag(value, &status, device, 0);
+    AsyncSetOperationValueType value =
+        makeBatch({{"HostFirmwareUpdateRestrictionEnabled", 1}});
+    sensor->setFlags(value, &status, device);
 
     EXPECT_FALSE(sensor->asyncPatchInProgress);
     EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
@@ -303,7 +326,7 @@ TEST_F(ProtectionOptionsModeV2Test, SetFlag_PostPatchIOFails_FlagCleared)
                      ->hostFirmwareUpdateRestrictionEnabled());
 }
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_NSMErrorCC_PropertiesUnchanged)
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_NSMErrorCC_PropertiesUnchanged)
 {
     auto sensor = makeSensor("set_err_cc");
 
@@ -311,8 +334,9 @@ TEST_F(ProtectionOptionsModeV2Test, SetFlag_NSMErrorCC_PropertiesUnchanged)
         .WillOnce(mockPostPatchIO(makeSetErrorResp()));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    AsyncSetOperationValueType value = bool(true);
-    sensor->setFlag(value, &status, device, 0);
+    AsyncSetOperationValueType value =
+        makeBatch({{"HostFirmwareUpdateRestrictionEnabled", 1}});
+    sensor->setFlags(value, &status, device);
 
     EXPECT_FALSE(sensor->asyncPatchInProgress);
     EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
@@ -320,16 +344,17 @@ TEST_F(ProtectionOptionsModeV2Test, SetFlag_NSMErrorCC_PropertiesUnchanged)
                      ->hostFirmwareUpdateRestrictionEnabled());
 }
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_Bit0_Success_FwPropertyUpdated)
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_SingleEntry_Fw_Success)
 {
-    auto sensor = makeSensor("set_bit0_ok");
+    auto sensor = makeSensor("set_fw_ok");
 
     EXPECT_CALL(*device, postPatchIO(_, _, _, _))
         .WillOnce(mockPostPatchIO(makeSetSuccessResp()));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    AsyncSetOperationValueType value = bool(true);
-    sensor->setFlag(value, &status, device, 0);
+    AsyncSetOperationValueType value =
+        makeBatch({{"HostFirmwareUpdateRestrictionEnabled", 1}});
+    sensor->setFlags(value, &status, device);
 
     EXPECT_FALSE(sensor->asyncPatchInProgress);
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
@@ -344,16 +369,17 @@ TEST_F(ProtectionOptionsModeV2Test, SetFlag_Bit0_Success_FwPropertyUpdated)
                      ->hostTransceiverConfigurationChangeRestrictionEnabled());
 }
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_Bit1_Success_CfgPropertyUpdated)
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_SingleEntry_Cfg_Success)
 {
-    auto sensor = makeSensor("set_bit1_ok");
+    auto sensor = makeSensor("set_cfg_ok");
 
     EXPECT_CALL(*device, postPatchIO(_, _, _, _))
         .WillOnce(mockPostPatchIO(makeSetSuccessResp()));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    AsyncSetOperationValueType value = bool(true);
-    sensor->setFlag(value, &status, device, 1);
+    AsyncSetOperationValueType value =
+        makeBatch({{"HostConfigurationChangeRestrictionEnabled", 1}});
+    sensor->setFlags(value, &status, device);
 
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
     EXPECT_FALSE(sensor->protectionOptionsModeIntf
@@ -362,16 +388,17 @@ TEST_F(ProtectionOptionsModeV2Test, SetFlag_Bit1_Success_CfgPropertyUpdated)
                     ->hostConfigurationChangeRestrictionEnabled());
 }
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_Bit2_Success_TxFwPropertyUpdated)
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_SingleEntry_TxFw_Success)
 {
-    auto sensor = makeSensor("set_bit2_ok");
+    auto sensor = makeSensor("set_txfw_ok");
 
     EXPECT_CALL(*device, postPatchIO(_, _, _, _))
         .WillOnce(mockPostPatchIO(makeSetSuccessResp()));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    AsyncSetOperationValueType value = bool(true);
-    sensor->setFlag(value, &status, device, 2);
+    AsyncSetOperationValueType value =
+        makeBatch({{"HostTransceiverFirmwareUpdateRestrictionEnabled", 1}});
+    sensor->setFlags(value, &status, device);
 
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
     EXPECT_TRUE(sensor->protectionOptionsModeIntf
@@ -380,26 +407,28 @@ TEST_F(ProtectionOptionsModeV2Test, SetFlag_Bit2_Success_TxFwPropertyUpdated)
                      ->hostTransceiverConfigurationChangeRestrictionEnabled());
 }
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_Bit3_Success_TxCfgPropertyUpdated)
+TEST_F(ProtectionOptionsModeV2Test, SetFlags_SingleEntry_TxCfg_Success)
 {
-    auto sensor = makeSensor("set_bit3_ok");
+    auto sensor = makeSensor("set_txcfg_ok");
 
     EXPECT_CALL(*device, postPatchIO(_, _, _, _))
         .WillOnce(mockPostPatchIO(makeSetSuccessResp()));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    AsyncSetOperationValueType value = bool(true);
-    sensor->setFlag(value, &status, device, 3);
+    AsyncSetOperationValueType value = makeBatch(
+        {{"HostTransceiverConfigurationChangeRestrictionEnabled", 1}});
+    sensor->setFlags(value, &status, device);
 
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
     EXPECT_TRUE(sensor->protectionOptionsModeIntf
                     ->hostTransceiverConfigurationChangeRestrictionEnabled());
 }
 
-TEST_F(ProtectionOptionsModeV2Test, SetFlag_PreservesOtherBits_ReadModifyWrite)
+TEST_F(ProtectionOptionsModeV2Test,
+       SetFlags_PartialBatch_PreservesUnspecifiedFlags)
 {
     auto sensor = makeSensor("set_rmw");
-    // Pre-set bits 1 and 3 to true
+    // Pre-set cfg and txCfg to true
     sensor->protectionOptionsModeIntf
         ->hostConfigurationChangeRestrictionEnabled(true);
     sensor->protectionOptionsModeIntf
@@ -409,9 +438,10 @@ TEST_F(ProtectionOptionsModeV2Test, SetFlag_PreservesOtherBits_ReadModifyWrite)
         .WillOnce(mockPostPatchIO(makeSetSuccessResp()));
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    // Set bit 0 (fw) to true; bits 1 and 3 should be preserved in NSM call
-    AsyncSetOperationValueType value = bool(true);
-    sensor->setFlag(value, &status, device, 0);
+    // Only fw is in the batch; cfg and txCfg must be preserved in the NSM call
+    AsyncSetOperationValueType value =
+        makeBatch({{"HostFirmwareUpdateRestrictionEnabled", 1}});
+    sensor->setFlags(value, &status, device);
 
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
     EXPECT_TRUE(sensor->protectionOptionsModeIntf
@@ -420,6 +450,36 @@ TEST_F(ProtectionOptionsModeV2Test, SetFlag_PreservesOtherBits_ReadModifyWrite)
                     ->hostConfigurationChangeRestrictionEnabled());
     EXPECT_FALSE(sensor->protectionOptionsModeIntf
                      ->hostTransceiverFirmwareUpdateRestrictionEnabled());
+    EXPECT_TRUE(sensor->protectionOptionsModeIntf
+                    ->hostTransceiverConfigurationChangeRestrictionEnabled());
+}
+
+TEST_F(ProtectionOptionsModeV2Test,
+       SetFlags_AllFourEntries_SingleNsmCallAppliesAtomically)
+{
+    auto sensor = makeSensor("set_all_four");
+
+    // Exactly one NSM Set round trip for all four flags together.
+    EXPECT_CALL(*device, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(makeSetSuccessResp()));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value = makeBatch({
+        {"HostFirmwareUpdateRestrictionEnabled", 1},
+        {"HostConfigurationChangeRestrictionEnabled", 1},
+        {"HostTransceiverFirmwareUpdateRestrictionEnabled", 1},
+        {"HostTransceiverConfigurationChangeRestrictionEnabled", 1},
+    });
+    sensor->setFlags(value, &status, device);
+
+    EXPECT_FALSE(sensor->asyncPatchInProgress);
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+    EXPECT_TRUE(sensor->protectionOptionsModeIntf
+                    ->hostFirmwareUpdateRestrictionEnabled());
+    EXPECT_TRUE(sensor->protectionOptionsModeIntf
+                    ->hostConfigurationChangeRestrictionEnabled());
+    EXPECT_TRUE(sensor->protectionOptionsModeIntf
+                    ->hostTransceiverFirmwareUpdateRestrictionEnabled());
     EXPECT_TRUE(sensor->protectionOptionsModeIntf
                     ->hostTransceiverConfigurationChangeRestrictionEnabled());
 }

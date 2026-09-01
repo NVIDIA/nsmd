@@ -895,57 +895,74 @@ uint8_t NsmNetworkAdapterProtectionOptionsMode::handleResponseMsg(
     return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine NsmNetworkAdapterProtectionOptionsMode::setFlag(
+requester::Coroutine NsmNetworkAdapterProtectionOptionsMode::setFlags(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
-    std::shared_ptr<NsmDevice> device, uint8_t bit)
+    std::shared_ptr<NsmDevice> device)
 {
-    const bool* newVal = std::get_if<bool>(&value);
-    if (!newVal)
+    const auto* entries =
+        std::get_if<std::vector<std::tuple<std::string, uint32_t>>>(&value);
+    if (!entries || entries->empty())
     {
         lg2::error(
-            "NsmNetworkAdapterProtectionOptionsMode::setFlag: bad value type");
-        *status = AsyncOperationStatusType::WriteFailure;
-        co_return NSM_SW_ERROR_DATA;
+            "NsmNetworkAdapterProtectionOptionsMode::setFlags: bad value type"
+            " or empty batch");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
     if (asyncPatchInProgress)
     {
-        lg2::error(
-            "NsmNetworkAdapterProtectionOptionsMode::setFlag: patch in progress");
+        lg2::error("NsmNetworkAdapterProtectionOptionsMode::setFlags: patch in"
+                   " progress");
+        *status = AsyncOperationStatusType::Unavailable;
         throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
     }
     asyncPatchInProgress = true;
 
-    bool fw = protectionOptionsModeIntf->hostFirmwareUpdateRestrictionEnabled();
-    bool cfg =
-        protectionOptionsModeIntf->hostConfigurationChangeRestrictionEnabled();
-    bool txFw = protectionOptionsModeIntf
-                    ->hostTransceiverFirmwareUpdateRestrictionEnabled();
-    bool txCfg = protectionOptionsModeIntf
-                     ->hostTransceiverConfigurationChangeRestrictionEnabled();
-
-    switch (bit)
+    bool fw = false;
+    bool cfg = false;
+    bool txFw = false;
+    bool txCfg = false;
+    if (protectionOptionsModeIntf)
     {
-        case 0:
-            fw = *newVal;
-            break;
-        case 1:
-            cfg = *newVal;
-            break;
-        case 2:
-            txFw = *newVal;
-            break;
-        case 3:
-            txCfg = *newVal;
-            break;
-        default:
+        fw = protectionOptionsModeIntf->hostFirmwareUpdateRestrictionEnabled();
+        cfg = protectionOptionsModeIntf
+                  ->hostConfigurationChangeRestrictionEnabled();
+        txFw = protectionOptionsModeIntf
+                   ->hostTransceiverFirmwareUpdateRestrictionEnabled();
+        txCfg = protectionOptionsModeIntf
+                    ->hostTransceiverConfigurationChangeRestrictionEnabled();
+    }
+
+    for (const auto& [key, raw] : *entries)
+    {
+        if (key == "HostFirmwareUpdateRestrictionEnabled")
+        {
+            fw = raw != 0;
+        }
+        else if (key == "HostConfigurationChangeRestrictionEnabled")
+        {
+            cfg = raw != 0;
+        }
+        else if (key == "HostTransceiverFirmwareUpdateRestrictionEnabled")
+        {
+            txFw = raw != 0;
+        }
+        else if (key == "HostTransceiverConfigurationChangeRestrictionEnabled")
+        {
+            txCfg = raw != 0;
+        }
+        else
+        {
             lg2::error(
-                "NsmNetworkAdapterProtectionOptionsMode::setFlag: bad bit"
-                " {BIT}",
-                "BIT", bit);
+                "NsmNetworkAdapterProtectionOptionsMode::setFlags: bad key"
+                " {KEY}",
+                "KEY", key);
             asyncPatchInProgress = false;
-            *status = AsyncOperationStatusType::WriteFailure;
-            co_return NSM_SW_ERROR_DATA;
+            *status = AsyncOperationStatusType::InvalidArgument;
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
     }
 
     uint16_t bitmask = (static_cast<uint16_t>(fw) << 0) |
@@ -1056,18 +1073,15 @@ static void createProtectionOptionsModeSensors(
         "HostTransceiverFirmwareUpdateRestrictionEnabled",
         "HostTransceiverConfigurationChangeRestrictionEnabled",
     };
-    for (uint8_t bit = 0; bit < 4; ++bit)
+    for (const char* propName : propNames)
     {
-        nsm::AsyncSetOperationHandler handler =
-            std::bind(&NsmNetworkAdapterProtectionOptionsMode::setFlag, sensor,
-                      std::placeholders::_1, std::placeholders::_2,
-                      std::placeholders::_3, bit);
+        nsm::AsyncSetOperationHandler handler = std::bind_front(
+            &NsmNetworkAdapterProtectionOptionsMode::setFlags, sensor);
         AsyncOperationManager::getInstance()
             ->getDispatcher(objPath)
             ->addAsyncSetOperation(
-                std::string(ProtectionOptionsModeServer::interface),
-                propNames[bit],
-                AsyncSetOperationInfo{handler, sensor, nsmDevice});
+                std::string(ProtectionOptionsModeServer::interface), propName,
+                AsyncSetOperationInfo{std::move(handler), sensor, nsmDevice});
     }
 
     lg2::info(
