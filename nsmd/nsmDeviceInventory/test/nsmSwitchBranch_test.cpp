@@ -919,7 +919,7 @@ TEST_F(NsmSwitchBranchTest,
     EXPECT_EQ(uphyModeIntf->pendingMode(), UPhyModeEnum::Enabled);
 }
 
-TEST_F(NsmSwitchBranchTest, UPhyMode_WireDefaultCurrentMode_ResolvesToEnabled)
+TEST_F(NsmSwitchBranchTest, UPhyMode_WireDefaultCurrentMode_ResolvesToDisabled)
 {
     auto uphyModeIntf = std::make_shared<UPhyModeIntf>(
         testBus, "/xyz/openbmc_project/inventory/branchtest/uphy_def_wire");
@@ -943,8 +943,8 @@ TEST_F(NsmSwitchBranchTest, UPhyMode_WireDefaultCurrentMode_ResolvesToEnabled)
 
     rc = sensor.handleResponseMsg(response, responseMsg.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_EQ(uphyModeIntf->currentMode(), UPhyModeEnum::Enabled);
-    EXPECT_EQ(uphyModeIntf->pendingMode(), UPhyModeEnum::Enabled);
+    EXPECT_EQ(uphyModeIntf->currentMode(), UPhyModeEnum::Disabled);
+    EXPECT_EQ(uphyModeIntf->pendingMode(), UPhyModeEnum::Disabled);
 }
 
 TEST_F(NsmSwitchBranchTest,
@@ -1109,7 +1109,7 @@ TEST_F(NsmSwitchBranchTest,
 }
 
 TEST_F(NsmSwitchBranchTest,
-       UPhyMode_SetUPhyMode_DefaultTarget_ResolvesToEnabled)
+       UPhyMode_SetUPhyMode_DefaultTarget_ResolvesToDisabled)
 {
     auto uphyModeIntf = std::make_shared<UPhyModeIntf>(
         testBus, "/xyz/openbmc_project/inventory/branchtest/uphy_set_default");
@@ -1135,7 +1135,7 @@ TEST_F(NsmSwitchBranchTest,
     sensor.setUPhyMode(value, &status, nvswitch);
 
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
-    EXPECT_EQ(uphyModeIntf->pendingMode(), UPhyModeEnum::Enabled);
+    EXPECT_EQ(uphyModeIntf->pendingMode(), UPhyModeEnum::Disabled);
 }
 
 TEST_F(NsmSwitchBranchTest,
