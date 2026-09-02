@@ -393,9 +393,17 @@ requester::Coroutine
     // Single-type patches are just a one-entry batch. Routing them through the
     // same owner keeps one read-modify-write implementation and one lock, so a
     // per-type write and a batch write cannot interleave.
+    // Built before the await rather than inline: an initializer-list temporary
+    // reading a member inside the operand ICEs gcc 15 while flattening it
+    // (compiler limitation in coroutine lowering, not a defect in this code
+    // -- the initializer-list form is well-formed and behaves identically
+    // once hoisted out of the co_await operand).
+    const std::map<ErrorInjectionCapabilityIntf::Type, bool> overrides{
+        {type, value}};
+    const auto rc =
+        co_await capabilities->applyEnabledOverrides(overrides, status, device);
     // coverity[missing_return]
-    co_return co_await capabilities->applyEnabledOverrides({{type, value}},
-                                                           status, device);
+    co_return rc;
 }
 
 NsmSetErrorInjectionPayload::NsmSetErrorInjectionPayload(
