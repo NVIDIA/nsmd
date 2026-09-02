@@ -372,7 +372,14 @@ requester::Coroutine NsmSetErrorInjectionEnabled::enabled(
 
     if (!enabledValue)
     {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+        // A thrown exception from a handler coroutine is stored in its
+        // promise and never reaches setImpl's catch, so the client would be
+        // told Success while nothing was written. Report the rejection
+        // through *status instead, so it is visible to the caller.
+        lg2::error("NsmSetErrorInjectionEnabled::enabled: value is not a bool");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR_DATA;
     }
     // coverity[missing_return]
     co_return co_await setEnabled(*enabledValue, *status, device);

@@ -30,6 +30,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <initializer_list>
 #include <map>
 #include <memory>
@@ -495,17 +496,32 @@ TEST_F(NsmSetErrorInjectionBatchTest, PerTypePatch_PreservesSiblings)
 
 TEST_F(NsmSetErrorInjectionBatchTest, PerTypePatch_RejectsNonBool)
 {
-    NsmSetErrorInjectionEnabled perType(
+    auto perType = std::make_shared<NsmSetErrorInjectionEnabled>(
         "ThermalErrors", ErrorInjectionCapabilityIntf::Type::ThermalErrors,
         interfaces, capabilities);
 
     EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).Times(0);
 
-    auto value = AsyncSetOperationValueType{uint32_t{1}};
-    auto status = AsyncOperationStatusType::Success;
-    EXPECT_THROW_COROUTINE(
-        perType.enabled(value, &status, gpu),
-        sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
+    // Driven through the dispatcher because that is where a rejected value has
+    // to surface. Registered without a sensor so setImpl's post-handler refresh
+    // stays out of the reject path.
+    const std::string objPath = "/test/ei/batch/pertype_nonbool";
+    auto& dispatcher =
+        *AsyncOperationManager::getInstance()->getDispatcher(objPath);
+    dispatcher.addAsyncSetOperation(
+        "com.nvidia.ErrorInjection.ErrorInjectionCapability", "Enabled",
+        AsyncSetOperationInfo{
+            std::bind_front(&NsmSetErrorInjectionEnabled::enabled,
+                            perType.get()),
+            nullptr, gpu});
+
+    auto result = AsyncOperationManager::getInstance()->getNewStatusInterface();
+    dispatcher.setImpl("com.nvidia.ErrorInjection.ErrorInjectionCapability",
+                       "Enabled", AsyncSetOperationValueType{uint32_t{1}},
+                       result.second);
+
+    EXPECT_EQ(result.second->status(),
+              AsyncOperationStatusType::InvalidArgument);
 
     EXPECT_FALSE(enabledOf(ErrorInjectionCapabilityIntf::Type::ThermalErrors));
 }

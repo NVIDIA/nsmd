@@ -456,10 +456,10 @@ TEST_F(NsmSetErrorInjectionCoroutineTest, Enabled_ValidBool_CallsSetEnabled)
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
 }
 
-// enabled: value is not bool → throws InvalidArgument
-// Only runs in coverage build: same reason as ErrorInjectionModeEnabled above.
-#ifdef COVERAGE_DISABLE_COROUTINES
-TEST_F(NsmSetErrorInjectionCoroutineTest, Enabled_NonBool_ThrowsInvalidArgument)
+// enabled: value is not bool → reported through status, not thrown, so it
+// reaches the client instead of being swallowed by the handler's promise.
+TEST_F(NsmSetErrorInjectionCoroutineTest,
+       Enabled_NonBool_ReportsInvalidArgument)
 {
     auto& bus = utils::DBusHandler::getBus();
     std::filesystem::path eiPath("/test/ei_en_nonbool");
@@ -473,13 +473,13 @@ TEST_F(NsmSetErrorInjectionCoroutineTest, Enabled_NonBool_ThrowsInvalidArgument)
         "EiEnabledNonBool", ErrorInjectionCapabilityIntf::Type::MemoryErrors,
         interfaces, makeErrorInjectionCapabilities(mockManager, interfaces));
 
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).Times(0);
+
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
     AsyncSetOperationValueType value = uint32_t{42};
-    EXPECT_THROW(
-        sensor.enabled(value, &status, gpu),
-        sdbusplus::error::xyz::openbmc_project::common::InvalidArgument);
+    sensor.enabled(value, &status, gpu);
+    EXPECT_EQ(status, AsyncOperationStatusType::InvalidArgument);
 }
-#endif // COVERAGE_DISABLE_COROUTINES
 
 // =============================================================================
 // setModeEnabled – postPatchIO failure branches
