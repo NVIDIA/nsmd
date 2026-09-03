@@ -685,6 +685,7 @@ void createGPUPowerLimit(std::shared_ptr<NsmDevice> nsmDevice,
 
         auto persistencyIntf =
             std::make_shared<PowerPersistencyIntf>(bus, objPath.c_str());
+        powerLimitsIntf->powerCap(INVALID_POWER_LIMIT);
         persistencyIntf->persistency(false);
         persistencyIntf->persistentPowerLimit(std::nan(""));
         persistencyIntf->oneShotPowerLimit(std::nan(""));
