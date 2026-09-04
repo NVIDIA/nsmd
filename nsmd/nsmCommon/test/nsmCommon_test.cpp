@@ -707,6 +707,44 @@ TEST_F(NsmClockLimitUpdateTest,
     EXPECT_EQ(dev->deviceUuid, mctpUuid);
 }
 
+// sensorIO succeeds but device returns NOT_READY CC -> do not fallback.
+TEST_F(NsmClockLimitUpdateTest, GetDeviceUUID_CcNotReady_DoesNotFallback)
+{
+    const uuid_t mctpUuid = "bbbbbbbb-cccc-dddd-eeee-222222222222";
+    const uuid_t originalUuid = "33333333-4444-5555-6666-777777777777";
+    auto dev = makeDeviceWithMctpUuid(215, mctpUuid);
+    dev->deviceUuid = originalUuid;
+    auto respBuf = makeInventoryInfoNonSuccessResp(NSM_ERR_NOT_READY);
+
+    EXPECT_CALL(*dev, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(respBuf));
+
+    uuid_t outUuid = originalUuid;
+    auto rc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+
+    EXPECT_EQ(rc.data(), NSM_ERR_NOT_READY);
+    EXPECT_EQ(outUuid, originalUuid);
+    EXPECT_EQ(dev->deviceUuid, originalUuid);
+}
+
+// sensorIO succeeds but device returns BUSY CC -> do not fallback.
+TEST_F(NsmClockLimitUpdateTest, GetDeviceUUID_CcBusy_DoesNotFallback)
+{
+    const uuid_t mctpUuid = "cccccccc-dddd-eeee-ffff-333333333333";
+    const uuid_t originalUuid = "44444444-5555-6666-7777-888888888888";
+    auto dev = makeDeviceWithMctpUuid(216, mctpUuid);
+    dev->deviceUuid = originalUuid;
+    auto respBuf = makeInventoryInfoNonSuccessResp(NSM_BUSY);
+
+    EXPECT_CALL(*dev, sensorIO(_, _, _, _, _)).WillOnce(mockSensorIO(respBuf));
+
+    uuid_t outUuid = originalUuid;
+    auto rc = nsm::getDeviceUUID(dev, fakeMctpDiscovery(), outUuid);
+
+    EXPECT_EQ(rc.data(), NSM_BUSY);
+    EXPECT_EQ(outUuid, originalUuid);
+    EXPECT_EQ(dev->deviceUuid, originalUuid);
+}
+
 // sensorIO succeeds but decode fails due to an empty response → fallback to
 // mctp uuid, co_return NSM_SW_SUCCESS.
 TEST_F(NsmClockLimitUpdateTest,

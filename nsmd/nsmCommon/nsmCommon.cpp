@@ -408,6 +408,9 @@ requester::Coroutine
             uuid = nsmDevice->getUuid();
             nsmDevice->deviceUuid = uuid;
         };
+        auto isRetryableDeviceState = [](uint8_t status) {
+            return status == NSM_ERR_NOT_READY || status == NSM_BUSY;
+        };
 
         // Scenario 1:
         // Handle special case for baseboard/FPGA, where we do not event
@@ -530,6 +533,14 @@ requester::Coroutine
             lg2::info(
                 "getDeviceUUID::Got CC value as invalid data, assigning mctp uuid eid={EID} rc={RC}",
                 "EID", nsmDevice->getEid(), "RC", rc);
+        }
+        else if (isRetryableDeviceState(cc))
+        {
+            lg2::info(
+                "getDeviceUUID::Got retryable CC value, will retry later eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
+                "EID", nsmDevice->getEid(), "CC", cc, "REASONCODE", reason_code,
+                "RC", rc);
+            co_return cc;
         }
         else
         {
