@@ -30,6 +30,9 @@
 #if defined(ENABLE_DEBUG_INFO)
 #include "nsmLogInfo.hpp"
 #endif
+#if defined(ENABLE_SELECTIVE_WIPE)
+#include "nsmSelectiveWipe.hpp"
+#endif
 #include "libnsm/device-configuration.h"
 
 #include "asyncOperationManager.hpp"
@@ -1291,6 +1294,13 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
     auto networkAdapterLogInfoObject = std::make_shared<NsmLogInfoObject>(
         bus, name, inventoryObjPath, type, uuid);
     nsmDevice->addStaticSensor(networkAdapterLogInfoObject);
+#endif
+
+#if defined(ENABLE_SELECTIVE_WIPE)
+    auto networkAdapterSelectiveWipeObject =
+        std::make_shared<NsmSelectiveWipeObject>(bus, name, type,
+                                                 inventoryObjPath, uuid);
+    nsmDevice->addStaticSensor(networkAdapterSelectiveWipeObject);
 #endif
 
 #if defined(ENABLE_ERROR_INJECTION)

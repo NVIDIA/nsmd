@@ -31,6 +31,7 @@ enum diagnostics_command {
 	NSM_GET_DEVICE_DEBUG_PARAMETERS = 0x04,
 	NSM_SET_DEVICE_DEBUG_PARAMETERS = 0x05,
 	NSM_DEVICE_RESET = 0x06,
+	NSM_SELECTIVE_DATA_WIPE = 0x08,
 	NSM_GET_DEVICE_DIAGNOSTICS = 0x40,
 	NSM_GET_NETWORK_DEVICE_DEBUG_INFO = 0x50,
 	NSM_ERASE_TRACE = 0x51,
@@ -115,6 +116,36 @@ enum device_reset_trigger {
 	NSM_RESET_TRIGGER_PCIE_LINK_DISABLE = 2,
 	NSM_RESET_TRIGGER_DRIVER_READY = 3,
 };
+
+/** @brief Logical persistent-data targets for Selective Data Wipe (cmd 0x08).
+ *
+ * Multiple targets may be selected by OR'ing their corresponding masks.
+ */
+enum selective_data_wipe_target {
+	NSM_WIPE_TARGET_SCRATCH_DATA = 0,
+	NSM_WIPE_TARGET_DIAGNOSTIC_DATA = 1,
+	NSM_WIPE_TARGET_LOG_DATA = 2,
+	NSM_WIPE_TARGET_USER_DATA = 3,
+};
+
+#define NSM_SELECTIVE_DATA_WIPE_TARGET_BIT(target) ((uint16_t)(1u << (target)))
+
+/** @struct nsm_selective_data_wipe_req
+ *
+ * Structure representing an NSM Selective Data Wipe request (cmd 0x08).
+ */
+struct nsm_selective_data_wipe_req {
+	struct nsm_common_req hdr;
+	uint16_t wipe_target_mask;
+	uint16_t reserved;
+} __attribute__((packed));
+
+/** @struct nsm_selective_data_wipe_resp
+ *
+ * A successful response means all requested targets were logically
+ * invalidated. Deferred physical sanitization is outside this command.
+ */
+typedef struct nsm_common_resp nsm_selective_data_wipe_resp;
 
 /** @struct nsm_device_reset_req
  *
@@ -815,6 +846,37 @@ int encode_device_reset_resp(uint8_t instance_id, uint16_t reason_code,
  */
 int decode_device_reset_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *reason_code);
+
+/** @brief Encode an NSM Selective Data Wipe request (cmd 0x08).
+ *
+ *  @param[in] instance_id      - NSM instance ID
+ *  @param[in] wipe_target_mask - Logical data targets to invalidate. At least
+ *                                one of bits 0-3 must be set; bits 4-15 are
+ *                                reserved.
+ *  @param[out] msg             - Request message to populate
+ *  @return nsm_completion_codes
+ */
+int encode_selective_data_wipe_req(uint8_t instance_id,
+				   uint16_t wipe_target_mask,
+				   struct nsm_msg *msg);
+
+/** @brief Decode an NSM Selective Data Wipe request (cmd 0x08).
+ *
+ *  @param[in] msg              - Request message
+ *  @param[in] msg_len          - Length of request message
+ *  @param[out] wipe_target_mask - Decoded logical data target mask
+ *  @return nsm_completion_codes
+ */
+int decode_selective_data_wipe_req(const struct nsm_msg *msg, size_t msg_len,
+				   uint16_t *wipe_target_mask);
+
+/** @brief Encode an NSM Selective Data Wipe response (cmd 0x08). */
+int encode_selective_data_wipe_resp(uint8_t instance_id, uint8_t cc,
+				    uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode an NSM Selective Data Wipe response (cmd 0x08). */
+int decode_selective_data_wipe_resp(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *cc, uint16_t *reason_code);
 
 /** @brief Decode a Diagnostics Enable/Disable WP request message
  *

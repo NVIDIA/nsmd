@@ -115,6 +115,7 @@ valid_nsmd_subdirs = [
     'nsmManagers',
     'nsmHistograms',
     'nsmReady',
+    'nsmSelectiveWipe',
 ]
 
 # Validate requested subdirs
@@ -130,6 +131,15 @@ subdir_should_skip = {
     'nsmDot': not dot_enabled,
     'nsmDumpCollection': not get_option('enable-debug-info').enabled(),
 }
+
+# ENABLE_SELECTIVE_WIPE is set project-wide, so the sources must be built too.
+if not nsmd_subdirs_all and get_option('enable-selective-wipe').enabled() and not cx8_features
+    foreach dep : ['nsmSelectiveWipe']
+        if not nsmd_subdirs_include.contains(dep)
+            nsmd_subdirs_include += [dep]
+        endif
+    endforeach
+endif
 
 # Process subdirs: included if nsmd-subdirs-all=true OR in nsmd-subdirs-include
 foreach d : valid_nsmd_subdirs

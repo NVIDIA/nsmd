@@ -644,6 +644,8 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         eraseTraceHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        selectiveDataWipeHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         eraseDebugInfoHandler(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>

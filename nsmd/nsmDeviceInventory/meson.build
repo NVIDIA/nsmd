@@ -41,4 +41,10 @@ if include_all_dev_inv or include_dev_inv_list.contains('network-adapter')
     sources += ['nsmDeviceInventory/nsmNetworkAdapter.cpp']
 endif
 
-nsmd_headers += ['.', '..', 'nsmDebugToken', 'nsmDumpCollection']
+nsmd_headers += [
+    '.',
+    '..',
+    'nsmDebugToken',
+    'nsmDumpCollection',
+    'nsmSelectiveWipe',
+]

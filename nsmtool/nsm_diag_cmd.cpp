@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <cstring>
 #include <ctime>
+#include <map>
 
 namespace nsmtool
 {
@@ -924,6 +925,76 @@ class ResetNetworkDevice : public CommandInterface
 
   private:
     uint8_t mode;
+};
+
+class SelectiveDataWipe : public CommandInterface
+{
+  public:
+    SelectiveDataWipe() = delete;
+    SelectiveDataWipe(const SelectiveDataWipe&) = delete;
+    SelectiveDataWipe(SelectiveDataWipe&&) = default;
+    SelectiveDataWipe& operator=(const SelectiveDataWipe&) = delete;
+    SelectiveDataWipe& operator=(SelectiveDataWipe&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SelectiveDataWipe(const char* type, const char* name,
+                               CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-t,--target", targets,
+                        "Wipe targets: scratch, diagnostic, log, user")
+            ->required()
+            ->delimiter(',')
+            ->check(CLI::IsMember(wipeTargets));
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        uint16_t targetMask = 0;
+        for (const auto& target : targets)
+        {
+            targetMask |=
+                NSM_SELECTIVE_DATA_WIPE_TARGET_BIT(wipeTargets.at(target));
+        }
+
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_selective_data_wipe_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_selective_data_wipe_req(instanceId, targetMask,
+                                                 request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        auto rc = decode_selective_data_wipe_resp(responsePtr, payloadLength,
+                                                  &cc, &reasonCode);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Reason Code"] = reasonCode;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    static inline const std::map<std::string, uint8_t> wipeTargets = {
+        {"scratch", NSM_WIPE_TARGET_SCRATCH_DATA},
+        {"diagnostic", NSM_WIPE_TARGET_DIAGNOSTIC_DATA},
+        {"log", NSM_WIPE_TARGET_LOG_DATA},
+        {"user", NSM_WIPE_TARGET_USER_DATA},
+    };
+
+    std::vector<std::string> targets;
 };
 
 class GetNetworkDeviceDebugInfo : public CommandInterface
@@ -1844,6 +1915,12 @@ void registerCommand(CLI::App& app)
     auto queryToken = diag->add_subcommand("QueryToken", "Query token");
     commands.push_back(
         std::make_unique<QueryToken>("diag", "QueryToken", queryToken));
+
+    auto selectiveDataWipe = diag->add_subcommand(
+        "SelectiveDataWipe",
+        "Logically invalidate selected persistent data classes (cmd 0x08)");
+    commands.push_back(std::make_unique<SelectiveDataWipe>(
+        "diag", "SelectiveDataWipe", selectiveDataWipe));
 }
 
 } // namespace diag

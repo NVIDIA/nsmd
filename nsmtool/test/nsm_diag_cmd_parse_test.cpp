@@ -43,6 +43,7 @@
 //   [15] InstallToken
 //   [16] EraseToken
 //   [17] QueryToken
+//   [18] SelectiveDataWipe
 
 namespace nsmtool::diag
 {

@@ -11921,3 +11921,19 @@ TEST_F(MockupResponderTest, CovDestructorClosesOwnedSocket)
     close(fds[0]);
     close(fds[1]);
 }
+
+TEST_F(MockupResponderTest, ProcessRxMsg_Diag_SelectiveDataWipe)
+{
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_selective_data_wipe_req),
+                    0);
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    auto rc = encode_selective_data_wipe_req(
+        instanceId,
+        NSM_SELECTIVE_DATA_WIPE_TARGET_BIT(NSM_WIPE_TARGET_SCRATCH_DATA),
+        requestMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    std::optional<Request> longRunningEvent;
+    auto resp = mockupResponder->processRxMsg(request, longRunningEvent);
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(respCompletionCode(*resp), NSM_SUCCESS);
+}
