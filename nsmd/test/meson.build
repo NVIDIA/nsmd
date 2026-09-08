@@ -45,6 +45,7 @@ tests = [
     'nsmDeviceBranch2_test',
     'nsmDeviceBranch3_test',
     'nsmPortHealthMetrics_test',
+    'nsmPortCharacteristicsV2_test',
 ]
 
 # mctpDiscoveryBranch_test: helper TU isolates mctp_endpoint_discovery.hpp

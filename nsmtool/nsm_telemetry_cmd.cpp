@@ -39,6 +39,7 @@
 
 #include <cstdint>
 #include <ctime>
+#include <map>
 
 namespace nsmtool
 {
@@ -771,6 +772,262 @@ class QueryPortCharacteristics : public CommandInterface
 
   private:
     uint8_t portNumber;
+};
+
+class QueryPortCharacteristicsV2 : public CommandInterface
+{
+  public:
+    ~QueryPortCharacteristicsV2() = default;
+    QueryPortCharacteristicsV2() = delete;
+    QueryPortCharacteristicsV2(const QueryPortCharacteristicsV2&) = delete;
+    QueryPortCharacteristicsV2(QueryPortCharacteristicsV2&&) = default;
+    QueryPortCharacteristicsV2&
+        operator=(const QueryPortCharacteristicsV2&) = delete;
+    QueryPortCharacteristicsV2&
+        operator=(QueryPortCharacteristicsV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit QueryPortCharacteristicsV2(const char* type, const char* name,
+                                        CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto portOptionGroup = app->add_option_group(
+            "Required",
+            "Port number for which the characteristics are to be retrieved.");
+
+        portNumber = 0;
+        portOptionGroup->add_option(
+            "-p, --port, --portNum", portNumber,
+            "retrieve port characteristics v2 for Port number (one-based)");
+        portOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        if (portNumber == 0)
+        {
+            std::cerr << "Invalid portNum " << portNumber
+                      << " (port number is 1-based)\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_port_characteristics_v2_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_query_port_characteristics_v2_req(instanceId,
+                                                           portNumber, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t recordCount = 0;
+        size_t consumedLen = 0;
+        auto responseData = reinterpret_cast<const uint8_t*>(responsePtr);
+
+        auto rc = decode_aggregate_resp(responsePtr, payloadLength,
+                                        &consumedLen, &cc, &recordCount);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: decode_aggregate_resp fail "
+                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Port Number"] = portNumber;
+        result["Completion Code"] = cc;
+        result["Record Count"] = recordCount;
+
+        std::vector<ordered_json> records;
+        size_t remaining = payloadLength;
+        while (recordCount--)
+        {
+            uint8_t tag = 0;
+            bool valid = false;
+            const uint8_t* data = nullptr;
+            size_t dataLen = 0;
+
+            remaining -= consumedLen;
+            responseData += consumedLen;
+
+            auto sample = reinterpret_cast<const nsm_aggregate_resp_sample*>(
+                responseData);
+            rc = decode_aggregate_resp_sample(sample, remaining, &consumedLen,
+                                              &tag, &valid, &data, &dataLen);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                std::cerr
+                    << "Response message error while parsing record header: "
+                    << "tag=" << static_cast<int>(tag) << ", rc=" << rc << "\n";
+                break;
+            }
+
+            ordered_json record;
+            record["Tag"] = tag;
+            record["Valid"] = valid;
+            record["DataLength"] = dataLen;
+            if (!valid)
+            {
+                records.push_back(record);
+                continue;
+            }
+
+            switch (tag)
+            {
+                case NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS:
+                case NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE:
+                case NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE:
+                case NSM_PORT_CHARACTERISTICS_V2_TAG_LANE_INFO:
+                {
+                    uint32_t value = 0;
+                    rc = decode_port_characteristics_v2_u32_record(
+                        data, dataLen, &value);
+                    if (rc == NSM_SW_SUCCESS)
+                    {
+                        static const std::map<uint8_t, std::string> names = {
+                            {NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS,
+                             "Port Status"},
+                            {NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE,
+                             "NV Port Line Rate Mbps"},
+                            {NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE,
+                             "NV Port Data Rate Kbps"},
+                            {NSM_PORT_CHARACTERISTICS_V2_TAG_LANE_INFO,
+                             "Lane Info Status"}};
+                        record[names.at(tag)] = value;
+                    }
+                    break;
+                }
+                case NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH:
+                {
+                    struct nsm_link_health_record linkHealth{};
+                    rc = decode_link_health_record(data, dataLen, &linkHealth);
+                    if (rc == NSM_SW_SUCCESS)
+                    {
+                        record["Link Health"] =
+                            static_cast<uint32_t>(linkHealth.link_health);
+                        record["Attention Trigger"] =
+                            static_cast<uint32_t>(linkHealth.attention_trigger);
+                        record["AttentionTriggerMetricId"] =
+                            static_cast<uint32_t>(
+                                linkHealth.attention_trigger_metric);
+                        record["AttentionTriggerConfiguration"] =
+                            static_cast<uint32_t>(
+                                linkHealth.link_health_config_changed);
+                    }
+                    break;
+                }
+                case NSM_PORT_CHARACTERISTICS_V2_TAG_TIMESTAMP:
+                {
+                    uint64_t timestamp = 0;
+                    rc = decode_aggregate_timestamp_data(data, dataLen,
+                                                         &timestamp);
+                    if (rc == NSM_SW_SUCCESS)
+                    {
+                        record["Timestamp"] = timestamp;
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+            if (rc != NSM_SW_SUCCESS)
+            {
+                std::cerr << "Response message error while decoding record: "
+                          << "tag=" << static_cast<int>(tag) << ", rc=" << rc
+                          << "\n";
+            }
+            records.push_back(record);
+        }
+        result["Records"] = records;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint16_t portNumber;
+};
+
+class ClearPortMetricState : public CommandInterface
+{
+  public:
+    ~ClearPortMetricState() = default;
+    ClearPortMetricState() = delete;
+    ClearPortMetricState(const ClearPortMetricState&) = delete;
+    ClearPortMetricState(ClearPortMetricState&&) = default;
+    ClearPortMetricState& operator=(const ClearPortMetricState&) = delete;
+    ClearPortMetricState& operator=(ClearPortMetricState&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit ClearPortMetricState(const char* type, const char* name,
+                                  CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto portOptionGroup = app->add_option_group(
+            "Required", "Port number whose metric state is to be cleared.");
+
+        portNumber = 0;
+        portOptionGroup->add_option(
+            "-p, --port, --portNum", portNumber,
+            "clear metric state of Port number (one-based)");
+        portOptionGroup->require_option(1);
+
+        app->add_option("-t, --tag", tagIds,
+                        "TagID(s) to clear, e.g. 4 for Link Health "
+                        "[default: 4]");
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        if (portNumber == 0)
+        {
+            std::cerr << "Invalid portNum " << portNumber
+                      << " (port number is 1-based)\n";
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+        if (tagIds.empty())
+        {
+            tagIds.push_back(NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH);
+        }
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_clear_port_metric_state_req) +
+            tagIds.size());
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_clear_port_metric_state_req(
+            instanceId, portNumber, static_cast<uint16_t>(tagIds.size()),
+            tagIds.data(), request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+
+        auto rc = decode_clear_port_metric_state_resp(
+            responsePtr, payloadLength, &cc, &reasonCode);
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+        {
+            ordered_json result;
+            result["Port Number"] = portNumber;
+            result["Tag IDs"] = tagIds;
+            result["Completion Code"] = cc;
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_clear_port_metric_state_resp fail "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reasonCode << "\n";
+        }
+    }
+
+  private:
+    uint16_t portNumber;
+    std::vector<uint8_t> tagIds;
 };
 
 class QueryPortStatus : public CommandInterface
@@ -1717,6 +1974,13 @@ class AggregateResponseParser
                     << "Response message error while parsing sample header: "
                     << "tag=" << static_cast<int>(tag) << ", rc=" << rc << "\n";
 
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    // The header could not be decoded, so the offset of the
+                    // next sample is unknown: stop here instead of reusing the
+                    // stale consumed_len and reading past the response.
+                    break;
+                }
                 continue;
             }
 
@@ -6911,6 +7175,17 @@ void registerCommand(CLI::App& app)
         "QueryPortCharacteristics", "query port characteristics");
     commands.push_back(std::make_unique<QueryPortCharacteristics>(
         "telemetry", "QueryPortCharacteristics", queryPortCharacteristics));
+
+    auto queryPortCharacteristicsV2 = telemetry->add_subcommand(
+        "QueryPortCharacteristicsV2",
+        "query port characteristics v2 (link health extension)");
+    commands.push_back(std::make_unique<QueryPortCharacteristicsV2>(
+        "telemetry", "QueryPortCharacteristicsV2", queryPortCharacteristicsV2));
+
+    auto clearPortMetricState = telemetry->add_subcommand(
+        "ClearPortMetricState", "clear port metric state (link health)");
+    commands.push_back(std::make_unique<ClearPortMetricState>(
+        "telemetry", "ClearPortMetricState", clearPortMetricState));
 
     auto queryPortStatus = telemetry->add_subcommand("QueryPortStatus",
                                                      "query port status");

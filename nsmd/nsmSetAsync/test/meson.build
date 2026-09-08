@@ -16,6 +16,7 @@ tests = [
     'nsmSetMigModeBranch_test',
     'nsmSetCpuOperatingConfig_test',
     'nsmSetAsyncBranch_test',
+    'nsmAsyncStatusMapping_test',
 ]
 foreach t : tests
     test(

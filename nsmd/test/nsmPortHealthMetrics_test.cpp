@@ -315,6 +315,61 @@ TEST_F(NsmPortHealthMetricsTest,
               AttentionTriggerReasonValues::Unknown);
 }
 
+TEST_F(NsmPortHealthMetricsTest, DecodeAttentionTrigger_AllDefinedValues)
+{
+    const std::vector<std::pair<uint8_t, AttentionTriggerReasonValues>>
+        expected{
+            {NSM_ATTENTION_TRIGGER_NA, AttentionTriggerReasonValues::Unknown},
+            {NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS,
+             AttentionTriggerReasonValues::PLRTXBandwidthLoss},
+            {NSM_ATTENTION_TRIGGER_RECOVERY_BANDWIDTH_LOSS,
+             AttentionTriggerReasonValues::RecoveryBandwidthLoss},
+            {NSM_ATTENTION_TRIGGER_EFFECTIVE_BER,
+             AttentionTriggerReasonValues::EffectiveBER},
+            {NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT,
+             AttentionTriggerReasonValues::SymbolErrorCount},
+            {NSM_ATTENTION_TRIGGER_RAW_BER,
+             AttentionTriggerReasonValues::RawBER},
+            {NSM_ATTENTION_TRIGGER_PLR_RX_BANDWIDTH_LOSS,
+             AttentionTriggerReasonValues::PLRRXBandwidthLoss},
+            {NSM_ATTENTION_TRIGGER_PORT_TOTAL_BANDWIDTH_LOSS,
+             AttentionTriggerReasonValues::PortTotalBandwidthLoss},
+            {NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT,
+             AttentionTriggerReasonValues::LinkDownCount},
+            {NSM_ATTENTION_TRIGGER_SYMBOL_BER,
+             AttentionTriggerReasonValues::SymbolBER},
+        };
+    for (const auto& [trigger, reason] : expected)
+    {
+        EXPECT_EQ(sensor->decodeAttentionTrigger(trigger), reason)
+            << "trigger=" << static_cast<int>(trigger);
+    }
+}
+
+TEST_F(NsmPortHealthMetricsTest, DecodeReservedThenValid_RearmsThrottles)
+{
+    // An out-of-spec value warns once; a valid value re-arms the throttle.
+    EXPECT_EQ(sensor->decodeAttentionTrigger(10),
+              AttentionTriggerReasonValues::Unknown);
+    EXPECT_EQ(sensor->decodeAttentionTrigger(10),
+              AttentionTriggerReasonValues::Unknown);
+    EXPECT_EQ(sensor->decodeAttentionTrigger(NSM_ATTENTION_TRIGGER_RAW_BER),
+              AttentionTriggerReasonValues::RawBER);
+    EXPECT_EQ(sensor->decodeAttentionTrigger(10),
+              AttentionTriggerReasonValues::Unknown);
+
+    EXPECT_EQ(sensor->decodeLinkHealth(3),
+              EarlyHealthIndicationValues::Unknown);
+    EXPECT_EQ(sensor->decodeLinkHealth(3),
+              EarlyHealthIndicationValues::Unknown);
+    EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_HEALTHY),
+              EarlyHealthIndicationValues::Healthy);
+    EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_NA),
+              EarlyHealthIndicationValues::Unknown);
+    EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_ATTENTION),
+              EarlyHealthIndicationValues::Attention);
+}
+
 // ===========================================================================
 // 4. healthStateInitialized first-poll skip
 // ===========================================================================
@@ -449,4 +504,266 @@ TEST_F(NsmPortHealthMetricsTest, TransitionHealthyToUnknownFiresEvent)
               EarlyHealthIndicationValues::Unknown);
     EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
               EarlyHealthIndicationValues::Unknown);
+}
+
+// ===========================================================================
+// 7. Unavailable bracketing of the transition event
+//
+// Unavailable means the Link Health record could not be read, not a health
+// transition: no event into it or for merely leaving it, and a change
+// bracketed by it is reported once against the last known state. The event
+// itself is fire-and-forget; the state the emitter keeps is asserted.
+// ===========================================================================
+
+namespace
+{
+constexpr auto kNeutralReason = AttentionTriggerReasonValues::Unknown;
+constexpr auto kNeutralConfig = AttentionTriggerConfigurationValues::Unknown;
+} // namespace
+
+TEST_F(NsmPortHealthMetricsTest, Event_NoEventIntoOrOutOfUnavailable)
+{
+    sensor->updateHealth(EarlyHealthIndicationValues::Healthy, kNeutralReason,
+                         0, kNeutralConfig);
+    ASSERT_TRUE(sensor->healthStateInitialized);
+    ASSERT_TRUE(sensor->lastKnownHealthStateValid);
+    ASSERT_EQ(sensor->lastKnownHealthState,
+              EarlyHealthIndicationValues::Healthy);
+
+    // Into Unavailable: published, but the last known state is kept.
+    sensor->updateHealth(EarlyHealthIndicationValues::Unavailable,
+                         kNeutralReason, 0, kNeutralConfig);
+    EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
+              EarlyHealthIndicationValues::Unavailable);
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Unavailable);
+    EXPECT_EQ(sensor->lastKnownHealthState,
+              EarlyHealthIndicationValues::Healthy);
+
+    // Back to the same readable state: nothing changed since the last known
+    // state, so no transition is recorded.
+    sensor->updateHealth(EarlyHealthIndicationValues::Healthy, kNeutralReason,
+                         0, kNeutralConfig);
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Healthy);
+    EXPECT_EQ(sensor->lastKnownHealthState,
+              EarlyHealthIndicationValues::Healthy);
+}
+
+TEST_F(NsmPortHealthMetricsTest, Event_BracketedChangeReportedOnce)
+{
+    sensor->updateHealth(EarlyHealthIndicationValues::Healthy, kNeutralReason,
+                         0, kNeutralConfig);
+    sensor->updateHealth(EarlyHealthIndicationValues::Unavailable,
+                         kNeutralReason, 0, kNeutralConfig);
+    ASSERT_EQ(sensor->lastKnownHealthState,
+              EarlyHealthIndicationValues::Healthy);
+
+    // Healthy -> Unavailable -> Attention: reported once the record is
+    // readable again, against the last known state.
+    sensor->updateHealth(EarlyHealthIndicationValues::Attention,
+                         AttentionTriggerReasonValues::RawBER, 5,
+                         AttentionTriggerConfigurationValues::Current);
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Attention);
+    EXPECT_EQ(sensor->lastKnownHealthState,
+              EarlyHealthIndicationValues::Attention);
+
+    // Repeating the state reports nothing further.
+    sensor->updateHealth(EarlyHealthIndicationValues::Attention,
+                         AttentionTriggerReasonValues::RawBER, 5,
+                         AttentionTriggerConfigurationValues::Current);
+    EXPECT_EQ(sensor->lastKnownHealthState,
+              EarlyHealthIndicationValues::Attention);
+}
+
+TEST_F(NsmPortHealthMetricsTest, Event_StartInUnavailableBaselinesFirstReadable)
+{
+    sensor->updateHealth(EarlyHealthIndicationValues::Unavailable,
+                         kNeutralReason, 0, kNeutralConfig);
+    EXPECT_TRUE(sensor->healthStateInitialized);
+    EXPECT_FALSE(sensor->lastKnownHealthStateValid);
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Unavailable);
+
+    // The first readable state is the baseline, not a transition.
+    sensor->updateHealth(EarlyHealthIndicationValues::Attention,
+                         AttentionTriggerReasonValues::EffectiveBER, 3,
+                         AttentionTriggerConfigurationValues::Current);
+    EXPECT_TRUE(sensor->lastKnownHealthStateValid);
+    EXPECT_EQ(sensor->lastKnownHealthState,
+              EarlyHealthIndicationValues::Attention);
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Attention);
+}
+
+// ===========================================================================
+// 8. updateHealth publisher and the extension properties
+// ===========================================================================
+
+TEST_F(NsmPortHealthMetricsTest, ConstructorSetsExtensionDefaults)
+{
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerMetricId(), 0);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerConfiguration(),
+              AttentionTriggerConfigurationValues::Unknown);
+    EXPECT_FALSE(sensor->lastKnownHealthStateValid);
+}
+
+TEST_F(NsmPortHealthMetricsTest, UpdateHealth_PublishesAllFourProperties)
+{
+    sensor->updateHealth(EarlyHealthIndicationValues::Attention,
+                         AttentionTriggerReasonValues::RawBER, 5,
+                         AttentionTriggerConfigurationValues::Modified);
+    EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
+              EarlyHealthIndicationValues::Attention);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
+              AttentionTriggerReasonValues::RawBER);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerMetricId(), 5);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerConfiguration(),
+              AttentionTriggerConfigurationValues::Modified);
+}
+
+TEST_F(NsmPortHealthMetricsTest, UpdateHealth_OperatorClearedTransition)
+{
+    // Attention baseline, then the publish that follows an operator clear:
+    // the transition to Healthy is recorded (logged Informational) with the
+    // trigger fields neutral.
+    sensor->updateHealth(EarlyHealthIndicationValues::Attention,
+                         AttentionTriggerReasonValues::EffectiveBER, 3,
+                         AttentionTriggerConfigurationValues::Current);
+    sensor->updateHealth(EarlyHealthIndicationValues::Healthy, kNeutralReason,
+                         0, kNeutralConfig, /*operatorCleared=*/true);
+    EXPECT_EQ(sensor->lastKnownHealthState,
+              EarlyHealthIndicationValues::Healthy);
+    EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
+              EarlyHealthIndicationValues::Healthy);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
+              AttentionTriggerReasonValues::Unknown);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerMetricId(), 0);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerConfiguration(),
+              AttentionTriggerConfigurationValues::Unknown);
+}
+
+TEST_F(NsmPortHealthMetricsTest, HandleResponse_KeepsExtensionFieldsNeutral)
+{
+    // The 0x42 status word carries no slot or configuration field: a Phase 1
+    // poll publishes them neutral even after they were set.
+    sensor->updateHealth(EarlyHealthIndicationValues::Attention,
+                         AttentionTriggerReasonValues::RawBER, 9,
+                         AttentionTriggerConfigurationValues::Current);
+    ASSERT_EQ(portHealthMetricsIntf->attentionTriggerMetricId(), 9);
+
+    auto buf = buildResponse(attentionStatus(NSM_ATTENTION_TRIGGER_RAW_BER));
+    auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
+    EXPECT_EQ(sensor->handleResponseMsg(msg, buf.size()), NSM_SUCCESS);
+    EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
+              EarlyHealthIndicationValues::Attention);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
+              AttentionTriggerReasonValues::RawBER);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerMetricId(), 0);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerConfiguration(),
+              AttentionTriggerConfigurationValues::Unknown);
+}
+
+// ===========================================================================
+// 9. NsmPortCharacteristicsV2 range-checked decoders of the Tag 0x04 fields
+// ===========================================================================
+
+class NsmPortHealthMetricsV2DecoderTest : public NsmPortHealthMetricsTest
+{
+  protected:
+    NsmPortHealthMetricsV2DecoderTest()
+    {
+        v2Path = objPath + "_v2";
+        v2Name = portName + "_v2";
+        v2IBPortIntf = std::make_shared<IBPortIntf>(testBus(), v2Path.c_str());
+        v2Oem3Intf = std::make_shared<PortMetricsOem3Intf>(testBus(),
+                                                           v2Path.c_str());
+        v2HealthIntf = std::make_shared<PortHealthMetricsIntf>(testBus(),
+                                                               v2Path.c_str());
+        // The decoders do not touch the device.
+        v2 = std::make_unique<NsmPortCharacteristicsV2>(
+            testBus(), v2Name, /*portNum=*/1, "NSM_NVLink", NSM_DEV_ID_GPU,
+            v2Oem3Intf, v2IBPortIntf, v2HealthIntf, v2Path,
+            /*device=*/nullptr);
+    }
+
+    std::string v2Path;
+    std::string v2Name;
+    std::shared_ptr<IBPortIntf> v2IBPortIntf;
+    std::shared_ptr<PortMetricsOem3Intf> v2Oem3Intf;
+    std::shared_ptr<PortHealthMetricsIntf> v2HealthIntf;
+    std::unique_ptr<NsmPortCharacteristicsV2> v2;
+};
+
+TEST_F(NsmPortHealthMetricsV2DecoderTest, DecodeMetricSlot_Ranges)
+{
+    EXPECT_EQ(v2->decodeMetricSlot(0), 0);
+    EXPECT_EQ(v2->decodeMetricSlot(1), 1);
+    EXPECT_EQ(v2->decodeMetricSlot(NSM_LINK_HEALTH_METRIC_SLOT_MAX),
+              NSM_LINK_HEALTH_METRIC_SLOT_MAX);
+    // 16..127 are reserved and published as 0 (one throttled warning per
+    // reserved episode, re-armed by a valid value).
+    EXPECT_EQ(v2->decodeMetricSlot(NSM_LINK_HEALTH_METRIC_SLOT_MAX + 1), 0);
+    EXPECT_EQ(v2->decodeMetricSlot(127), 0);
+    EXPECT_EQ(v2->decodeMetricSlot(2), 2);
+    EXPECT_EQ(v2->decodeMetricSlot(64), 0);
+}
+
+TEST_F(NsmPortHealthMetricsV2DecoderTest, DecodeConfigChanged_Ranges)
+{
+    EXPECT_EQ(v2->decodeConfigChanged(NSM_LINK_HEALTH_CONFIG_NA),
+              AttentionTriggerConfigurationValues::Unknown);
+    EXPECT_EQ(v2->decodeConfigChanged(NSM_LINK_HEALTH_CONFIG_CURRENT),
+              AttentionTriggerConfigurationValues::Current);
+    EXPECT_EQ(v2->decodeConfigChanged(NSM_LINK_HEALTH_CONFIG_PREVIOUS),
+              AttentionTriggerConfigurationValues::Modified);
+    // 3 is reserved; anything wider than the 2-bit field is invalid too.
+    EXPECT_EQ(v2->decodeConfigChanged(3),
+              AttentionTriggerConfigurationValues::Unknown);
+    EXPECT_EQ(v2->decodeConfigChanged(0xFF),
+              AttentionTriggerConfigurationValues::Unknown);
+    EXPECT_EQ(v2->decodeConfigChanged(NSM_LINK_HEALTH_CONFIG_CURRENT),
+              AttentionTriggerConfigurationValues::Current);
+}
+
+// ===========================================================================
+// 10. ClearEarlyHealthIndication on a Phase 1-only port
+// ===========================================================================
+
+TEST_F(NsmPortHealthMetricsTest, Phase1OnlyPort_ClearReportsUnsupportedRequest)
+{
+    // No NsmPortCharacteristicsV2 attached: the method answers through a
+    // fresh async result object without contacting any device.
+    ASSERT_FALSE(static_cast<bool>(portHealthMetricsIntf->clearHandler));
+
+    auto path = portHealthMetricsIntf->clearEarlyHealthIndication();
+    ASSERT_FALSE(path.str.empty());
+    EXPECT_TRUE(path.str.starts_with(AsyncOperationResultObjPath));
+
+    std::shared_ptr<AsyncStatusIntf> status;
+    for (const auto& [index, statusInterface] :
+         AsyncOperationManager::getInstance()->statusInterfaces)
+    {
+        if (std::string{AsyncOperationResultObjPath} + "/" +
+                std::to_string(index) ==
+            path.str)
+        {
+            status = statusInterface;
+        }
+    }
+    ASSERT_NE(status, nullptr);
+    EXPECT_EQ(status->status(), AsyncOperationStatusType::UnsupportedRequest);
+}
+
+TEST_F(NsmPortHealthMetricsTest, AllocateClearResult_ReturnsPendingObject)
+{
+    auto [path, status] = PortHealthMetricsIntf::allocateClearResult(objPath);
+    EXPECT_TRUE(path.starts_with(AsyncOperationResultObjPath));
+    ASSERT_NE(status, nullptr);
+    EXPECT_EQ(status->status(), AsyncOperationStatusType::InProgress);
+    // TODO(link-health): the Common.Error.Unavailable branch (no free result
+    // object) is unreachable through AsyncOperationManager today:
+    // getCurrentObjectCount() never reports exhaustion, so it cannot be
+    // exercised without a test hook in the manager.
 }

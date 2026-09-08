@@ -2,6 +2,7 @@
 
 #include "libnsm/network-ports.h"
 
+#include "asyncOperationManager.hpp"
 #include "common/types.hpp"
 #include "nsmDbusIfaceOverride/nsmResetIface.hpp"
 #include "nsmDevice.hpp"
@@ -49,7 +50,7 @@ using PortMetricsOem2Intf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::PortMetricsOem2>;
 using PortMetricsOem3Intf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::PortMetricsOem3>;
-using PortHealthMetricsIntf = sdbusplus::server::object_t<
+using PortHealthMetricsServer = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::nv_link::PortHealthMetrics>;
 using AssociationDefInft = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::association::Definitions>;
@@ -90,6 +91,46 @@ using EarlyHealthIndicationValues =
     com::nvidia::nv_link::PortHealthMetrics::EarlyHealthIndicationValues;
 using AttentionTriggerReasonValues =
     com::nvidia::nv_link::PortHealthMetrics::AttentionTriggerReasonValues;
+using AttentionTriggerConfigurationValues = com::nvidia::nv_link::
+    PortHealthMetrics::AttentionTriggerConfigurationValues;
+
+/** @class PortHealthMetricsIntf
+ *
+ *  com.nvidia.NVLink.PortHealthMetrics object of one NVLink-family port.
+ *  The generated server class declares the pure-virtual
+ *  clearEarlyHealthIndication(), so the object is instantiated through this
+ *  class. The clear is routed to the owning NsmPortCharacteristicsV2 sensor
+ *  when one is attached; a Phase 1-only port (no handler) answers
+ *  UnsupportedRequest through a fresh async result without device I/O.
+ */
+class PortHealthMetricsIntf : public PortHealthMetricsServer
+{
+  public:
+    using ClearHandler = std::function<sdbusplus::object_path()>;
+
+    PortHealthMetricsIntf(sdbusplus::bus_t& bus, const char* path) :
+        PortHealthMetricsServer(bus, path), objPath(path)
+    {}
+
+    void setClearHandler(ClearHandler handler)
+    {
+        clearHandler = std::move(handler);
+    }
+
+    sdbusplus::object_path clearEarlyHealthIndication() override;
+
+    /** @brief Allocate a com.nvidia.Async.Status result object for a clear.
+     *
+     *  Throws xyz.openbmc_project.Common.Error.Unavailable if the async
+     *  manager returns no result object.
+     */
+    static std::pair<std::string, std::shared_ptr<AsyncStatusIntf>>
+        allocateClearResult(const std::string& portPath);
+
+  private:
+    ClearHandler clearHandler;
+    std::string objPath;
+};
 
 class NsmPortStatus : public NsmObject
 {
@@ -132,6 +173,34 @@ class NsmPortCharacteristics : public NsmSensor
     void updateMetricOnSharedMemory() override;
     std::string portName;
 
+    // Publishers shared with NsmPortCharacteristicsV2 so that the 0x42 and
+    // 0x12 queries drive D-Bus, the TAL cache and the health event
+    // identically. The u32 arguments carry the 0x42 field encodings, which
+    // the 0x12 Tags 0x00-0x03 reuse.
+    void updatePortStatus(uint32_t portStatus); // link-down reason (GPU only)
+    void updateLineRate(uint32_t lineRateMbps); // GPU only
+    void updateDataRate(uint32_t dataRateKbps); // GPU only
+    void updateLaneInfo(uint32_t laneInfo);     // GPU only
+    /** @brief Publish the health set and emit the transition event.
+     *
+     *  @param[in] state - new EarlyHealthIndication
+     *  @param[in] reason - new AttentionTriggerReason
+     *  @param[in] metricId - AttentionTriggerMetricId (0 for Phase 1)
+     *  @param[in] configuration - AttentionTriggerConfiguration
+     *                             (Unknown for Phase 1)
+     *  @param[in] operatorCleared - the publish follows an operator clear;
+     *                               a transition is then Informational
+     */
+    void updateHealth(EarlyHealthIndicationValues state,
+                      AttentionTriggerReasonValues reason, uint8_t metricId,
+                      AttentionTriggerConfigurationValues configuration,
+                      bool operatorCleared = false);
+    // Range-checked decoders of the wire fields; reserved values map to
+    // Unknown with a warning naming the port, throttled through this
+    // object's StateChangeLogger (one warning per reserved episode).
+    EarlyHealthIndicationValues decodeLinkHealth(uint8_t linkHealth);
+    AttentionTriggerReasonValues decodeAttentionTrigger(uint8_t triggerValue);
+
   private:
     std::unique_ptr<PortInfoIntf> portInfoIntf = nullptr;
     std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
@@ -145,17 +214,138 @@ class NsmPortCharacteristics : public NsmSensor
     EarlyHealthIndicationValues previousEarlyHealthIndication =
         EarlyHealthIndicationValues::Unknown;
     bool healthStateInitialized = false;
+    // Last state other than Unavailable; the transition event compares
+    // against it so that a state change bracketed by Unavailable is still
+    // reported once the record is readable again.
+    EarlyHealthIndicationValues lastKnownHealthState =
+        EarlyHealthIndicationValues::Unknown;
+    bool lastKnownHealthStateValid = false;
     uint8_t portNumber;
     // GPU exposes the full port-characteristics telemetry; a switch exposes
     // only the health counters. Gates non-health publishes.
     uint8_t deviceType;
     std::string objPath;
     void updateLinkDownCode(const uint32_t linkDownCode);
-    void decodeAttentionTrigger(uint8_t triggerValue);
     // Emits NVLinkPortHealthStateChanged on a health-state transition (the
-    // first observation is baselined, not reported). Isolated from
-    // handleResponseMsg for readability and to localize the flood policy.
-    void emitHealthStateChangeEvent(EarlyHealthIndicationValues newHealthState);
+    // first observation is baselined, not reported; no event to or from
+    // Unavailable). Isolated from the publish path for readability and to
+    // localize the flood policy.
+    void emitHealthStateChangeEvent(EarlyHealthIndicationValues newHealthState,
+                                    bool operatorCleared);
+};
+
+/** @class NsmPortCharacteristicsV2
+ *
+ *  Per-port sensor for NSM Type 1 Query Port Characteristics v2 (0x12), the
+ *  Link Health Indication Extension. Created instead of NsmPortCharacteristics
+ *  on ports whose entity-manager entry sets LinkHealthExtensionSupported.
+ *
+ *  Records: Tags 0x00-0x03 feed the Phase 1 publishers of the owned
+ *  NsmPortCharacteristics (health bits of Tag 0x00 are ignored); Tag 0x04
+ *  yields EarlyHealthIndication, AttentionTriggerReason,
+ *  AttentionTriggerMetricId and AttentionTriggerConfiguration. A
+ *  Valid = 0 record publishes Unavailable with neutral trigger fields; a
+ *  malformed response aborts the poll with the properties unchanged.
+ *
+ *  A device answering 0x12 with unsupported command drops the port to the
+ *  Phase 1 query (0x42) through the owned sensor, publishes
+ *  ClearEarlyHealthIndicationSupported
+ *  false and re-probes 0x12 every kFallbackReprobeInterval cycles and on
+ *  re-discovery.
+ *
+ *  ClearEarlyHealthIndication() sends Clear Port Metric State (0x13) for Tag
+ *  0x04 through the device write path, maps the completion code with
+ *  mapNsmCompletionToAsyncStatus, refreshes the port through update() and only
+ *  then reports Success.
+ */
+class NsmPortCharacteristicsV2 : public NsmSensorAggregator
+{
+  public:
+    NsmPortCharacteristicsV2(
+        sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
+        const std::string& type, uint8_t deviceType,
+        std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Intf,
+        std::shared_ptr<IBPortIntf> iBPortIntf,
+        std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsIntf,
+        std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device);
+    ~NsmPortCharacteristicsV2() override;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
+    void updateMetricOnSharedMemory() override;
+    void onDeviceOnline() override;
+
+    /** @brief D-Bus ClearEarlyHealthIndication entry point.
+     *
+     *  Returns the com.nvidia.Async.Status object path at once; throws
+     *  Common.Error.Unavailable only when no result object is free.
+     */
+    sdbusplus::object_path clearEarlyHealthIndication();
+
+    bool isFallbackActive() const
+    {
+        return fallbackActive;
+    }
+
+    std::string portName;
+
+    // In fallback every kFallbackReprobeInterval-th round-robin cycle sends
+    // 0x12 again instead of 0x42.
+    static constexpr size_t kFallbackReprobeInterval = 16;
+
+  private:
+    int handleSample(const TelemetrySample& sample) override;
+    // Strict record walk of a 0x12 response; returns the completion code or
+    // an NSM_SW_ERROR_* code without publishing anything on malformation.
+    // unsupportedByDevice is set when the device itself answered
+    // unsupported command (positive evidence for the 0x42 fallback).
+    uint8_t decodeRecords(const nsm_msg* responseMsg, size_t responseLen,
+                          bool& unsupportedByDevice);
+    void publishRecords();
+    // Range-checked decoders of the Tag 0x04 extension fields (reserved ->
+    // 0 / Unknown with a StateChangeLogger-throttled warning).
+    uint8_t decodeMetricSlot(uint8_t metricSlot);
+    AttentionTriggerConfigurationValues
+        decodeConfigChanged(uint8_t configChanged);
+    void enterFallback();
+    void leaveFallback();
+    requester::Coroutine
+        doClearOnDevice(std::shared_ptr<AsyncStatusIntf> statusInterface);
+
+    // Owns the port's publishers and runs the 0x42 query during fallback.
+    std::shared_ptr<NsmPortCharacteristics> phase1;
+    std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsIntf = nullptr;
+    std::weak_ptr<NsmDevice> device;
+    uint16_t portNumber;
+    std::string objPath;
+
+    bool fallbackActive = false;
+    // 0x12 has answered at least once since creation / re-discovery; gates
+    // ClearEarlyHealthIndicationSupported together with fallbackActive.
+    bool extensionConfirmed = false;
+    bool reprobeRequested = false;
+    size_t fallbackCycles = 0;
+    // Set by the clear path so the refresh that follows reports its
+    // transition as Informational.
+    bool operatorClearPending = false;
+    // A Clear Port Metric State (0x13) for this port is on the wire; a
+    // second ClearEarlyHealthIndication meanwhile answers
+    // ConflictingOperation without device I/O.
+    bool clearInFlight = false;
+
+    // Records of the response being decoded; published only after the walk
+    // completed without error.
+    struct RecordSet
+    {
+        std::optional<uint32_t> portStatus;
+        std::optional<uint32_t> lineRate;
+        std::optional<uint32_t> dataRate;
+        std::optional<uint32_t> laneInfo;
+        bool linkHealthPresent = false;
+        bool linkHealthValid = false;
+        nsm_link_health_record linkHealth{};
+    } records;
 };
 
 class NsmPortMetrics : public NsmSensor

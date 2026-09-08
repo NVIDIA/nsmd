@@ -583,6 +583,11 @@ std::optional<Response>
                     return getPortTelemetryCounterHandler(request, requestLen);
                 case NSM_QUERY_PORT_CHARACTERISTICS:
                     return queryPortCharacteristicsHandler(request, requestLen);
+                case NSM_QUERY_PORT_CHARACTERISTICS_V2:
+                    return queryPortCharacteristicsV2Handler(request,
+                                                             requestLen);
+                case NSM_CLEAR_PORT_METRIC_STATE:
+                    return clearPortMetricStateHandler(request, requestLen);
                 case NSM_QUERY_PORT_STATUS:
                     return queryPortStatusHandler(request, requestLen);
                 case NSM_GET_FABRIC_MANAGER_STATE:
@@ -1083,7 +1088,10 @@ std::optional<std::vector<uint8_t>>
                   {0, 1, 2, 3, 4, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
                    NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
                    NSM_GET_DEVICE_CAPABILITIES_V2}},
-                 {1, {1, 8, 9, 10, 11, 14, 68, 69}},
+                 {1,
+                  {1, 8, 9, 10, 11, 14, NSM_QUERY_PORT_CHARACTERISTICS_V2,
+                   NSM_CLEAR_PORT_METRIC_STATE, NSM_QUERY_PORT_CHARACTERISTICS,
+                   68, 69}},
                  {2, {4}},
                  {3, {12}},
                  {4,
@@ -1127,7 +1135,9 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
                    NSM_GET_DEVICE_CAPABILITIES_V2,
                    NSM_GET_EVENT_LOG_RECORD_V2}},
-                 {1, {1, 65, 66, 67, 68, 69}},
+                 {1,
+                  {1, NSM_QUERY_PORT_CHARACTERISTICS_V2,
+                   NSM_CLEAR_PORT_METRIC_STATE, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
                  {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,
                       15,  16,  17,  69,  70,  71,  72,  73,  74,  75,  77,
@@ -1606,6 +1616,259 @@ std::optional<std::vector<uint8_t>>
                    "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPortCharacteristicsV2Handler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("queryPortCharacteristicsV2Handler: request length={LEN}",
+                  "LEN", requestLen);
+    }
+
+    uint16_t portNumber = 0;
+    auto rc = decode_query_port_characteristics_v2_req(requestMsg, requestLen,
+                                                       &portNumber);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_port_characteristics_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // Tag 0x04 content for this poll.
+    struct LinkHealthCase
+    {
+        uint8_t health;
+        uint8_t trigger;
+        uint8_t metric;
+        uint8_t config;
+        bool valid;
+    };
+    LinkHealthCase hc{NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA, 0,
+                      NSM_LINK_HEALTH_CONFIG_NA, true};
+    if (failureCycle)
+    {
+        // Each successive poll walks every health state, all nine causes with
+        // a slot index and both configuration states, then N/A, a Valid = 0
+        // record and a reserved-encoding record (link_health 3,
+        // attention_trigger 10, metric 20, config_changed 3).
+        static constexpr std::array<LinkHealthCase, 14> kLinkHealthV2Cycle = {{
+            {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA, 0,
+             NSM_LINK_HEALTH_CONFIG_NA, true},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS, 1,
+             NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_RECOVERY_BANDWIDTH_LOSS, 2,
+             NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER, 3,
+             NSM_LINK_HEALTH_CONFIG_PREVIOUS, true},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT, 4,
+             NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_RAW_BER, 5,
+             NSM_LINK_HEALTH_CONFIG_PREVIOUS, true},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_PLR_RX_BANDWIDTH_LOSS, 6,
+             NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+            {NSM_LINK_HEALTH_ATTENTION,
+             NSM_ATTENTION_TRIGGER_PORT_TOTAL_BANDWIDTH_LOSS, 7,
+             NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT,
+             8, NSM_LINK_HEALTH_CONFIG_PREVIOUS, true},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_SYMBOL_BER,
+             NSM_LINK_HEALTH_METRIC_SLOT_MAX, NSM_LINK_HEALTH_CONFIG_CURRENT,
+             true},
+            {NSM_LINK_HEALTH_NA, NSM_ATTENTION_TRIGGER_NA, 0,
+             NSM_LINK_HEALTH_CONFIG_NA, true},
+            {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER, 3,
+             NSM_LINK_HEALTH_CONFIG_CURRENT, false},
+            {3, 10, 20, 3, true},
+            {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA, 0,
+             NSM_LINK_HEALTH_CONFIG_NA, true},
+        }};
+        hc = kLinkHealthV2Cycle[portHealthV2CycleIndex];
+        if (verbose)
+        {
+            lg2::info("[MOCK-CYCLE] QueryPortCharacteristicsV2 case={I} "
+                      "link_health={H} attention_trigger={T} metric={M} "
+                      "config_changed={C} valid={V}",
+                      "I", portHealthV2CycleIndex, "H",
+                      static_cast<int>(hc.health), "T",
+                      static_cast<int>(hc.trigger), "M",
+                      static_cast<int>(hc.metric), "C",
+                      static_cast<int>(hc.config), "V", hc.valid);
+        }
+        portHealthV2CycleIndex = (portHealthV2CycleIndex + 1) %
+                                 kLinkHealthV2Cycle.size();
+    }
+    else
+    {
+        // Latched Attention until Clear Port Metric State (0x13) clears it;
+        // re-latched after kLinkHealthRelatchPolls polls so a clear can be
+        // exercised repeatedly.
+        auto& mock = linkHealthMockByPort[portNumber];
+        if (!mock.attentionLatched &&
+            ++mock.pollsSinceClear >= kLinkHealthRelatchPolls)
+        {
+            mock.attentionLatched = true;
+        }
+        if (mock.attentionLatched)
+        {
+            hc = {NSM_LINK_HEALTH_ATTENTION,
+                  NSM_ATTENTION_TRIGGER_EFFECTIVE_BER, 3,
+                  NSM_LINK_HEALTH_CONFIG_CURRENT, true};
+        }
+    }
+
+    // Tag 0x00 carries the 0x42 status word; its health bits stay 0 because
+    // the v2 sensor takes health from Tag 0x04 only.
+    decltype(nsm_port_characteristics_data::port_status) portStatus{};
+    portStatus.link_state = NSM_PORTSTATE_UP;
+    portStatus.sub_link_state = 6;
+    portStatus.rx_detect_state = 1;
+    uint32_t portStatusWord = 0;
+    static_assert(sizeof(portStatus) == sizeof(portStatusWord));
+    std::memcpy(&portStatusWord, &portStatus, sizeof(portStatusWord));
+
+    struct nsm_link_health_record record{};
+    record.link_health = hc.health;
+    record.attention_trigger = hc.trigger;
+    record.attention_trigger_metric = hc.metric;
+    record.link_health_config_changed = hc.config;
+
+    constexpr uint16_t kRecordCount = 5;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_query_port_characteristics_v2_resp(requestMsg->hdr.instance_id,
+                                                   NSM_SUCCESS, ERR_NULL,
+                                                   kRecordCount, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_port_characteristics_v2_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    auto appendRecord = [&](uint8_t tag, bool valid, const uint8_t* data,
+                            size_t dataLen) -> bool {
+        std::array<uint8_t, 16> sampleBuf{};
+        auto sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sampleBuf.data());
+        size_t sampleLen = 0;
+        auto rc2 = encode_aggregate_resp_sample(tag, valid, data, dataLen,
+                                                sample, &sampleLen);
+        if (rc2 != NSM_SW_SUCCESS)
+        {
+            lg2::error("encode_aggregate_resp_sample failed: tag={TAG} rc={RC}",
+                       "TAG", tag, "RC", rc2);
+            return false;
+        }
+        response.insert(
+            response.end(), sampleBuf.begin(),
+            std::next(sampleBuf.begin(), static_cast<long>(sampleLen)));
+        return true;
+    };
+
+    uint8_t data[sizeof(uint32_t)]{}; // every 0x12 record is one u32
+    size_t dataLen = 0;
+    const std::array<std::pair<uint8_t, uint32_t>, 4> u32Records = {{
+        {NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS, portStatusWord},
+        {NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE, 2500},
+        {NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE, 3000},
+        {NSM_PORT_CHARACTERISTICS_V2_TAG_LANE_INFO, 225},
+    }};
+    for (const auto& [tag, value] : u32Records)
+    {
+        rc = encode_port_characteristics_v2_u32_record(value, data, &dataLen);
+        if (rc != NSM_SW_SUCCESS || !appendRecord(tag, true, data, dataLen))
+        {
+            return std::nullopt;
+        }
+    }
+    rc = encode_link_health_record(&record, data, &dataLen);
+    if (rc != NSM_SW_SUCCESS ||
+        !appendRecord(NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH, hc.valid,
+                      data, dataLen))
+    {
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::clearPortMetricStateHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("clearPortMetricStateHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint16_t portNumber = 0;
+    uint16_t tagCount = 0;
+    const uint8_t* tagIds = nullptr;
+    auto rc = decode_clear_port_metric_state_req(
+        requestMsg, requestLen, &portNumber, &tagCount, &tagIds);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_clear_port_metric_state_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    for (uint16_t i = 0; i < tagCount; ++i)
+    {
+        if (tagIds[i] != NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH)
+        {
+            // Only the Link Health record is clearable in this mock.
+            lg2::error("clearPortMetricStateHandler: unsupported tag {TAG}",
+                       "TAG", tagIds[i]);
+            cc = NSM_ERR_INVALID_DATA;
+        }
+    }
+
+    if (cc == NSM_SUCCESS)
+    {
+        // Clear the mocked latch for this port only. The --failure_cycle walk
+        // is one global sequence shared by all ports and is left untouched.
+        linkHealthMockByPort[portNumber] = LinkHealthMock{false, 0};
+        if (verbose)
+        {
+            lg2::info("clearPortMetricStateHandler: cleared port {PORT}",
+                      "PORT", portNumber);
+        }
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_clear_port_metric_state_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_clear_port_metric_state_resp(requestMsg->hdr.instance_id, cc,
+                                             reasonCode, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_clear_port_metric_state_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    if (cc != NSM_SUCCESS)
+    {
+        // encode_reason_code wrote only nsm_common_non_success_resp; shrink
+        // the success-sized buffer so the requester's exact-length check on
+        // the reason-code reply passes.
+        response.resize(sizeof(nsm_msg_hdr) +
+                        sizeof(nsm_common_non_success_resp));
+    }
+
     return response;
 }
 
