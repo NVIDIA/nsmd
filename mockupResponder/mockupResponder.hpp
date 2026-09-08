@@ -337,6 +337,19 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         queryPortCharacteristicsHandler(const nsm_msg* requestMsg,
                                         size_t requestLen);
+    /* Link Health Indication Extension: Type 1 cmd 0x12 Query Port
+     * Characteristics v2 (aggregate with Tags 0x00-0x04) and cmd 0x13 Clear
+     * Port Metric State. With --failure_cycle the Tag 0x04 record walks
+     * every health state, cause, slot index and configuration state plus a
+     * Valid = 0 and a reserved-encoding record; otherwise a per-port latched
+     * Attention is reported until cleared by 0x13 and re-latched a few polls
+     * later. */
+    std::optional<std::vector<uint8_t>>
+        queryPortCharacteristicsV2Handler(const nsm_msg* requestMsg,
+                                          size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        clearPortMetricStateHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>
         queryPortStatusHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
@@ -924,6 +937,21 @@ class MockupResponder
     // Port-characteristics health-cycle index (see --failure_cycle /
     // queryPortCharacteristicsHandler). Per-instance so each mock starts at 0.
     size_t portHealthCycleIndex = 0;
+
+    // Query Port Characteristics v2 (0x12) Tag 0x04 cycle index (see
+    // --failure_cycle / queryPortCharacteristicsV2Handler).
+    size_t portHealthV2CycleIndex = 0;
+
+    // Per-port mocked Link Health latch for the non-cycle 0x12 path: Attention
+    // is reported until Clear Port Metric State (0x13) clears it, then Healthy
+    // for kLinkHealthRelatchPolls polls before Attention latches again.
+    struct LinkHealthMock
+    {
+        bool attentionLatched = true;
+        size_t pollsSinceClear = 0;
+    };
+    static constexpr size_t kLinkHealthRelatchPolls = 8;
+    std::map<uint16_t, LinkHealthMock> linkHealthMockByPort;
 
     // Resolve the page for the current cycle position, log it, and advance
     // the global counter. iterative is true for the page-based commands

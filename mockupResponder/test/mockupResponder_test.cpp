@@ -17,6 +17,7 @@
 
 #include "base.h"
 #include "debug-token.h"
+#include "device-capability-discovery.h"
 #include "device-configuration.h"
 #include "diagnostics.h"
 #include "firmware-utils.h"
@@ -27,6 +28,10 @@
 
 #include "common/event.hpp"
 #include "utils.hpp"
+
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include <cstdio>
 #include <fstream>
@@ -764,6 +769,186 @@ TEST_F(MockupResponderTest, testQueryPortStatusHandler)
     EXPECT_TRUE(resp.has_value());
     EXPECT_EQ(resp.value().size(),
               sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_status_resp));
+}
+
+// =============================================================================
+// Link Health Indication Extension: Query Port Characteristics v2 (0x12) and
+// Clear Port Metric State (0x13)
+// =============================================================================
+
+namespace
+{
+struct LinkHealthV2Record
+{
+    bool valid = false;
+    nsm_link_health_record record{};
+};
+
+// Sends 0x12 for `portNumber`, checks the five records (Tags 0x00-0x04, one
+// u32 each) and returns the decoded Tag 0x04 record.
+static LinkHealthV2Record
+    queryLinkHealthV2(MockupResponder::MockupResponder& responder,
+                      uint8_t instanceId, uint16_t portNumber)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_port_characteristics_v2_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(encode_query_port_characteristics_v2_req(instanceId, portNumber,
+                                                       requestMsg),
+              NSM_SW_SUCCESS);
+
+    LinkHealthV2Record result;
+    auto resp = responder.queryPortCharacteristicsV2Handler(requestMsg,
+                                                            request.size());
+    if (!resp.has_value())
+    {
+        ADD_FAILURE() << "no Query Port Characteristics v2 response";
+        return result;
+    }
+
+    auto respMsg = reinterpret_cast<const nsm_msg*>(resp->data());
+    uint8_t cc = NSM_ERROR;
+    uint16_t recordCount = 0;
+    size_t consumedLen = 0;
+    EXPECT_EQ(decode_aggregate_resp(respMsg, resp->size(), &consumedLen, &cc,
+                                    &recordCount),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    EXPECT_EQ(recordCount, 5);
+
+    const uint8_t* data = resp->data() + consumedLen;
+    size_t remaining = resp->size() - consumedLen;
+    for (uint16_t index = 0; index < recordCount; ++index)
+    {
+        uint8_t tag = 0;
+        bool valid = false;
+        const uint8_t* sampleData = nullptr;
+        size_t dataLen = 0;
+        size_t sampleLen = 0;
+        auto sample = reinterpret_cast<const nsm_aggregate_resp_sample*>(data);
+        if (decode_aggregate_resp_sample(sample, remaining, &sampleLen, &tag,
+                                         &valid, &sampleData,
+                                         &dataLen) != NSM_SW_SUCCESS)
+        {
+            ADD_FAILURE() << "malformed record " << index;
+            break;
+        }
+        EXPECT_EQ(tag, index); // Tags 0x00..0x04 in order
+        EXPECT_EQ(dataLen, sizeof(uint32_t));
+        if (tag == NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH)
+        {
+            result.valid = valid;
+            EXPECT_EQ(
+                decode_link_health_record(sampleData, dataLen, &result.record),
+                NSM_SW_SUCCESS);
+        }
+        else
+        {
+            EXPECT_TRUE(valid);
+        }
+        data += sampleLen;
+        remaining -= sampleLen;
+    }
+    EXPECT_EQ(remaining, 0u);
+    return result;
+}
+
+static std::optional<Response>
+    clearLinkHealth(MockupResponder::MockupResponder& responder,
+                    uint8_t instanceId, uint16_t portNumber,
+                    const std::vector<uint8_t>& tagIds)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_clear_port_metric_state_req) + tagIds.size());
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(encode_clear_port_metric_state_req(
+                  instanceId, portNumber, static_cast<uint16_t>(tagIds.size()),
+                  tagIds.data(), requestMsg),
+              NSM_SW_SUCCESS);
+    return responder.clearPortMetricStateHandler(requestMsg, request.size());
+}
+} // namespace
+
+TEST_F(MockupResponderTest, testQueryPortCharacteristicsV2Handler)
+{
+    // Without --failure_cycle the port reports a latched Attention until it
+    // is cleared.
+    auto health = queryLinkHealthV2(*mockupResponder, instanceId, 1);
+    EXPECT_TRUE(health.valid);
+    EXPECT_EQ(health.record.link_health, NSM_LINK_HEALTH_ATTENTION);
+    EXPECT_EQ(health.record.attention_trigger,
+              NSM_ATTENTION_TRIGGER_EFFECTIVE_BER);
+    EXPECT_EQ(health.record.attention_trigger_metric, 3);
+    EXPECT_EQ(health.record.link_health_config_changed,
+              NSM_LINK_HEALTH_CONFIG_CURRENT);
+}
+
+TEST_F(MockupResponderTest, testClearPortMetricStateHandlerClearsAndRelatches)
+{
+    auto resp = clearLinkHealth(*mockupResponder, instanceId, 1,
+                                {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH});
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(resp->size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_clear_port_metric_state_resp));
+    uint8_t cc = NSM_ERROR;
+    uint16_t reasonCode = ERR_NULL;
+    EXPECT_EQ(decode_clear_port_metric_state_resp(
+                  reinterpret_cast<const nsm_msg*>(resp->data()), resp->size(),
+                  &cc, &reasonCode),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(cc, NSM_SUCCESS);
+
+    // Healthy with neutral trigger fields until the re-latch poll.
+    for (size_t poll = 1;
+         poll < MockupResponder::MockupResponder::kLinkHealthRelatchPolls;
+         ++poll)
+    {
+        auto health = queryLinkHealthV2(*mockupResponder, instanceId, 1);
+        EXPECT_TRUE(health.valid);
+        EXPECT_EQ(health.record.link_health, NSM_LINK_HEALTH_HEALTHY)
+            << "poll " << poll;
+        EXPECT_EQ(health.record.attention_trigger, NSM_ATTENTION_TRIGGER_NA);
+        EXPECT_EQ(health.record.attention_trigger_metric, 0);
+        EXPECT_EQ(health.record.link_health_config_changed,
+                  NSM_LINK_HEALTH_CONFIG_NA);
+    }
+    auto relatched = queryLinkHealthV2(*mockupResponder, instanceId, 1);
+    EXPECT_EQ(relatched.record.link_health, NSM_LINK_HEALTH_ATTENTION);
+    EXPECT_EQ(relatched.record.attention_trigger,
+              NSM_ATTENTION_TRIGGER_EFFECTIVE_BER);
+}
+
+TEST_F(MockupResponderTest, testClearPortMetricStateHandlerPerPortAndBadTag)
+{
+    // Clearing port 1 leaves port 2 latched.
+    ASSERT_TRUE(clearLinkHealth(*mockupResponder, instanceId, 1,
+                                {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH})
+                    .has_value());
+    EXPECT_EQ(
+        queryLinkHealthV2(*mockupResponder, instanceId, 1).record.link_health,
+        NSM_LINK_HEALTH_HEALTHY);
+    EXPECT_EQ(
+        queryLinkHealthV2(*mockupResponder, instanceId, 2).record.link_health,
+        NSM_LINK_HEALTH_ATTENTION);
+
+    // Only Tag 0x04 is clearable: any other TagID is INVALID_DATA in the
+    // reason-code layout, and the latch of that port stays.
+    auto resp = clearLinkHealth(*mockupResponder, instanceId, 2,
+                                {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH,
+                                 NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE});
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(resp->size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    EXPECT_EQ(decode_clear_port_metric_state_resp(
+                  reinterpret_cast<const nsm_msg*>(resp->data()), resp->size(),
+                  &cc, &reasonCode),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(cc, NSM_ERR_INVALID_DATA);
+    EXPECT_EQ(
+        queryLinkHealthV2(*mockupResponder, instanceId, 2).record.link_health,
+        NSM_LINK_HEALTH_ATTENTION);
 }
 
 // =============================================================================
@@ -5439,6 +5624,36 @@ TEST_F(MockupResponderTest, testQueryPortStatusHandlerDecodeFailure)
     });
 }
 
+TEST_F(MockupResponderTest, testQueryPortCharacteristicsV2HandlerDecodeFailure)
+{
+    truncatedDecodeTest(this, [this](const nsm_msg* m, size_t l) {
+        return mockupResponder->queryPortCharacteristicsV2Handler(m, l);
+    });
+}
+
+TEST_F(MockupResponderTest, testClearPortMetricStateHandlerDecodeFailure)
+{
+    truncatedDecodeTest(this, [this](const nsm_msg* m, size_t l) {
+        return mockupResponder->clearPortMetricStateHandler(m, l);
+    });
+
+    // A well-formed frame whose Count is 0 is rejected by the request
+    // decoder as well: no response.
+    const uint8_t tagId = NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH;
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_clear_port_metric_state_req) + sizeof(tagId));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    ASSERT_EQ(encode_clear_port_metric_state_req(instanceId, 1, 1, &tagId,
+                                                 requestMsg),
+              NSM_SW_SUCCESS);
+    auto fixed =
+        reinterpret_cast<nsm_clear_port_metric_state_req*>(requestMsg->payload);
+    fixed->tag_count = 0;
+    EXPECT_FALSE(
+        mockupResponder->clearPortMetricStateHandler(requestMsg, request.size())
+            .has_value());
+}
+
 TEST_F(MockupResponderTest, testGetFabricManagerStateHandlerDecodeFailure)
 {
     truncatedDecodeTest(this, [this](const nsm_msg* m, size_t l) {
@@ -8755,7 +8970,9 @@ TEST_F(MockupResponderTest, testSetPciePortConfigHandlerNotValidSample)
     // flags byte = 0x00: valid=0 (bit 0=0), length=0 (bits 1-3=0)
     // → data_len=1<<0=1 byte → decode sets valid=false → if(valid) false path
     std::vector<uint8_t> sampleData = {
-        0x00, 0x00, 0x12, // tag=0, valid=0, length=0, data=0x12
+        0x00,
+        0x00,
+        0x12, // tag=0, valid=0, length=0, data=0x12
     };
     Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_set_port_config_aggregate_req) - 1 +
@@ -9900,6 +10117,82 @@ TEST_F(MockupDumpCycleTest, CycleOn_EraseCmdSkipsIterationOnlyCase)
     EXPECT_EQ(mockupResponder->cyclePageIndex, 0u);
 }
 
+// ---------------------------------------------------------------------------
+// Link Health (0x12) --failure_cycle walk: every health state, all nine
+// causes with a slot index and both configuration states, N/A, a Valid = 0
+// record and a reserved-encoding record, wrapping to the start. 0x13 leaves
+// the global walk untouched.
+// ---------------------------------------------------------------------------
+TEST_F(MockupDumpCycleTest, LinkHealthV2FailureCycleWalk)
+{
+    buildMock(true);
+
+    struct ExpectedCase
+    {
+        uint8_t health;
+        uint8_t trigger;
+        uint8_t metric;
+        uint8_t config;
+        bool valid;
+    };
+    const std::array<ExpectedCase, 14> expected = {{
+        {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA, 0,
+         NSM_LINK_HEALTH_CONFIG_NA, true},
+        {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS,
+         1, NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+        {NSM_LINK_HEALTH_ATTENTION,
+         NSM_ATTENTION_TRIGGER_RECOVERY_BANDWIDTH_LOSS, 2,
+         NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+        {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER, 3,
+         NSM_LINK_HEALTH_CONFIG_PREVIOUS, true},
+        {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_SYMBOL_ERROR_COUNT, 4,
+         NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+        {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_RAW_BER, 5,
+         NSM_LINK_HEALTH_CONFIG_PREVIOUS, true},
+        {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_PLR_RX_BANDWIDTH_LOSS,
+         6, NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+        {NSM_LINK_HEALTH_ATTENTION,
+         NSM_ATTENTION_TRIGGER_PORT_TOTAL_BANDWIDTH_LOSS, 7,
+         NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+        {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT, 8,
+         NSM_LINK_HEALTH_CONFIG_PREVIOUS, true},
+        {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_SYMBOL_BER,
+         NSM_LINK_HEALTH_METRIC_SLOT_MAX, NSM_LINK_HEALTH_CONFIG_CURRENT, true},
+        {NSM_LINK_HEALTH_NA, NSM_ATTENTION_TRIGGER_NA, 0,
+         NSM_LINK_HEALTH_CONFIG_NA, true},
+        {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER, 3,
+         NSM_LINK_HEALTH_CONFIG_CURRENT, false},
+        {3, 10, 20, 3, true},
+        {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA, 0,
+         NSM_LINK_HEALTH_CONFIG_NA, true},
+    }};
+
+    for (size_t i = 0; i < expected.size(); ++i)
+    {
+        auto health = queryLinkHealthV2(*mockupResponder, instanceId, 1);
+        EXPECT_EQ(health.valid, expected[i].valid) << "case " << i;
+        EXPECT_EQ(health.record.link_health, expected[i].health)
+            << "case " << i;
+        EXPECT_EQ(health.record.attention_trigger, expected[i].trigger)
+            << "case " << i;
+        EXPECT_EQ(health.record.attention_trigger_metric, expected[i].metric)
+            << "case " << i;
+        EXPECT_EQ(health.record.link_health_config_changed, expected[i].config)
+            << "case " << i;
+        EXPECT_EQ(mockupResponder->portHealthV2CycleIndex,
+                  (i + 1) % expected.size());
+    }
+
+    // The walk wrapped; a clear does not move it.
+    ASSERT_TRUE(clearLinkHealth(*mockupResponder, instanceId, 1,
+                                {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH})
+                    .has_value());
+    EXPECT_EQ(mockupResponder->portHealthV2CycleIndex, 0u);
+    auto wrapped = queryLinkHealthV2(*mockupResponder, instanceId, 1);
+    EXPECT_EQ(wrapped.record.link_health, NSM_LINK_HEALTH_HEALTHY);
+    EXPECT_EQ(mockupResponder->portHealthV2CycleIndex, 1u);
+}
+
 } // namespace
 
 namespace
@@ -10002,3 +10295,1631 @@ TEST_F(MockupDumpCycleTest, testQueryPortCharacteristicsNoCycleLegacy)
 }
 
 } // namespace
+
+// =============================================================================
+// Branch-coverage extension: dispatcher sweep, Link Health (0x12/0x13) quiet
+// mode, never-executed handlers, Pre-Boot Diagnostics session simulation and
+// the MCTP send success paths (over an injected AF_UNIX socket pair).
+// =============================================================================
+
+namespace MockupResponder
+{
+// Non-const mock table owned by mockupResponder.cpp; extended by a test to
+// reach the unexpected-tag path of getPciePortConfigHandler.
+extern std::unordered_map<uint8_t, uint8_t> pciePortConfigMockTable;
+} // namespace MockupResponder
+
+namespace
+{
+using CovDispatchEntry = std::pair<uint8_t, std::vector<uint8_t>>;
+
+// Every (message type, command) pair routed by processRxMsg, in dispatcher
+// order.
+const std::vector<CovDispatchEntry>& covDispatchTable()
+{
+    static const std::vector<CovDispatchEntry> table = {
+        {NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+         {NSM_PING, NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES,
+          NSM_SUPPORTED_COMMAND_CODES, NSM_QUERY_DEVICE_IDENTIFICATION,
+          NSM_GET_EVENT_SUBSCRIPTION, NSM_SET_EVENT_SUBSCRIPTION,
+          NSM_GET_SUPPORTED_EVENT_SOURCES, NSM_GET_CURRENT_EVENT_SOURCES,
+          NSM_SET_CURRENT_EVENT_SOURCES, NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT,
+          NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
+          NSM_GET_DEVICE_CAPABILITIES_V2, NSM_GET_GPIO_STATE,
+          NSM_GET_EVENT_LOG_RECORD_V2}},
+        {NSM_TYPE_NETWORK_PORT,
+         {NSM_GET_PORT_TELEMETRY_COUNTER, NSM_QUERY_PORT_CHARACTERISTICS,
+          NSM_QUERY_PORT_CHARACTERISTICS_V2, NSM_CLEAR_PORT_METRIC_STATE,
+          NSM_QUERY_PORT_STATUS, NSM_GET_FABRIC_MANAGER_STATE,
+          NSM_QUERY_PORTS_AVAILABLE, NSM_SET_PORT_DISABLE_FUTURE,
+          NSM_GET_PORT_DISABLE_FUTURE, NSM_GET_POWER_MODE, NSM_SET_POWER_MODE,
+          NSM_GET_SWITCH_ISOLATION_MODE, NSM_SET_SWITCH_ISOLATION_MODE,
+          NSM_GET_ETH_PORT_TELEMETRY_COUNTER,
+          NSM_QUERY_PORT_TELEMETRY_COUNTER_V2,
+          NSM_QUERY_PORT_TELEMETRY_CAPABILITIES, NSM_GET_NETWORK_ADDRESSES,
+          NSM_GET_PORT_ECC_COUNTERS, NSM_GET_LLDP_PACKET}},
+        {NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+         {NSM_GET_INVENTORY_INFORMATION,
+          NSM_GET_TEMPERATURE_READING,
+          NSM_READ_THERMAL_PARAMETER,
+          NSM_GET_POWER,
+          NSM_GET_MAX_OBSERVED_POWER,
+          NSM_GET_ENERGY_COUNT,
+          NSM_GET_VOLTAGE,
+          NSM_GET_ALTITUDE_PRESSURE,
+          NSM_GET_DRIVER_INFO,
+          NSM_GET_MIG_MODE,
+          NSM_SET_MIG_MODE,
+          NSM_GET_ECC_MODE,
+          NSM_SET_ECC_MODE,
+          NSM_GET_ECC_ERROR_COUNTS,
+          NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR,
+          NSM_SET_PROGRAMMABLE_EDPP_SCALING_FACTOR,
+          NSM_GET_CLOCK_LIMIT,
+          NSM_SET_CLOCK_LIMIT,
+          NSM_GET_CURRENT_CLOCK_FREQUENCY,
+          NSM_GET_CLOCK_EVENT_REASON_CODES,
+          NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME,
+          NSM_GET_CURRENT_UTILIZATION,
+          NSM_SET_POWER_LIMITS,
+          NSM_GET_POWER_LIMITS,
+          NSM_GET_CLOCK_OUTPUT_ENABLE_STATE,
+          NSM_GET_ROW_REMAP_STATE_FLAGS,
+          NSM_GET_ROW_REMAPPING_COUNTS,
+          NSM_GET_ROW_REMAP_AVAILABILITY,
+          NSM_GET_LEAK_DETECTION_INFO,
+          NSM_GET_MEMORY_CAPACITY_UTILIZATION,
+          NSM_GET_SUPPORTED_GPM_METRICS,
+          NSM_QUERY_AGGREGATE_GPM_METRICS,
+          NSM_QUERY_PER_INSTANCE_GPM_METRICS,
+          NSM_QUERY_PER_INSTANCE_GPM_METRICS_V2,
+          NSM_GET_VIOLATION_DURATION,
+          NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE,
+          NSM_PWR_SMOOTHING_GET_FEATURE_INFO,
+          NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2,
+          NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE,
+          NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION,
+          NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE,
+          NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2,
+          NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE,
+          NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2,
+          NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE,
+          NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE,
+          NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN,
+          NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION,
+          NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2,
+          NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS,
+          NSM_ENABLE_WORKLOAD_POWER_PROFILE,
+          NSM_DISABLE_WORKLOAD_POWER_PROFILE,
+          NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO,
+          NSM_GET_WORKLOAD_POWER_PROFILE_INFO}},
+        {NSM_TYPE_PCI_LINK,
+         {NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
+          NSM_ASSERT_PCIE_FUNDAMENTAL_RESET, NSM_GET_PORT_CONFIGURATION,
+          NSM_SET_PORT_CONFIGURATION, NSM_CLEAR_DATA_SOURCE_V1,
+          NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES,
+          NSM_LIST_AVAILABLE_PCIE_PORTS,
+          NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2}},
+        {NSM_TYPE_DIAGNOSTIC,
+         {NSM_GET_DEVICE_RESET_STATISTICS, NSM_QUERY_TOKEN_PARAMETERS,
+          NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS, NSM_QUERY_TOKEN_STATUS,
+          NSM_QUERY_DEVICE_IDS, NSM_RESET_NETWORK_DEVICE, NSM_ENABLE_DISABLE_WP,
+          NSM_GET_DEVICE_DIAGNOSTICS, NSM_GET_NETWORK_DEVICE_DEBUG_INFO,
+          NSM_ERASE_TRACE, NSM_GET_NETWORK_DEVICE_LOG_INFO,
+          NSM_ERASE_DEBUG_INFO, NSM_GET_DEVICE_DEBUG_PARAMETERS,
+          NSM_SET_DEVICE_DEBUG_PARAMETERS, NSM_DIAG_SET_SYSTEM_CONFIG,
+          NSM_DIAG_SET_TID_CONFIG}},
+        {NSM_TYPE_DEVICE_CONFIGURATION,
+         {NSM_GET_ERROR_INJECTION_MODE_V1,
+          NSM_SET_ERROR_INJECTION_MODE_V1,
+          NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1,
+          NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1,
+          NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1,
+          NSM_GET_ERROR_INJECTION_PAYLOAD,
+          NSM_SET_ERROR_INJECTION_PAYLOAD,
+          NSM_ACTIVATE_ERROR_INJECTION,
+          NSM_GET_RECONFIGURATION_PERMISSIONS_V1,
+          NSM_SET_RECONFIGURATION_PERMISSIONS_V1,
+          NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1,
+          NSM_SET_CONFIDENTIAL_COMPUTE_MODE_V1,
+          NSM_ENABLE_DISABLE_GPU_IST_MODE,
+          NSM_GET_FPGA_DIAGNOSTICS_SETTINGS,
+          NSM_GET_DEVICE_MODE_SETTING,
+          NSM_SET_DEVICE_MODE_SETTING,
+          NSM_GET_DEVICE_MODE_SETTINGS_V2,
+          NSM_SET_DEVICE_MODE_SETTINGS_V2,
+          NSM_SET_DEVICE_CONFIG_V2,
+          NSM_GET_DEVICE_CONFIG_V2,
+          NSM_GET_PROTECTION_OPTIONS}},
+        {NSM_TYPE_FIRMWARE,
+         {NSM_FW_GET_EROT_STATE_INFORMATION, NSM_FW_IRREVERSABLE_CONFIGURATION,
+          NSM_FW_IMAGE_COPY_CONTROL, NSM_FW_QUERY_CODE_AUTH_KEY_PERM,
+          NSM_FW_UPDATE_CODE_AUTH_KEY_PERM,
+          NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
+          NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER, NSM_FW_SET_ROT_PROPERTY,
+          NSM_FW_DOT_CAK_INSTALL, NSM_FW_DOT_CAK_BYPASS, NSM_FW_DOT_LOCK,
+          NSM_FW_DOT_UNLOCK_CHALLENGE, NSM_FW_DOT_UNLOCK, NSM_FW_DOT_CAK_ROTATE,
+          NSM_FW_DOT_GET_INFO, NSM_FW_DOT_GET_STATUS, NSM_FW_DOT_DISABLE,
+          NSM_FW_DOT_OVERRIDE, NSM_FW_DOT_RECOVERY}},
+    };
+    return table;
+}
+
+// Handlers that assert() on a failed request decode instead of answering;
+// they are left out of the empty-payload dispatcher sweep.
+bool covAssertsOnBadRequest(uint8_t type, uint8_t command)
+{
+    if (type == NSM_TYPE_PLATFORM_ENVIRONMENTAL)
+    {
+        switch (command)
+        {
+            case NSM_GET_ECC_ERROR_COUNTS:
+            case NSM_GET_CLOCK_LIMIT:
+            case NSM_GET_CURRENT_CLOCK_FREQUENCY:
+            case NSM_GET_POWER_LIMITS:
+            case NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME:
+            case NSM_GET_ROW_REMAPPING_COUNTS:
+            case NSM_GET_ROW_REMAP_AVAILABILITY:
+            case NSM_GET_CLOCK_OUTPUT_ENABLE_STATE:
+            case NSM_QUERY_AGGREGATE_GPM_METRICS:
+                return true;
+            default:
+                return false;
+        }
+    }
+    if (type == NSM_TYPE_DIAGNOSTIC)
+    {
+        switch (command)
+        {
+            case NSM_ENABLE_DISABLE_WP:
+            case NSM_GET_DEVICE_RESET_STATISTICS:
+            // debugToken.cpp
+            case NSM_QUERY_TOKEN_PARAMETERS:
+            case NSM_PROVIDE_TOKEN:
+            case NSM_DISABLE_TOKENS:
+            case NSM_QUERY_TOKEN_STATUS:
+            case NSM_QUERY_DEVICE_IDS:
+                return true;
+            default:
+                return false;
+        }
+    }
+    if (type == NSM_TYPE_FIRMWARE)
+    {
+        // firmwareUtils.cpp
+        return command == NSM_FW_QUERY_CODE_AUTH_KEY_PERM ||
+               command == NSM_FW_UPDATE_CODE_AUTH_KEY_PERM;
+    }
+    return false;
+}
+
+// A request frame carrying only the common header (data_size 0), zero padded
+// to `size` bytes so every handler sees a well-formed header but a payload
+// its request decoder rejects.
+Request covCommonRequest(uint8_t instanceId, uint8_t type, uint8_t command,
+                         size_t size = 512)
+{
+    Request request(
+        std::max(size, sizeof(nsm_msg_hdr) + sizeof(nsm_common_req)), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(encode_common_req(instanceId, type, command, msg),
+              NSM_SW_SUCCESS);
+    return request;
+}
+
+// Non-blocking AF_UNIX datagram pair: fds[0] is handed to the mock as its
+// MCTP socket, fds[1] receives what the mock sends.
+struct CovSocketPair
+{
+    int fds[2] = {-1, -1};
+    CovSocketPair()
+    {
+        EXPECT_EQ(socketpair(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0, fds), 0);
+    }
+    ~CovSocketPair()
+    {
+        for (int fd : fds)
+        {
+            if (fd >= 0)
+            {
+                close(fd);
+            }
+        }
+    }
+    // Number of datagrams queued on the receiving end (all consumed).
+    size_t drain()
+    {
+        size_t count = 0;
+        std::array<uint8_t, 4096> buf{};
+        while (recv(fds[1], buf.data(), buf.size(), 0) >= 0)
+        {
+            ++count;
+        }
+        return count;
+    }
+};
+
+// Temporarily gives the mock a real (test-owned) socket descriptor; the mock
+// destructor closes sockFd >= 0, so it is reset to -1 on scope exit.
+struct CovSockFdGuard
+{
+    MockupResponder::MockupResponder& mock;
+    CovSockFdGuard(MockupResponder::MockupResponder& m, int fd) : mock(m)
+    {
+        mock.sockFd = fd;
+    }
+    ~CovSockFdGuard()
+    {
+        mock.sockFd = -1;
+    }
+};
+} // namespace
+
+// ---- Link Health (0x12) / Clear Port Metric State (0x13) -------------------
+
+TEST_F(MockupResponderTest, CovLinkHealthV2DispatchThroughProcessRxMsg)
+{
+    std::optional<Request> longRunningEvent;
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_port_characteristics_v2_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    ASSERT_EQ(
+        encode_query_port_characteristics_v2_req(instanceId, 3, requestMsg),
+        NSM_SW_SUCCESS);
+    auto resp = mockupResponder->processRxMsg(request, longRunningEvent);
+    ASSERT_TRUE(resp.has_value());
+    uint8_t cc = NSM_ERROR;
+    uint16_t recordCount = 0;
+    size_t consumedLen = 0;
+    EXPECT_EQ(
+        decode_aggregate_resp(reinterpret_cast<const nsm_msg*>(resp->data()),
+                              resp->size(), &consumedLen, &cc, &recordCount),
+        NSM_SW_SUCCESS);
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    EXPECT_EQ(recordCount, 5);
+
+    const uint8_t tagId = NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH;
+    Request clearReq(sizeof(nsm_msg_hdr) +
+                     sizeof(nsm_clear_port_metric_state_req) + sizeof(tagId));
+    auto clearMsg = reinterpret_cast<nsm_msg*>(clearReq.data());
+    ASSERT_EQ(
+        encode_clear_port_metric_state_req(instanceId, 3, 1, &tagId, clearMsg),
+        NSM_SW_SUCCESS);
+    resp = mockupResponder->processRxMsg(clearReq, longRunningEvent);
+    ASSERT_TRUE(resp.has_value());
+    uint16_t reasonCode = ERR_NULL;
+    EXPECT_EQ(decode_clear_port_metric_state_resp(
+                  reinterpret_cast<const nsm_msg*>(resp->data()), resp->size(),
+                  &cc, &reasonCode),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    // The clear reached port 3 only; another port stays latched.
+    EXPECT_EQ(
+        queryLinkHealthV2(*mockupResponder, instanceId, 3).record.link_health,
+        NSM_LINK_HEALTH_HEALTHY);
+    EXPECT_EQ(
+        queryLinkHealthV2(*mockupResponder, instanceId, 4).record.link_health,
+        NSM_LINK_HEALTH_ATTENTION);
+}
+
+TEST_F(MockupResponderTest, CovLinkHealthV2QuietModeLatchClearRelatch)
+{
+    mockupResponder->verbose = false;
+    constexpr uint16_t port = 4;
+    auto latched = queryLinkHealthV2(*mockupResponder, instanceId, port);
+    EXPECT_TRUE(latched.valid);
+    EXPECT_EQ(latched.record.link_health, NSM_LINK_HEALTH_ATTENTION);
+
+    auto resp = clearLinkHealth(*mockupResponder, instanceId, port,
+                                {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH});
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(respCompletionCode(*resp), NSM_SUCCESS);
+    EXPECT_FALSE(mockupResponder->linkHealthMockByPort[port].attentionLatched);
+
+    // A rejected tag list in quiet mode leaves the cleared state alone.
+    resp = clearLinkHealth(*mockupResponder, instanceId, port,
+                           {NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS});
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(respCompletionCode(*resp), NSM_ERR_INVALID_DATA);
+    EXPECT_FALSE(mockupResponder->linkHealthMockByPort[port].attentionLatched);
+
+    // Healthy for kLinkHealthRelatchPolls - 1 polls, Attention on the next.
+    for (size_t poll = 1;
+         poll < MockupResponder::MockupResponder::kLinkHealthRelatchPolls;
+         ++poll)
+    {
+        EXPECT_EQ(queryLinkHealthV2(*mockupResponder, instanceId, port)
+                      .record.link_health,
+                  NSM_LINK_HEALTH_HEALTHY)
+            << "poll " << poll;
+        EXPECT_EQ(mockupResponder->linkHealthMockByPort[port].pollsSinceClear,
+                  poll);
+    }
+    EXPECT_EQ(queryLinkHealthV2(*mockupResponder, instanceId, port)
+                  .record.link_health,
+              NSM_LINK_HEALTH_ATTENTION);
+    EXPECT_TRUE(mockupResponder->linkHealthMockByPort[port].attentionLatched);
+}
+
+TEST_F(MockupDumpCycleTest, CovLinkHealthV2QuietModeFailureCycleAdvances)
+{
+    buildMock(/*failureCycle=*/true);
+    mockupResponder->verbose = false;
+    auto first = queryLinkHealthV2(*mockupResponder, instanceId, 1);
+    EXPECT_TRUE(first.valid);
+    EXPECT_EQ(first.record.link_health, NSM_LINK_HEALTH_HEALTHY);
+    EXPECT_EQ(mockupResponder->portHealthV2CycleIndex, 1u);
+    auto second = queryLinkHealthV2(*mockupResponder, instanceId, 2);
+    EXPECT_EQ(second.record.link_health, NSM_LINK_HEALTH_ATTENTION);
+    EXPECT_EQ(second.record.attention_trigger,
+              NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS);
+    EXPECT_EQ(mockupResponder->portHealthV2CycleIndex, 2u);
+    // The per-port latch is not consulted while the cycle is on.
+    EXPECT_TRUE(mockupResponder->linkHealthMockByPort.empty());
+}
+
+TEST_F(MockupResponderTest, CovClearPortMetricStateTagListVariants)
+{
+    // Clearing a port that was never polled creates its (cleared) entry.
+    auto resp = clearLinkHealth(*mockupResponder, instanceId, 9,
+                                {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH,
+                                 NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH});
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(resp->size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_clear_port_metric_state_resp));
+    EXPECT_EQ(respCompletionCode(*resp), NSM_SUCCESS);
+    ASSERT_EQ(mockupResponder->linkHealthMockByPort.count(9), 1u);
+    EXPECT_FALSE(mockupResponder->linkHealthMockByPort[9].attentionLatched);
+    EXPECT_EQ(
+        queryLinkHealthV2(*mockupResponder, instanceId, 9).record.link_health,
+        NSM_LINK_HEALTH_HEALTHY);
+
+    // A bad tag anywhere in the list rejects the whole request and keeps the
+    // latch of that port.
+    EXPECT_EQ(
+        queryLinkHealthV2(*mockupResponder, instanceId, 10).record.link_health,
+        NSM_LINK_HEALTH_ATTENTION);
+    resp = clearLinkHealth(*mockupResponder, instanceId, 10,
+                           {NSM_PORT_CHARACTERISTICS_V2_TAG_LANE_INFO,
+                            NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH});
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(resp->size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    EXPECT_EQ(respCompletionCode(*resp), NSM_ERR_INVALID_DATA);
+    EXPECT_TRUE(mockupResponder->linkHealthMockByPort[10].attentionLatched);
+    EXPECT_EQ(
+        queryLinkHealthV2(*mockupResponder, instanceId, 10).record.link_health,
+        NSM_LINK_HEALTH_ATTENTION);
+}
+
+// ---- processRxMsg dispatcher -----------------------------------------------
+
+TEST_F(MockupResponderTest, CovProcessRxMsgRoutesEveryCommandWithEmptyPayload)
+{
+    // In verbose mode configureEventAcknowledgement logs through the mask
+    // pointer that its failed request decode never set, so that command is
+    // only swept in quiet mode.
+    // Two frame shapes: a zero-padded frame whose data_size the decoders
+    // reject, and a frame cut right after the command byte so even the
+    // decoders that only check the minimum length fail.
+    for (size_t frameSize : {size_t{512}, sizeof(nsm_msg_hdr) + 1})
+    {
+        for (bool verbose : {false, true})
+        {
+            mockupResponder->verbose = verbose;
+            for (const auto& [type, commands] : covDispatchTable())
+            {
+                for (uint8_t command : commands)
+                {
+                    if (covAssertsOnBadRequest(type, command) ||
+                        (verbose &&
+                         type == NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY &&
+                         command == NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT))
+                    {
+                        continue;
+                    }
+                    // Built at full size so the bytes past the frame end stay
+                    // zero-initialized storage, then shortened.
+                    auto request = covCommonRequest(instanceId, type, command);
+                    request.resize(frameSize);
+                    std::optional<Request> longRunningEvent;
+                    EXPECT_NO_THROW(mockupResponder->processRxMsg(
+                        request, longRunningEvent))
+                        << "type " << int(type) << " command " << int(command)
+                        << " frame " << frameSize;
+                }
+            }
+        }
+    }
+    for (const auto& [type, commands] : covDispatchTable())
+    {
+        // An unknown command of a known type is answered with
+        // UNSUPPORTED_COMMAND_CODE.
+        auto request = covCommonRequest(instanceId, type, 0xFE);
+        std::optional<Request> longRunningEvent;
+        auto resp = mockupResponder->processRxMsg(request, longRunningEvent);
+        ASSERT_TRUE(resp.has_value()) << "type " << int(type);
+        EXPECT_EQ(respCompletionCode(*resp), NSM_ERR_UNSUPPORTED_COMMAND_CODE);
+    }
+    // Unknown message type.
+    auto request = covCommonRequest(instanceId, 0x7E, NSM_PING);
+    std::optional<Request> longRunningEvent;
+    auto resp = mockupResponder->processRxMsg(request, longRunningEvent);
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(respCompletionCode(*resp), NSM_ERR_UNSUPPORTED_COMMAND_CODE);
+}
+
+TEST_F(MockupResponderTest, CovProcessRxMsgQuietModeHeaderPaths)
+{
+    mockupResponder->verbose = false;
+    std::optional<Request> longRunningEvent;
+
+    // Event acknowledgment: consumed silently.
+    Request ack(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req), 0);
+    ASSERT_EQ(encode_nsm_event_acknowledgement(
+                  instanceId, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, NSM_PING,
+                  reinterpret_cast<nsm_msg*>(ack.data())),
+              NSM_SW_SUCCESS);
+    EXPECT_FALSE(mockupResponder->processRxMsg(ack, longRunningEvent));
+
+    // Request: dispatched without the request log line.
+    Request ping(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req), 0);
+    auto pingMsg = reinterpret_cast<nsm_msg*>(ping.data());
+    ASSERT_EQ(encode_ping_req(instanceId, pingMsg), NSM_SW_SUCCESS);
+    EXPECT_TRUE(mockupResponder->processRxMsg(ping, longRunningEvent));
+
+    // A response-typed frame (request bit clear) is still dispatched.
+    for (bool verbose : {false, true})
+    {
+        mockupResponder->verbose = verbose;
+        Request frame = ping;
+        auto frameMsg = reinterpret_cast<nsm_msg*>(frame.data());
+        frameMsg->hdr.request = 0;
+        frameMsg->hdr.datagram = 0;
+        EXPECT_TRUE(mockupResponder->processRxMsg(frame, longRunningEvent));
+    }
+}
+
+// ---- Never-executed handlers -----------------------------------------------
+
+TEST_F(MockupResponderTest, CovGetLldpPacketHandlerSyntheticAndEmpty)
+{
+    auto query = [&](uint16_t port, uint8_t direction) {
+        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req),
+                        0);
+        auto msg = reinterpret_cast<nsm_msg*>(request.data());
+        EXPECT_EQ(encode_get_lldp_packet_req(instanceId, port, direction, msg),
+                  NSM_SW_SUCCESS);
+        return mockupResponder->getLldpPacketHandler(msg, request.size());
+    };
+    auto decode = [](const Response& resp, std::vector<uint8_t>& data) {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        data.assign(512, 0);
+        uint16_t dataSize = static_cast<uint16_t>(data.size()); // capacity in
+        EXPECT_EQ(decode_get_lldp_packet_resp(
+                      reinterpret_cast<const nsm_msg*>(resp.data()),
+                      resp.size(), &cc, &reasonCode, data.data(), &dataSize),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(cc, NSM_SUCCESS);
+        data.resize(dataSize);
+    };
+
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        // (port 0, RX) carries the synthetic Ethernet-framed LLDPDU.
+        auto resp = query(0, NSM_LLDP_DIRECTION_RX);
+        ASSERT_TRUE(resp.has_value());
+        std::vector<uint8_t> data;
+        decode(*resp, data);
+        ASSERT_GT(data.size(), 14u);
+        EXPECT_EQ(data[12], 0x88);              // EtherType 0x88CC
+        EXPECT_EQ(data[13], 0xCC);
+        EXPECT_EQ(data[14], 0x02);              // Chassis ID TLV
+        EXPECT_EQ(data[data.size() - 2], 0x00); // End-of-LLDPDU
+        EXPECT_EQ(data[data.size() - 1], 0x00);
+        const std::string systemName = "mock-lldp-peer";
+        EXPECT_NE(std::search(data.begin(), data.end(), systemName.begin(),
+                              systemName.end()),
+                  data.end());
+
+        // Every other tuple is the empty working-assumption buffer.
+        resp = query(1, NSM_LLDP_DIRECTION_RX);
+        ASSERT_TRUE(resp.has_value());
+        decode(*resp, data);
+        EXPECT_TRUE(data.empty());
+        resp = query(0, NSM_LLDP_DIRECTION_TX);
+        ASSERT_TRUE(resp.has_value());
+        decode(*resp, data);
+        EXPECT_TRUE(data.empty());
+    }
+}
+
+TEST_F(MockupResponderTest, CovGetEventLogRecordV2HandlerPages)
+{
+    auto query = [&](uint8_t mode, uint16_t eventHandle,
+                     uint16_t transferHandle) {
+        Request request(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_event_log_record_v2_req), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(request.data());
+        EXPECT_EQ(encode_nsm_get_event_log_record_v2_req(
+                      instanceId, mode, eventHandle, transferHandle, msg),
+                  NSM_SW_SUCCESS);
+        return mockupResponder->getEventLogRecordV2Handler(msg, request.size());
+    };
+
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        // First page: transfer handle 0 -> 1 in the first-handle layout.
+        auto resp = query(NSM_EVENT_LOG_V2_MODE_GET_DATA, 7, 0);
+        ASSERT_TRUE(resp.has_value());
+        uint8_t cc = NSM_ERROR;
+        nsm_event_log_record_v2_first_fields first{};
+        ASSERT_EQ(decode_nsm_get_event_log_record_v2_resp_first_handle(
+                      reinterpret_cast<const nsm_msg*>(resp->data()),
+                      resp->size(), &cc, &first),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(cc, NSM_SUCCESS);
+        EXPECT_EQ(first.event_handle, 7);
+        EXPECT_EQ(first.next_transfer_handle, 1);
+        EXPECT_EQ(first.nvidia_message_type, NSM_TYPE_PLATFORM_ENVIRONMENTAL);
+        EXPECT_EQ(first.event_data_len, 4);
+
+        // Middle page: next-handle layout, handle 3 -> 4.
+        resp = query(NSM_EVENT_LOG_V2_MODE_GET_DATA, 7, 3);
+        ASSERT_TRUE(resp.has_value());
+        nsm_event_log_record_v2_next_fields next{};
+        ASSERT_EQ(decode_nsm_get_event_log_record_v2_resp_next_handle(
+                      reinterpret_cast<const nsm_msg*>(resp->data()),
+                      resp->size(), &cc, &next),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(next.event_handle, 7);
+        EXPECT_EQ(next.next_transfer_handle, 4);
+        EXPECT_EQ(next.event_data_len, 4);
+
+        // Last page: handle 5 -> 0 (end).
+        resp = query(NSM_EVENT_LOG_V2_MODE_GET_DATA, 7, 5);
+        ASSERT_TRUE(resp.has_value());
+        ASSERT_EQ(decode_nsm_get_event_log_record_v2_resp_next_handle(
+                      reinterpret_cast<const nsm_msg*>(resp->data()),
+                      resp->size(), &cc, &next),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(next.next_transfer_handle, 0);
+
+        // Acknowledgment: first-handle layout, handle 0xFFFF, no data.
+        resp = query(NSM_EVENT_LOG_V2_MODE_ACKNOWLEDGEMENT, 0, 0);
+        ASSERT_TRUE(resp.has_value());
+        ASSERT_EQ(decode_nsm_get_event_log_record_v2_resp_first_handle(
+                      reinterpret_cast<const nsm_msg*>(resp->data()),
+                      resp->size(), &cc, &first),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(first.event_handle, 0xFFFF);
+        EXPECT_EQ(first.next_transfer_handle, 0);
+        EXPECT_EQ(first.event_data_len, 0);
+    }
+}
+
+TEST_F(MockupResponderTest, CovQueryPortTelemetryV2HandlerOpticalModuleGroup)
+{
+    auto query = [&](uint8_t group) {
+        Request request(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_v2_req), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(request.data());
+        EXPECT_EQ(
+            encode_query_port_telemetry_v2_req(instanceId, 1, group, 0, msg),
+            NSM_SW_SUCCESS);
+        return mockupResponder->queryPortTelemetryV2Handler(msg,
+                                                            request.size());
+    };
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        // Optical module: 3 metrics x 8 lanes + 8 SNR lanes + sequence token.
+        auto resp = query(NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE);
+        ASSERT_TRUE(resp.has_value());
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t count = 0;
+        size_t consumedLen = 0;
+        ASSERT_EQ(decode_query_port_telemetry_v2_resp(
+                      reinterpret_cast<const nsm_msg*>(resp->data()),
+                      resp->size(), &cc, &reasonCode, &count, &consumedLen),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(cc, NSM_SUCCESS);
+        EXPECT_EQ(count, 3 * 8 + 8 + 1);
+        EXPECT_GT(resp->size(), consumedLen);
+        // The terminating Sequence Token Record (tag 0xFD) is the last sample:
+        // tag byte, then valid/length byte, then 4 bytes of token = 0.
+        ASSERT_GE(resp->size(), 6u);
+        EXPECT_EQ((*resp)[resp->size() - 6], 0xFD);
+        EXPECT_EQ((*resp)[resp->size() - 1], 0);
+
+        // Other groups: NSM_ERROR carrier with no samples.
+        resp = query(NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE - 1);
+        ASSERT_TRUE(resp.has_value());
+        EXPECT_EQ(resp->size(),
+                  sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp));
+        EXPECT_EQ(respCompletionCode(*resp), NSM_ERROR);
+    }
+}
+
+TEST_F(MockupResponderTest, CovQueryPortTelemetryCapabilitiesHandler)
+{
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        Request request(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_caps_req), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(request.data());
+        ASSERT_EQ(encode_query_port_telemetry_caps_req(instanceId, 2, msg),
+                  NSM_SW_SUCCESS);
+        auto resp = mockupResponder->queryPortTelemetryCapabilitiesHandler(
+            msg, request.size());
+        ASSERT_TRUE(resp.has_value());
+        uint8_t cc = NSM_ERROR;
+        uint8_t maxGroup = 0;
+        uint8_t maxRecords = 0;
+        std::array<uint8_t, 32> bitmask{};
+        ASSERT_EQ(decode_query_port_telemetry_caps_resp(
+                      reinterpret_cast<const nsm_msg*>(resp->data()),
+                      resp->size(), &cc, &maxGroup, &maxRecords,
+                      bitmask.data()),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(cc, NSM_SUCCESS);
+        EXPECT_EQ(maxGroup, NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE);
+        EXPECT_EQ(maxRecords, 32);
+        EXPECT_EQ(bitmask[0], 0xFF);
+        EXPECT_EQ(bitmask[1], 0x01);
+        EXPECT_EQ(bitmask[2], 0x00);
+    }
+}
+
+namespace
+{
+Response covGetDeviceModeSettingsV2(MockupResponderTest& suite, uint32_t index,
+                                    std::vector<uint8_t>& cur,
+                                    std::vector<uint8_t>& pend)
+{
+    Request request(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_req), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(
+        encode_get_device_mode_settings_v2_req(suite.instanceId, index, msg),
+        NSM_SW_SUCCESS);
+    auto resp = suite.mockupResponder->getDeviceModeSettingsV2Handler(
+        msg, request.size());
+    if (!resp.has_value())
+    {
+        ADD_FAILURE() << "no Get Device Mode Settings v2 response for index "
+                      << index;
+        return {};
+    }
+    uint8_t cc = NSM_ERROR;
+    uint16_t reasonCode = ERR_NULL;
+    cur.assign(64, 0);
+    pend.assign(64, 0);
+    uint16_t curLen = 0;
+    uint16_t pendLen = 0;
+    EXPECT_EQ(decode_get_device_mode_settings_v2_resp(
+                  reinterpret_cast<const nsm_msg*>(resp->data()), resp->size(),
+                  &cc, &reasonCode, cur.data(), &curLen, pend.data(), &pendLen),
+              NSM_SW_SUCCESS)
+        << "index " << index;
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    cur.resize(curLen);
+    pend.resize(pendLen);
+    return *resp;
+}
+
+Response covSetDeviceModeSettingsV2(MockupResponderTest& suite, uint32_t index,
+                                    const std::vector<uint8_t>& data)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                        sizeof(nsm_set_device_mode_settings_v2_req) - 1 +
+                        data.size(),
+                    0);
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(encode_set_device_mode_settings_v2_req(
+                  suite.instanceId, index, data.data(),
+                  static_cast<uint16_t>(data.size()), msg),
+              NSM_SW_SUCCESS);
+    auto resp = suite.mockupResponder->setDeviceModeSettingsV2Handler(
+        msg, request.size());
+    if (!resp.has_value())
+    {
+        ADD_FAILURE() << "no Set Device Mode Settings v2 response for index "
+                      << index;
+        return {};
+    }
+    return *resp;
+}
+} // namespace
+
+TEST_F(MockupResponderTest, CovGetDeviceModeSettingsV2HandlerDefaultsPerIndex)
+{
+    struct Expected
+    {
+        uint32_t index;
+        size_t length;
+    };
+    const std::vector<Expected> expected = {
+        {DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT, 4},
+        {DEVICE_MODE_PERSISTENT_GPU_BASE_POWER_LIMIT, 4},
+        {DEVICE_MODE_ONE_SHOT_CPU_POWER_LIMIT_GPU_COPY, 4},
+        {DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY, 4},
+        {DEVICE_MODE_ONE_SHOT_GPU_COPY_SWITCH_POWER_LIMIT, 4},
+        {DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT, 4},
+        {DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE, 4},
+        {DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED, 1},
+        {DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX, 2},
+        {DEVICE_MODE_SOC_POWER_BRAKE_ENABLED, 1},
+        {DEVICE_MODE_ADAPTIVE_TGPMODE, 1},
+        {DEVICE_MODE_LLDP, 1},
+        {0x7777, 4}, // unknown index: u32 zero
+    };
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        for (const auto& e : expected)
+        {
+            std::vector<uint8_t> cur;
+            std::vector<uint8_t> pend;
+            covGetDeviceModeSettingsV2(*this, e.index, cur, pend);
+            EXPECT_EQ(cur.size(), e.length) << "index " << e.index;
+            EXPECT_EQ(pend, cur) << "index " << e.index;
+        }
+    }
+    std::vector<uint8_t> cur;
+    std::vector<uint8_t> pend;
+    covGetDeviceModeSettingsV2(*this, DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT,
+                               cur, pend);
+    ASSERT_EQ(cur.size(), 4u);
+    uint32_t powerLimit = 0;
+    std::memcpy(&powerLimit, cur.data(), sizeof(powerLimit));
+    EXPECT_EQ(le32toh(powerLimit), 550000u);
+    covGetDeviceModeSettingsV2(
+        *this, DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX, cur, pend);
+    EXPECT_EQ(cur, (std::vector<uint8_t>{2, 0x07}));
+    covGetDeviceModeSettingsV2(*this, DEVICE_MODE_ADAPTIVE_TGPMODE, cur, pend);
+    EXPECT_EQ(cur, (std::vector<uint8_t>{NSM_ADAPTIVE_TGPMODE_ENABLED}));
+    covGetDeviceModeSettingsV2(*this, 0x7777, cur, pend);
+    EXPECT_EQ(cur, (std::vector<uint8_t>{0, 0, 0, 0}));
+}
+
+TEST_F(MockupResponderTest, CovSetDeviceModeSettingsV2HandlerLengthsAndStore)
+{
+    const std::vector<uint8_t> u32 = {1, 2, 3, 4};
+    const std::vector<uint8_t> u8 = {1};
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        for (uint32_t index : {DEVICE_MODE_SOC_MAX_AC_POWER_RAMP_RATE,
+                               DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT,
+                               DEVICE_MODE_PERSISTENT_GPU_BASE_POWER_LIMIT,
+                               DEVICE_MODE_ONE_SHOT_CPU_POWER_LIMIT_GPU_COPY,
+                               DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY})
+        {
+            EXPECT_EQ(respCompletionCode(
+                          covSetDeviceModeSettingsV2(*this, index, u32)),
+                      NSM_SUCCESS)
+                << index;
+            EXPECT_EQ(respCompletionCode(
+                          covSetDeviceModeSettingsV2(*this, index, u8)),
+                      NSM_ERR_INVALID_DATA_LENGTH)
+                << index;
+        }
+        for (uint32_t index :
+             {DEVICE_MODE_SOC_POWER_SMOOTHING_ENABLED,
+              DEVICE_MODE_SOC_POWER_BRAKE_ENABLED, DEVICE_MODE_ADAPTIVE_TGPMODE,
+              DEVICE_MODE_SOC_POWER_SMOOTHING_PRESET_INDEX, DEVICE_MODE_LLDP})
+        {
+            EXPECT_EQ(respCompletionCode(
+                          covSetDeviceModeSettingsV2(*this, index, u8)),
+                      NSM_SUCCESS)
+                << index;
+            EXPECT_EQ(respCompletionCode(
+                          covSetDeviceModeSettingsV2(*this, index, u32)),
+                      NSM_ERR_INVALID_DATA_LENGTH)
+                << index;
+        }
+        // Unknown index: any length is accepted.
+        EXPECT_EQ(respCompletionCode(
+                      covSetDeviceModeSettingsV2(*this, 0x7777, {9, 8, 7})),
+                  NSM_SUCCESS);
+    }
+
+    // The accepted value is stored as pending; current keeps the mock default
+    // until a current value is seeded.
+    std::vector<uint8_t> cur;
+    std::vector<uint8_t> pend;
+    covGetDeviceModeSettingsV2(*this, DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT,
+                               cur, pend);
+    EXPECT_EQ(pend, u32);
+    uint32_t powerLimit = 0;
+    ASSERT_EQ(cur.size(), 4u);
+    std::memcpy(&powerLimit, cur.data(), sizeof(powerLimit));
+    EXPECT_EQ(le32toh(powerLimit), 550000u);
+
+    const std::vector<uint8_t> seeded = {9, 9, 9, 9};
+    mockupResponder->state
+        .deviceModeSettingsV2[DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT]
+        .first = seeded;
+    covGetDeviceModeSettingsV2(*this, DEVICE_MODE_ONE_SHOT_GPU_BASE_POWER_LIMIT,
+                               cur, pend);
+    EXPECT_EQ(cur, seeded);
+    EXPECT_EQ(pend, u32);
+}
+
+TEST_F(MockupResponderTest, CovDeviceConfigV2HandlersStoreAndQuery)
+{
+    const std::vector<uint8_t> cfg = {0x11, 0x22, 0x33};
+    const std::vector<uint8_t> query = {0x01, 0x02};
+    auto set = [&](uint32_t type) {
+        Request request(sizeof(nsm_msg_hdr) +
+                            sizeof(nsm_set_device_config_v2_req) - 1 +
+                            cfg.size(),
+                        0);
+        auto msg = reinterpret_cast<nsm_msg*>(request.data());
+        EXPECT_EQ(encode_set_device_config_v2_req(
+                      instanceId, type, cfg.data(),
+                      static_cast<uint16_t>(cfg.size()), msg),
+                  NSM_SW_SUCCESS);
+        return mockupResponder->setDeviceConfigV2Handler(msg, request.size());
+    };
+    auto get = [&](uint32_t type, std::vector<uint8_t>& cur,
+                   std::vector<uint8_t>& pend) {
+        Request request(sizeof(nsm_msg_hdr) +
+                            sizeof(nsm_get_device_config_v2_req) - 1 +
+                            query.size(),
+                        0);
+        auto msg = reinterpret_cast<nsm_msg*>(request.data());
+        EXPECT_EQ(encode_get_device_config_v2_req(
+                      instanceId, type, query.data(),
+                      static_cast<uint16_t>(query.size()), msg),
+                  NSM_SW_SUCCESS);
+        auto resp = mockupResponder->getDeviceConfigV2Handler(msg,
+                                                              request.size());
+        if (!resp.has_value())
+        {
+            ADD_FAILURE() << "no Get Device Config v2 response";
+            return;
+        }
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        cur.assign(64, 0);
+        pend.assign(64, 0);
+        uint16_t curLen = 0;
+        uint16_t pendLen = 0;
+        EXPECT_EQ(decode_get_device_config_v2_resp(
+                      reinterpret_cast<const nsm_msg*>(resp->data()),
+                      resp->size(), &cc, &reasonCode, cur.data(), &curLen,
+                      pend.data(), &pendLen),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(cc, NSM_SUCCESS);
+        cur.resize(curLen);
+        pend.resize(pendLen);
+    };
+
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        auto resp = set(5);
+        ASSERT_TRUE(resp.has_value());
+        EXPECT_EQ(respCompletionCode(*resp), NSM_SUCCESS);
+
+        std::vector<uint8_t> cur;
+        std::vector<uint8_t> pend;
+        get(5, cur, pend);
+        EXPECT_EQ(cur, cfg);
+        EXPECT_EQ(pend, (std::vector<uint8_t>{0xca, 0xfe}));
+
+        // A different config type answers with the placeholder.
+        get(6, cur, pend);
+        EXPECT_EQ(cur, (std::vector<uint8_t>{0xde, 0xad, 0xbe, 0xef}));
+        EXPECT_EQ(pend, (std::vector<uint8_t>{0xca, 0xfe}));
+    }
+}
+
+TEST_F(MockupResponderTest, CovGetSupportedGPMMetricsHandlerValidRequest)
+{
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        Request request(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_gpm_metrics_req), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(request.data());
+        ASSERT_EQ(encode_get_supported_gpm_metrics_req(instanceId, 1, msg),
+                  NSM_SW_SUCCESS);
+        auto resp = mockupResponder->getSupportedGPMMetrics(msg,
+                                                            request.size());
+        ASSERT_TRUE(resp.has_value());
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t maskSize = 0;
+        uint16_t maxMetrics = 0;
+        std::array<uint8_t, 64> bitmask{};
+        uint16_t bitmaskSize = bitmask.size();
+        ASSERT_EQ(decode_get_supported_gpm_metrics_resp(
+                      reinterpret_cast<const nsm_msg*>(resp->data()),
+                      resp->size(), &cc, &reasonCode, &maskSize, &maxMetrics,
+                      bitmask.data(), &bitmaskSize),
+                  NSM_SW_SUCCESS);
+        EXPECT_EQ(cc, NSM_SUCCESS);
+        EXPECT_EQ(maskSize, 4);
+        EXPECT_EQ(maxMetrics, 21);
+        EXPECT_EQ(bitmask[0], 0xFF);
+        EXPECT_EQ(bitmask[3], 0xFF);
+    }
+}
+
+TEST_F(MockupResponderTest, CovGetPciePortConfigHandlerSkipsUnexpectedTag)
+{
+    // Tags above 4 are neither a preset nor the Tx amplitude: skipped.
+    MockupResponder::pciePortConfigMockTable[9] = 1;
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_config_req), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    ASSERT_EQ(encode_get_pcie_port_config_req(instanceId, 0, 0, 0, msg),
+              NSM_SW_SUCCESS);
+    auto resp = mockupResponder->getPciePortConfigHandler(msg, request.size());
+    MockupResponder::pciePortConfigMockTable.erase(9);
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_GE(resp->size(), sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp));
+}
+
+TEST(MockupResponderCovStandalone, EventSourceIgnoresOutOfRangeIds)
+{
+    MockupResponder::EventSource source(
+        std::vector<uint64_t>{1, EVENT_SOURCES_LENGTH * 8ULL, 5000});
+    EXPECT_EQ(source.events[0].byte, 0x02);
+    for (size_t i = 1; i < source.events.size(); ++i)
+    {
+        EXPECT_EQ(source.events[i].byte, 0) << "byte " << i;
+    }
+}
+
+// ---- Pre-Boot Diagnostics (CPU responder) ----------------------------------
+
+namespace
+{
+using DiagState = MockupResponder::MockupResponder::DiagSessionState;
+
+static Response covSetDiagSystemConfig(MockupResponderTest& suite,
+                                       uint8_t duration,
+                                       const std::vector<uint8_t>& dynamic)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                        sizeof(nsm_diag_set_system_config_req) - 1 +
+                        dynamic.size(),
+                    0);
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(encode_diag_set_system_config_req(
+                  suite.instanceId, NSM_DIAG_CONFIG_TYPE_TEST, duration,
+                  dynamic.empty() ? nullptr : dynamic.data(),
+                  static_cast<uint8_t>(dynamic.size()), msg),
+              NSM_SW_SUCCESS);
+    auto resp =
+        suite.mockupResponder->setDiagSystemConfigHandler(msg, request.size());
+    if (!resp.has_value())
+    {
+        ADD_FAILURE() << "no Set Diag System Config response";
+        return {};
+    }
+    return *resp;
+}
+
+static Response covSetDiagTidConfig(MockupResponderTest& suite, uint8_t tid,
+                                    uint8_t duration, uint16_t loops,
+                                    uint8_t logLevel,
+                                    const std::vector<uint8_t>& dynamic)
+{
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_diag_set_tid_config_req) -
+                        1 + dynamic.size(),
+                    0);
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_EQ(encode_diag_set_tid_config_req(
+                  suite.instanceId, tid, duration, loops, logLevel,
+                  static_cast<uint8_t>(dynamic.size()),
+                  dynamic.empty() ? nullptr : dynamic.data(), msg),
+              NSM_SW_SUCCESS);
+    auto resp = suite.mockupResponder->setDiagTidConfigHandler(msg,
+                                                               request.size());
+    if (!resp.has_value())
+    {
+        ADD_FAILURE() << "no Set Diag TID Config response";
+        return {};
+    }
+    return *resp;
+}
+} // namespace
+
+TEST_F(MockupResponderTest, CovSetDiagSystemConfigHandlerStoresTidList)
+{
+    auto& session = mockupResponder->diagSession;
+
+    // No dynamic data: system-level test, no TIDs requested.
+    EXPECT_EQ(respCompletionCode(covSetDiagSystemConfig(*this, 2, {})),
+              NSM_SUCCESS);
+    EXPECT_EQ(session.configType, NSM_DIAG_CONFIG_TYPE_TEST);
+    EXPECT_EQ(session.systemTestDuration, 2);
+    EXPECT_TRUE(session.systemDynamicData.empty());
+    EXPECT_TRUE(session.requestedTids.empty());
+    EXPECT_EQ(mockupResponder->diagTimerSource, nullptr); // session IDLE
+
+    // DynamicData[0] = count, then the TID values.
+    EXPECT_EQ(respCompletionCode(
+                  covSetDiagSystemConfig(*this, 0, {3, 0x01, 0x02, 0x09})),
+              NSM_SUCCESS);
+    EXPECT_EQ(session.requestedTids, (std::vector<uint8_t>{1, 2, 9}));
+    EXPECT_EQ(session.systemDynamicData,
+              (std::vector<uint8_t>{3, 0x01, 0x02, 0x09}));
+
+    // A count larger than the data present is clamped to what is there.
+    EXPECT_EQ(respCompletionCode(covSetDiagSystemConfig(*this, 0, {3, 0x05})),
+              NSM_SUCCESS);
+    EXPECT_EQ(session.requestedTids, (std::vector<uint8_t>{5}));
+
+    // While the mock waits for the system config the reply arms the session
+    // timer; quiet mode takes the same path.
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        mockupResponder->diagSessionState = DiagState::WAIT_SYSTEM_CONFIG;
+        EXPECT_EQ(respCompletionCode(covSetDiagSystemConfig(*this, 1, {})),
+                  NSM_SUCCESS);
+        EXPECT_NE(mockupResponder->diagTimerSource, nullptr);
+    }
+
+    // A request without the fixed fields is rejected as unsupported.
+    auto bad = covCommonRequest(instanceId, NSM_TYPE_DIAGNOSTIC,
+                                NSM_DIAG_SET_SYSTEM_CONFIG,
+                                sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto resp = mockupResponder->setDiagSystemConfigHandler(
+        reinterpret_cast<const nsm_msg*>(bad.data()), bad.size());
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(respCompletionCode(*resp), NSM_ERR_UNSUPPORTED_COMMAND_CODE);
+}
+
+TEST_F(MockupResponderTest, CovSetDiagTidConfigHandlerStoresPerTidConfig)
+{
+    auto& session = mockupResponder->diagSession;
+    EXPECT_EQ(respCompletionCode(
+                  covSetDiagTidConfig(*this, 1, 2, 10, 3, {0xAA, 0xBB})),
+              NSM_SUCCESS);
+    ASSERT_EQ(session.tidConfigs.count(1), 1u);
+    EXPECT_EQ(session.tidConfigs[1].testDuration, 2);
+    EXPECT_EQ(session.tidConfigs[1].loops, 10);
+    EXPECT_EQ(session.tidConfigs[1].logLevel, 3);
+    EXPECT_EQ(session.tidConfigs[1].dynamicData,
+              (std::vector<uint8_t>{0xAA, 0xBB}));
+    EXPECT_EQ(mockupResponder->diagTimerSource, nullptr); // session IDLE
+
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        mockupResponder->diagSessionState = DiagState::REQUESTING_TID_CONFIGS;
+        EXPECT_EQ(
+            respCompletionCode(covSetDiagTidConfig(*this, 2, 1, 0, 0, {})),
+            NSM_SUCCESS);
+        EXPECT_NE(mockupResponder->diagTimerSource, nullptr);
+        EXPECT_TRUE(session.tidConfigs[2].dynamicData.empty());
+    }
+
+    auto bad = covCommonRequest(instanceId, NSM_TYPE_DIAGNOSTIC,
+                                NSM_DIAG_SET_TID_CONFIG,
+                                sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto resp = mockupResponder->setDiagTidConfigHandler(
+        reinterpret_cast<const nsm_msg*>(bad.data()), bad.size());
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(respCompletionCode(*resp), NSM_ERR_UNSUPPORTED_COMMAND_CODE);
+}
+
+TEST_F(MockupResponderTest, CovGenerateResultForTidMatchesGoldenResults)
+{
+    auto& session = mockupResponder->diagSession;
+    auto result = [&](uint8_t tid) {
+        return mockupResponder->generateResultForTid(tid);
+    };
+
+    // Out-of-range TIDs.
+    EXPECT_EQ(result(0x00).first, NSM_DIAG_TEST_INVALID_TID);
+    EXPECT_EQ(result(0x0B).first, NSM_DIAG_TEST_INVALID_TID);
+    EXPECT_TRUE(result(0x0B).second.empty());
+
+    // System-level test: CPU tests carry a 47-byte mask, memory tests 148.
+    session.reset();
+    session.systemTestDuration = 2;
+    EXPECT_EQ(result(0x01).first, NSM_DIAG_TEST_PASS);
+    EXPECT_EQ(result(0x01).second.size(), 0x2Fu);
+    EXPECT_EQ(result(0x08).second.size(), 0x2Fu);
+    EXPECT_EQ(result(0x09).first, NSM_DIAG_TEST_PASS);
+    EXPECT_EQ(result(0x09).second.size(), 0x94u);
+    EXPECT_EQ(result(0x0A).second.size(), 0x94u);
+    session.systemTestDuration = 4;
+    EXPECT_EQ(result(0x03).first, NSM_DIAG_TEST_UNSPECIFIED_ERROR);
+
+    // Per-TID configuration required when the system duration is 0.
+    session.reset();
+    EXPECT_EQ(result(0x02).first, NSM_DIAG_TEST_TID_NOT_CONFIGURED);
+    session.tidConfigs[0x02] = {4, 1, 0, {}};
+    EXPECT_EQ(result(0x02).first, NSM_DIAG_TEST_INVALID_PARAMETER);
+    session.tidConfigs[0x02].testDuration = 3;
+    EXPECT_EQ(result(0x02).first, NSM_DIAG_TEST_PASS);
+    EXPECT_EQ(result(0x02).second.size(), 0x2Fu);
+}
+
+TEST_F(MockupResponderTest, CovRunDiagSessionRequiresReceiverAndRestarts)
+{
+    auto& mock = *mockupResponder;
+    mock.eventReceiverEid = 0;
+    mock.runDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::IDLE);
+
+    mock.eventReceiverEid = 30;
+    mock.diagSession.requestedTids = {1};
+    mock.runDiagSession(); // no socket: the GetSystemConfig event send fails
+    EXPECT_EQ(mock.diagSessionState, DiagState::WAIT_SYSTEM_CONFIG);
+    EXPECT_TRUE(mock.diagSession.requestedTids.empty());
+    EXPECT_EQ(mock.diagTimerSource, nullptr);
+
+    // Restart while in progress, first without and then with an armed timer.
+    mock.runDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::WAIT_SYSTEM_CONFIG);
+    mock.scheduleDiagTimer(1000000);
+    ASSERT_NE(mock.diagTimerSource, nullptr);
+    mock.runDiagSession();
+    EXPECT_EQ(mock.diagTimerSource, nullptr);
+    EXPECT_EQ(mock.diagSessionState, DiagState::WAIT_SYSTEM_CONFIG);
+
+    // Re-arming replaces the previous timer source.
+    mock.scheduleDiagTimer(1000000);
+    auto* first = mock.diagTimerSource;
+    ASSERT_NE(first, nullptr);
+    mock.scheduleDiagTimer(2000000);
+    EXPECT_NE(mock.diagTimerSource, nullptr);
+}
+
+TEST_F(MockupResponderTest, CovAdvanceDiagSessionWalksEveryState)
+{
+    auto& mock = *mockupResponder;
+    mock.eventReceiverEid = 30;
+
+    // IDLE and an unknown state: nothing to do.
+    mock.diagSessionState = DiagState::IDLE;
+    mock.advanceDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::IDLE);
+    mock.diagSessionState = static_cast<DiagState>(99);
+    mock.advanceDiagSession();
+    EXPECT_EQ(mock.diagSessionState, static_cast<DiagState>(99));
+
+    // Invalid system duration: error result, then DONE.
+    mock.diagSession.reset();
+    mock.diagSession.systemTestDuration = 5;
+    mock.diagSessionState = DiagState::WAIT_SYSTEM_CONFIG;
+    mock.advanceDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::DONE);
+    EXPECT_NE(mock.diagTimerSource, nullptr);
+
+    // Duration 0 without TIDs: error result, then DONE.
+    mock.diagSession.reset();
+    mock.diagSessionState = DiagState::WAIT_SYSTEM_CONFIG;
+    mock.advanceDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::DONE);
+
+    // System-level test: straight to EXECUTING.
+    mock.diagSession.reset();
+    mock.diagSession.systemTestDuration = 2;
+    mock.diagSessionState = DiagState::WAIT_SYSTEM_CONFIG;
+    mock.advanceDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::EXECUTING);
+
+    // Per-TID test: one config request per TID, then EXECUTING.
+    mock.diagSession.reset();
+    mock.diagSession.requestedTids = {1, 9};
+    mock.diagSessionState = DiagState::WAIT_SYSTEM_CONFIG;
+    mock.advanceDiagSession(); // falls through and requests TID 1
+    EXPECT_EQ(mock.diagSessionState, DiagState::REQUESTING_TID_CONFIGS);
+    EXPECT_EQ(mock.pendingTidRequests.size(), 1u);
+    mock.advanceDiagSession(); // requests TID 9
+    EXPECT_EQ(mock.diagSessionState, DiagState::REQUESTING_TID_CONFIGS);
+    EXPECT_TRUE(mock.pendingTidRequests.empty());
+    mock.advanceDiagSession(); // all configs received
+    EXPECT_EQ(mock.diagSessionState, DiagState::EXECUTING);
+
+    // EXECUTING with explicit TIDs queues exactly those results.
+    mock.advanceDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::REPORTING);
+    EXPECT_EQ(mock.pendingTidResults.size(), 2u);
+
+    // EXECUTING for a system-level test queues the eight default TIDs and
+    // REPORTING drains one result per call before finishing.
+    mock.diagSession.reset();
+    mock.diagSession.systemTestDuration = 1;
+    mock.diagSessionState = DiagState::EXECUTING;
+    mock.advanceDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::REPORTING);
+    ASSERT_EQ(mock.pendingTidResults.size(), 8u);
+    for (size_t i = 0; i < 8; ++i)
+    {
+        mock.advanceDiagSession();
+        EXPECT_EQ(mock.diagSessionState, DiagState::REPORTING) << i;
+        EXPECT_EQ(mock.pendingTidResults.size(), 7 - i);
+    }
+    mock.advanceDiagSession(); // REPORTING -> DONE -> IDLE
+    EXPECT_EQ(mock.diagSessionState, DiagState::IDLE);
+    EXPECT_EQ(mock.diagTimerSource, nullptr);
+
+    // DONE with an armed timer releases it.
+    mock.scheduleDiagTimer(1000000);
+    mock.diagSessionState = DiagState::DONE;
+    mock.advanceDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::IDLE);
+    EXPECT_EQ(mock.diagTimerSource, nullptr);
+}
+
+TEST_F(MockupResponderTest, CovDiagEventSendersWithoutSocket)
+{
+    auto& mock = *mockupResponder;
+    for (bool verbose : {true, false})
+    {
+        mock.verbose = verbose;
+        EXPECT_NO_THROW(mock.sendDiagGetSystemConfigEvent(
+            30, true, NSM_DIAG_CONFIG_TYPE_TEST));
+        EXPECT_NO_THROW(mock.sendDiagGetTidConfigEvent(30, true, 1));
+        EXPECT_NO_THROW(mock.sendDiagSetTestResultEvent(
+            30, true, 1, NSM_DIAG_TEST_PASS, std::vector<uint8_t>(0x2F, 0)));
+        EXPECT_NO_THROW(mock.sendDiagSetTestResultEvent(
+            30, true, 0, NSM_DIAG_TEST_UNSPECIFIED_ERROR, {}));
+        // Oversized dynamic data is rejected before encoding.
+        EXPECT_NO_THROW(mock.sendDiagSetTestResultEvent(
+            30, true, 1, NSM_DIAG_TEST_PASS,
+            std::vector<uint8_t>(NSM_DIAG_MAX_DYNAMIC_DATA_SIZE + 1, 0)));
+        EXPECT_NO_THROW(mock.sendDiagSetFlowControlEvent(
+            30, false, NSM_DIAG_FLOW_CTRL_IN_PROGRESS));
+        EXPECT_NO_THROW(mock.sendRuntimeISTCompleteEvent(
+            30, true, "GPU-0001", 1, "1.2.3", 0, 0, 80, 70));
+        // Over-long identifiers are truncated to the payload fields.
+        EXPECT_NO_THROW(mock.sendRuntimeISTCompleteEvent(
+            30, false, std::string(NSM_RIST_GPU_UUID_LEN + 10, 'u'), 2,
+            std::string(NSM_RIST_APP_VERSION_LEN + 10, 'v'), 1, 5, -1, -2));
+    }
+}
+
+// ---- MCTP send over an injected socket -------------------------------------
+
+TEST_F(MockupResponderTest, CovMctpSockSendDeliversFrameOverInjectedSocket)
+{
+    CovSocketPair sp;
+    ASSERT_GE(sp.fds[0], 0);
+    CovSockFdGuard guard(*mockupResponder, sp.fds[0]);
+    std::vector<uint8_t> payload = {0x10, 0xDE, 0x80, 0x89, 0x00, 0x00, 0x01};
+    for (bool verbose : {true, false})
+    {
+        mockupResponder->verbose = verbose;
+        EXPECT_EQ(mockupResponder->mctpSockSend(30, payload), NSM_SUCCESS);
+        std::array<uint8_t, 64> rx{};
+        ssize_t n = recv(sp.fds[1], rx.data(), rx.size(), 0);
+        ASSERT_EQ(n, static_cast<ssize_t>(payload.size() + 3));
+        EXPECT_EQ(rx[1], 30); // destination EID follows the tag byte
+        EXPECT_TRUE(std::equal(payload.begin(), payload.end(),
+                               std::next(rx.begin(), 3)));
+    }
+
+    // sendmsg() on a descriptor that is not a socket fails.
+    int devNull = open("/dev/null", O_WRONLY);
+    ASSERT_GE(devNull, 0);
+    mockupResponder->sockFd = devNull;
+    EXPECT_EQ(mockupResponder->mctpSockSend(30, payload), NSM_ERROR);
+    close(devNull);
+}
+
+TEST_F(MockupResponderTest, CovEventSendersSucceedOverInjectedSocket)
+{
+    CovSocketPair sp;
+    ASSERT_GE(sp.fds[0], 0);
+    CovSockFdGuard guard(*mockupResponder, sp.fds[0]);
+    auto& mock = *mockupResponder;
+    std::vector<std::pair<uint16_t, bool>> gpioEvents = {{1, true}, {2, false}};
+    for (bool verbose : {true, false})
+    {
+        mock.verbose = verbose;
+        mock.sendRediscoveryEvent(30, true);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendXIDEvent(30, true, 0x01, 999, 1, 12345, "xid");
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendResetRequiredEvent(30, true);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendDeviceConfigurationRequestEventV1(30, true);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendFabricManagerStateEvent(30, true, 1, 2, 3, 4);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendNsmEvent(30, NSM_TYPE_PLATFORM_ENVIRONMENTAL, true, 1, 2, 3, 4,
+                          0, nullptr);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendThreasholdEvent(30, true, true, false, true, false, true,
+                                 false, true, 2);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendGpioStateChangeEvent(30, true, 5, gpioEvents);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendRuntimeISTCompleteEvent(30, true, "GPU-0001", 1, "1.2.3", 0, 0,
+                                         80, 70);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendDiagGetSystemConfigEvent(30, true, NSM_DIAG_CONFIG_TYPE_TEST);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendDiagGetTidConfigEvent(30, true, 1);
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendDiagSetTestResultEvent(30, true, 1, NSM_DIAG_TEST_PASS,
+                                        std::vector<uint8_t>(0x2F, 0));
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendDiagSetTestResultEvent(30, true, 0,
+                                        NSM_DIAG_TEST_UNSPECIFIED_ERROR, {});
+        EXPECT_EQ(sp.drain(), size_t{1});
+        mock.sendDiagSetFlowControlEvent(30, false,
+                                         NSM_DIAG_FLOW_CTRL_IN_PROGRESS);
+        EXPECT_EQ(sp.drain(), size_t{1});
+    }
+}
+
+TEST_F(MockupResponderTest, CovDiagSessionEmitsEveryEventOverInjectedSocket)
+{
+    CovSocketPair sp;
+    ASSERT_GE(sp.fds[0], 0);
+    CovSockFdGuard guard(*mockupResponder, sp.fds[0]);
+    auto& mock = *mockupResponder;
+    mock.eventReceiverEid = 30;
+
+    // Start: one GetSystemConfig event.
+    mock.runDiagSession();
+    EXPECT_EQ(sp.drain(), size_t{1});
+
+    // The BMC answers with a two-TID config; the mock requests both configs.
+    EXPECT_EQ(respCompletionCode(covSetDiagSystemConfig(*this, 0, {2, 1, 9})),
+              NSM_SUCCESS);
+    mock.advanceDiagSession();
+    EXPECT_EQ(sp.drain(), size_t{1}); // TID 1 config request
+    EXPECT_EQ(respCompletionCode(covSetDiagTidConfig(*this, 1, 2, 1, 0, {})),
+              NSM_SUCCESS);
+    mock.advanceDiagSession();
+    EXPECT_EQ(sp.drain(), size_t{1}); // TID 9 config request
+    mock.advanceDiagSession();        // -> EXECUTING
+    EXPECT_EQ(mock.diagSessionState, DiagState::EXECUTING);
+    mock.advanceDiagSession();        // heartbeat -> REPORTING
+    EXPECT_EQ(sp.drain(), size_t{1});
+    EXPECT_EQ(mock.pendingTidResults.size(), 2u);
+    mock.advanceDiagSession(); // TID 1: PASS
+    EXPECT_EQ(sp.drain(), size_t{1});
+    mock.advanceDiagSession(); // TID 9: not configured
+    EXPECT_EQ(sp.drain(), size_t{1});
+    mock.advanceDiagSession(); // execution finished
+    EXPECT_EQ(sp.drain(), size_t{1});
+    EXPECT_EQ(mock.diagSessionState, DiagState::IDLE);
+}
+
+// ---- Dump failure cycle: 0x40 / 0x51 / 0x52 / 0x59 --------------------------
+
+namespace
+{
+// Iterative dump commands consume one page per request; check every page of
+// every case against the table.
+template <typename Handler>
+void covWalkIterativeCycle(MockupResponder::MockupResponder& mock,
+                           Handler handler)
+{
+    for (const auto& c : MockupResponder::kDumpFailureCycle)
+    {
+        for (uint32_t p = 0; p < c.pageCount; ++p)
+        {
+            const auto& page = c.pages[p];
+            auto resp = handler();
+            if (page.silent)
+            {
+                EXPECT_FALSE(resp.has_value()) << c.caseId;
+                continue;
+            }
+            ASSERT_TRUE(resp.has_value()) << c.caseId;
+            EXPECT_EQ(respCompletionCode(*resp), page.cc) << c.caseId;
+            if (page.cc != NSM_SUCCESS)
+            {
+                EXPECT_EQ(respReasonCode(*resp), page.reasonCode) << c.caseId;
+                EXPECT_EQ(resp->size(), sizeof(nsm_msg_hdr) +
+                                            sizeof(nsm_common_non_success_resp))
+                    << c.caseId;
+            }
+        }
+    }
+    EXPECT_EQ(mock.cycleCaseIndex, 0u);
+    EXPECT_EQ(mock.cyclePageIndex, 0u);
+}
+
+// Single-shot erase commands skip multi-page cases and consume one
+// single-page case per request.
+template <typename Handler>
+void covWalkEraseCycle(MockupResponder::MockupResponder& mock, Handler handler)
+{
+    const auto& cycle = MockupResponder::kDumpFailureCycle;
+    for (size_t step = 0; step < cycle.size(); ++step)
+    {
+        uint32_t idx = mock.cycleCaseIndex;
+        while (cycle[idx].pageCount > 1)
+        {
+            idx = (idx + 1) % cycle.size();
+        }
+        const auto& page = cycle[idx].pages[0];
+        auto resp = handler();
+        if (page.silent)
+        {
+            EXPECT_FALSE(resp.has_value()) << cycle[idx].caseId;
+        }
+        else
+        {
+            ASSERT_TRUE(resp.has_value()) << cycle[idx].caseId;
+            EXPECT_EQ(respCompletionCode(*resp), page.cc) << cycle[idx].caseId;
+            if (page.cc != NSM_SUCCESS)
+            {
+                EXPECT_EQ(respReasonCode(*resp), page.reasonCode)
+                    << cycle[idx].caseId;
+            }
+        }
+        EXPECT_EQ(mock.cycleCaseIndex, (idx + 1) % cycle.size());
+        EXPECT_EQ(mock.cyclePageIndex, 0u);
+    }
+}
+} // namespace
+
+TEST_F(MockupDumpCycleTest, CovDeviceDiagnosticsWalksWholeFailureCycle)
+{
+    buildMock(/*failureCycle=*/true);
+    covWalkIterativeCycle(*mockupResponder, [&]() {
+        auto req = makeDiagnosticsReq(instanceId, 0);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        return mockupResponder->getDeviceDiagnosticsHandler(reqMsg, req.size());
+    });
+}
+
+TEST_F(MockupDumpCycleTest, CovNetworkDeviceLogInfoWalksWholeFailureCycle)
+{
+    buildMock(/*failureCycle=*/true);
+    covWalkIterativeCycle(*mockupResponder, [&]() {
+        auto req = makeLogInfoReq(instanceId, 0);
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        return mockupResponder->getNetworkDeviceLogInfoHandler(reqMsg,
+                                                               req.size());
+    });
+}
+
+TEST_F(MockupDumpCycleTest, CovEraseTraceWalksSingleShotFailureCycle)
+{
+    buildMock(/*failureCycle=*/true);
+    covWalkEraseCycle(*mockupResponder, [&]() {
+        Request req(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        EXPECT_EQ(encode_erase_trace_req(instanceId, reqMsg), NSM_SW_SUCCESS);
+        return mockupResponder->eraseTraceHandler(reqMsg, req.size());
+    });
+}
+
+TEST_F(MockupDumpCycleTest, CovEraseDebugInfoWalksSingleShotFailureCycle)
+{
+    buildMock(/*failureCycle=*/true);
+    covWalkEraseCycle(*mockupResponder, [&]() {
+        Request req(sizeof(nsm_msg_hdr) + sizeof(nsm_erase_debug_info_req));
+        auto* reqMsg = reinterpret_cast<nsm_msg*>(req.data());
+        EXPECT_EQ(encode_erase_debug_info_req(instanceId, 0, reqMsg),
+                  NSM_SW_SUCCESS);
+        return mockupResponder->eraseDebugInfoHandler(reqMsg, req.size());
+    });
+}
+
+// ---- Remaining reachable decision points -----------------------------------
+
+TEST_F(MockupResponderTest, CovDbusMethodsInvokeEventSenders)
+{
+    // The mock exposes its event generators as D-Bus methods on the fixture's
+    // connection; calling them through the bus runs the registered lambdas.
+    const std::string service = systemBus->get_unique_name();
+    const std::string path = "/xyz/openbmc_project/NSM/30";
+    const std::string iface = "xyz.openbmc_project.NSM.Device";
+    int completed = 0;
+    auto onDone = [&completed](boost::system::error_code ec) {
+        EXPECT_FALSE(ec) << ec.message();
+        ++completed;
+    };
+    systemBus->async_method_call(onDone, service, path, iface, "genXIDEvent",
+                                 uint8_t{30}, true, uint8_t{1}, uint32_t{999},
+                                 uint32_t{1}, uint64_t{12345},
+                                 std::string("xid"));
+    systemBus->async_method_call(
+        onDone, service, path, iface, "genRuntimeISTCompleteEvent", uint8_t{30},
+        true, std::string("GPU-0001"), uint64_t{1}, std::string("1.2.3"),
+        uint8_t{0}, uint64_t{0}, int32_t{80}, int32_t{70});
+    systemBus->async_method_call(
+        onDone, service, path, iface, "genGpioStateChangeEvent", uint8_t{30},
+        true, uint64_t{5},
+        std::vector<std::pair<uint16_t, bool>>{{1, true}, {2, false}});
+    systemBus->async_method_call(
+        onDone, service, path, iface, "genDiagSetTestResultEvent", uint8_t{30},
+        true, uint8_t{1}, uint16_t{0}, std::vector<uint8_t>{1, 2});
+    systemBus->async_method_call(onDone, service, path, iface,
+                                 "genDiagSetFlowControlEvent", uint8_t{30},
+                                 uint8_t{NSM_DIAG_FLOW_CTRL_IN_PROGRESS});
+    const int expected = 5;
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::seconds(10);
+    while (completed < expected && std::chrono::steady_clock::now() < deadline)
+    {
+        if (io.stopped())
+        {
+            io.restart();
+        }
+        io.run_for(std::chrono::milliseconds(50));
+    }
+    EXPECT_EQ(completed, expected);
+}
+
+TEST_F(MockupResponderTest, CovAdvanceDiagSessionDoneWithoutTimer)
+{
+    auto& mock = *mockupResponder;
+    mock.eventReceiverEid = 30;
+    mock.diagSessionState = DiagState::DONE;
+    ASSERT_EQ(mock.diagTimerSource, nullptr);
+    mock.advanceDiagSession();
+    EXPECT_EQ(mock.diagSessionState, DiagState::IDLE);
+}
+
+TEST_F(MockupResponderTest, CovSetCurrentEventSourcesUnknownMessageType)
+{
+    bitfield8_t sources[EVENT_SOURCES_LENGTH] = {};
+    sources[0].byte = 0xFF;
+    Request request(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_set_current_event_source_req), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    ASSERT_EQ(encode_nsm_set_current_event_sources_req(
+                  instanceId, NSM_TYPE_FIRMWARE + 1, sources, msg),
+              NSM_SW_SUCCESS);
+    auto resp = mockupResponder->setCurrentEventSources(msg, request.size());
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(respCompletionCode(*resp), NSM_SUCCESS);
+    // Nothing is supported for an unknown type, so nothing gets enabled.
+    for (const auto& byte :
+         mockupResponder->state.eventSources[NSM_TYPE_FIRMWARE + 1])
+    {
+        EXPECT_EQ(byte.byte, 0);
+    }
+}
+
+TEST_F(MockupResponderTest, CovGetEgmModeHandlerTruncatedRequest)
+{
+    truncatedDecodeTest(this, [this](const nsm_msg* m, size_t l) {
+        return mockupResponder->getEgmModeHandler(m, l);
+    });
+}
+
+TEST_F(MockupDumpCycleTest, CovQueryPortCharacteristicsQuietFailureCycle)
+{
+    buildMock(/*failureCycle=*/true);
+    mockupResponder->verbose = false;
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_port_characteristics_req));
+    auto* reqMsg = reinterpret_cast<nsm_msg*>(request.data());
+    ASSERT_EQ(encode_query_port_characteristics_req(instanceId, 0, reqMsg),
+              NSM_SW_SUCCESS);
+    auto resp = mockupResponder->queryPortCharacteristicsHandler(
+        reqMsg, request.size());
+    ASSERT_TRUE(resp.has_value());
+    EXPECT_EQ(mockupResponder->portHealthCycleIndex, 1u);
+}
+
+TEST_F(MockupResponderTest, CovDestructorClosesOwnedSocket)
+{
+    // A mock that ends up owning a socket descriptor closes it on teardown.
+    int fds[2] = {-1, -1};
+    ASSERT_EQ(socketpair(AF_UNIX, SOCK_DGRAM, 0, fds), 0);
+    int owned = dup(fds[0]);
+    ASSERT_GE(owned, 0);
+    mockupResponder->sockFd = owned;
+    mockupResponder.reset();
+    EXPECT_EQ(fcntl(owned, F_GETFD), -1); // already closed by the mock
+    close(fds[0]);
+    close(fds[1]);
+}

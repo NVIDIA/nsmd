@@ -767,6 +767,346 @@ int decode_query_port_characteristics_resp(
 	return NSM_SW_SUCCESS;
 }
 
+int encode_query_port_characteristics_v2_req(uint8_t instance_id,
+					     uint16_t port_number,
+					     struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_query_port_characteristics_v2_req *request =
+	    (struct nsm_query_port_characteristics_v2_req *)msg->payload;
+
+	request->hdr.command = NSM_QUERY_PORT_CHARACTERISTICS_V2;
+	request->hdr.data_size =
+	    sizeof(request->port_number) + sizeof(request->reserved);
+	request->port_number = htole16(port_number);
+	request->reserved = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_port_characteristics_v2_req(const struct nsm_msg *msg,
+					     size_t msg_len,
+					     uint16_t *port_number)
+{
+	if (msg == NULL || port_number == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	const size_t expected_msg_len =
+	    sizeof(struct nsm_msg_hdr) +
+	    sizeof(struct nsm_query_port_characteristics_v2_req);
+	if (msg_len != expected_msg_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_query_port_characteristics_v2_req *request =
+	    (struct nsm_query_port_characteristics_v2_req *)msg->payload;
+
+	const uint8_t expected_data_size =
+	    sizeof(request->port_number) + sizeof(request->reserved);
+	if (request->hdr.data_size != expected_data_size) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_number = le16toh(request->port_number);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_port_characteristics_v2_resp(uint8_t instance_id, uint8_t cc,
+					      uint16_t reason_code,
+					      uint16_t telemetry_count,
+					      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_QUERY_PORT_CHARACTERISTICS_V2, msg);
+	}
+
+	struct nsm_aggregate_resp *response =
+	    (struct nsm_aggregate_resp *)msg->payload;
+
+	response->command = NSM_QUERY_PORT_CHARACTERISTICS_V2;
+	response->completion_code = cc;
+	response->telemetry_count = htole16(telemetry_count);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_port_characteristics_v2_u32_record(uint32_t value, uint8_t *data,
+					      size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint32_t le_value = htole32(value);
+	memcpy(data, &le_value, sizeof(le_value));
+	*data_len = sizeof(le_value);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_port_characteristics_v2_u32_record(const uint8_t *data,
+					      size_t data_len, uint32_t *value)
+{
+	if (data == NULL || value == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	/* The specification defines Tags 0x00-0x03 as one u32 each; the
+	 * record walk itself is driven by the metadata Length field. */
+	if (data_len != sizeof(uint32_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint32_t le_value;
+	memcpy(&le_value, data, sizeof(le_value));
+	*value = le32toh(le_value);
+
+	return NSM_SW_SUCCESS;
+}
+
+/* Link Health record bit layout (see struct nsm_link_health_record). */
+#define LINK_HEALTH_STATE_SHIFT 0
+#define LINK_HEALTH_STATE_MASK 0x0F
+#define LINK_HEALTH_TRIGGER_SHIFT 5
+#define LINK_HEALTH_TRIGGER_MASK 0xFF
+#define LINK_HEALTH_METRIC_SHIFT 13
+#define LINK_HEALTH_METRIC_MASK 0x7F
+#define LINK_HEALTH_CONFIG_CHANGED_SHIFT 20
+#define LINK_HEALTH_CONFIG_CHANGED_MASK 0x03
+
+int encode_link_health_record(const struct nsm_link_health_record *record,
+			      uint8_t *data, size_t *data_len)
+{
+	if (record == NULL || data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint32_t value =
+	    ((uint32_t)(record->link_health & LINK_HEALTH_STATE_MASK)
+	     << LINK_HEALTH_STATE_SHIFT) |
+	    ((uint32_t)(record->attention_trigger & LINK_HEALTH_TRIGGER_MASK)
+	     << LINK_HEALTH_TRIGGER_SHIFT) |
+	    ((uint32_t)(record->attention_trigger_metric &
+			LINK_HEALTH_METRIC_MASK)
+	     << LINK_HEALTH_METRIC_SHIFT) |
+	    ((uint32_t)(record->link_health_config_changed &
+			LINK_HEALTH_CONFIG_CHANGED_MASK)
+	     << LINK_HEALTH_CONFIG_CHANGED_SHIFT);
+
+	return encode_port_characteristics_v2_u32_record(value, data, data_len);
+}
+
+int decode_link_health_record(const uint8_t *data, size_t data_len,
+			      struct nsm_link_health_record *record)
+{
+	if (record == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	/* The specification defines the Link Health record as one u32; the
+	 * record walk itself is driven by the metadata Length field. */
+	if (data_len != sizeof(uint32_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint32_t value = 0;
+	int rc =
+	    decode_port_characteristics_v2_u32_record(data, data_len, &value);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	record->link_health =
+	    (value >> LINK_HEALTH_STATE_SHIFT) & LINK_HEALTH_STATE_MASK;
+	record->attention_trigger =
+	    (value >> LINK_HEALTH_TRIGGER_SHIFT) & LINK_HEALTH_TRIGGER_MASK;
+	record->attention_trigger_metric =
+	    (value >> LINK_HEALTH_METRIC_SHIFT) & LINK_HEALTH_METRIC_MASK;
+	record->link_health_config_changed =
+	    (value >> LINK_HEALTH_CONFIG_CHANGED_SHIFT) &
+	    LINK_HEALTH_CONFIG_CHANGED_MASK;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_clear_port_metric_state_req(uint8_t instance_id,
+				       uint16_t port_number, uint16_t tag_count,
+				       const uint8_t *tag_ids,
+				       struct nsm_msg *msg)
+{
+	if (msg == NULL || tag_ids == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	/* data_size is one byte; the fixed fields take 6 of it. */
+	if (tag_count == 0 ||
+	    tag_count >
+		UINT8_MAX - NSM_CLEAR_PORT_METRIC_STATE_REQ_FIXED_DATA_SIZE) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_clear_port_metric_state_req *request =
+	    (struct nsm_clear_port_metric_state_req *)msg->payload;
+
+	request->hdr.command = NSM_CLEAR_PORT_METRIC_STATE;
+	/* The spec text gives "4 + Count" but lists six fixed request bytes
+	 * (Port Number, Reserved, Count). libnsm counts the real request data
+	 * bytes, as every other Type 1 encoder does: 6 + Count. Reported to
+	 * the spec owner as an erratum. */
+	request->hdr.data_size =
+	    NSM_CLEAR_PORT_METRIC_STATE_REQ_FIXED_DATA_SIZE + tag_count;
+	request->port_number = htole16(port_number);
+	request->reserved = 0;
+	request->tag_count = htole16(tag_count);
+
+	memcpy(msg->payload + sizeof(struct nsm_clear_port_metric_state_req),
+	       tag_ids, tag_count);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_clear_port_metric_state_req(const struct nsm_msg *msg,
+				       size_t msg_len, uint16_t *port_number,
+				       uint16_t *tag_count,
+				       const uint8_t **tag_ids)
+{
+	if (msg == NULL || port_number == NULL || tag_count == NULL ||
+	    tag_ids == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_clear_port_metric_state_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_clear_port_metric_state_req *request =
+	    (struct nsm_clear_port_metric_state_req *)msg->payload;
+
+	uint16_t count = le16toh(request->tag_count);
+	/* The encoder writes 6 + Count (real request bytes, repo convention).
+	 * The spec text says 4 + Count; until the erratum is confirmed by the
+	 * spec owner (NVBug 6689491) accept both so a requester that follows
+	 * the literal text is not rejected here. */
+	if (count == 0 ||
+	    (request->hdr.data_size !=
+		 NSM_CLEAR_PORT_METRIC_STATE_REQ_FIXED_DATA_SIZE + count &&
+	     request->hdr.data_size !=
+		 NSM_CLEAR_PORT_METRIC_STATE_REQ_FIXED_DATA_SIZE - 2 + count)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_clear_port_metric_state_req) +
+			  count) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	*port_number = le16toh(request->port_number);
+	*tag_count = count;
+	*tag_ids =
+	    msg->payload + sizeof(struct nsm_clear_port_metric_state_req);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_clear_port_metric_state_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t reason_code,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_CLEAR_PORT_METRIC_STATE, msg);
+	}
+
+	nsm_clear_port_metric_state_resp *response =
+	    (nsm_clear_port_metric_state_resp *)msg->payload;
+
+	response->command = NSM_CLEAR_PORT_METRIC_STATE;
+	response->completion_code = cc;
+	response->reserved = 0;
+	response->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_clear_port_metric_state_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code)
+{
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_clear_port_metric_state_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_clear_port_metric_state_resp *response =
+	    (nsm_clear_port_metric_state_resp *)msg->payload;
+	if (le16toh(response->data_size) != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_query_ports_available_req(uint8_t instance_id, struct nsm_msg *msg)
 {
 	if (msg == NULL) {

@@ -2,6 +2,7 @@
 
 #include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmAsyncStatusMapping.hpp"
 #include "nsmEvent.hpp"
 #include "nsmInterface.hpp"
 #include "utils.hpp"
@@ -11,11 +12,13 @@
 #endif
 
 #include <phosphor-logging/lg2.hpp>
+#include <xyz/openbmc_project/Common/error.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationContext/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationReference/server.hpp>
 
+#include <cstring>
 #include <limits>
 #include <optional>
 #include <vector>
@@ -138,6 +141,37 @@ requester::Coroutine coGetTopologyData(const std::string& topoObjPath,
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
+}
+
+std::pair<std::string, std::shared_ptr<AsyncStatusIntf>>
+    PortHealthMetricsIntf::allocateClearResult(const std::string& portPath)
+{
+    auto [objectPath, statusInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusInterface();
+    if (objectPath.empty())
+    {
+        lg2::error(
+            "ClearEarlyHealthIndication on {PATH} failed: no available result object to allocate for the request",
+            "PATH", portPath);
+        throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+    }
+    return {objectPath, statusInterface};
+}
+
+sdbusplus::message::object_path
+    PortHealthMetricsIntf::clearEarlyHealthIndication()
+{
+    if (clearHandler)
+    {
+        return clearHandler();
+    }
+    // Phase 1-only port: the device is never contacted.
+    auto [objectPath, statusInterface] = allocateClearResult(objPath);
+    lg2::info(
+        "ClearEarlyHealthIndication on {PATH}: link health extension not enabled for this port, reporting UnsupportedRequest",
+        "PATH", objPath);
+    statusInterface->status(AsyncOperationStatusType::UnsupportedRequest);
+    return objectPath;
 }
 
 NsmPortStatus::NsmPortStatus(
@@ -366,6 +400,9 @@ NsmPortCharacteristics::NsmPortCharacteristics(
         EarlyHealthIndicationValues::Unknown);
     portHealthMetricsIntf->attentionTriggerReason(
         AttentionTriggerReasonValues::Unknown);
+    portHealthMetricsIntf->attentionTriggerMetricId(0);
+    portHealthMetricsIntf->attentionTriggerConfiguration(
+        AttentionTriggerConfigurationValues::Unknown);
 
     updateMetricOnSharedMemory();
 }
@@ -411,59 +448,121 @@ uint8_t
 
     if (deviceType == NSM_DEV_ID_GPU)
     {
-        auto speedGbps = (data.nv_port_line_rate_mbps) / 1000;
-        portInfoIntf->maxSpeed(speedGbps);
-
-        auto currSpeedGbps = (data.nv_port_data_rate_kbps) * 1e-6;
-        portInfoIntf->currentSpeed(currSpeedGbps);
-
-        portMetricsOem3Intf->txNoProtocolBytes(data.nv_port_data_rate_kbps);
-        portMetricsOem3Intf->rxNoProtocolBytes(data.nv_port_data_rate_kbps);
-
-        uint16_t width = static_cast<uint16_t>(data.status_lane_info & 0x0F);
-        portMetricsOem3Intf->txWidth(width);
-        portMetricsOem3Intf->rxWidth(width);
+        updateLineRate(data.nv_port_line_rate_mbps);
+        updateDataRate(data.nv_port_data_rate_kbps);
+        updateLaneInfo(data.status_lane_info);
         updateLinkDownCode(data.port_status.port_down_reason_code);
     }
 
-    // Decode link_health (bits 17:16) → EarlyHealthIndication.
-    EarlyHealthIndicationValues newHealthState;
-    switch (static_cast<nsm_link_health_state>(data.port_status.link_health))
-    {
-        case NSM_LINK_HEALTH_NA:
-            newHealthState = EarlyHealthIndicationValues::Unknown;
-            break;
-        case NSM_LINK_HEALTH_ATTENTION:
-            newHealthState = EarlyHealthIndicationValues::Attention;
-            break;
-        case NSM_LINK_HEALTH_HEALTHY:
-            newHealthState = EarlyHealthIndicationValues::Healthy;
-            break;
-        default:
-        {
-            // 0b11 is reserved for a future bitmap extension (not a real
-            // state); any unexpected value is invalid → Unknown. Throttled: a
-            // stuck value would otherwise log every poll.
-            const unsigned int linkHealthValue = data.port_status.link_health;
-            LG2_WARNING_FLT(
-                "NsmPortCharacteristics: link_health=0x{VALUE} is invalid/reserved, reporting Unknown on {PATH}",
-                "VALUE", linkHealthValue, "PATH", objPath);
-            newHealthState = EarlyHealthIndicationValues::Unknown;
-            break;
-        }
-    }
-    portHealthMetricsIntf->earlyHealthIndication(newHealthState);
-    decodeAttentionTrigger(data.port_status.attention_trigger);
-
-    emitHealthStateChangeEvent(newHealthState);
+    // Decode link_health (bits 17:16) → EarlyHealthIndication. The 0x42
+    // status word carries no metric slot or configuration field, so
+    // the extension properties stay neutral on this path.
+    updateHealth(decodeLinkHealth(data.port_status.link_health),
+                 decodeAttentionTrigger(data.port_status.attention_trigger), 0,
+                 AttentionTriggerConfigurationValues::Unknown);
 
     updateMetricOnSharedMemory();
 
     return cc ? cc : rc;
 }
 
+void NsmPortCharacteristics::updatePortStatus(uint32_t portStatus)
+{
+    if (deviceType != NSM_DEV_ID_GPU)
+    {
+        return;
+    }
+    // Same bit layout as the 0x42 status word. Only the link-down reason is
+    // taken from it; the health bits are owned by the Link Health record.
+    decltype(nsm_port_characteristics_data::port_status) statusWord{};
+    static_assert(sizeof(statusWord) == sizeof(portStatus));
+    std::memcpy(&statusWord, &portStatus, sizeof(portStatus));
+    updateLinkDownCode(statusWord.port_down_reason_code);
+}
+
+void NsmPortCharacteristics::updateLineRate(uint32_t lineRateMbps)
+{
+    if (deviceType != NSM_DEV_ID_GPU)
+    {
+        return;
+    }
+    auto speedGbps = lineRateMbps / 1000;
+    portInfoIntf->maxSpeed(speedGbps);
+}
+
+void NsmPortCharacteristics::updateDataRate(uint32_t dataRateKbps)
+{
+    if (deviceType != NSM_DEV_ID_GPU)
+    {
+        return;
+    }
+    auto currSpeedGbps = dataRateKbps * 1e-6;
+    portInfoIntf->currentSpeed(currSpeedGbps);
+
+    portMetricsOem3Intf->txNoProtocolBytes(dataRateKbps);
+    portMetricsOem3Intf->rxNoProtocolBytes(dataRateKbps);
+}
+
+void NsmPortCharacteristics::updateLaneInfo(uint32_t laneInfo)
+{
+    if (deviceType != NSM_DEV_ID_GPU)
+    {
+        return;
+    }
+    uint16_t width = static_cast<uint16_t>(laneInfo & 0x0F);
+    portMetricsOem3Intf->txWidth(width);
+    portMetricsOem3Intf->rxWidth(width);
+}
+
+void NsmPortCharacteristics::updateHealth(
+    EarlyHealthIndicationValues state, AttentionTriggerReasonValues reason,
+    uint8_t metricId, AttentionTriggerConfigurationValues configuration,
+    bool operatorCleared)
+{
+    portHealthMetricsIntf->earlyHealthIndication(state);
+    portHealthMetricsIntf->attentionTriggerReason(reason);
+    portHealthMetricsIntf->attentionTriggerMetricId(metricId);
+    portHealthMetricsIntf->attentionTriggerConfiguration(configuration);
+
+    emitHealthStateChangeEvent(state, operatorCleared);
+}
+
+EarlyHealthIndicationValues
+    NsmPortCharacteristics::decodeLinkHealth(uint8_t linkHealth)
+{
+    auto state = EarlyHealthIndicationValues::Unknown;
+    bool reserved = false;
+    switch (static_cast<nsm_link_health_state>(linkHealth))
+    {
+        case NSM_LINK_HEALTH_NA:
+            state = EarlyHealthIndicationValues::Unknown;
+            break;
+        case NSM_LINK_HEALTH_ATTENTION:
+            state = EarlyHealthIndicationValues::Attention;
+            break;
+        case NSM_LINK_HEALTH_HEALTHY:
+            state = EarlyHealthIndicationValues::Healthy;
+            break;
+        default:
+            // 0b11 (0x42) and 3..15 (0x12) are reserved; any unexpected value
+            // is invalid → Unknown.
+            reserved = true;
+            break;
+    }
+    // Throttled: one warning when a reserved value first appears, re-armed
+    // once a valid value is read again.
+    if (shouldLog("NsmPortCharacteristics::decodeLinkHealth", reserved) &&
+        reserved)
+    {
+        lg2::warning(
+            "NsmPortCharacteristics: link_health=0x{VALUE} is invalid/reserved, reporting Unknown on {PATH}",
+            "VALUE", linkHealth, "PATH", objPath);
+    }
+    return state;
+}
+
 void NsmPortCharacteristics::emitHealthStateChangeEvent(
-    EarlyHealthIndicationValues newHealthState)
+    EarlyHealthIndicationValues newHealthState, bool operatorCleared)
 {
     // Baseline the first observation so a fresh daemon start does not emit a
     // spurious event.
@@ -471,9 +570,38 @@ void NsmPortCharacteristics::emitHealthStateChangeEvent(
     {
         healthStateInitialized = true;
         previousEarlyHealthIndication = newHealthState;
+        if (newHealthState != EarlyHealthIndicationValues::Unavailable)
+        {
+            lastKnownHealthState = newHealthState;
+            lastKnownHealthStateValid = true;
+        }
         return;
     }
     if (newHealthState == previousEarlyHealthIndication)
+    {
+        return;
+    }
+    previousEarlyHealthIndication = newHealthState;
+
+    // Unavailable means the Link Health record could not be read, not a
+    // health transition: no event into it, and none for merely leaving it.
+    // The new state is compared against the last known state instead, so a
+    // change bracketed by Unavailable (Healthy -> Unavailable -> Attention)
+    // is still reported once the record is readable again.
+    if (newHealthState == EarlyHealthIndicationValues::Unavailable)
+    {
+        return;
+    }
+    if (!lastKnownHealthStateValid)
+    {
+        // First readable state after starting in Unavailable: baseline.
+        lastKnownHealthState = newHealthState;
+        lastKnownHealthStateValid = true;
+        return;
+    }
+    const auto previousState = lastKnownHealthState;
+    lastKnownHealthState = newHealthState;
+    if (newHealthState == previousState)
     {
         return;
     }
@@ -484,15 +612,17 @@ void NsmPortCharacteristics::emitHealthStateChangeEvent(
             newHealthState);
     auto prevStateStr =
         NvidiaMetrics::convertEarlyHealthIndicationValuesToString(
-            previousEarlyHealthIndication);
+            previousState);
     auto triggerStr =
         NvidiaMetrics::convertAttentionTriggerReasonValuesToString(
             portHealthMetricsIntf->attentionTriggerReason());
 
     // Warning for Attention and Unknown (loss of a known health signal),
-    // Informational (OK) only for Healthy — see isWarningSeverity().
-    auto severity = isWarningSeverity(newHealthState) ? Level::Warning
-                                                      : Level::Informational;
+    // Informational (OK) for Healthy — see isWarningSeverity() — and for any
+    // transition that follows an operator clear.
+    auto severity = (!operatorCleared && isWarningSeverity(newHealthState))
+                        ? Level::Warning
+                        : Level::Informational;
 
     logEventAsync("NvidiaMessageRegistry.1.0.NVLinkPortHealthStateChanged",
                   severity,
@@ -507,8 +637,6 @@ void NsmPortCharacteristics::emitHealthStateChangeEvent(
                    {"PREVIOUS_STATE", prevStateStr},
                    {"NEW_STATE", newStateStr},
                    {"ATTENTION_TRIGGER", triggerStr}});
-
-    previousEarlyHealthIndication = newHealthState;
 }
 
 void NsmPortCharacteristics::updateLinkDownCode(const uint32_t linkDownCode)
@@ -663,9 +791,11 @@ void NsmPortCharacteristics::updateLinkDownCode(const uint32_t linkDownCode)
     }
 }
 
-void NsmPortCharacteristics::decodeAttentionTrigger(uint8_t triggerValue)
+AttentionTriggerReasonValues
+    NsmPortCharacteristics::decodeAttentionTrigger(uint8_t triggerValue)
 {
-    AttentionTriggerReasonValues reason;
+    auto reason = AttentionTriggerReasonValues::Unknown;
+    bool reserved = false;
     switch (triggerValue)
     {
         case NSM_ATTENTION_TRIGGER_NA:
@@ -699,15 +829,20 @@ void NsmPortCharacteristics::decodeAttentionTrigger(uint8_t triggerValue)
             reason = AttentionTriggerReasonValues::SymbolBER;
             break;
         default:
-            // Throttled: a stuck out-of-spec trigger would otherwise log every
-            // poll. Reported as Unknown.
-            LG2_WARNING_FLT(
-                "NsmPortCharacteristics: attention_trigger=0x{VALUE} is out of spec, reporting Unknown on {PATH}",
-                "VALUE", triggerValue, "PATH", objPath);
-            reason = AttentionTriggerReasonValues::Unknown;
+            // Out-of-spec trigger: reported as Unknown.
+            reserved = true;
             break;
     }
-    portHealthMetricsIntf->attentionTriggerReason(reason);
+    // Throttled: one warning when an out-of-spec value first appears,
+    // re-armed once a valid value is read again.
+    if (shouldLog("NsmPortCharacteristics::decodeAttentionTrigger", reserved) &&
+        reserved)
+    {
+        lg2::warning(
+            "NsmPortCharacteristics: attention_trigger=0x{VALUE} is out of spec, reporting Unknown on {PATH}",
+            "VALUE", triggerValue, "PATH", objPath);
+    }
+    return reason;
 }
 
 void NsmPortCharacteristics::updateMetricOnSharedMemory()
@@ -787,7 +922,656 @@ void NsmPortCharacteristics::updateMetricOnSharedMemory()
     propName = "AttentionTriggerReason";
     nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePortHealthName, propName, rawSmbpbiData, attnTrigger);
+
+    nv::sensor_aggregation::DbusVariantType metricId{
+        portHealthMetricsIntf->attentionTriggerMetricId()};
+    propName = "AttentionTriggerMetricId";
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifacePortHealthName, propName, rawSmbpbiData, metricId);
+
+    nv::sensor_aggregation::DbusVariantType configuration{
+        com::nvidia::nv_link::PortHealthMetrics::
+            convertAttentionTriggerConfigurationValuesToString(
+                portHealthMetricsIntf->attentionTriggerConfiguration())};
+    propName = "AttentionTriggerConfiguration";
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifacePortHealthName, propName, rawSmbpbiData, configuration);
 #endif
+}
+
+NsmPortCharacteristicsV2::NsmPortCharacteristicsV2(
+    sdbusplus::bus_t& bus, std::string& portName, uint8_t portNum,
+    const std::string& type, uint8_t deviceType,
+    std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Intf,
+    std::shared_ptr<IBPortIntf> iBPortIntf,
+    std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsInterface,
+    std::string& inventoryObjPath, std::shared_ptr<NsmDevice> nsmDevice) :
+    NsmSensorAggregator(portName, type), portName(portName),
+    phase1(std::make_shared<NsmPortCharacteristics>(
+        bus, portName, portNum, type, deviceType, portMetricsOem3Intf,
+        iBPortIntf, portHealthMetricsInterface, inventoryObjPath)),
+    portHealthMetricsIntf(portHealthMetricsInterface), device(nsmDevice),
+    portNumber(portNum), objPath(inventoryObjPath)
+{
+    lg2::info(
+        "NsmPortCharacteristicsV2: {NAME} with port number {NUM} uses the link health extension (0x12)",
+        "NAME", portName, "NUM", portNum);
+
+    // ClearEarlyHealthIndicationSupported turns true once 0x12 has answered
+    // (see leaveFallback).
+    portHealthMetricsIntf->clearEarlyHealthIndicationSupported(false);
+    // The interface object and this sensor are both owned by the port; the
+    // handler stays valid for the sensor's lifetime.
+    portHealthMetricsIntf->setClearHandler(
+        [this]() { return clearEarlyHealthIndication(); });
+}
+
+NsmPortCharacteristicsV2::~NsmPortCharacteristicsV2()
+{
+    // The clear handler captures a raw this (a detached doClearOnDevice()
+    // coroutine holds a shared_ptr to the sensor instead). Sensors live as
+    // long as the device that owns them, but detach the D-Bus entry point so
+    // a late method call cannot reach a destroyed sensor.
+    portHealthMetricsIntf->setClearHandler(nullptr);
+}
+
+uint8_t NsmPortCharacteristicsV2::decodeMetricSlot(uint8_t metricSlot)
+{
+    // attention_trigger_metric: 0 none, 1..15 Health Agent metric slot
+    // index; 16..127 are reserved and published as 0.
+    const bool reserved = metricSlot > NSM_LINK_HEALTH_METRIC_SLOT_MAX;
+    if (shouldLog("NsmPortCharacteristicsV2::decodeMetricSlot", reserved) &&
+        reserved)
+    {
+        lg2::warning(
+            "NsmPortCharacteristicsV2: attention_trigger_metric={VALUE} is reserved, reporting 0 on {PATH}",
+            "VALUE", metricSlot, "PATH", objPath);
+    }
+    return reserved ? 0 : metricSlot;
+}
+
+AttentionTriggerConfigurationValues
+    NsmPortCharacteristicsV2::decodeConfigChanged(uint8_t configChanged)
+{
+    // link_health_config_changed: 0 N/A -> Unknown, 1 current -> Current,
+    // 2 previous -> Modified, 3 reserved -> Unknown.
+    auto value = AttentionTriggerConfigurationValues::Unknown;
+    bool reserved = false;
+    switch (configChanged)
+    {
+        case NSM_LINK_HEALTH_CONFIG_NA:
+            value = AttentionTriggerConfigurationValues::Unknown;
+            break;
+        case NSM_LINK_HEALTH_CONFIG_CURRENT:
+            value = AttentionTriggerConfigurationValues::Current;
+            break;
+        case NSM_LINK_HEALTH_CONFIG_PREVIOUS:
+            value = AttentionTriggerConfigurationValues::Modified;
+            break;
+        default:
+            reserved = true;
+            break;
+    }
+    if (shouldLog("NsmPortCharacteristicsV2::decodeConfigChanged", reserved) &&
+        reserved)
+    {
+        lg2::warning(
+            "NsmPortCharacteristicsV2: link_health_config_changed={VALUE} is reserved, reporting Unknown on {PATH}",
+            "VALUE", configChanged, "PATH", objPath);
+    }
+    return value;
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmPortCharacteristicsV2::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_query_port_characteristics_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_query_port_characteristics_v2_req(instanceId, portNumber,
+                                                       requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug(
+            "encode_query_port_characteristics_v2_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+requester::Coroutine
+    NsmPortCharacteristicsV2::update(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    if (fallbackActive && !reprobeRequested)
+    {
+        // Fallback: the Phase 1 query serves this port; every
+        // kFallbackReprobeInterval-th cycle probes 0x12 again.
+        if ((++fallbackCycles % kFallbackReprobeInterval) != 0)
+        {
+            // The Phase 1 path publishes on its own; an operator clear flag
+            // must not leak into one of its transitions.
+            operatorClearPending = false;
+            auto rc = co_await phase1->update(nsmDevice);
+            // coverity[missing_return]
+            co_return rc;
+        }
+    }
+    reprobeRequested = false;
+
+    // Positive evidence for the fallback, part 1: the device advertises the
+    // Type 1 command set (0x42) but not 0x12. Neither being advertised means
+    // the matrix is not populated yet, which is no evidence about 0x12.
+    if (nsmDevice->isOnline() &&
+        nsmDevice->isCommandSupported(NSM_TYPE_NETWORK_PORT,
+                                      NSM_QUERY_PORT_CHARACTERISTICS) &&
+        !nsmDevice->isCommandSupported(NSM_TYPE_NETWORK_PORT,
+                                       NSM_QUERY_PORT_CHARACTERISTICS_V2))
+    {
+        enterFallback();
+        auto rc = co_await phase1->update(nsmDevice);
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    auto requestMsg = genRequestMsg(nsmDevice->getEid(), 0);
+    if (!requestMsg.has_value())
+    {
+        lg2::error(
+            "NsmPortCharacteristicsV2::update: genRequestMsg failed, name={NAME}, eid={EID}",
+            "NAME", getName(), "EID", nsmDevice->getEid());
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), *requestMsg,
+                                           responseMsg, responseLen);
+    bool unsupportedByDevice = false;
+    if (rc == NSM_SW_SUCCESS)
+    {
+        rc = decodeRecords(responseMsg.get(), responseLen, unsupportedByDevice);
+    }
+
+    // Positive evidence, part 2: the device itself answered unsupported
+    // command. The Phase 1 query serves this port until 0x12 answers again.
+    // A transport failure (including sensorIO's rejection of an offline
+    // device) carries no evidence about 0x12 and keeps the current mode.
+    if (unsupportedByDevice)
+    {
+        enterFallback();
+        rc = co_await phase1->update(nsmDevice);
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    // Not ready / busy / timeout / malformed response: nothing is published
+    // and the next poll retries, as for every other sensor.
+    if (rc != NSM_SW_SUCCESS)
+    {
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    leaveFallback();
+    publishRecords();
+
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
+}
+
+uint8_t NsmPortCharacteristicsV2::decodeRecords(const nsm_msg* responseMsg,
+                                                size_t responseLen,
+                                                bool& unsupportedByDevice)
+{
+    records = RecordSet{};
+    unsupportedByDevice = false;
+
+    uint8_t cc = NSM_SUCCESS;
+    // Wire Count field; the decoder needs the uint16_t.
+    uint16_t wireRecordCount = 0;
+    size_t consumedLen = 0;
+    auto rc = decode_aggregate_resp(responseMsg, responseLen, &consumedLen, &cc,
+                                    &wireRecordCount);
+    // On a non-success response the count field carries the reason code
+    // (nsm_common_non_success_resp layout).
+    const uint16_t reasonCode = (rc == NSM_SW_SUCCESS && cc != NSM_SUCCESS)
+                                    ? wireRecordCount
+                                    : uint16_t(ERR_NULL);
+    // Throttled through StateChangeLogger: logs when the (reason, cc, rc)
+    // state changes, and a cleared-codes line once it recovers.
+    const bool logDecode = shouldLog(
+        "NsmPortCharacteristicsV2::decode_aggregate_resp", reasonCode, cc, rc);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        if (logDecode)
+        {
+            lg2::error(
+                "NsmPortCharacteristicsV2: decode_aggregate_resp failed on {PATH} | cc: {CC}, rc: {RC}",
+                "PATH", objPath, "CC", cc, "RC", rc);
+        }
+        return rc;
+    }
+    if (cc != NSM_SUCCESS)
+    {
+        if (cc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            // Reported by the caller through the fallback switch log.
+            unsupportedByDevice = true;
+        }
+        else if (logDecode)
+        {
+            lg2::error(
+                "NsmPortCharacteristicsV2: Query Port Characteristics v2 failed on {PATH} | reasonCode: {REASONCODE}, cc: {CC}",
+                "PATH", objPath, "REASONCODE", reasonCode, "CC", cc);
+        }
+        return cc;
+    }
+
+    // Strict walk: every record must fit the response and decode; a short
+    // response, a Count mismatch or an overrunning Length aborts the poll
+    // before anything is published.
+    auto data = reinterpret_cast<const uint8_t*>(responseMsg) + consumedLen;
+    size_t remaining = responseLen - consumedLen;
+    const size_t recordCount = wireRecordCount;
+    sampleTags.clear();
+    for (size_t index = 0; index < recordCount; ++index)
+    {
+        uint8_t tag = 0;
+        bool valid = false;
+        const uint8_t* sampleData = nullptr;
+        size_t dataLen = 0;
+        size_t sampleLen = 0;
+
+        auto sample = reinterpret_cast<const nsm_aggregate_resp_sample*>(data);
+        rc = decode_aggregate_resp_sample(sample, remaining, &sampleLen, &tag,
+                                          &valid, &sampleData, &dataLen);
+        const bool logSample =
+            shouldLog("NsmPortCharacteristicsV2::decode_aggregate_resp_sample",
+                      nsm_sw_codes(rc));
+        if (rc != NSM_SW_SUCCESS)
+        {
+            if (logSample)
+            {
+                lg2::error(
+                    "NsmPortCharacteristicsV2: malformed record {INDEX} of {COUNT} on {PATH} | rc: {RC}, poll aborted",
+                    "INDEX", index, "COUNT", recordCount, "PATH", objPath, "RC",
+                    utils::nsmSwCodeToString(rc));
+            }
+            return rc;
+        }
+        sampleTags.push_back(tag);
+
+        rc = handleSample(TelemetrySample{tag, static_cast<uint8_t>(dataLen),
+                                          sampleData, valid});
+        if (rc != NSM_SW_SUCCESS)
+        {
+            return rc;
+        }
+
+        data += sampleLen;
+        remaining -= sampleLen;
+    }
+
+    // Count smaller than the payload is a Count mismatch as well.
+    const bool trailing = remaining != 0;
+    if (shouldLog("NsmPortCharacteristicsV2::trailing_bytes", trailing) &&
+        trailing)
+    {
+        lg2::error(
+            "NsmPortCharacteristicsV2: {TRAILING} trailing bytes after {COUNT} records on {PATH}, poll aborted",
+            "TRAILING", remaining, "COUNT", recordCount, "PATH", objPath);
+    }
+    if (trailing)
+    {
+        return NSM_SW_ERROR_LENGTH;
+    }
+
+    return NSM_SW_SUCCESS;
+}
+
+int NsmPortCharacteristicsV2::handleSample(const TelemetrySample& sample)
+{
+    switch (sample.tag)
+    {
+        case NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS:
+        case NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE:
+        case NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE:
+        case NSM_PORT_CHARACTERISTICS_V2_TAG_LANE_INFO:
+        {
+            if (!sample.valid)
+            {
+                // Characteristic currently unreadable: keep the last value.
+                return NSM_SW_SUCCESS;
+            }
+            uint32_t value = 0;
+            auto rc = decode_port_characteristics_v2_u32_record(
+                sample.data, sample.data_len, &value);
+            if (shouldLog("NsmPortCharacteristicsV2::u32_record_length",
+                          nsm_sw_codes(rc)) &&
+                rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "NsmPortCharacteristicsV2: record tag {TAG} has invalid length {LEN} on {PATH}, poll aborted",
+                    "TAG", sample.tag, "LEN", sample.data_len, "PATH", objPath);
+            }
+            if (rc != NSM_SW_SUCCESS)
+            {
+                return rc;
+            }
+            switch (sample.tag)
+            {
+                case NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS:
+                    records.portStatus = value;
+                    break;
+                case NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE:
+                    records.lineRate = value;
+                    break;
+                case NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE:
+                    records.dataRate = value;
+                    break;
+                default:
+                    records.laneInfo = value;
+                    break;
+            }
+            return NSM_SW_SUCCESS;
+        }
+        case NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH:
+        {
+            records.linkHealthPresent = true;
+            records.linkHealthValid = sample.valid;
+            if (!sample.valid)
+            {
+                // Supported but unreadable: published as Unavailable.
+                return NSM_SW_SUCCESS;
+            }
+            auto rc = decode_link_health_record(sample.data, sample.data_len,
+                                                &records.linkHealth);
+            if (shouldLog("NsmPortCharacteristicsV2::link_health_record_length",
+                          nsm_sw_codes(rc)) &&
+                rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "NsmPortCharacteristicsV2: Link Health record has invalid length {LEN} on {PATH}, poll aborted",
+                    "LEN", sample.data_len, "PATH", objPath);
+            }
+            if (rc != NSM_SW_SUCCESS)
+            {
+                return rc;
+            }
+            return NSM_SW_SUCCESS;
+        }
+        case NSM_PORT_CHARACTERISTICS_V2_TAG_TIMESTAMP:
+            return NSM_SW_SUCCESS;
+        default:
+            // Reserved tag: skipped by its Length.
+            lg2::debug(
+                "NsmPortCharacteristicsV2: skipping unknown record tag {TAG} on {PATH}",
+                "TAG", sample.tag, "PATH", objPath);
+            return NSM_SW_SUCCESS;
+    }
+}
+
+void NsmPortCharacteristicsV2::publishRecords()
+{
+    if (records.portStatus)
+    {
+        phase1->updatePortStatus(*records.portStatus);
+    }
+    if (records.lineRate)
+    {
+        phase1->updateLineRate(*records.lineRate);
+    }
+    if (records.dataRate)
+    {
+        phase1->updateDataRate(*records.dataRate);
+    }
+    if (records.laneInfo)
+    {
+        phase1->updateLaneInfo(*records.laneInfo);
+    }
+
+    auto state = EarlyHealthIndicationValues::Unknown;
+    auto reason = AttentionTriggerReasonValues::Unknown;
+    uint8_t metricId = 0;
+    auto configChanged = AttentionTriggerConfigurationValues::Unknown;
+    // Throttled: one warning when the record becomes unreadable, re-armed
+    // once it is readable again.
+    const bool unreadable = records.linkHealthPresent &&
+                            !records.linkHealthValid;
+    if (shouldLog("NsmPortCharacteristicsV2::link_health_unreadable",
+                  unreadable) &&
+        unreadable)
+    {
+        lg2::warning(
+            "NsmPortCharacteristicsV2: Link Health record unreadable (Valid = 0) on {PATH}, reporting Unavailable",
+            "PATH", objPath);
+    }
+    if (!records.linkHealthPresent)
+    {
+        lg2::debug(
+            "NsmPortCharacteristicsV2: no Link Health record on {PATH}, reporting Unknown",
+            "PATH", objPath);
+    }
+    else if (unreadable)
+    {
+        // Never keep stale values: the whole health set goes neutral.
+        state = EarlyHealthIndicationValues::Unavailable;
+    }
+    else
+    {
+        const auto& record = records.linkHealth;
+        state = phase1->decodeLinkHealth(record.link_health);
+        // The trigger fields are defined only while link_health is
+        // Attention; outside it they read neutral without range checks.
+        if (state == EarlyHealthIndicationValues::Attention)
+        {
+            reason = phase1->decodeAttentionTrigger(record.attention_trigger);
+            metricId = decodeMetricSlot(record.attention_trigger_metric);
+            configChanged =
+                decodeConfigChanged(record.link_health_config_changed);
+        }
+    }
+
+    const bool operatorCleared = operatorClearPending;
+    operatorClearPending = false;
+    phase1->updateHealth(state, reason, metricId, configChanged,
+                         operatorCleared);
+    phase1->updateMetricOnSharedMemory();
+}
+
+void NsmPortCharacteristicsV2::enterFallback()
+{
+    if (!fallbackActive)
+    {
+        lg2::warning(
+            "NsmPortCharacteristicsV2: {PATH} does not answer Query Port Characteristics v2 (0x12); falling back to Query Port Characteristics (0x42), re-probing every {CYCLES} cycles",
+            "PATH", objPath, "CYCLES", kFallbackReprobeInterval);
+    }
+    fallbackActive = true;
+    fallbackCycles = 0;
+    extensionConfirmed = false;
+    operatorClearPending = false;
+    // A clear still on the wire finishes on its own; the entry point answers
+    // UnsupportedRequest meanwhile, so it must not stay blocked afterwards.
+    clearInFlight = false;
+    portHealthMetricsIntf->clearEarlyHealthIndicationSupported(false);
+}
+
+void NsmPortCharacteristicsV2::leaveFallback()
+{
+    if (fallbackActive)
+    {
+        lg2::info(
+            "NsmPortCharacteristicsV2: {PATH} answers Query Port Characteristics v2 (0x12) again; returning to the v2 query",
+            "PATH", objPath);
+    }
+    fallbackActive = false;
+    fallbackCycles = 0;
+    if (!extensionConfirmed)
+    {
+        extensionConfirmed = true;
+        portHealthMetricsIntf->clearEarlyHealthIndicationSupported(true);
+    }
+}
+
+void NsmPortCharacteristicsV2::onDeviceOnline()
+{
+    // Re-discovery: probe 0x12 on the next poll whatever the cycle counter.
+    reprobeRequested = true;
+}
+
+void NsmPortCharacteristicsV2::updateMetricOnSharedMemory()
+{
+    phase1->updateMetricOnSharedMemory();
+}
+
+sdbusplus::message::object_path
+    NsmPortCharacteristicsV2::clearEarlyHealthIndication()
+{
+    auto [objectPath, statusInterface] =
+        PortHealthMetricsIntf::allocateClearResult(objPath);
+
+    if (!portHealthMetricsIntf->clearEarlyHealthIndicationSupported())
+    {
+        // Fallback (or 0x12 not answered yet): no device I/O.
+        lg2::info(
+            "ClearEarlyHealthIndication on {PATH}: link health extension inactive (fallback={FALLBACK}), reporting UnsupportedRequest",
+            "PATH", objPath, "FALLBACK", fallbackActive);
+        statusInterface->status(AsyncOperationStatusType::UnsupportedRequest);
+        return objectPath;
+    }
+
+    if (clearInFlight)
+    {
+        // One 0x13 per port at a time: a second request would only race the
+        // first one's refresh.
+        lg2::info(
+            "ClearEarlyHealthIndication on {PATH} rejected: a clear is already in flight",
+            "PATH", objPath);
+        statusInterface->status(AsyncOperationStatusType::ConflictingOperation);
+        return objectPath;
+    }
+
+    lg2::info("ClearEarlyHealthIndication requested on {PATH}, port {PORT}",
+              "PATH", objPath, "PORT", portNumber);
+    clearInFlight = true;
+    // The coroutine outlives this call and touches members after each
+    // co_await: hold a self reference in its frame so the sensor cannot be
+    // freed underneath it (NsmDevice owns sensors through shared_ptr).
+    doClearOnDevice(weak_from_this().lock(), statusInterface).detach();
+
+    return objectPath;
+}
+
+requester::Coroutine NsmPortCharacteristicsV2::doClearOnDevice(
+    [[maybe_unused]] std::shared_ptr<NsmPortCharacteristicsV2> self,
+    std::shared_ptr<AsyncStatusIntf> statusInterface)
+{
+    // The in-flight guard drops before each result is published so a client
+    // that sees the terminal status can issue the next clear at once.
+    auto publish = [&](AsyncOperationStatusType result) {
+        clearInFlight = false;
+        statusInterface->status(result);
+    };
+
+    auto nsmDevice = device.lock();
+    if (!nsmDevice)
+    {
+        lg2::error(
+            "ClearEarlyHealthIndication on {PATH}: owning device is gone",
+            "PATH", objPath);
+        publish(AsyncOperationStatusType::Unavailable);
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR;
+    }
+    const auto eid = nsmDevice->getEid();
+
+    const uint8_t tagIds[] = {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH};
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_clear_port_metric_state_req) + sizeof(tagIds));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    // first argument instanceid=0 is irrelevant
+    auto rc = encode_clear_port_metric_state_req(0, portNumber, sizeof(tagIds),
+                                                 tagIds, requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "ClearEarlyHealthIndication on {PATH}: encode_clear_port_metric_state_req failed. eid={EID}, rc={RC}",
+            "PATH", objPath, "EID", eid, "RC", utils::nsmSwCodeToString(rc));
+        publish(AsyncOperationStatusType::InternalFailure);
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    // Serialized with the other writes to this device.
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await nsmDevice->postPatchIO(eid, request, responseMsg,
+                                         responseLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "ClearEarlyHealthIndication on {PATH}: postPatchIO failed. eid={EID}, rc={RC}",
+            "PATH", objPath, "EID", eid, "RC", utils::nsmSwCodeToString(rc));
+        // postPatchIO refuses an offline device before any I/O: that is
+        // Unavailable, whatever code it returns.
+        publish(!nsmDevice->isOnline()
+                    ? AsyncOperationStatusType::Unavailable
+                    : mapNsmCompletionToAsyncStatus(rc, NSM_SUCCESS, ERR_NULL));
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    rc = decode_clear_port_metric_state_resp(responseMsg.get(), responseLen,
+                                             &cc, &reasonCode);
+    auto status = mapNsmCompletionToAsyncStatus(rc, cc, reasonCode);
+    if (status == AsyncOperationStatusType::InProgress)
+    {
+        // 0x13 is a register write-one, not a long-running command: an
+        // accepted-but-pending answer leaves nothing to poll, so it is a
+        // failure here rather than an open result object.
+        lg2::error(
+            "ClearEarlyHealthIndication on {PATH}: device answered NSM_ACCEPTED to Clear Port Metric State, which is not a long-running command. eid={EID}, port={PORT}",
+            "PATH", objPath, "EID", eid, "PORT", portNumber);
+        status = AsyncOperationStatusType::InternalFailure;
+    }
+    if (status != AsyncOperationStatusType::Success)
+    {
+        lg2::error(
+            "ClearEarlyHealthIndication on {PATH} failed. eid={EID}, port={PORT}, reasonCode={REASONCODE}, cc={CC}, rc={RC}",
+            "PATH", objPath, "EID", eid, "PORT", portNumber, "REASONCODE",
+            reasonCode, "CC", cc, "RC", rc);
+        publish(status);
+        // coverity[missing_return]
+        co_return rc != NSM_SW_SUCCESS ? rc : cc;
+    }
+
+    lg2::info(
+        "ClearEarlyHealthIndication on {PATH}: device cleared port {PORT}, eid={EID}, cc={CC}; refreshing",
+        "PATH", objPath, "PORT", portNumber, "EID", eid, "CC", cc);
+
+    // Refresh through the sensor's own request chain so the publish and the
+    // transition event precede Success. A failed refresh still reports
+    // Success: the device has cleared, and operatorClearPending stays set so
+    // the next successful publish still reports its transition as an
+    // operator clear.
+    operatorClearPending = true;
+    auto refreshRc = co_await update(nsmDevice);
+    if (refreshRc != NSM_SW_SUCCESS)
+    {
+        lg2::warning(
+            "ClearEarlyHealthIndication on {PATH}: refresh after clear failed, rc={RC}; the next poll publishes",
+            "PATH", objPath, "RC", refreshRc);
+    }
+
+    publish(AsyncOperationStatusType::Success);
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
 }
 
 NsmPortMetrics::NsmPortMetrics(
@@ -1965,6 +2749,15 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
         supportFECHistogram =
             std::get<bool>(allCurrentIfaceProperties.at("SupportFECHistogram"));
     }
+    // "LinkHealthExtensionSupported": true selects the Query Port
+    // Characteristics v2 (0x12) sensor for the NVLink ports of this entry;
+    // absent = false keeps the Phase 1 sensor.
+    bool linkHealthExtensionSupported = false;
+    if (allCurrentIfaceProperties.count("LinkHealthExtensionSupported"))
+    {
+        linkHealthExtensionSupported = std::get<bool>(
+            allCurrentIfaceProperties.at("LinkHealthExtensionSupported"));
+    }
 
     std::vector<std::string> portNameMap{};
     if (allCurrentIfaceProperties.count("PortNameMap"))
@@ -2170,21 +2963,33 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
                 nsmDevice->addSensor(portStatusSensor, priority);
             }
 
-            auto portCharacteristicsSensor =
-                std::make_shared<NsmPortCharacteristics>(
-                    bus, portName, logicalPortNum, type, deviceType,
-                    portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
-                    objPath);
-            if (!portCharacteristicsSensor)
+            if (linkHealthExtensionSupported)
             {
-                lg2::error(
-                    "Failed to create NSM Port characteristics sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                    "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                    objPath);
+                auto portCharacteristicsV2Sensor =
+                    std::make_shared<NsmPortCharacteristicsV2>(
+                        bus, portName, logicalPortNum, type, deviceType,
+                        portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
+                        objPath, nsmDevice);
+                nsmDevice->addSensor(portCharacteristicsV2Sensor, priority);
             }
             else
             {
-                nsmDevice->addSensor(portCharacteristicsSensor, priority);
+                auto portCharacteristicsSensor =
+                    std::make_shared<NsmPortCharacteristics>(
+                        bus, portName, logicalPortNum, type, deviceType,
+                        portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
+                        objPath);
+                if (!portCharacteristicsSensor)
+                {
+                    lg2::error(
+                        "Failed to create NSM Port characteristics sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
+                        "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
+                        objPath);
+                }
+                else
+                {
+                    nsmDevice->addSensor(portCharacteristicsSensor, priority);
+                }
             }
         }
 

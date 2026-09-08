@@ -60,6 +60,9 @@ enum nsm_network_port_commands {
 	NSM_GET_ETH_PORT_TELEMETRY_COUNTER = 0x0f,
 	NSM_GET_PORT_ECC_COUNTERS = 0x10,
 	NSM_GET_NETWORK_ADDRESSES = 0x11,
+	NSM_QUERY_PORT_CHARACTERISTICS_V2 =
+	    0x12, /* Query Port Characteristics v2 (aggregate) */
+	NSM_CLEAR_PORT_METRIC_STATE = 0x13, /* Clear Port Metric State */
 	NSM_QUERY_PORT_TELEMETRY_COUNTER_V2 =
 	    0x14, /* Query Port Telemetry Counter v2 */
 	NSM_QUERY_PORT_TELEMETRY_CAPABILITIES =
@@ -157,6 +160,37 @@ enum nsm_attention_trigger {
 	NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT = 8,
 	NSM_ATTENTION_TRIGGER_SYMBOL_BER = 9
 };
+
+/** @brief Aggregate record tags of Query Port Characteristics v2 (0x12)
+ *
+ *  Tags 0x00-0x03 carry the same u32 encodings as the corresponding fields
+ *  of the Query Port Characteristics (0x42) response. Tag 0x04 is the Link
+ *  Health record (struct nsm_link_health_record). 0x05-0xFE are reserved and
+ *  skipped by their Length; 0xFF is the aggregate timestamp.
+ */
+enum nsm_port_characteristics_v2_tag {
+	NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS = 0x00,
+	NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE = 0x01,
+	NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE = 0x02,
+	NSM_PORT_CHARACTERISTICS_V2_TAG_LANE_INFO = 0x03,
+	NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH = 0x04,
+	NSM_PORT_CHARACTERISTICS_V2_TAG_TIMESTAMP = 0xFF
+};
+
+/** @brief link_health_config_changed field of the Link Health record
+ *
+ *  Whether a link health metric parameter was modified after the current
+ *  Attention state latched. 3 is reserved.
+ */
+enum nsm_link_health_config_changed {
+	NSM_LINK_HEALTH_CONFIG_NA = 0,
+	NSM_LINK_HEALTH_CONFIG_CURRENT = 1,
+	NSM_LINK_HEALTH_CONFIG_PREVIOUS = 2
+};
+
+/* attention_trigger_metric: 0 none, 1..15 Health Agent metric slot index,
+ * 16..127 reserved. */
+#define NSM_LINK_HEALTH_METRIC_SLOT_MAX 15
 
 enum port_down_reason_code {
 	NSM_PORT_DOWN_REASON_CODE_NO_LINK_DOWN = 0x00,
@@ -528,6 +562,55 @@ struct nsm_query_port_characteristics_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_port_characteristics_data data;
 } __attribute__((packed));
+
+/** @struct nsm_query_port_characteristics_v2_req
+ *
+ *  Structure representing NSM Query Port Characteristics v2 (0x12) request.
+ *  The response is an aggregate (struct nsm_aggregate_resp followed by
+ *  records, see enum nsm_port_characteristics_v2_tag).
+ */
+struct nsm_query_port_characteristics_v2_req {
+	struct nsm_common_req hdr;
+	uint16_t port_number; /* one-based logical port, as for 0x42 */
+	uint16_t reserved;
+} __attribute__((packed));
+
+/** @struct nsm_link_health_record
+ *
+ *  Decoded Link Health record (Tag 0x04 of Query Port Characteristics v2).
+ *  Wire layout of the u32: [3:0] link_health, [4] reserved,
+ *  [12:5] attention_trigger, [19:13] attention_trigger_metric,
+ *  [21:20] link_health_config_changed, [31:22] reserved.
+ */
+struct nsm_link_health_record {
+	uint8_t link_health;		    /* enum nsm_link_health_state */
+	uint8_t attention_trigger;	    /* enum nsm_attention_trigger */
+	uint8_t attention_trigger_metric;   /* 0 none, 1..15 slot index */
+	uint8_t link_health_config_changed; /* enum
+					       nsm_link_health_config_changed */
+};
+
+/** @struct nsm_clear_port_metric_state_req
+ *
+ *  Fixed part of the NSM Clear Port Metric State (0x13) request. The
+ *  tag_count TagID bytes follow this structure in the payload.
+ */
+struct nsm_clear_port_metric_state_req {
+	struct nsm_common_req hdr;
+	uint16_t port_number; /* one-based, same numbering as 0x12 / 0x42 */
+	uint16_t reserved;
+	uint16_t tag_count;
+} __attribute__((packed));
+
+/* Request data bytes preceding the TagID list: port_number + reserved +
+ * tag_count. */
+#define NSM_CLEAR_PORT_METRIC_STATE_REQ_FIXED_DATA_SIZE 6
+
+/** @struct nsm_clear_port_metric_state_resp
+ *
+ *  Structure representing NSM Clear Port Metric State response (no data).
+ */
+typedef struct nsm_common_resp nsm_clear_port_metric_state_resp;
 
 /** @struct nsm_query_ports_available_req
  *
@@ -1032,6 +1115,150 @@ int decode_query_port_characteristics_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint16_t *data_size,
     struct nsm_port_characteristics_data *data);
+
+/** @brief Encode a Query Port Characteristics v2 (0x12) request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] port_number - one-based logical port number
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_query_port_characteristics_v2_req(uint8_t instance_id,
+					     uint16_t port_number,
+					     struct nsm_msg *msg);
+
+/** @brief Decode a Query Port Characteristics v2 (0x12) request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] port_number - one-based logical port number
+ *  @return nsm_completion_codes
+ */
+int decode_query_port_characteristics_v2_req(const struct nsm_msg *msg,
+					     size_t msg_len,
+					     uint16_t *port_number);
+
+/** @brief Encode the header of a Query Port Characteristics v2 (0x12)
+ *         aggregate response message
+ *
+ *  Like encode_query_port_telemetry_v2_resp() this stamps the NSM header
+ *  with NSM_TYPE_NETWORK_PORT; records are appended by the caller with
+ *  encode_aggregate_resp_sample(). A non-success cc is encoded as a
+ *  reason-code response.
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - response message completion code
+ *  @param[in] reason_code - reason code (used when cc != NSM_SUCCESS)
+ *  @param[in] telemetry_count - number of records that follow
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_query_port_characteristics_v2_resp(uint8_t instance_id, uint8_t cc,
+					      uint16_t reason_code,
+					      uint16_t telemetry_count,
+					      struct nsm_msg *msg);
+
+/** @brief Encode a u32 record (Tags 0x00-0x03) of a Query Port
+ *         Characteristics v2 response
+ *
+ *  @param[in] value - record value
+ *  @param[out] data - pointer to telemetry sample data
+ *  @param[out] data_len - number of bytes in telemetry sample data
+ *  @return nsm_completion_codes
+ */
+int encode_port_characteristics_v2_u32_record(uint32_t value, uint8_t *data,
+					      size_t *data_len);
+
+/** @brief Decode a u32 record (Tags 0x00-0x03) of a Query Port
+ *         Characteristics v2 response
+ *
+ *  @param[in] data - pointer to telemetry sample data
+ *  @param[in] data_len - number of bytes in telemetry sample data (must be 4)
+ *  @param[out] value - decoded value in host byte order
+ *  @return nsm_completion_codes; NSM_SW_ERROR_LENGTH if data_len != 4
+ */
+int decode_port_characteristics_v2_u32_record(const uint8_t *data,
+					      size_t data_len, uint32_t *value);
+
+/** @brief Encode a Link Health record (Tag 0x04) of a Query Port
+ *         Characteristics v2 response
+ *
+ *  @param[in] record - record fields to pack
+ *  @param[out] data - pointer to telemetry sample data
+ *  @param[out] data_len - number of bytes in telemetry sample data
+ *  @return nsm_completion_codes
+ */
+int encode_link_health_record(const struct nsm_link_health_record *record,
+			      uint8_t *data, size_t *data_len);
+
+/** @brief Decode a Link Health record (Tag 0x04) of a Query Port
+ *         Characteristics v2 response
+ *
+ *  Fields are returned as received; range checks (reserved encodings) are
+ *  left to the caller.
+ *
+ *  @param[in] data - pointer to telemetry sample data
+ *  @param[in] data_len - number of bytes in telemetry sample data (must be 4)
+ *  @param[out] record - decoded record
+ *  @return nsm_completion_codes; NSM_SW_ERROR_LENGTH if data_len != 4
+ */
+int decode_link_health_record(const uint8_t *data, size_t data_len,
+			      struct nsm_link_health_record *record);
+
+/** @brief Encode a Clear Port Metric State (0x13) request message
+ *
+ *  The caller allocates sizeof(struct nsm_msg_hdr) +
+ *  sizeof(struct nsm_clear_port_metric_state_req) + tag_count bytes.
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] port_number - one-based logical port number
+ *  @param[in] tag_count - number of TagIDs (1..249)
+ *  @param[in] tag_ids - TagIDs to clear (enum nsm_port_characteristics_v2_tag)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_clear_port_metric_state_req(uint8_t instance_id,
+				       uint16_t port_number, uint16_t tag_count,
+				       const uint8_t *tag_ids,
+				       struct nsm_msg *msg);
+
+/** @brief Decode a Clear Port Metric State (0x13) request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] port_number - one-based logical port number
+ *  @param[out] tag_count - number of TagIDs
+ *  @param[out] tag_ids - pointer to the TagID list inside msg
+ *  @return nsm_completion_codes
+ */
+int decode_clear_port_metric_state_req(const struct nsm_msg *msg,
+				       size_t msg_len, uint16_t *port_number,
+				       uint16_t *tag_count,
+				       const uint8_t **tag_ids);
+
+/** @brief Encode a Clear Port Metric State (0x13) response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - response message completion code
+ *  @param[in] reason_code - reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_clear_port_metric_state_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t reason_code,
+					struct nsm_msg *msg);
+
+/** @brief Decode a Clear Port Metric State (0x13) response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc     - pointer to response message completion code
+ *  @param[out] reason_code - pointer to reason code
+ *  @return nsm_completion_codes
+ */
+int decode_clear_port_metric_state_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code);
 
 /** @brief Encode a query ports available request message
  *

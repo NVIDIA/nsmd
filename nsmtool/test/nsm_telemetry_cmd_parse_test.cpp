@@ -22,6 +22,9 @@
 #include "platform-environmental.h"
 #include "powersmoothing-powerprofile-api-v2.h"
 
+#include <array>
+#include <set>
+
 #include "../nsm_telemetry_cmd.cpp"
 
 #include <gtest/gtest.h>
@@ -29,67 +32,72 @@
 // Telemetry commands (after registerCommand) in order:
 //   [0]  GetPortTelemetryCounter
 //   [1]  QueryPortCharacteristics
-//   [2]  QueryPortStatus
-//   [3]  QueryPortsAvailable
-//   [4]  SetPortDisableFuture
-//   [5]  GetFabricManagerState
-//   [6]  GetPortDisableFuture
-//   [7]  GetPowerMode
-//   [8]  SetPowerMode
-//   [9]  GetSwitchIsolationMode
-//   [10] SetSwitchIsolationMode
-//   [11] GetInventoryInformation
-//   [12] GetTemperatureReading
-//   [13] ReadThermalParameter
-//   [14] GetCurrentPowerDraw
-//   [15] GetMaxObservedPower
-//   [16] GetCurrentEnergyCount
-//   [17] GetVoltage
-//   [18] GetAltitudePressure
-//   [19] GetDriverInfo
-//   [20] GetMigMode
-//   [21] SetMigMode
-//   [22] GetEccMode
-//   [23] SetEccMode
-//   [24] GetEccErrorCounts
-//   [25] SetClockLimit
-//   [26] GetEDPpScalingFactors
-//   [27] SetEDPpScalingFactors
-//   [28] QueryScalarGroupTelemetry
-//   [29] QueryVectorGroupTelemetry
-//   [30] QueryAvailableAndClearableScalarGroup
-//   [31] PcieFundamentalReset
-//   [32] ClearScalarDataSource
-//   [33] GetClockLimit
-//   [34] SetPowerLimit
-//   [35] GetPowerLimit
-//   [36] GetCurrClockFreq
-//   [37] GetAccumGpuUtilTime
-//   [38] GetProcessorThrottleReason
-//   [39] GetRowRemapState
-//   [40] GetRowRemappingCounts
-//   [41] GetRowRemapAvailability
-//   [42] GetLeakDetectionInfo
-//   [43] SetLeakDetectionThresholds
-//   [44] GetMemoryCapacityUtil
-//   [45] GetCurrentUtilization
-//   [46] GetClockOutputEnableState
-//   [47] GetSupportedGPMMetrics
-//   [48] QueryAggregatedGPMMetrics
-//   [49] QueryPerInstanceGPMMetrics
-//   [50] QueryPerInstanceGPMMetricsV2
-//   [51] GetViolationDuration
-//   [52] GetListAvailablePciePorts
-//   [53] GetPCIePortConfig
-//   [54] SetPCIePortConfig
-//   [55] QueryMultiportScalarGroupTelemetry
-//   [56] GetEthPortTelemetryCounter
-//   [57] GetPortNetworkAddresses
-//   [58] GetPortEccCounters
-//   [59] GetPowerSmoothingFeatureInfoV2
-//   [60] GetPowerSmoothingCurrentProfileInformationV2
-//   [61] GetPowerSmoothingAdminOverrideProfileInformationV2
-//   [62] GetPowerSmoothingPresetProfileInformationV2
+//   [2]  QueryPortCharacteristicsV2
+//   [3]  ClearPortMetricState
+//   [4]  QueryPortStatus
+//   [5]  QueryPortsAvailable
+//   [6]  SetPortDisableFuture
+//   [7]  GetFabricManagerState
+//   [8]  GetPortDisableFuture
+//   [9]  GetPowerMode
+//   [10]  SetPowerMode
+//   [11]  GetSwitchIsolationMode
+//   [12]  SetSwitchIsolationMode
+//   [13]  GetInventoryInformation
+//   [14]  GetTemperatureReading
+//   [15]  ReadThermalParameter
+//   [16]  GetCurrentPowerDraw
+//   [17]  GetMaxObservedPower
+//   [18]  GetCurrentEnergyCount
+//   [19]  GetVoltage
+//   [20]  GetAltitudePressure
+//   [21]  GetDriverInfo
+//   [22]  GetMigMode
+//   [23]  SetMigMode
+//   [24]  GetEccMode
+//   [25]  SetEccMode
+//   [26]  GetEccErrorCounts
+//   [27]  SetClockLimit
+//   [28]  GetEDPpScalingFactors
+//   [29]  SetEDPpScalingFactors
+//   [30]  QueryScalarGroupTelemetry
+//   [31]  QueryVectorGroupTelemetry
+//   [32]  QueryAvailableAndClearableScalarGroup
+//   [33]  PcieFundamentalReset
+//   [34]  ClearScalarDataSource
+//   [35]  GetClockLimit
+//   [36]  SetPowerLimit
+//   [37]  GetPowerLimit
+//   [38]  GetCurrClockFreq
+//   [39]  GetAccumGpuUtilTime
+//   [40]  GetProcessorThrottleReason
+//   [41]  GetRowRemapState
+//   [42]  GetRowRemappingCounts
+//   [43]  GetRowRemapAvailability
+//   [44]  GetLeakDetectionInfo
+//   [45]  SetLeakDetectionThresholds
+//   [46]  GetMemoryCapacityUtil
+//   [47]  GetCurrentUtilization
+//   [48]  GetClockOutputEnableState
+//   [49]  GetSupportedGPMMetrics
+//   [50]  QueryAggregatedGPMMetrics
+//   [51]  QueryPerInstanceGPMMetrics
+//   [52]  QueryPerInstanceGPMMetricsV2
+//   [53]  GetViolationDuration
+//   [54]  GetListAvailablePciePorts
+//   [55]  GetPCIePortConfig
+//   [56]  SetPCIePortConfig
+//   [57]  QueryMultiportScalarGroupTelemetry
+//   [58]  GetEthPortTelemetryCounter
+//   [59]  GetPortNetworkAddresses
+//   [60]  GetPortEccCounters
+//   [61]  GetPowerSmoothingFeatureInfoV2
+//   [62]  GetPowerSmoothingCurrentProfileInformationV2
+//   [63]  GetPowerSmoothingAdminOverrideProfileInformationV2
+//   [64]  GetPowerSmoothingPresetProfileInformationV2
+//   [65]  GetLLDPPacket
+//   [66]  QueryPortTelemetryV2
+//   [67]  QueryPortTelemetryCapabilities
 
 namespace nsmtool::telemetry
 {
@@ -183,7 +191,7 @@ TEST(NsmTelemetryCmdParse, QueryPortStatus_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_port_status_resp(0, NSM_SUCCESS, ERR_NULL, portState,
                                   portStatus, msg);
-    EXPECT_NO_THROW(commands[2]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[4]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [3] QueryPortsAvailable ------------------------------------------------
@@ -197,7 +205,7 @@ TEST(NsmTelemetryCmdParse, QueryPortsAvailable_ParseResponseSuccess)
                              sizeof(nsm_query_ports_available_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_ports_available_resp(0, NSM_SUCCESS, ERR_NULL, 1, msg);
-    EXPECT_NO_THROW(commands[3]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[5]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [4] SetPortDisableFuture -----------------------------------------------
@@ -214,7 +222,7 @@ TEST(NsmTelemetryCmdParse, SetPortDisableFuture_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_port_disable_future_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[4]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[6]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [5] GetFabricManagerState ----------------------------------------------
@@ -230,7 +238,7 @@ TEST(NsmTelemetryCmdParse, GetFabricManagerState_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_fabric_manager_state_resp(0, NSM_SUCCESS, ERR_NULL, &fmData,
                                          msg);
-    EXPECT_NO_THROW(commands[5]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[7]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [6] GetPortDisableFuture -----------------------------------------------
@@ -246,7 +254,7 @@ TEST(NsmTelemetryCmdParse, GetPortDisableFuture_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_port_disable_future_resp(0, NSM_SUCCESS, ERR_NULL, portMask,
                                         msg);
-    EXPECT_NO_THROW(commands[6]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[8]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [7] GetPowerMode -------------------------------------------------------
@@ -261,7 +269,7 @@ TEST(NsmTelemetryCmdParse, GetPowerMode_ParseResponseSuccess)
                              sizeof(nsm_get_power_mode_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_power_mode_resp(0, NSM_SUCCESS, ERR_NULL, &pmData, msg);
-    EXPECT_NO_THROW(commands[7]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[9]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [8] SetPowerMode -------------------------------------------------------
@@ -278,7 +286,7 @@ TEST(NsmTelemetryCmdParse, SetPowerMode_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_power_mode_resp(0, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[8]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [9] GetSwitchIsolationMode ---------------------------------------------
@@ -292,7 +300,7 @@ TEST(NsmTelemetryCmdParse, GetSwitchIsolationMode_ParseResponseSuccess)
                              sizeof(nsm_get_switch_isolation_mode_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_switch_isolation_mode_resp(0, NSM_SUCCESS, ERR_NULL, 0, msg);
-    EXPECT_NO_THROW(commands[9]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [10] SetSwitchIsolationMode --------------------------------------------
@@ -306,7 +314,7 @@ TEST(NsmTelemetryCmdParse, SetSwitchIsolationMode_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_switch_isolation_mode_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[12]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [11] GetInventoryInformation -------------------------------------------
@@ -327,7 +335,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInformation_ParseResponseSuccess)
     encode_get_inventory_information_resp(
         0, NSM_SUCCESS, ERR_NULL, dataSize,
         reinterpret_cast<const uint8_t*>(partNumber), msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [12] GetTemperatureReading (sensorId=255 -> aggregate) -----------------
@@ -341,7 +349,7 @@ TEST(NsmTelemetryCmdParse, GetTemperatureReading_Aggregate_ParseResponseSuccess)
     auto buf = makeAggregateResp(NSM_GET_TEMPERATURE_READING);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[12]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[14]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [12] GetTemperatureReading (sensorId=0 -> regular) --------------------
@@ -357,7 +365,7 @@ TEST(NsmTelemetryCmdParse, GetTemperatureReading_Regular_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     double temp = 25.0;
     encode_get_temperature_reading_resp(0, NSM_SUCCESS, ERR_NULL, temp, msg);
-    EXPECT_NO_THROW(commands[12]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[14]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [13] ReadThermalParameter (sensorId=255 -> aggregate) -----------------
@@ -371,7 +379,7 @@ TEST(NsmTelemetryCmdParse, ReadThermalParameter_Aggregate_ParseResponseSuccess)
     auto buf = makeAggregateResp(NSM_READ_THERMAL_PARAMETER);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[13]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[15]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [13] ReadThermalParameter (sensorId=0 -> regular) ---------------------
@@ -388,7 +396,7 @@ TEST(NsmTelemetryCmdParse, ReadThermalParameter_Regular_ParseResponseSuccess)
     int32_t threshold = 100;
     encode_read_thermal_parameter_resp(0, NSM_SUCCESS, ERR_NULL, threshold,
                                        msg);
-    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[15]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [14] GetCurrentPowerDraw (sensorId=255 -> aggregate) ------------------
@@ -402,7 +410,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentPowerDraw_Aggregate_ParseResponseSuccess)
     auto buf = makeAggregateResp(NSM_GET_POWER);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[14]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[16]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [14] GetCurrentPowerDraw (sensorId=0 -> regular) ----------------------
@@ -418,7 +426,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentPowerDraw_Regular_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     uint32_t reading = 150000;
     encode_get_current_power_draw_resp(0, NSM_SUCCESS, ERR_NULL, reading, msg);
-    EXPECT_NO_THROW(commands[14]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[16]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [15] GetMaxObservedPower (sensorId=255 -> aggregate) ------------------
@@ -432,7 +440,7 @@ TEST(NsmTelemetryCmdParse, GetMaxObservedPower_Aggregate_ParseResponseSuccess)
     auto buf = makeAggregateResp(NSM_GET_MAX_OBSERVED_POWER);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[15]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[17]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [15] GetMaxObservedPower (sensorId=0 -> regular) ----------------------
@@ -448,7 +456,7 @@ TEST(NsmTelemetryCmdParse, GetMaxObservedPower_Regular_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     uint32_t reading = 200000;
     encode_get_max_observed_power_resp(0, NSM_SUCCESS, ERR_NULL, reading, msg);
-    EXPECT_NO_THROW(commands[15]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [16] GetCurrentEnergyCount (sensorId=255 -> aggregate) ----------------
@@ -462,7 +470,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentEnergyCount_Aggregate_ParseResponseSuccess)
     auto buf = makeAggregateResp(NSM_GET_ENERGY_COUNT);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[16]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[18]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [16] GetCurrentEnergyCount (sensorId=0 -> regular) --------------------
@@ -479,7 +487,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentEnergyCount_Regular_ParseResponseSuccess)
     uint64_t reading = 123456789;
     encode_get_current_energy_count_resp(0, NSM_SUCCESS, ERR_NULL, reading,
                                          msg);
-    EXPECT_NO_THROW(commands[16]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[18]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [17] GetVoltage (sensorId=255 -> aggregate) ---------------------------
@@ -493,7 +501,7 @@ TEST(NsmTelemetryCmdParse, GetVoltage_Aggregate_ParseResponseSuccess)
     auto buf = makeAggregateResp(NSM_GET_VOLTAGE);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[17]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[19]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [17] GetVoltage (sensorId=0 -> regular) --------------------------------
@@ -509,7 +517,7 @@ TEST(NsmTelemetryCmdParse, GetVoltage_Regular_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     uint32_t reading = 1200;
     encode_get_voltage_resp(0, NSM_SUCCESS, ERR_NULL, reading, msg);
-    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[19]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [18] GetAltitudePressure -----------------------------------------------
@@ -524,7 +532,7 @@ TEST(NsmTelemetryCmdParse, GetAltitudePressure_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     uint32_t reading = 101325;
     encode_get_altitude_pressure_resp(0, NSM_SUCCESS, ERR_NULL, reading, msg);
-    EXPECT_NO_THROW(commands[18]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[20]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [19] GetDriverInfo -----------------------------------------------------
@@ -546,7 +554,7 @@ TEST(NsmTelemetryCmdParse, GetDriverInfo_ParseResponseSuccess)
     memcpy(driverInfoData.data() + 1, version, strlen(version));
     encode_get_driver_info_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                 driverInfoData.data(), msg);
-    EXPECT_NO_THROW(commands[19]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[21]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [20] GetMigMode --------------------------------------------------------
@@ -561,7 +569,7 @@ TEST(NsmTelemetryCmdParse, GetMigMode_ParseResponseSuccess)
                              sizeof(nsm_get_MIG_mode_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_MIG_mode_resp(0, NSM_SUCCESS, ERR_NULL, &flags, msg);
-    EXPECT_NO_THROW(commands[20]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[22]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [21] SetMigMode --------------------------------------------------------
@@ -575,7 +583,7 @@ TEST(NsmTelemetryCmdParse, SetMigMode_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_MIG_mode_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[21]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[23]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [22] GetEccMode --------------------------------------------------------
@@ -590,7 +598,7 @@ TEST(NsmTelemetryCmdParse, GetEccMode_ParseResponseSuccess)
                              sizeof(nsm_get_ECC_mode_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_ECC_mode_resp(0, NSM_SUCCESS, ERR_NULL, &flags, msg);
-    EXPECT_NO_THROW(commands[22]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [23] SetEccMode --------------------------------------------------------
@@ -604,7 +612,7 @@ TEST(NsmTelemetryCmdParse, SetEccMode_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_ECC_mode_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[23]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[25]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [24] GetEccErrorCounts -------------------------------------------------
@@ -620,7 +628,7 @@ TEST(NsmTelemetryCmdParse, GetEccErrorCounts_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_ECC_error_counts_resp(0, NSM_SUCCESS, ERR_NULL, &errorCounts,
                                      msg);
-    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [25] SetClockLimit -----------------------------------------------------
@@ -635,7 +643,7 @@ TEST(NsmTelemetryCmdParse, SetClockLimit_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_clock_limit_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[25]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[27]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [26] GetEDPpScalingFactors ---------------------------------------------
@@ -655,7 +663,7 @@ TEST(NsmTelemetryCmdParse, GetEDPpScalingFactors_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_programmable_EDPp_scaling_factor_resp(0, NSM_SUCCESS, ERR_NULL,
                                                      &sf, msg);
-    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [27] SetEDPpScalingFactors ---------------------------------------------
@@ -671,7 +679,7 @@ TEST(NsmTelemetryCmdParse, SetEDPpScalingFactors_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_programmable_EDPp_scaling_factor_resp(0, NSM_SUCCESS, ERR_NULL,
                                                      msg);
-    EXPECT_NO_THROW(commands[27]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[29]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 0)
@@ -691,7 +699,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group0_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 1)
@@ -711,7 +719,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group1_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 2)
@@ -731,7 +739,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group2_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 3)
@@ -751,7 +759,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group3_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 4)
@@ -771,7 +779,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group4_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 5)
@@ -791,7 +799,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group5_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 6)
@@ -811,7 +819,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group6_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 8)
@@ -831,7 +839,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group8_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 9)
@@ -851,7 +859,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group9_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (group 10)
@@ -871,7 +879,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group10_resp(0, NSM_SUCCESS,
                                                         ERR_NULL, &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [28] QueryScalarGroupTelemetry (unknown group -> default case)
@@ -885,7 +893,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_UnknownGroup)
 
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [29] QueryVectorGroupTelemetry (group 1) -------------------------------
@@ -906,7 +914,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_vector_group_telemetry_v2_group1_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[29]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[31]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [29] QueryVectorGroupTelemetry (invalid group -> default case) ---------
@@ -922,7 +930,7 @@ TEST(NsmTelemetryCmdParse, QueryVectorGroupTelemetry_InvalidGroup)
 
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[29]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[31]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [30] QueryAvailableAndClearableScalarGroup (group 2) -------------------
@@ -948,7 +956,7 @@ TEST(NsmTelemetryCmdParse,
         static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
         reinterpret_cast<uint8_t*>(available),
         reinterpret_cast<uint8_t*>(clearable), msg);
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [30] QueryAvailableAndClearableScalarGroup (group 3) -------------------
@@ -972,7 +980,7 @@ TEST(NsmTelemetryCmdParse,
         static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
         reinterpret_cast<uint8_t*>(available),
         reinterpret_cast<uint8_t*>(clearable), msg);
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [30] QueryAvailableAndClearableScalarGroup (group 4) -------------------
@@ -996,7 +1004,7 @@ TEST(NsmTelemetryCmdParse,
         static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
         reinterpret_cast<uint8_t*>(available),
         reinterpret_cast<uint8_t*>(clearable), msg);
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [30] QueryAvailableAndClearableScalarGroup (default group)
@@ -1012,7 +1020,7 @@ TEST(NsmTelemetryCmdParse, QueryAvailableAndClearableScalarGroup_DefaultGroup)
 
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [31] PcieFundamentalReset ----------------------------------------------
@@ -1026,7 +1034,7 @@ TEST(NsmTelemetryCmdParse, PcieFundamentalReset_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_assert_pcie_fundamental_reset_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[31]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[33]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [32] ClearScalarDataSource ---------------------------------------------
@@ -1041,7 +1049,7 @@ TEST(NsmTelemetryCmdParse, ClearScalarDataSource_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_clear_data_source_v1_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[34]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [33] GetClockLimit -----------------------------------------------------
@@ -1059,7 +1067,7 @@ TEST(NsmTelemetryCmdParse, GetClockLimit_ParseResponseSuccess)
                              sizeof(nsm_get_clock_limit_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_clock_limit_resp(0, NSM_SUCCESS, ERR_NULL, &clockLimit, msg);
-    EXPECT_NO_THROW(commands[33]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[35]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [33] GetClockLimit (SpeedLocked case) ----------------------------------
@@ -1078,7 +1086,7 @@ TEST(NsmTelemetryCmdParse, GetClockLimit_SpeedLocked_ParseResponseSuccess)
                              sizeof(nsm_get_clock_limit_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_clock_limit_resp(0, NSM_SUCCESS, ERR_NULL, &clockLimit, msg);
-    EXPECT_NO_THROW(commands[33]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[35]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [34] SetPowerLimit -----------------------------------------------------
@@ -1093,7 +1101,7 @@ TEST(NsmTelemetryCmdParse, SetPowerLimit_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_power_limit_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[34]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[36]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [35] GetPowerLimit -----------------------------------------------------
@@ -1112,7 +1120,7 @@ TEST(NsmTelemetryCmdParse, GetPowerLimit_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_power_limit_resp(0, NSM_SUCCESS, ERR_NULL, persistentLimit,
                                 oneShotLimit, enforcedLimit, msg);
-    EXPECT_NO_THROW(commands[35]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[37]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [36] GetCurrClockFreq --------------------------------------------------
@@ -1128,7 +1136,7 @@ TEST(NsmTelemetryCmdParse, GetCurrClockFreq_ParseResponseSuccess)
                              sizeof(nsm_get_curr_clock_freq_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_curr_clock_freq_resp(0, NSM_SUCCESS, ERR_NULL, &clockFreq, msg);
-    EXPECT_NO_THROW(commands[36]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[38]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [37] GetAccumGpuUtilTime -----------------------------------------------
@@ -1145,7 +1153,7 @@ TEST(NsmTelemetryCmdParse, GetAccumGpuUtilTime_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_accum_GPU_util_time_resp(0, NSM_SUCCESS, ERR_NULL, &contextUtil,
                                         &smUtil, msg);
-    EXPECT_NO_THROW(commands[37]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[39]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [38] GetProcessorThrottleReason ----------------------------------------
@@ -1162,7 +1170,7 @@ TEST(NsmTelemetryCmdParse, GetProcessorThrottleReason_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_current_clock_event_reason_code_resp(0, NSM_SUCCESS, ERR_NULL,
                                                     &flags, msg);
-    EXPECT_NO_THROW(commands[38]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[40]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [39] GetRowRemapState --------------------------------------------------
@@ -1177,7 +1185,7 @@ TEST(NsmTelemetryCmdParse, GetRowRemapState_ParseResponseSuccess)
                              sizeof(nsm_get_row_remap_state_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_row_remap_state_resp(0, NSM_SUCCESS, ERR_NULL, &flags, msg);
-    EXPECT_NO_THROW(commands[39]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[41]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [40] GetRowRemappingCounts ---------------------------------------------
@@ -1194,7 +1202,7 @@ TEST(NsmTelemetryCmdParse, GetRowRemappingCounts_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_row_remapping_counts_resp(0, NSM_SUCCESS, ERR_NULL, correctable,
                                          uncorrectable, msg);
-    EXPECT_NO_THROW(commands[40]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[42]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [41] GetRowRemapAvailability -------------------------------------------
@@ -1214,7 +1222,7 @@ TEST(NsmTelemetryCmdParse, GetRowRemapAvailability_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_row_remap_availability_resp(0, NSM_SUCCESS, ERR_NULL, &remapData,
                                            msg);
-    EXPECT_NO_THROW(commands[41]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[43]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [42] GetLeakDetectionInfo ----------------------------------------------
@@ -1234,7 +1242,7 @@ TEST(NsmTelemetryCmdParse, GetLeakDetectionInfo_ParseResponseSuccess)
     encode_get_leak_detection_info_resp(0, NSM_SUCCESS, ERR_NULL, numSensors,
                                         numThresholdLevels, sensorsData.data(),
                                         sensorsData.size(), msg);
-    EXPECT_NO_THROW(commands[42]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[44]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [43] SetLeakDetectionThresholds ----------------------------------------
@@ -1249,7 +1257,7 @@ TEST(NsmTelemetryCmdParse, SetLeakDetectionThresholds_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_leak_detection_thresholds_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[43]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[45]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [44] GetMemoryCapacityUtil ---------------------------------------------
@@ -1266,7 +1274,7 @@ TEST(NsmTelemetryCmdParse, GetMemoryCapacityUtil_ParseResponseSuccess)
                              sizeof(nsm_get_memory_capacity_util_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_memory_capacity_util_resp(0, NSM_SUCCESS, ERR_NULL, &data, msg);
-    EXPECT_NO_THROW(commands[44]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[46]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [45] GetCurrentUtilization ---------------------------------------------
@@ -1283,7 +1291,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentUtilization_ParseResponseSuccess)
                              sizeof(nsm_get_current_utilization_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_current_utilization_resp(0, NSM_SUCCESS, ERR_NULL, &data, msg);
-    EXPECT_NO_THROW(commands[45]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[47]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [46] GetClockOutputEnableState -----------------------------------------
@@ -1300,7 +1308,7 @@ TEST(NsmTelemetryCmdParse, GetClockOutputEnableState_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_clock_output_enable_state_resp(0, NSM_SUCCESS, ERR_NULL, clkBuf,
                                               msg);
-    EXPECT_NO_THROW(commands[46]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[48]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [47] GetSupportedGPMMetrics --------------------------------------------
@@ -1317,7 +1325,7 @@ TEST(NsmTelemetryCmdParse, GetSupportedGPMMetrics_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_supported_gpm_metrics_resp(0, NSM_SUCCESS, ERR_NULL, 0, 0,
                                           bitmask, msg);
-    EXPECT_NO_THROW(commands[47]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[49]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [48] QueryAggregatedGPMMetrics (aggregate response) --------------------
@@ -1332,7 +1340,7 @@ TEST(NsmTelemetryCmdParse, QueryAggregatedGPMMetrics_ParseResponseSuccess)
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[48]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[50]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [49] QueryPerInstanceGPMMetrics ----------------------------------------
@@ -1347,7 +1355,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetrics_ParseResponseSuccess)
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[49]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[51]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [50] QueryPerInstanceGPMMetricsV2 --------------------------------------
@@ -1362,7 +1370,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetricsV2_ParseResponseSuccess)
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[50]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[52]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [51] GetViolationDuration ----------------------------------------------
@@ -1377,7 +1385,7 @@ TEST(NsmTelemetryCmdParse, GetViolationDuration_ParseResponseSuccess)
                              sizeof(nsm_get_violation_duration_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_violation_duration_resp(0, NSM_SUCCESS, ERR_NULL, &vd, msg);
-    EXPECT_NO_THROW(commands[51]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[53]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [52] GetListAvailablePciePorts -----------------------------------------
@@ -1392,7 +1400,7 @@ TEST(NsmTelemetryCmdParse, GetListAvailablePciePorts_ParseResponseSuccess)
     std::vector<uint8_t> buf(NSM_LIST_AVAILABLE_PCIE_PORTS_RESPONSE_MIN_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_list_available_pcie_ports_resp(0, NSM_SUCCESS, ERR_NULL, &info, msg);
-    EXPECT_NO_THROW(commands[52]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[54]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [53] GetPCIePortConfig (aggregate response) ----------------------------
@@ -1407,7 +1415,7 @@ TEST(NsmTelemetryCmdParse, GetPCIePortConfig_ParseResponseSuccess)
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[53]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[55]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [54] SetPCIePortConfig -------------------------------------------------
@@ -1422,7 +1430,7 @@ TEST(NsmTelemetryCmdParse, SetPCIePortConfig_ParseResponseSuccess)
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_port_config_aggregate_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[54]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[56]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [55] QueryMultiportScalarGroupTelemetry (group 0) ----------------------
@@ -1442,7 +1450,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group0_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[55]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[57]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- [56] GetEthPortTelemetryCounter (aggregate response) -------------------
@@ -1456,7 +1464,7 @@ TEST(NsmTelemetryCmdParse, GetEthPortTelemetryCounter_ParseResponseSuccess)
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[56]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[58]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [57] GetPortNetworkAddresses (aggregate response) ----------------------
@@ -1470,7 +1478,7 @@ TEST(NsmTelemetryCmdParse, GetPortNetworkAddresses_ParseResponseSuccess)
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[57]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[59]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [58] GetPortEccCounters (aggregate response) ---------------------------
@@ -1484,7 +1492,7 @@ TEST(NsmTelemetryCmdParse, GetPortEccCounters_ParseResponseSuccess)
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[58]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[60]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [59] GetPowerSmoothingFeatureInfoV2 (aggregate response) ---------------
@@ -1497,7 +1505,7 @@ TEST(NsmTelemetryCmdParse, GetPowerSmoothingFeatureInfoV2_ParseResponseSuccess)
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[59]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[61]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [60] GetPowerSmoothingCurrentProfileInformationV2 (aggregate) ----------
@@ -1511,7 +1519,7 @@ TEST(NsmTelemetryCmdParse,
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[60]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[62]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [61] GetPowerSmoothingAdminOverrideProfileInformationV2 (aggregate) ----
@@ -1525,7 +1533,7 @@ TEST(NsmTelemetryCmdParse,
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[61]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[63]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- [62] GetPowerSmoothingPresetProfileInformationV2 (aggregate) -----------
@@ -1539,7 +1547,7 @@ TEST(NsmTelemetryCmdParse,
     auto buf = makeAggregateResp(0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[62]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[64]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // Helper: build aggregate response with a single temperature sample
@@ -1619,7 +1627,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint32_MAXIMUM_MEMORY_CAPACITY)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&value),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // uint32_t property: GPU_HOST_ID=34 (Data = le32toh(value) + 1)
@@ -1637,7 +1645,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint32_GPU_HOST_ID)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&value),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // UUID property: DEVICE_GUID=10 (UUID_INT_SIZE=16 bytes)
@@ -1654,7 +1662,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_UUID_DEVICE_GUID)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           guidData.data(), msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // GPU_NVLINK_PEER_TYPE=36 → Direct (peerType=0)
@@ -1672,7 +1680,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_GPU_NVLINK_PEER_TYPE_Direct)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&peerType),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // GPU_NVLINK_PEER_TYPE=36 → Bridge (peerType=1)
@@ -1690,7 +1698,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_GPU_NVLINK_PEER_TYPE_Bridge)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&peerType),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // CHASSIS_SERIAL_NUMBER=31 (string)
@@ -1708,7 +1716,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_String_CHASSIS_SERIAL_NUMBER)
     encode_get_inventory_information_resp(
         0, NSM_SUCCESS, ERR_NULL, dataSize,
         reinterpret_cast<const uint8_t*>(serial), msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // GPU_IBGUID=30 (uint64_t / 8 bytes)
@@ -1726,7 +1734,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Hex_GPU_IBGUID)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&ibguid),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // MINIMUM_EDPP_SCALING_FACTOR=24 (uint8_t)
@@ -1743,7 +1751,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint8_MINIMUM_EDPP_SCALING_FACTOR)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           &scalingFactor, msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // PCIERETIMER_0_EEPROM_VERSION=144 (uint64_t, version bytes)
@@ -1762,7 +1770,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Version_PCIERETIMER_0_EEPROM)
     encode_get_inventory_information_resp(
         0, NSM_SUCCESS, ERR_NULL, dataSize,
         reinterpret_cast<uint8_t*>(&versionData), msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // uint32_t property: MAXIMUM_MODULE_POWER_LIMIT=18 (uncovered switch group)
@@ -1780,7 +1788,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint32_MAXIMUM_MODULE_POWER_LIMIT)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&value),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // uint32_t property: RATED_MODULE_POWER_LIMIT=20 (uncovered switch group)
@@ -1798,7 +1806,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint32_RATED_MODULE_POWER_LIMIT)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&value),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // uint32_t property: MINIMUM_MEMORY_CLOCK_LIMIT=28
@@ -1816,7 +1824,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint32_MINIMUM_MEMORY_CLOCK_LIMIT)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&value),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // uint32_t property: MAXIMUM_MEMORY_CLOCK_LIMIT=29
@@ -1834,7 +1842,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint32_MAXIMUM_MEMORY_CLOCK_LIMIT)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&value),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // uint32_t property: MAXIMUM_GRAPHICS_CLOCK_LIMIT=27
@@ -1852,7 +1860,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint32_MAXIMUM_GRAPHICS_CLOCK_LIMIT)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&value),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // uint32_t property: MINIMUM_GRAPHICS_CLOCK_LIMIT=26
@@ -1870,7 +1878,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint32_MINIMUM_GRAPHICS_CLOCK_LIMIT)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&value),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // uint8_t property: MAXIMUM_EDPP_SCALING_FACTOR=25
@@ -1887,7 +1895,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_Uint8_MAXIMUM_EDPP_SCALING_FACTOR)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           &scalingFactor, msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // Error path: data size mismatch (covers lines 1140-1142)
@@ -1906,7 +1914,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_SizeMismatch_ErrorPath)
     encode_get_inventory_information_resp(
         0, NSM_SUCCESS, ERR_NULL, dataSize,
         reinterpret_cast<uint8_t*>(&wrongData), msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // Unknown property (default case → cerr + return)
@@ -1925,7 +1933,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInfo_UnknownProperty_Default)
     encode_get_inventory_information_resp(0, NSM_SUCCESS, ERR_NULL, dataSize,
                                           reinterpret_cast<uint8_t*>(&value),
                                           msg);
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- QueryAvailableAndClearableScalarGroup with non-zero bitfields
@@ -1953,7 +1961,7 @@ TEST(NsmTelemetryCmdParse,
         static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
         reinterpret_cast<uint8_t*>(available),
         reinterpret_cast<uint8_t*>(clearable), msg);
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // Group 3 with bit0 set (covers the L0ToRecoveryCount push_back)
@@ -1978,7 +1986,7 @@ TEST(NsmTelemetryCmdParse,
         static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
         reinterpret_cast<uint8_t*>(available),
         reinterpret_cast<uint8_t*>(clearable), msg);
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // Group 4 with all bits set
@@ -2003,7 +2011,7 @@ TEST(NsmTelemetryCmdParse,
         static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
         reinterpret_cast<uint8_t*>(available),
         reinterpret_cast<uint8_t*>(clearable), msg);
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- GetClockOutputEnableState with NVHS and IBLINK indices -----------------
@@ -2021,7 +2029,7 @@ TEST(NsmTelemetryCmdParse, GetClockOutputEnableState_NVHS_ParseResponseSuccess)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_clock_output_enable_state_resp(0, NSM_SUCCESS, ERR_NULL, clkBuf,
                                               msg);
-    EXPECT_NO_THROW(commands[46]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[48]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse,
@@ -2038,7 +2046,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_clock_output_enable_state_resp(0, NSM_SUCCESS, ERR_NULL, clkBuf,
                                               msg);
-    EXPECT_NO_THROW(commands[46]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[48]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse,
@@ -2055,7 +2063,7 @@ TEST(NsmTelemetryCmdParse,
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_clock_output_enable_state_resp(0, NSM_SUCCESS, ERR_NULL, clkBuf,
                                               msg);
-    EXPECT_NO_THROW(commands[46]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[48]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- GetPortTelemetryCounter with all supported_counter bits set ------------
@@ -2097,7 +2105,7 @@ TEST(NsmTelemetryCmdParse, GetTemperatureReading_Aggregate_WithSample)
                                                42.5);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[12]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[14]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // GetTemperatureReading aggregate with timestamp + sample (covers timestamp
@@ -2113,7 +2121,7 @@ TEST(NsmTelemetryCmdParse,
         NSM_GET_TEMPERATURE_READING, 0, 35.0);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[12]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[14]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // GetCurrentPowerDraw aggregate with a sample (covers power reading path)
@@ -2143,7 +2151,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentPowerDraw_Aggregate_WithSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[14]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[16]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- Helper: append a sample to an aggregate response buffer ---------------
@@ -2184,7 +2192,7 @@ TEST(NsmTelemetryCmdParse,
         static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
         reinterpret_cast<uint8_t*>(available),
         reinterpret_cast<uint8_t*>(clearable), msg);
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- QueryAvailableAndClearableScalarGroup GROUP_ID_9 ----------------------
@@ -2210,7 +2218,7 @@ TEST(NsmTelemetryCmdParse,
         static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
         reinterpret_cast<uint8_t*>(available),
         reinterpret_cast<uint8_t*>(clearable), msg);
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- QueryAvailableAndClearableScalarGroup default (unknown groupId) --------
@@ -2233,7 +2241,7 @@ TEST(NsmTelemetryCmdParse, QueryAvailableAndClearableScalarGroup_DefaultGroupId)
         static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
         reinterpret_cast<uint8_t*>(available),
         reinterpret_cast<uint8_t*>(clearable), msg);
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- GetPowerSmoothingFeatureInfoV2 with all sample tags -------------------
@@ -2277,7 +2285,7 @@ TEST(NsmTelemetryCmdParse, GetPowerSmoothingFeatureInfoV2_AllSampleTags)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[59]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[61]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetPowerSmoothingCurrentProfileInformationV2 with all tags ------------
@@ -2329,7 +2337,7 @@ TEST(NsmTelemetryCmdParse, GetPowerSmoothingCurrentProfileInfoV2_AllSampleTags)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[60]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[62]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetPowerSmoothingAdminOverrideProfileInformationV2 with all tags ------
@@ -2380,7 +2388,7 @@ TEST(NsmTelemetryCmdParse,
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[61]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[63]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetPowerSmoothingPresetProfileInformationV2 with all profile tags -----
@@ -2453,7 +2461,7 @@ TEST(NsmTelemetryCmdParse, GetPowerSmoothingPresetProfileInfoV2_AllSampleTags)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[62]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[64]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetEthPortTelemetryCounter with a counter data sample -----------------
@@ -2477,7 +2485,7 @@ TEST(NsmTelemetryCmdParse, GetEthPortTelemetryCounter_WithCounterSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[56]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[58]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetPortNetworkAddresses with a link-type sample -----------------------
@@ -2501,7 +2509,7 @@ TEST(NsmTelemetryCmdParse, GetPortNetworkAddresses_WithLinkTypeSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[57]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[59]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetPortEccCounters with an ECC counter sample -------------------------
@@ -2524,7 +2532,7 @@ TEST(NsmTelemetryCmdParse, GetPortEccCounters_WithEccCounterSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[58]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[60]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- Error paths: all simple commands (payloadLength=0 → decode fails) -----
@@ -2542,23 +2550,23 @@ TEST(NsmTelemetryCmdParse, ErrorPaths_Commands0to11)
         commands[0]->parseResponseMsg(msg, 0)); // GetPortTelemetryCounter
     EXPECT_NO_THROW(
         commands[1]->parseResponseMsg(msg, 0)); // QueryPortCharacteristics
-    EXPECT_NO_THROW(commands[2]->parseResponseMsg(msg, 0)); // QueryPortStatus
+    EXPECT_NO_THROW(commands[4]->parseResponseMsg(msg, 0)); // QueryPortStatus
     EXPECT_NO_THROW(
-        commands[3]->parseResponseMsg(msg, 0)); // QueryPortsAvailable
+        commands[5]->parseResponseMsg(msg, 0)); // QueryPortsAvailable
     EXPECT_NO_THROW(
-        commands[4]->parseResponseMsg(msg, 0)); // SetPortDisableFuture
+        commands[6]->parseResponseMsg(msg, 0)); // SetPortDisableFuture
     EXPECT_NO_THROW(
-        commands[5]->parseResponseMsg(msg, 0)); // GetFabricManagerState
+        commands[7]->parseResponseMsg(msg, 0)); // GetFabricManagerState
     EXPECT_NO_THROW(
-        commands[6]->parseResponseMsg(msg, 0)); // GetPortDisableFuture
-    EXPECT_NO_THROW(commands[7]->parseResponseMsg(msg, 0)); // GetPowerMode
-    EXPECT_NO_THROW(commands[8]->parseResponseMsg(msg, 0)); // SetPowerMode
+        commands[8]->parseResponseMsg(msg, 0)); // GetPortDisableFuture
+    EXPECT_NO_THROW(commands[9]->parseResponseMsg(msg, 0));  // GetPowerMode
+    EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, 0)); // SetPowerMode
     EXPECT_NO_THROW(
-        commands[9]->parseResponseMsg(msg, 0));  // GetSwitchIsolationMode
+        commands[11]->parseResponseMsg(msg, 0)); // GetSwitchIsolationMode
     EXPECT_NO_THROW(
-        commands[10]->parseResponseMsg(msg, 0)); // SetSwitchIsolationMode
+        commands[12]->parseResponseMsg(msg, 0)); // SetSwitchIsolationMode
     EXPECT_NO_THROW(
-        commands[11]->parseResponseMsg(msg, 0)); // GetInventoryInformation
+        commands[13]->parseResponseMsg(msg, 0)); // GetInventoryInformation
 }
 
 // ---- Error paths: aggregate commands (payloadLength=0 → decode_aggregate_resp
@@ -2575,14 +2583,14 @@ TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_AggregateCommands12to17)
     // payloadLength=0 → msg_len=sizeof(nsm_msg_hdr)=8 < 12 needed
     // → decode_aggregate_resp fails → AggregateResponseParser error path
     EXPECT_NO_THROW(
-        commands[12]->parseResponseMsg(msg, 0)); // GetTemperatureReading
+        commands[14]->parseResponseMsg(msg, 0)); // GetTemperatureReading
     EXPECT_NO_THROW(
-        commands[14]->parseResponseMsg(msg, 0)); // GetCurrentPowerDraw
+        commands[16]->parseResponseMsg(msg, 0)); // GetCurrentPowerDraw
     EXPECT_NO_THROW(
-        commands[15]->parseResponseMsg(msg, 0)); // GetMaxObservedPower
+        commands[17]->parseResponseMsg(msg, 0)); // GetMaxObservedPower
     EXPECT_NO_THROW(
-        commands[16]->parseResponseMsg(msg, 0)); // GetCurrentEnergyCount
-    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, 0)); // GetVoltage
+        commands[18]->parseResponseMsg(msg, 0)); // GetCurrentEnergyCount
+    EXPECT_NO_THROW(commands[19]->parseResponseMsg(msg, 0)); // GetVoltage
 }
 
 TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands13_18to30)
@@ -2594,25 +2602,25 @@ TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands13_18to30)
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
 
     EXPECT_NO_THROW(
-        commands[13]->parseResponseMsg(msg, 0)); // ReadThermalParameter
+        commands[15]->parseResponseMsg(msg, 0)); // ReadThermalParameter
     EXPECT_NO_THROW(
-        commands[18]->parseResponseMsg(msg, 0)); // GetAltitudePressure
-    EXPECT_NO_THROW(commands[19]->parseResponseMsg(msg, 0)); // GetDriverInfo
-    EXPECT_NO_THROW(commands[20]->parseResponseMsg(msg, 0)); // GetMigMode
-    EXPECT_NO_THROW(commands[21]->parseResponseMsg(msg, 0)); // SetMigMode
-    EXPECT_NO_THROW(commands[22]->parseResponseMsg(msg, 0)); // GetEccMode
-    EXPECT_NO_THROW(commands[23]->parseResponseMsg(msg, 0)); // SetEccMode
+        commands[20]->parseResponseMsg(msg, 0)); // GetAltitudePressure
+    EXPECT_NO_THROW(commands[21]->parseResponseMsg(msg, 0)); // GetDriverInfo
+    EXPECT_NO_THROW(commands[22]->parseResponseMsg(msg, 0)); // GetMigMode
+    EXPECT_NO_THROW(commands[23]->parseResponseMsg(msg, 0)); // SetMigMode
+    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, 0)); // GetEccMode
+    EXPECT_NO_THROW(commands[25]->parseResponseMsg(msg, 0)); // SetEccMode
     EXPECT_NO_THROW(
-        commands[24]->parseResponseMsg(msg, 0)); // GetEccErrorCounts
-    EXPECT_NO_THROW(commands[25]->parseResponseMsg(msg, 0)); // SetClockLimit
+        commands[26]->parseResponseMsg(msg, 0)); // GetEccErrorCounts
+    EXPECT_NO_THROW(commands[27]->parseResponseMsg(msg, 0)); // SetClockLimit
     EXPECT_NO_THROW(
-        commands[26]->parseResponseMsg(msg, 0)); // GetEDPpScalingFactors
+        commands[28]->parseResponseMsg(msg, 0)); // GetEDPpScalingFactors
     EXPECT_NO_THROW(
-        commands[27]->parseResponseMsg(msg, 0)); // SetEDPpScalingFactors
+        commands[29]->parseResponseMsg(msg, 0)); // SetEDPpScalingFactors
     EXPECT_NO_THROW(
-        commands[28]->parseResponseMsg(msg, 0)); // QueryScalarGroupTelemetry
+        commands[30]->parseResponseMsg(msg, 0)); // QueryScalarGroupTelemetry
     EXPECT_NO_THROW(
-        commands[31]->parseResponseMsg(msg, 0)); // PcieFundamentalReset
+        commands[33]->parseResponseMsg(msg, 0)); // PcieFundamentalReset
 }
 
 TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands31to53)
@@ -2624,47 +2632,47 @@ TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands31to53)
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
 
     EXPECT_NO_THROW(
-        commands[32]->parseResponseMsg(msg, 0)); // ClearScalarDataSource
-    EXPECT_NO_THROW(commands[33]->parseResponseMsg(msg, 0)); // GetClockLimit
-    EXPECT_NO_THROW(commands[34]->parseResponseMsg(msg, 0)); // SetPowerLimit
-    EXPECT_NO_THROW(commands[35]->parseResponseMsg(msg, 0)); // GetPowerLimit
-    EXPECT_NO_THROW(commands[36]->parseResponseMsg(msg, 0)); // GetCurrClockFreq
+        commands[34]->parseResponseMsg(msg, 0)); // ClearScalarDataSource
+    EXPECT_NO_THROW(commands[35]->parseResponseMsg(msg, 0)); // GetClockLimit
+    EXPECT_NO_THROW(commands[36]->parseResponseMsg(msg, 0)); // SetPowerLimit
+    EXPECT_NO_THROW(commands[37]->parseResponseMsg(msg, 0)); // GetPowerLimit
+    EXPECT_NO_THROW(commands[38]->parseResponseMsg(msg, 0)); // GetCurrClockFreq
     EXPECT_NO_THROW(
-        commands[37]->parseResponseMsg(msg, 0)); // GetAccumGpuUtilTime
+        commands[39]->parseResponseMsg(msg, 0)); // GetAccumGpuUtilTime
     EXPECT_NO_THROW(
-        commands[38]->parseResponseMsg(msg, 0)); // GetProcessorThrottleReason
-    EXPECT_NO_THROW(commands[39]->parseResponseMsg(msg, 0)); // GetRowRemapState
+        commands[40]->parseResponseMsg(msg, 0)); // GetProcessorThrottleReason
+    EXPECT_NO_THROW(commands[41]->parseResponseMsg(msg, 0)); // GetRowRemapState
     EXPECT_NO_THROW(
-        commands[40]->parseResponseMsg(msg, 0)); // GetRowRemappingCounts
+        commands[42]->parseResponseMsg(msg, 0)); // GetRowRemappingCounts
     EXPECT_NO_THROW(
-        commands[41]->parseResponseMsg(msg, 0)); // GetRowRemapAvailability
+        commands[43]->parseResponseMsg(msg, 0)); // GetRowRemapAvailability
     EXPECT_NO_THROW(
-        commands[42]->parseResponseMsg(msg, 0)); // GetLeakDetectionInfo
+        commands[44]->parseResponseMsg(msg, 0)); // GetLeakDetectionInfo
     EXPECT_NO_THROW(
-        commands[43]->parseResponseMsg(msg, 0)); // SetLeakDetectionThresholds
+        commands[45]->parseResponseMsg(msg, 0)); // SetLeakDetectionThresholds
     EXPECT_NO_THROW(
-        commands[44]->parseResponseMsg(msg, 0)); // GetMemoryCapacityUtil
+        commands[46]->parseResponseMsg(msg, 0)); // GetMemoryCapacityUtil
     EXPECT_NO_THROW(
-        commands[45]->parseResponseMsg(msg, 0)); // GetCurrentUtilization
+        commands[47]->parseResponseMsg(msg, 0)); // GetCurrentUtilization
     EXPECT_NO_THROW(
-        commands[46]->parseResponseMsg(msg, 0)); // GetClockOutputEnableState
+        commands[48]->parseResponseMsg(msg, 0)); // GetClockOutputEnableState
     EXPECT_NO_THROW(
-        commands[47]->parseResponseMsg(msg, 0)); // GetSupportedGPMMetrics
-    EXPECT_NO_THROW(commands[48]->parseResponseMsg(
-        msg, 0)); // QueryAggregatedGPMMetrics (aggregate)
-    EXPECT_NO_THROW(commands[49]->parseResponseMsg(
-        msg, 0)); // QueryPerInstanceGPMMetrics (aggregate)
+        commands[49]->parseResponseMsg(msg, 0)); // GetSupportedGPMMetrics
     EXPECT_NO_THROW(commands[50]->parseResponseMsg(
+        msg, 0)); // QueryAggregatedGPMMetrics (aggregate)
+    EXPECT_NO_THROW(commands[51]->parseResponseMsg(
+        msg, 0)); // QueryPerInstanceGPMMetrics (aggregate)
+    EXPECT_NO_THROW(commands[52]->parseResponseMsg(
         msg, 0)); // QueryPerInstanceGPMMetricsV2 (aggregate)
     EXPECT_NO_THROW(
-        commands[51]->parseResponseMsg(msg, 0)); // GetViolationDuration
+        commands[53]->parseResponseMsg(msg, 0)); // GetViolationDuration
     EXPECT_NO_THROW(
-        commands[52]->parseResponseMsg(msg, 0)); // GetListAvailablePciePorts
-    EXPECT_NO_THROW(commands[53]->parseResponseMsg(
+        commands[54]->parseResponseMsg(msg, 0)); // GetListAvailablePciePorts
+    EXPECT_NO_THROW(commands[55]->parseResponseMsg(
         msg, 0)); // GetPCIePortConfig (aggregate)
     EXPECT_NO_THROW(
-        commands[54]->parseResponseMsg(msg, 0)); // SetPCIePortConfig
-    EXPECT_NO_THROW(commands[55]->parseResponseMsg(
+        commands[56]->parseResponseMsg(msg, 0)); // SetPCIePortConfig
+    EXPECT_NO_THROW(commands[57]->parseResponseMsg(
         msg, 0)); // QueryMultiportScalarGroupTelemetry
 }
 
@@ -2679,18 +2687,18 @@ TEST(NsmTelemetryCmdParse, DISABLED_ErrorPaths_Commands55to61_Aggregate)
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
 
     EXPECT_NO_THROW(
-        commands[56]->parseResponseMsg(msg, 0)); // GetEthPortTelemetryCounter
+        commands[58]->parseResponseMsg(msg, 0)); // GetEthPortTelemetryCounter
     EXPECT_NO_THROW(
-        commands[57]->parseResponseMsg(msg, 0)); // GetPortNetworkAddresses
+        commands[59]->parseResponseMsg(msg, 0)); // GetPortNetworkAddresses
     EXPECT_NO_THROW(
-        commands[58]->parseResponseMsg(msg, 0)); // GetPortEccCounters
-    EXPECT_NO_THROW(commands[59]->parseResponseMsg(
-        msg, 0)); // GetPowerSmoothingFeatureInfoV2
-    EXPECT_NO_THROW(commands[60]->parseResponseMsg(
-        msg, 0)); // GetPowerSmoothingCurrentProfileInfoV2
+        commands[60]->parseResponseMsg(msg, 0)); // GetPortEccCounters
     EXPECT_NO_THROW(commands[61]->parseResponseMsg(
-        msg, 0)); // GetPowerSmoothingAdminOverrideV2
+        msg, 0)); // GetPowerSmoothingFeatureInfoV2
     EXPECT_NO_THROW(commands[62]->parseResponseMsg(
+        msg, 0)); // GetPowerSmoothingCurrentProfileInfoV2
+    EXPECT_NO_THROW(commands[63]->parseResponseMsg(
+        msg, 0)); // GetPowerSmoothingAdminOverrideV2
+    EXPECT_NO_THROW(commands[64]->parseResponseMsg(
         msg, 0)); // GetPowerSmoothingPresetProfileInfoV2
 }
 
@@ -2710,7 +2718,7 @@ TEST(NsmTelemetryCmdParse,
         std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN,
                                  0);
         auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
-        EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, 0));
+        EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, 0));
     }
 }
 
@@ -2733,7 +2741,7 @@ TEST(NsmTelemetryCmdParse, GetListAvailablePciePorts_WithOnePciPort)
     std::vector<uint8_t> buf(NSM_LIST_AVAILABLE_PCIE_PORTS_RESPONSE_MIN_LEN);
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_list_available_pcie_ports_resp(0, NSM_SUCCESS, ERR_NULL, info, msg);
-    EXPECT_NO_THROW(commands[52]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[54]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- GetLeakDetectionInfo with 1 sensor (covers sensor-loop in parseResponse)
@@ -2769,7 +2777,7 @@ TEST(NsmTelemetryCmdParse, GetLeakDetectionInfo_WithOneSensor)
     encode_get_leak_detection_info_resp(0, NSM_SUCCESS, ERR_NULL, numSensors,
                                         numThresholdLevels, sensorsBuf.data(),
                                         sensorsBuf.size(), msg);
-    EXPECT_NO_THROW(commands[42]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[44]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- GetEthPortTelemetryCounter: 32-bit tags (tags 8-20) -------------------
@@ -2796,7 +2804,7 @@ TEST(NsmTelemetryCmdParse, GetEthPortTelemetryCounter_32BitTags)
         appendAggSample(buf, tag, d, dl);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[56]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[58]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -2825,7 +2833,7 @@ TEST(NsmTelemetryCmdParse, GetEthPortTelemetryCounter_64BitTags1to7)
         appendAggSample(buf, tag, d, dl);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[56]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[58]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -2857,7 +2865,7 @@ TEST(NsmTelemetryCmdParse, GetPortNetworkAddresses_MacAddressTags)
         appendAggSample(buf, tag, d, dl);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[57]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[59]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -2884,7 +2892,7 @@ TEST(NsmTelemetryCmdParse, GetPortNetworkAddresses_GuidTags)
         appendAggSample(buf, tag, d, dl);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[57]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[59]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -2911,7 +2919,7 @@ TEST(NsmTelemetryCmdParse, GetPortEccCounters_AllRemainingTags)
         appendAggSample(buf, tag, d, dl);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[58]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[60]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -2935,7 +2943,7 @@ TEST(NsmTelemetryCmdParse, ReadThermalParameter_Aggregate_WithSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[13]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[15]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 TEST(NsmTelemetryCmdParse, GetMaxObservedPower_Aggregate_WithSample)
@@ -2955,7 +2963,7 @@ TEST(NsmTelemetryCmdParse, GetMaxObservedPower_Aggregate_WithSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[15]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[17]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 TEST(NsmTelemetryCmdParse, GetCurrentEnergyCount_Aggregate_WithSample)
@@ -2975,7 +2983,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentEnergyCount_Aggregate_WithSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[16]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[18]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 TEST(NsmTelemetryCmdParse, GetVoltage_Aggregate_WithSample)
@@ -2995,7 +3003,7 @@ TEST(NsmTelemetryCmdParse, GetVoltage_Aggregate_WithSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[17]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[19]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- QueryScalarGroupTelemetry: error path for each groupId ----------------
@@ -3011,7 +3019,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_AllGroups_ErrorPaths)
         std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN,
                                  0);
         auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
-        EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, 0));
+        EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, 0));
     }
 }
 
@@ -3030,7 +3038,7 @@ TEST(NsmTelemetryCmdParse, GetProcessorThrottleReason_AllFlagsSet)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_current_clock_event_reason_code_resp(0, NSM_SUCCESS, ERR_NULL,
                                                     &flags, msg);
-    EXPECT_NO_THROW(commands[38]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[40]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- AggregateResponseParser error paths -----------------------------------
@@ -3060,7 +3068,7 @@ TEST(NsmTelemetryCmdParse, AggregateParser_InvalidSample_Skips)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[12]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[14]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // Timestamp with data_len != 8 → triggers lines 1390-1395
@@ -3080,7 +3088,7 @@ TEST(NsmTelemetryCmdParse, AggregateParser_TimestampWrongSize_Skips)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[12]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[14]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // handleSampleData returns non-success → triggers lines 1423-1428
@@ -3101,7 +3109,7 @@ TEST(NsmTelemetryCmdParse, AggregateParser_HandleSampleDataFails_Skips)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[12]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[14]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- QueryAggregatedGPMMetrics: PERCENTAGE and BANDWIDTH sample paths ------
@@ -3125,7 +3133,7 @@ TEST(NsmTelemetryCmdParse, QueryAggregatedGPMMetrics_PercentageSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[48]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[50]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 TEST(NsmTelemetryCmdParse, QueryAggregatedGPMMetrics_BandwidthSample)
@@ -3147,7 +3155,7 @@ TEST(NsmTelemetryCmdParse, QueryAggregatedGPMMetrics_BandwidthSample)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[48]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[50]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // tag not in metricsTable → lines 4661-4664 (returns NSM_SW_ERROR_DATA)
@@ -3168,7 +3176,7 @@ TEST(NsmTelemetryCmdParse, QueryAggregatedGPMMetrics_UnknownTagError)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[48]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[50]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // metricId not in metricsTable → early return at lines 4844-4845
@@ -3180,7 +3188,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetrics_UnknownMetricId)
                     {"-r", "0", "-g", "0", "-c", "0", "-i", "255", "-b", "1"});
     std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
-    EXPECT_NO_THROW(commands[49]->parseResponseMsg(msg, 0));
+    EXPECT_NO_THROW(commands[51]->parseResponseMsg(msg, 0));
 }
 
 // metricId not in metricsTable → early return at lines 4913-4914
@@ -3192,7 +3200,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetricsV2_UnknownMetricId)
                     {"-r", "0", "-g", "0", "-c", "0", "-i", "255", "-b", "1"});
     std::vector<uint8_t> hdr(sizeof(nsm_msg_hdr) + NSM_RESPONSE_ERROR_LEN, 0);
     auto* msg = reinterpret_cast<nsm_msg*>(hdr.data());
-    EXPECT_NO_THROW(commands[50]->parseResponseMsg(msg, 0));
+    EXPECT_NO_THROW(commands[52]->parseResponseMsg(msg, 0));
 }
 
 // ---- GetPowerSmoothingFeatureInfoV2: handleSampleData error paths ----------
@@ -3227,7 +3235,7 @@ TEST(NsmTelemetryCmdParse,
         appendAggSample(buf, tag, d.data(), dl);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[59]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[61]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -3247,7 +3255,7 @@ TEST(NsmTelemetryCmdParse, GetPowerSmoothingFeatureInfoV2_UnknownTagError)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[59]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[61]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetPowerSmoothingCurrentProfileInfoV2: handleSampleData errors --------
@@ -3283,7 +3291,7 @@ TEST(NsmTelemetryCmdParse,
         appendAggSample(buf, tag, d.data(), dl);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[60]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[62]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -3304,7 +3312,7 @@ TEST(NsmTelemetryCmdParse,
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[60]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[62]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetPowerSmoothingAdminOverrideProfileInfoV2: handleSampleData errors --
@@ -3338,7 +3346,7 @@ TEST(NsmTelemetryCmdParse,
         appendAggSample(buf, tag, d.data(), dl);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[61]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[63]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -3359,7 +3367,7 @@ TEST(NsmTelemetryCmdParse,
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[61]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[63]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetPowerSmoothingPresetProfileInfoV2: handleSampleData error paths ----
@@ -3406,7 +3414,7 @@ TEST(NsmTelemetryCmdParse,
         appendAggSample(buf, tag, d.data(), dl);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[62]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[64]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -3427,7 +3435,7 @@ TEST(NsmTelemetryCmdParse, GetPowerSmoothingPresetProfileInfoV2_UnknownTagError)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[62]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[64]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetMigMode: MigModeEnabled=true branch (line 2124) --------------------
@@ -3443,7 +3451,7 @@ TEST(NsmTelemetryCmdParse, GetMigMode_FlagBit0Set)
                              sizeof(nsm_get_MIG_mode_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_MIG_mode_resp(0, NSM_SUCCESS, ERR_NULL, &flags, msg);
-    EXPECT_NO_THROW(commands[20]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[22]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- GetEccMode: ECCModeEnabled=true and PendingECCState=true (2239,2247) --
@@ -3459,7 +3467,7 @@ TEST(NsmTelemetryCmdParse, GetEccMode_AllFlagsSet)
                              sizeof(nsm_get_ECC_mode_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_ECC_mode_resp(0, NSM_SUCCESS, ERR_NULL, &flags, msg);
-    EXPECT_NO_THROW(commands[22]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- QueryPerInstanceGPMMetrics: valid metricId PERCENTAGE (4844-4845,
@@ -3484,7 +3492,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetrics_ValidMetricId_Percentage)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[49]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[51]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- QueryPerInstanceGPMMetrics: valid metricId BANDWIDTH (4764-4776) ------
@@ -3507,7 +3515,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetrics_ValidMetricId_Bandwidth)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[49]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[51]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- QueryPerInstanceGPMMetricsV2: valid metricId (4913-4914) ---------------
@@ -3530,7 +3538,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetricsV2_ValidMetricId)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[50]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[52]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- GetPCIePortConfig: aggregate handler all paths (4957-4996) -------------
@@ -3555,7 +3563,7 @@ TEST(NsmTelemetryCmdParse, GetPCIePortConfig_PresetTag_Success)
         appendAggSample(buf, tag, &preset_byte, 1);
 
         msg = reinterpret_cast<nsm_msg*>(buf.data());
-        EXPECT_NO_THROW(commands[53]->parseResponseMsg(
+        EXPECT_NO_THROW(commands[55]->parseResponseMsg(
             msg, buf.size() - sizeof(nsm_msg_hdr)));
     }
 }
@@ -3577,7 +3585,7 @@ TEST(NsmTelemetryCmdParse, GetPCIePortConfig_TxAmplitude_Success)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[53]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[55]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // Unknown tag (5) → NSM_SW_ERROR_DATA path 4960-4964
@@ -3597,7 +3605,7 @@ TEST(NsmTelemetryCmdParse, GetPCIePortConfig_UnknownTag_Error)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[53]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[55]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // PCIe preset with wrong size (2 bytes) → error path 4977
@@ -3617,7 +3625,7 @@ TEST(NsmTelemetryCmdParse, GetPCIePortConfig_PresetTag_BadData)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[53]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[55]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // PCIe_Tx_Amplitude with wrong size (2 bytes) → error path 4991
@@ -3637,7 +3645,7 @@ TEST(NsmTelemetryCmdParse, GetPCIePortConfig_TxAmplitude_BadData)
 
     msg = reinterpret_cast<nsm_msg*>(buf.data());
     EXPECT_NO_THROW(
-        commands[53]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+        commands[55]->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
 }
 
 // ---- SetPCIePortConfig: sampleCount mismatch triggers error path (line 5066)
@@ -3651,7 +3659,7 @@ TEST(NsmTelemetryCmdParse, SetPCIePortConfig_SampleCountMismatch)
     parseSubcmdArgs(app, "SetPCIePortConfig",
                     {"-p", "0", "-t", "0", "-i", "0", "-c", "1", "-d", "0"});
     // createRequestMsg returns error code without throwing
-    EXPECT_NO_THROW(commands[54]->createRequestMsg());
+    EXPECT_NO_THROW(commands[56]->createRequestMsg());
 }
 
 // ---- GetRowRemapState with flags set ----------------------------------------
@@ -3668,7 +3676,7 @@ TEST(NsmTelemetryCmdParse, GetRowRemapState_Bit0Set)
                              sizeof(nsm_get_row_remap_state_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_row_remap_state_resp(0, NSM_SUCCESS, ERR_NULL, &flags, msg);
-    EXPECT_NO_THROW(commands[39]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[41]->parseResponseMsg(msg, buf.size()));
 }
 
 // GetRowRemapState with bit1=1 → line 4033 (RowRemappingPendingState = true)
@@ -3683,7 +3691,7 @@ TEST(NsmTelemetryCmdParse, GetRowRemapState_Bit1Set)
                              sizeof(nsm_get_row_remap_state_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_get_row_remap_state_resp(0, NSM_SUCCESS, ERR_NULL, &flags, msg);
-    EXPECT_NO_THROW(commands[39]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[41]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- SetPowerLimit MODULE branch (createRequestMsg, line 3817-3820) ---------
@@ -3695,7 +3703,7 @@ TEST(NsmTelemetryCmdParse, SetPowerLimit_ModuleBranch)
     // powerLimitId = MODULE (1)
     parseSubcmdArgs(app, "SetPowerLimit",
                     {"-i", "1", "-a", "0", "-p", "0", "-l", "100000"});
-    EXPECT_NO_THROW(commands[34]->createRequestMsg());
+    EXPECT_NO_THROW(commands[36]->createRequestMsg());
 }
 
 // ---- GetPowerLimit MODULE branch (createRequestMsg, line 3886-3888) ---------
@@ -3706,7 +3714,7 @@ TEST(NsmTelemetryCmdParse, GetPowerLimit_ModuleBranch)
     setupTelemetryCommands(app);
     // powerLimitId = MODULE (1)
     parseSubcmdArgs(app, "GetPowerLimit", {"-i", "1"});
-    EXPECT_NO_THROW(commands[35]->createRequestMsg());
+    EXPECT_NO_THROW(commands[37]->createRequestMsg());
 }
 
 // ============================================================================
@@ -3747,7 +3755,7 @@ TEST(NsmTelemetryCmdParse, QueryPortStatus_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[2]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[4]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryPortsAvailable_ParseResponseError)
@@ -3756,7 +3764,7 @@ TEST(NsmTelemetryCmdParse, QueryPortsAvailable_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[3]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[5]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetPortDisableFuture_ParseResponseError)
@@ -3765,7 +3773,7 @@ TEST(NsmTelemetryCmdParse, SetPortDisableFuture_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[4]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[6]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetFabricManagerState_ParseResponseError)
@@ -3774,7 +3782,7 @@ TEST(NsmTelemetryCmdParse, GetFabricManagerState_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[5]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[7]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetPortDisableFuture_ParseResponseError)
@@ -3783,7 +3791,7 @@ TEST(NsmTelemetryCmdParse, GetPortDisableFuture_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[6]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[8]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetPowerMode_ParseResponseError)
@@ -3792,7 +3800,7 @@ TEST(NsmTelemetryCmdParse, GetPowerMode_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[7]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[9]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetPowerMode_ParseResponseError)
@@ -3801,7 +3809,7 @@ TEST(NsmTelemetryCmdParse, SetPowerMode_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[8]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetSwitchIsolationMode_ParseResponseError)
@@ -3810,7 +3818,7 @@ TEST(NsmTelemetryCmdParse, GetSwitchIsolationMode_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[9]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetSwitchIsolationMode_ParseResponseError)
@@ -3819,7 +3827,7 @@ TEST(NsmTelemetryCmdParse, SetSwitchIsolationMode_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[10]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[12]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetInventoryInformation_ParseResponseError)
@@ -3828,7 +3836,7 @@ TEST(NsmTelemetryCmdParse, GetInventoryInformation_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[11]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetTemperatureReading_ParseResponseError)
@@ -3837,7 +3845,7 @@ TEST(NsmTelemetryCmdParse, GetTemperatureReading_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[12]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[14]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, ReadThermalParameter_ParseResponseError)
@@ -3846,7 +3854,7 @@ TEST(NsmTelemetryCmdParse, ReadThermalParameter_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[13]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[15]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetCurrentPowerDraw_ParseResponseError)
@@ -3855,7 +3863,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentPowerDraw_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[14]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[16]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetMaxObservedPower_ParseResponseError)
@@ -3864,7 +3872,7 @@ TEST(NsmTelemetryCmdParse, GetMaxObservedPower_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[15]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetCurrentEnergyCount_ParseResponseError)
@@ -3873,7 +3881,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentEnergyCount_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[16]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[18]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetVoltage_ParseResponseError)
@@ -3882,7 +3890,7 @@ TEST(NsmTelemetryCmdParse, GetVoltage_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[17]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[19]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetAltitudePressure_ParseResponseError)
@@ -3891,7 +3899,7 @@ TEST(NsmTelemetryCmdParse, GetAltitudePressure_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[18]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[20]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetDriverInfo_ParseResponseError)
@@ -3900,7 +3908,7 @@ TEST(NsmTelemetryCmdParse, GetDriverInfo_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[19]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[21]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetMigMode_ParseResponseError)
@@ -3909,7 +3917,7 @@ TEST(NsmTelemetryCmdParse, GetMigMode_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[20]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[22]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetMigMode_ParseResponseError)
@@ -3918,7 +3926,7 @@ TEST(NsmTelemetryCmdParse, SetMigMode_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[21]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[23]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetEccMode_ParseResponseError)
@@ -3927,7 +3935,7 @@ TEST(NsmTelemetryCmdParse, GetEccMode_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[22]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetEccMode_ParseResponseError)
@@ -3936,7 +3944,7 @@ TEST(NsmTelemetryCmdParse, SetEccMode_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[23]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[25]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetEccErrorCounts_ParseResponseError)
@@ -3945,7 +3953,7 @@ TEST(NsmTelemetryCmdParse, GetEccErrorCounts_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetClockLimit_ParseResponseError)
@@ -3954,7 +3962,7 @@ TEST(NsmTelemetryCmdParse, SetClockLimit_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[25]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[27]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetEDPpScalingFactors_ParseResponseError)
@@ -3963,7 +3971,7 @@ TEST(NsmTelemetryCmdParse, GetEDPpScalingFactors_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetEDPpScalingFactors_ParseResponseError)
@@ -3972,7 +3980,7 @@ TEST(NsmTelemetryCmdParse, SetEDPpScalingFactors_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[27]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[29]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_ParseResponseError)
@@ -3981,7 +3989,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryVectorGroupTelemetry_ParseResponseError)
@@ -3990,7 +3998,7 @@ TEST(NsmTelemetryCmdParse, QueryVectorGroupTelemetry_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[29]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[31]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse,
@@ -4000,7 +4008,7 @@ TEST(NsmTelemetryCmdParse,
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, PcieFundamentalReset_ParseResponseError)
@@ -4009,7 +4017,7 @@ TEST(NsmTelemetryCmdParse, PcieFundamentalReset_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[31]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[33]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, ClearScalarDataSource_ParseResponseError)
@@ -4018,7 +4026,7 @@ TEST(NsmTelemetryCmdParse, ClearScalarDataSource_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[32]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[34]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetClockLimit_ParseResponseError)
@@ -4027,7 +4035,7 @@ TEST(NsmTelemetryCmdParse, GetClockLimit_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[33]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[35]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetPowerLimit_ParseResponseError)
@@ -4036,7 +4044,7 @@ TEST(NsmTelemetryCmdParse, SetPowerLimit_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[34]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[36]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetPowerLimit_ParseResponseError)
@@ -4045,7 +4053,7 @@ TEST(NsmTelemetryCmdParse, GetPowerLimit_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[35]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[37]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetCurrClockFreq_ParseResponseError)
@@ -4054,7 +4062,7 @@ TEST(NsmTelemetryCmdParse, GetCurrClockFreq_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[36]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[38]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetAccumGpuUtilTime_ParseResponseError)
@@ -4063,7 +4071,7 @@ TEST(NsmTelemetryCmdParse, GetAccumGpuUtilTime_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[37]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[39]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetProcessorThrottleReason_ParseResponseError)
@@ -4072,7 +4080,7 @@ TEST(NsmTelemetryCmdParse, GetProcessorThrottleReason_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[38]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[40]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetRowRemapState_ParseResponseError)
@@ -4081,7 +4089,7 @@ TEST(NsmTelemetryCmdParse, GetRowRemapState_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[39]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[41]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetRowRemappingCounts_ParseResponseError)
@@ -4090,7 +4098,7 @@ TEST(NsmTelemetryCmdParse, GetRowRemappingCounts_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[40]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[42]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetRowRemapAvailability_ParseResponseError)
@@ -4099,7 +4107,7 @@ TEST(NsmTelemetryCmdParse, GetRowRemapAvailability_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[41]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[43]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetLeakDetectionInfo_ParseResponseError)
@@ -4108,7 +4116,7 @@ TEST(NsmTelemetryCmdParse, GetLeakDetectionInfo_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[42]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[44]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetLeakDetectionThresholds_ParseResponseError)
@@ -4117,7 +4125,7 @@ TEST(NsmTelemetryCmdParse, SetLeakDetectionThresholds_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[43]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[45]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetMemoryCapacityUtil_ParseResponseError)
@@ -4126,7 +4134,7 @@ TEST(NsmTelemetryCmdParse, GetMemoryCapacityUtil_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[44]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[46]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetCurrentUtilization_ParseResponseError)
@@ -4135,7 +4143,7 @@ TEST(NsmTelemetryCmdParse, GetCurrentUtilization_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[45]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[47]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetClockOutputEnableState_ParseResponseError)
@@ -4144,7 +4152,7 @@ TEST(NsmTelemetryCmdParse, GetClockOutputEnableState_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[46]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[48]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryAggregatedGPMMetrics_ParseResponseError)
@@ -4153,7 +4161,7 @@ TEST(NsmTelemetryCmdParse, QueryAggregatedGPMMetrics_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[48]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[50]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetrics_ParseResponseError)
@@ -4162,7 +4170,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetrics_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[49]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[51]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetricsV2_ParseResponseError)
@@ -4171,7 +4179,7 @@ TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetricsV2_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[50]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[52]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetViolationDuration_ParseResponseError)
@@ -4180,7 +4188,7 @@ TEST(NsmTelemetryCmdParse, GetViolationDuration_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[51]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[53]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetListAvailablePciePorts_ParseResponseError)
@@ -4189,7 +4197,7 @@ TEST(NsmTelemetryCmdParse, GetListAvailablePciePorts_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[52]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[54]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetPCIePortConfig_ParseResponseError)
@@ -4198,7 +4206,7 @@ TEST(NsmTelemetryCmdParse, GetPCIePortConfig_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[53]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[55]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, SetPCIePortConfig_ParseResponseError)
@@ -4207,7 +4215,7 @@ TEST(NsmTelemetryCmdParse, SetPCIePortConfig_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[54]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[56]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse,
@@ -4217,7 +4225,7 @@ TEST(NsmTelemetryCmdParse,
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[55]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[57]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetEthPortTelemetryCounter_ParseResponseError)
@@ -4226,7 +4234,7 @@ TEST(NsmTelemetryCmdParse, GetEthPortTelemetryCounter_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[56]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[58]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetPortNetworkAddresses_ParseResponseError)
@@ -4235,7 +4243,7 @@ TEST(NsmTelemetryCmdParse, GetPortNetworkAddresses_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[57]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[59]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetPortEccCounters_ParseResponseError)
@@ -4244,7 +4252,7 @@ TEST(NsmTelemetryCmdParse, GetPortEccCounters_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[58]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[60]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetPowerSmoothingFeatureInfoV2_ParseResponseError)
@@ -4253,7 +4261,7 @@ TEST(NsmTelemetryCmdParse, GetPowerSmoothingFeatureInfoV2_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[59]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[61]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetPowerSmoothingCurrentProfile_ParseResponseError)
@@ -4262,7 +4270,7 @@ TEST(NsmTelemetryCmdParse, GetPowerSmoothingCurrentProfile_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[60]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[62]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse,
@@ -4272,7 +4280,7 @@ TEST(NsmTelemetryCmdParse,
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[61]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[63]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, GetPowerSmoothingPresetProfile_ParseResponseError)
@@ -4281,7 +4289,7 @@ TEST(NsmTelemetryCmdParse, GetPowerSmoothingPresetProfile_ParseResponseError)
     setupTelemetryCommands(app);
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[62]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[64]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- printPortTeleInfo: all counter bits set to 1 --------------------------
@@ -4354,7 +4362,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group1_CommonClockMode)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group1_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- QueryScalarGroupTelemetry Group 1: Unknown clock mode (default) --------
@@ -4373,7 +4381,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group1_UnknownClockMode)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group1_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- QueryScalarGroupTelemetry Group 7: success path (various port types) ---
@@ -4392,7 +4400,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_Endpoint)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_RootPort)
@@ -4409,7 +4417,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_RootPort)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_UpstreamPort)
@@ -4426,7 +4434,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_UpstreamPort)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_DownstreamPort)
@@ -4443,7 +4451,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_DownstreamPort)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_UnknownPortType)
@@ -4460,7 +4468,7 @@ TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group7_UnknownPortType)
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_query_scalar_group_telemetry_v1_group7_resp(0, NSM_SUCCESS, ERR_NULL,
                                                        &data, msg);
-    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- QueryVectorGroupTelemetry Group 1: error path --------------------------
@@ -4478,7 +4486,7 @@ TEST(NsmTelemetryCmdParse, QueryVectorGroupTelemetry_Group1_ParseResponseError)
 
     auto buf = makeTruncatedResp();
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[29]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[31]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- SetPCIePortConfig: parseResponseMsg cc error path ----------------------
@@ -4499,7 +4507,7 @@ TEST(NsmTelemetryCmdParse, SetPCIePortConfig_ParseResponseCcError)
     // inside parseResponseMsg is exercised.
     buf[sizeof(nsm_msg_hdr) + 1] = NSM_ERROR;
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
-    EXPECT_NO_THROW(commands[54]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[56]->parseResponseMsg(msg, buf.size()));
 }
 
 // ---- GetPortTelemetryCounter: printPortTeleInfo null portData
@@ -4567,6 +4575,1204 @@ TEST(NsmTelemetryCmdParse, GetPortTelemetryCounter_ParseResponseCcError)
     encode_get_port_telemetry_counter_resp(0, NSM_ERROR, ERR_NULL, &portData,
                                            msg);
     EXPECT_NO_THROW(commands[0]->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- QueryPortCharacteristicsV2 / ClearPortMetricState (link health ext.) --
+
+// Position of a telemetry subcommand in `commands`: registerCommand pushes
+// one command per leaf add_subcommand, so the CLI order is the vector order.
+static size_t telemetryCommandIndex(CLI::App& app, const std::string& cmdName)
+{
+    auto* telSub = app.get_subcommand("telemetry");
+    const auto subs = telSub->get_subcommands({});
+    EXPECT_EQ(subs.size(), commands.size());
+    for (size_t i = 0; i < subs.size(); ++i)
+    {
+        if (subs[i]->get_name() == cmdName)
+        {
+            return i;
+        }
+    }
+    ADD_FAILURE() << "unknown telemetry subcommand " << cmdName;
+    return 0;
+}
+
+struct LinkHealthV2Sample
+{
+    uint8_t tag;
+    bool valid;
+    std::vector<uint8_t> data;
+};
+
+// Query Port Characteristics v2 aggregate response with `recordCount` in the
+// header and the given samples appended.
+static std::vector<uint8_t>
+    makeLinkHealthV2Resp(uint16_t recordCount,
+                         const std::vector<LinkHealthV2Sample>& samples)
+{
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp),
+                             0);
+    encode_query_port_characteristics_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, recordCount,
+        reinterpret_cast<nsm_msg*>(buf.data()));
+    for (const auto& sample : samples)
+    {
+        std::array<uint8_t, sizeof(nsm_aggregate_resp_sample) + 8> sampleBuf{};
+        size_t sampleLen = 0;
+        encode_aggregate_resp_sample(
+            sample.tag, sample.valid, sample.data.data(), sample.data.size(),
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sampleBuf.data()),
+            &sampleLen);
+        buf.insert(buf.end(), sampleBuf.begin(), sampleBuf.begin() + sampleLen);
+    }
+    return buf;
+}
+
+static std::vector<uint8_t> u32RecordData(uint32_t value)
+{
+    std::vector<uint8_t> data(sizeof(uint32_t));
+    size_t dataLen = 0;
+    encode_port_characteristics_v2_u32_record(value, data.data(), &dataLen);
+    return data;
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortCharacteristicsV2_CreateRequest)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryPortCharacteristicsV2", {"-p", "3"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryPortCharacteristicsV2")];
+
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    ASSERT_EQ(request.size(),
+              sizeof(nsm_msg_hdr) +
+                  sizeof(nsm_query_port_characteristics_v2_req));
+    EXPECT_EQ(request[sizeof(nsm_msg_hdr)], NSM_QUERY_PORT_CHARACTERISTICS_V2);
+    uint16_t portNumber = 0;
+    EXPECT_EQ(decode_query_port_characteristics_v2_req(
+                  reinterpret_cast<const nsm_msg*>(request.data()),
+                  request.size(), &portNumber),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(portNumber, 3);
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortCharacteristicsV2_CreateRequest_PortZero)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryPortCharacteristicsV2", {"-p", "0"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryPortCharacteristicsV2")];
+
+    // Port numbers are one-based.
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    EXPECT_TRUE(request.empty());
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortCharacteristicsV2_ParseResponse)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryPortCharacteristicsV2", {"-p", "3"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryPortCharacteristicsV2")];
+
+    nsm_link_health_record linkHealth{};
+    linkHealth.link_health = NSM_LINK_HEALTH_ATTENTION;
+    linkHealth.attention_trigger = NSM_ATTENTION_TRIGGER_EFFECTIVE_BER;
+    linkHealth.attention_trigger_metric = 3;
+    linkHealth.link_health_config_changed = NSM_LINK_HEALTH_CONFIG_CURRENT;
+    std::vector<uint8_t> healthData(sizeof(uint32_t));
+    size_t dataLen = 0;
+    encode_link_health_record(&linkHealth, healthData.data(), &dataLen);
+    std::vector<uint8_t> timestampData(sizeof(uint64_t));
+    encode_aggregate_timestamp_data(0x1122334455667788ULL, timestampData.data(),
+                                    &dataLen);
+
+    // All four u32 records, the Link Health record, a Valid = 0 record, a
+    // reserved tag and the aggregate timestamp.
+    auto buf = makeLinkHealthV2Resp(
+        8,
+        {{NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS, true,
+          u32RecordData(0x00000801)},
+         {NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE, true, u32RecordData(2500)},
+         {NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE, true, u32RecordData(3000)},
+         {NSM_PORT_CHARACTERISTICS_V2_TAG_LANE_INFO, false, u32RecordData(0)},
+         {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH, true, healthData},
+         {0x20, true, u32RecordData(0)},
+         {NSM_PORT_CHARACTERISTICS_V2_TAG_TIMESTAMP, true, timestampData},
+         {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH, true, {1, 0}}});
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(buf.data()), buf.size()));
+
+    // Error completion code
+    std::vector<uint8_t> err(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    encode_query_port_characteristics_v2_resp(
+        0, NSM_ERR_UNSUPPORTED_COMMAND_CODE, ERR_NOT_SUPPORTED, 0,
+        reinterpret_cast<nsm_msg*>(err.data()));
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(err.data()), err.size()));
+
+    // Record count larger than the payload: parsing stops at the missing
+    // record.
+    auto truncated =
+        makeLinkHealthV2Resp(2, {{NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE,
+                                  true, u32RecordData(2500)}});
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(truncated.data()), truncated.size()));
+}
+
+TEST(NsmTelemetryCmdParse, ClearPortMetricState_CreateRequest_DefaultTag)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "ClearPortMetricState", {"-p", "2"});
+    auto& cmd = commands[telemetryCommandIndex(app, "ClearPortMetricState")];
+
+    // No --tag: the Link Health record (Tag 0x04) is cleared.
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    ASSERT_EQ(request.size(), sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_clear_port_metric_state_req) + 1);
+    EXPECT_EQ(request[sizeof(nsm_msg_hdr)], NSM_CLEAR_PORT_METRIC_STATE);
+    uint16_t portNumber = 0;
+    uint16_t tagCount = 0;
+    const uint8_t* tagIds = nullptr;
+    ASSERT_EQ(decode_clear_port_metric_state_req(
+                  reinterpret_cast<const nsm_msg*>(request.data()),
+                  request.size(), &portNumber, &tagCount, &tagIds),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(portNumber, 2);
+    EXPECT_EQ(tagCount, 1);
+    EXPECT_EQ(tagIds[0], NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH);
+}
+
+TEST(NsmTelemetryCmdParse, ClearPortMetricState_CreateRequest_ExplicitTags)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "ClearPortMetricState",
+                    {"-p", "2", "-t", "4", "-t", "1"});
+    auto& cmd = commands[telemetryCommandIndex(app, "ClearPortMetricState")];
+
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    uint16_t portNumber = 0;
+    uint16_t tagCount = 0;
+    const uint8_t* tagIds = nullptr;
+    ASSERT_EQ(decode_clear_port_metric_state_req(
+                  reinterpret_cast<const nsm_msg*>(request.data()),
+                  request.size(), &portNumber, &tagCount, &tagIds),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(portNumber, 2);
+    ASSERT_EQ(tagCount, 2);
+    EXPECT_EQ(tagIds[0], NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH);
+    EXPECT_EQ(tagIds[1], NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE);
+
+    // Port numbers are one-based.
+    CLI::App zeroApp;
+    setupTelemetryCommands(zeroApp);
+    parseSubcmdArgs(zeroApp, "ClearPortMetricState", {"-p", "0", "-t", "4"});
+    auto& zeroCmd =
+        commands[telemetryCommandIndex(zeroApp, "ClearPortMetricState")];
+    auto [zeroRc, zeroRequest] = zeroCmd->createRequestMsg();
+    EXPECT_EQ(zeroRc, NSM_SW_ERROR_DATA);
+    EXPECT_TRUE(zeroRequest.empty());
+}
+
+TEST(NsmTelemetryCmdParse, ClearPortMetricState_ParseResponse)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "ClearPortMetricState", {"-p", "2"});
+    auto& cmd = commands[telemetryCommandIndex(app, "ClearPortMetricState")];
+
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_clear_port_metric_state_resp), 0);
+    encode_clear_port_metric_state_resp(0, NSM_SUCCESS, ERR_NULL,
+                                        reinterpret_cast<nsm_msg*>(buf.data()));
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(buf.data()), buf.size()));
+
+    std::vector<uint8_t> err(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    encode_clear_port_metric_state_resp(0, NSM_ERR_INVALID_DATA, ERR_NULL,
+                                        reinterpret_cast<nsm_msg*>(err.data()));
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(err.data()), err.size()));
+}
+
+// ---- Coverage push: name-based lookups for the remaining branches ----------
+
+// Non-success response (nsm_msg_hdr + nsm_common_non_success_resp) that every
+// decode_*_resp accepts with rc == NSM_SW_SUCCESS and cc != NSM_SUCCESS.
+static std::vector<uint8_t> makeCcErrorResp(uint8_t cc = NSM_ERROR,
+                                            uint16_t reasonCode = ERR_NULL)
+{
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    encode_cc_only_resp(0, NSM_TYPE_PLATFORM_ENVIRONMENTAL, 0, cc, reasonCode,
+                        reinterpret_cast<nsm_msg*>(buf.data()));
+    return buf;
+}
+
+// Commands whose parseResponseMsg treats payloadLength as the payload size
+// (they add sizeof(nsm_msg_hdr) themselves before decoding).
+static bool usesPayloadOnlyLength(const std::string& cmdName)
+{
+    static const std::set<std::string> payloadOnly = {
+        "ReadThermalParameter",
+        "GetCurrentPowerDraw",
+        "GetMaxObservedPower",
+        "GetCurrentEnergyCount",
+        "GetVoltage",
+        "GetAltitudePressure",
+        "QueryVectorGroupTelemetry",
+        "GetPCIePortConfig",
+        "GetPowerSmoothingFeatureInfoV2",
+        "GetPowerSmoothingCurrentProfileInformationV2",
+        "GetPowerSmoothingAdminOverrideProfileInformationV2",
+        "GetPowerSmoothingPresetProfileInformationV2",
+        "GetEthPortTelemetryCounter",
+        "GetPortNetworkAddresses",
+        "GetPortEccCounters",
+        "QueryAggregatedGPMMetrics",
+        "QueryPerInstanceGPMMetrics",
+        "QueryPerInstanceGPMMetricsV2",
+        "QueryPortTelemetryV2",
+    };
+    return payloadOnly.contains(cmdName);
+}
+
+// Every command: a well-formed non-success response (rc == NSM_SW_SUCCESS,
+// cc != NSM_SUCCESS) and a zero-length response (rc != NSM_SW_SUCCESS).
+TEST(NsmTelemetryCmdParse, AllCommands_CcErrorAndZeroLengthResponses)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    // Commands whose parse path needs CLI arguments to reach the decoder.
+    parseSubcmdArgs(
+        app, "QueryVectorGroupTelemetry",
+        {"-t", "0", "-u", "0", "-i", "0", "-g", "1", "-s", "1", "-l", "0"});
+
+    auto* telSub = app.get_subcommand("telemetry");
+    const auto subs = telSub->get_subcommands({});
+    ASSERT_EQ(subs.size(), commands.size());
+
+    auto err = makeCcErrorResp();
+    auto* errMsg = reinterpret_cast<nsm_msg*>(err.data());
+    for (size_t i = 0; i < subs.size(); ++i)
+    {
+        const auto& name = subs[i]->get_name();
+        size_t len = usesPayloadOnlyLength(name)
+                         ? err.size() - sizeof(nsm_msg_hdr)
+                         : err.size();
+        EXPECT_NO_THROW(commands[i]->parseResponseMsg(errMsg, len)) << name;
+        EXPECT_NO_THROW(commands[i]->parseResponseMsg(errMsg, 0)) << name;
+    }
+}
+
+// ---- GetLLDPPacket ----------------------------------------------------------
+
+TEST(NsmTelemetryCmdParse, GetLLDPPacket_CreateRequest_InvalidDirection)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetLLDPPacket", {"-p", "1", "-d", "2"});
+    auto& cmd = commands[telemetryCommandIndex(app, "GetLLDPPacket")];
+
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    EXPECT_TRUE(request.empty());
+}
+
+TEST(NsmTelemetryCmdParse, GetLLDPPacket_CreateRequest_Valid)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetLLDPPacket", {"-p", "3", "-d", "1"});
+    auto& cmd = commands[telemetryCommandIndex(app, "GetLLDPPacket")];
+
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    ASSERT_EQ(request.size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_get_lldp_packet_req));
+    uint16_t portNumber = 0;
+    uint8_t direction = 0;
+    ASSERT_EQ(decode_get_lldp_packet_req(
+                  reinterpret_cast<const nsm_msg*>(request.data()),
+                  request.size(), &portNumber, &direction),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(portNumber, 3);
+    EXPECT_EQ(direction, NSM_LLDP_DIRECTION_RX);
+}
+
+static std::vector<uint8_t> makeLldpResp(const std::vector<uint8_t>& data)
+{
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + data.size(), 0);
+    EXPECT_EQ(encode_get_lldp_packet_resp(
+                  0, NSM_SUCCESS, ERR_NULL, data.data(),
+                  static_cast<uint16_t>(data.size()),
+                  reinterpret_cast<nsm_msg*>(buf.data()), buf.size()),
+              NSM_SW_SUCCESS);
+    return buf;
+}
+
+TEST(NsmTelemetryCmdParse, GetLLDPPacket_ParseResponse_AllDirections)
+{
+    // direction 1 (RX), 0 (TX) and an out-of-range value (printed raw).
+    for (const char* dir : {"1", "0", "7"})
+    {
+        CLI::App app;
+        setupTelemetryCommands(app);
+        parseSubcmdArgs(app, "GetLLDPPacket", {"-p", "2", "-d", dir});
+        auto& cmd = commands[telemetryCommandIndex(app, "GetLLDPPacket")];
+
+        auto buf = makeLldpResp({0x01, 0x80, 0xC2, 0x00, 0x00, 0x0E});
+        EXPECT_NO_THROW(cmd->parseResponseMsg(
+            reinterpret_cast<nsm_msg*>(buf.data()), buf.size()));
+    }
+}
+
+TEST(NsmTelemetryCmdParse, GetLLDPPacket_ParseResponse_EmptyAndError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetLLDPPacket", {"-p", "2", "-d", "0"});
+    auto& cmd = commands[telemetryCommandIndex(app, "GetLLDPPacket")];
+
+    auto empty = makeLldpResp({});
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(empty.data()), empty.size()));
+
+    auto err = makeCcErrorResp();
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(err.data()), err.size()));
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(err.data()), 0));
+}
+
+// ---- QueryPortTelemetryV2 ---------------------------------------------------
+
+TEST(NsmTelemetryCmdParse, QueryPortTelemetryV2_CreateRequest_Invalid)
+{
+    // Port index is one-based.
+    CLI::App portApp;
+    setupTelemetryCommands(portApp);
+    parseSubcmdArgs(portApp, "QueryPortTelemetryV2", {"-p", "0", "-g", "9"});
+    auto& portCmd =
+        commands[telemetryCommandIndex(portApp, "QueryPortTelemetryV2")];
+    auto [portRc, portReq] = portCmd->createRequestMsg();
+    EXPECT_EQ(portRc, NSM_SW_ERROR_DATA);
+    EXPECT_TRUE(portReq.empty());
+
+    // Group ID outside 0x01-0x09.
+    for (const char* group : {"0", "10"})
+    {
+        CLI::App app;
+        setupTelemetryCommands(app);
+        parseSubcmdArgs(app, "QueryPortTelemetryV2", {"-p", "1", "-g", group});
+        auto& cmd =
+            commands[telemetryCommandIndex(app, "QueryPortTelemetryV2")];
+        auto [rc, request] = cmd->createRequestMsg();
+        EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+        EXPECT_TRUE(request.empty());
+    }
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortTelemetryV2_CreateRequest_Valid)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryPortTelemetryV2",
+                    {"-p", "2", "-g", "3", "-s", "5"});
+    auto& cmd = commands[telemetryCommandIndex(app, "QueryPortTelemetryV2")];
+
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    ASSERT_EQ(request.size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_v2_req));
+    uint16_t portIndex = 0;
+    uint8_t groupId = 0;
+    uint32_t sequenceToken = 0;
+    ASSERT_EQ(decode_query_port_telemetry_v2_req(
+                  reinterpret_cast<const nsm_msg*>(request.data()),
+                  request.size(), &portIndex, &groupId, &sequenceToken),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(portIndex, 2);
+    EXPECT_EQ(groupId, NSM_PORT_TELEMETRY_GROUP_PHY_PLR);
+    EXPECT_EQ(sequenceToken, 5u);
+}
+
+static std::vector<uint8_t> makePortTelemetryV2Resp(uint16_t count)
+{
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp),
+                             0);
+    encode_query_port_telemetry_v2_resp(0, NSM_SUCCESS, count,
+                                        reinterpret_cast<nsm_msg*>(buf.data()));
+    return buf;
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortTelemetryV2_ParseResponse_OpticalModule)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryPortTelemetryV2", {"-p", "1", "-g", "9"});
+    auto& cmd = commands[telemetryCommandIndex(app, "QueryPortTelemetryV2")];
+
+    const uint8_t snr[4] = {0x21, 0x16, 0x00, 0x00}; // raw 5665 -> 22.13 dB
+    const uint8_t u16[2] = {0x34, 0x12};
+    auto buf = makePortTelemetryV2Resp(7);
+    // SNR lane 2, TX power lane 0, RX power lane 1, bias current lane 7,
+    // unknown metric base (0x20), SNR with a bad length, power with a bad
+    // length.
+    appendAggSample(
+        buf, static_cast<uint8_t>(NSM_OPTICAL_MODULE_TAG_SNR_BASE + 2), snr, 4);
+    appendAggSample(buf, NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE, u16, 2);
+    appendAggSample(
+        buf, static_cast<uint8_t>(NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE + 1),
+        u16, 2);
+    appendAggSample(
+        buf, static_cast<uint8_t>(NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE + 7),
+        u16, 2);
+    appendAggSample(buf, 0x20, u16, 2);
+    appendAggSample(buf, NSM_OPTICAL_MODULE_TAG_SNR_BASE, u16, 2);
+    appendAggSample(
+        buf, static_cast<uint8_t>(NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE + 3),
+        snr, 4);
+
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                              buf.size() - sizeof(nsm_msg_hdr)));
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortTelemetryV2_ParseResponse_RawGroup)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryPortTelemetryV2", {"-p", "1", "-g", "1"});
+    auto& cmd = commands[telemetryCommandIndex(app, "QueryPortTelemetryV2")];
+
+    const uint8_t raw[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    auto buf = makePortTelemetryV2Resp(1);
+    appendAggSample(buf, 5, raw, 8);
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                              buf.size() - sizeof(nsm_msg_hdr)));
+}
+
+// ---- QueryPortTelemetryCapabilities ----------------------------------------
+
+TEST(NsmTelemetryCmdParse, QueryPortTelemetryCapabilities_CreateRequest)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryPortTelemetryCapabilities", {"-p", "4"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryPortTelemetryCapabilities")];
+
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    ASSERT_EQ(request.size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_caps_req));
+    uint16_t portIndex = 0;
+    ASSERT_EQ(decode_query_port_telemetry_caps_req(
+                  reinterpret_cast<const nsm_msg*>(request.data()),
+                  request.size(), &portIndex),
+              NSM_SW_SUCCESS);
+    EXPECT_EQ(portIndex, 4);
+}
+
+TEST(NsmTelemetryCmdParse, QueryPortTelemetryCapabilities_ParseResponse)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryPortTelemetryCapabilities", {"-p", "4"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryPortTelemetryCapabilities")];
+
+    // Groups 1, 3, 5, 7 (byte 0) and 9 (byte 1, bit 0) supported.
+    uint8_t bitmask[32] = {};
+    bitmask[0] = 0x55;
+    bitmask[1] = 0x01;
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_caps_resp), 0);
+    ASSERT_EQ(encode_query_port_telemetry_caps_resp(
+                  0, NSM_SUCCESS, ERR_NULL, 9, 4, bitmask,
+                  reinterpret_cast<nsm_msg*>(buf.data())),
+              NSM_SW_SUCCESS);
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(buf.data()), buf.size()));
+
+    auto err = makeCcErrorResp();
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(err.data()), err.size()));
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(err.data()), 0));
+}
+
+// ---- QueryPortCharacteristicsV2: bad record lengths and error responses ----
+
+TEST(NsmTelemetryCmdParse, QueryPortCharacteristicsV2_ParseResponse_BadRecords)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryPortCharacteristicsV2", {"-p", "3"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryPortCharacteristicsV2")];
+
+    // u32, Link Health and Timestamp records that are all too short.
+    auto buf = makeLinkHealthV2Resp(
+        3, {{NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS, true, {0x01, 0x02}},
+            {NSM_PORT_CHARACTERISTICS_V2_TAG_LINK_HEALTH, true, {0x01, 0x02}},
+            {NSM_PORT_CHARACTERISTICS_V2_TAG_TIMESTAMP, true, {0x01, 0x02}}});
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(buf.data()), buf.size()));
+
+    // Record count larger than the records present: header decode fails.
+    auto truncated = makeLinkHealthV2Resp(2, {});
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(truncated.data()), truncated.size()));
+
+    auto err = makeCcErrorResp();
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(err.data()), err.size()));
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(err.data()), 0));
+}
+
+// ---- GetPortTelemetryCounter: each supported-counter bit on its own --------
+
+TEST(NsmTelemetryCmdParse, GetPortTelemetryCounter_EachCounterBitAlone)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetPortTelemetryCounter", {"-p", "1"});
+    auto& cmd = commands[telemetryCommandIndex(app, "GetPortTelemetryCounter")];
+
+    constexpr size_t counterBits = 8 * sizeof(nsm_supported_port_counter);
+    for (size_t bit = 0; bit < counterBits; ++bit)
+    {
+        struct nsm_port_counter_data portData{};
+        auto* bits = reinterpret_cast<uint8_t*>(&portData.supported_counter);
+        bits[bit / 8] = static_cast<uint8_t>(1u << (bit % 8));
+        std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                                 sizeof(nsm_port_counter_data));
+        auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+        encode_get_port_telemetry_counter_resp(0, NSM_SUCCESS, ERR_NULL,
+                                               &portData, msg);
+        EXPECT_NO_THROW(cmd->parseResponseMsg(msg, buf.size())) << bit;
+    }
+}
+
+// ---- GetInventoryInformation: every property identifier --------------------
+
+TEST(NsmTelemetryCmdParse, GetInventoryInformation_AllPropertyIds)
+{
+    struct PropertyCase
+    {
+        std::vector<uint8_t> ids;
+        std::vector<uint8_t> data;
+    };
+    const std::vector<PropertyCase> cases = {
+        // uint32 properties
+        {{MAXIMUM_MEMORY_CAPACITY,
+          PRODUCT_LENGTH,
+          PRODUCT_WIDTH,
+          PRODUCT_HEIGHT,
+          RATED_DEVICE_POWER_LIMIT,
+          MINIMUM_DEVICE_POWER_LIMIT,
+          MAXIMUM_DEVICE_POWER_LIMIT,
+          MINIMUM_MODULE_POWER_LIMIT,
+          MAXIMUM_MODULE_POWER_LIMIT,
+          RATED_MODULE_POWER_LIMIT,
+          RATED_GPU_BASE_POWER_LIMIT,
+          MINIMUM_GPU_BASE_POWER_LIMIT,
+          MAXIMUM_GPU_BASE_POWER_LIMIT,
+          DEFAULT_BOOST_CLOCKS,
+          DEFAULT_BASE_CLOCKS,
+          TRAY_SLOT_NUMBER,
+          TRAY_SLOT_INDEX,
+          GPU_HOST_ID,
+          GPU_MODULE_ID,
+          GPU_NVLINK_PEER_TYPE,
+          MINIMUM_MEMORY_CLOCK_LIMIT,
+          MAXIMUM_MEMORY_CLOCK_LIMIT,
+          MINIMUM_GRAPHICS_CLOCK_LIMIT,
+          MAXIMUM_GRAPHICS_CLOCK_LIMIT},
+         {0x10, 0x00, 0x00, 0x00}},
+        // uint8 properties
+        {{MINIMUM_EDPP_SCALING_FACTOR, MAXIMUM_EDPP_SCALING_FACTOR}, {0x5A}},
+        // uint64 properties
+        {{GPU_IBGUID, PCIERETIMER_0_EEPROM_VERSION,
+          PCIERETIMER_1_EEPROM_VERSION, PCIERETIMER_2_EEPROM_VERSION,
+          PCIERETIMER_3_EEPROM_VERSION, PCIERETIMER_4_EEPROM_VERSION,
+          PCIERETIMER_5_EEPROM_VERSION, PCIERETIMER_6_EEPROM_VERSION,
+          PCIERETIMER_7_EEPROM_VERSION},
+         {1, 0, 2, 0, 3, 0, 4, 0}},
+        // UUID
+        {{DEVICE_GUID}, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}},
+        // string properties (no expected length)
+        {{BOARD_PART_NUMBER, SERIAL_NUMBER, MARKETING_NAME, DEVICE_PART_NUMBER,
+          FRU_PART_NUMBER, MEMORY_VENDOR, MEMORY_PART_NUMBER, BUILD_DATE,
+          FIRMWARE_VERSION, INFO_ROM_VERSION, PRODUCT_NAME,
+          FPGA_FIRMWARE_VERSION, ASSET_TAG, CHASSIS_SERIAL_NUMBER},
+         {'A', 'B', 'C'}},
+    };
+
+    for (const auto& c : cases)
+    {
+        for (uint8_t id : c.ids)
+        {
+            CLI::App app;
+            setupTelemetryCommands(app);
+            parseSubcmdArgs(app, "GetInventoryInformation",
+                            {"-p", std::to_string(id)});
+            auto& cmd =
+                commands[telemetryCommandIndex(app, "GetInventoryInformation")];
+
+            const auto dataSize = static_cast<uint16_t>(c.data.size());
+            std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                                     sizeof(nsm_common_resp) + dataSize);
+            auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+            ASSERT_EQ(encode_get_inventory_information_resp(0, NSM_SUCCESS,
+                                                            ERR_NULL, dataSize,
+                                                            c.data.data(), msg),
+                      NSM_SW_SUCCESS);
+            EXPECT_NO_THROW(cmd->parseResponseMsg(msg, buf.size()))
+                << "property " << static_cast<int>(id);
+        }
+    }
+}
+
+// ---- AggregateResponseParser edge cases ------------------------------------
+
+TEST(NsmTelemetryCmdParse, AggregateParser_HeaderTooShort)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetTemperatureReading", {"-s", "255"});
+    auto& cmd = commands[telemetryCommandIndex(app, "GetTemperatureReading")];
+
+    auto buf = makeAggregateResp(NSM_GET_TEMPERATURE_READING);
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()), 1));
+}
+
+TEST(NsmTelemetryCmdParse, AggregateParser_TruncatedSampleHeader)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetTemperatureReading", {"-s", "255"});
+    auto& cmd = commands[telemetryCommandIndex(app, "GetTemperatureReading")];
+
+    // Sample count says two samples but none are present.
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp));
+    encode_aggregate_resp(0, NSM_GET_TEMPERATURE_READING, NSM_SUCCESS, 2,
+                          reinterpret_cast<nsm_msg*>(buf.data()));
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                              buf.size() - sizeof(nsm_msg_hdr)));
+}
+
+TEST(NsmTelemetryCmdParse, AggregateParser_ReservedTagSkipped)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetTemperatureReading", {"-s", "255"});
+    auto& cmd = commands[telemetryCommandIndex(app, "GetTemperatureReading")];
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp));
+    encode_aggregate_resp(0, NSM_GET_TEMPERATURE_READING, NSM_SUCCESS, 2,
+                          reinterpret_cast<nsm_msg*>(buf.data()));
+    uint8_t d[8]{};
+    size_t dl{};
+    encode_aggregate_temperature_reading_data(20.0, d, &dl);
+    appendAggSample(buf, 0xF0, d, dl); // reserved: neither timestamp nor data
+    appendAggSample(buf, 0x01, d, 2);  // bad length: handleSampleData fails
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                              buf.size() - sizeof(nsm_msg_hdr)));
+}
+
+// ---- Sensor aggregate parsers: sample decode failures -----------------------
+
+TEST(NsmTelemetryCmdParse, SensorAggregates_BadSampleLength)
+{
+    struct SensorCase
+    {
+        const char* name;
+        std::vector<std::string> args;
+        uint8_t command;
+    };
+    const std::vector<SensorCase> cases = {
+        {"ReadThermalParameter", {"-s", "255"}, NSM_READ_THERMAL_PARAMETER},
+        {"GetCurrentPowerDraw", {"-s", "255", "-a", "0"}, NSM_GET_POWER},
+        {"GetMaxObservedPower",
+         {"-s", "255", "-a", "0"},
+         NSM_GET_MAX_OBSERVED_POWER},
+        {"GetCurrentEnergyCount", {"-s", "255"}, NSM_GET_ENERGY_COUNT},
+        {"GetVoltage", {"-s", "255"}, NSM_GET_VOLTAGE},
+    };
+    for (const auto& c : cases)
+    {
+        CLI::App app;
+        setupTelemetryCommands(app);
+        parseSubcmdArgs(app, c.name, c.args);
+        auto& cmd = commands[telemetryCommandIndex(app, c.name)];
+
+        std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_aggregate_resp));
+        encode_aggregate_resp(0, c.command, NSM_SUCCESS, 2,
+                              reinterpret_cast<nsm_msg*>(buf.data()));
+        const uint8_t good[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+        appendAggSample(buf, 0, good, 1); // too short for every sensor type
+        appendAggSample(buf, 1, good,
+                        c.command == NSM_GET_ENERGY_COUNT ? 8 : 4);
+        EXPECT_NO_THROW(
+            cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                                  buf.size() - sizeof(nsm_msg_hdr)))
+            << c.name;
+    }
+}
+
+// ---- QueryScalarGroupTelemetry: every group, success and cc error ----------
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_AllGroups_Success)
+{
+    auto run = [](int group, auto encode) {
+        CLI::App app;
+        setupTelemetryCommands(app);
+        parseSubcmdArgs(app, "QueryScalarGroupTelemetry",
+                        {"-d", "0", "-g", std::to_string(group)});
+        auto& cmd =
+            commands[telemetryCommandIndex(app, "QueryScalarGroupTelemetry")];
+        std::vector<uint8_t> buf(512, 0);
+        auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+        size_t size = encode(msg);
+        ASSERT_LE(size, buf.size());
+        EXPECT_NO_THROW(cmd->parseResponseMsg(msg, size)) << "group " << group;
+    };
+
+    run(0, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_0 data{};
+        data.pci_vendor_id = 0x10DE;
+        encode_query_scalar_group_telemetry_v1_group0_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_0_resp);
+    });
+    run(1, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_1 data{};
+        data.max_read_request_size_bytes = 6; // > 5: not decodable to bytes
+        data.max_payload_size_bytes = 7;
+        data.clock_mode = NSM_PCIE_CLOCK_MODE_SEPARATE;
+        encode_query_scalar_group_telemetry_v1_group1_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_1_resp);
+    });
+    run(2, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_2 data{};
+        encode_query_scalar_group_telemetry_v1_group2_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_2_resp);
+    });
+    run(3, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_3 data{};
+        encode_query_scalar_group_telemetry_v1_group3_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_3_resp);
+    });
+    run(4, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_4 data{};
+        encode_query_scalar_group_telemetry_v1_group4_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_4_resp);
+    });
+    run(5, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_5 data{};
+        encode_query_scalar_group_telemetry_v1_group5_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_5_resp);
+    });
+    run(6, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_6 data{};
+        encode_query_scalar_group_telemetry_v1_group6_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp);
+    });
+    run(7, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_7 data{};
+        data.port_type = NSM_PCIE_PORT_TYPE_ENDPOINT;
+        encode_query_scalar_group_telemetry_v1_group7_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_7_resp);
+    });
+    run(8, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_8 data{};
+        encode_query_scalar_group_telemetry_v1_group8_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_8_resp);
+    });
+    run(9, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_9 data{};
+        encode_query_scalar_group_telemetry_v1_group9_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_9_resp);
+    });
+    run(10, [](nsm_msg* msg) {
+        nsm_query_scalar_group_telemetry_group_10 data{};
+        data.dwords_transferred_in_outbound_read_tlp_high = 1;
+        encode_query_scalar_group_telemetry_v1_group10_resp(
+            0, NSM_SUCCESS, ERR_NULL, &data, msg);
+        return sizeof(nsm_msg_hdr) +
+               sizeof(nsm_query_scalar_group_telemetry_v1_group_10_resp);
+    });
+}
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_Group10_Extended)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "10"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryScalarGroupTelemetry")];
+
+    nsm_query_scalar_group_telemetry_group_10_extended data{};
+    data.inbound_completion_tlp_count = 42;
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_10_extended_resp));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    ASSERT_EQ(encode_query_scalar_group_telemetry_v1_group10_extended_resp(
+                  0, NSM_SUCCESS, ERR_NULL, &data, msg),
+              NSM_SW_SUCCESS);
+    // 56-byte payload: the plain decode reports a length error and the
+    // extended decode succeeds.
+    EXPECT_NO_THROW(cmd->parseResponseMsg(msg, buf.size()));
+    // Truncated extended payload: both decodes report a length error.
+    EXPECT_NO_THROW(cmd->parseResponseMsg(msg, buf.size() - 4));
+}
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_InvalidGroupId)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryScalarGroupTelemetry", {"-d", "0", "-g", "11"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryScalarGroupTelemetry")];
+
+    auto buf = makeCcErrorResp();
+    EXPECT_NO_THROW(cmd->parseResponseMsg(
+        reinterpret_cast<nsm_msg*>(buf.data()), buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryScalarGroupTelemetry_AllGroups_CcError)
+{
+    for (int g = 0; g <= 10; ++g)
+    {
+        CLI::App app;
+        setupTelemetryCommands(app);
+        parseSubcmdArgs(app, "QueryScalarGroupTelemetry",
+                        {"-d", "0", "-g", std::to_string(g)});
+        auto& cmd =
+            commands[telemetryCommandIndex(app, "QueryScalarGroupTelemetry")];
+        auto err = makeCcErrorResp(NSM_ERR_INVALID_DATA, ERR_NULL);
+        EXPECT_NO_THROW(cmd->parseResponseMsg(
+            reinterpret_cast<nsm_msg*>(err.data()), err.size()))
+            << "group " << g;
+    }
+}
+
+// ---- QueryAvailableAndClearableScalarGroup: all groups, all/no bits --------
+
+TEST(NsmTelemetryCmdParse,
+     QueryAvailableAndClearableScalarGroup_AllGroups_BitsAndErrors)
+{
+    for (int g : {2, 3, 4, 8, 9})
+    {
+        for (uint8_t mask : {uint8_t{0xFF}, uint8_t{0x00}})
+        {
+            CLI::App app;
+            setupTelemetryCommands(app);
+            parseSubcmdArgs(app, "QueryAvailableAndClearableScalarGroup",
+                            {"-d", "0", "-g", std::to_string(g)});
+            auto& cmd = commands[telemetryCommandIndex(
+                app, "QueryAvailableAndClearableScalarGroup")];
+
+            uint8_t available[1] = {mask};
+            uint8_t clearable[1] = {mask};
+            std::vector<uint8_t> buf(
+                sizeof(nsm_msg_hdr) +
+                sizeof(
+                    nsm_query_available_clearable_scalar_data_sources_v1_resp) +
+                1);
+            auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+            encode_query_available_clearable_scalar_data_sources_v1_resp(
+                0, NSM_SUCCESS, ERR_NULL,
+                static_cast<uint16_t>(sizeof(uint8_t) + 2 * sizeof(uint8_t)), 1,
+                available, clearable, msg);
+            EXPECT_NO_THROW(cmd->parseResponseMsg(msg, buf.size()))
+                << "group " << g;
+
+            auto err = makeCcErrorResp();
+            EXPECT_NO_THROW(cmd->parseResponseMsg(
+                reinterpret_cast<nsm_msg*>(err.data()), err.size()))
+                << "group " << g;
+        }
+    }
+}
+
+// ---- QueryVectorGroupTelemetry: cc error with the group 1 arguments --------
+
+TEST(NsmTelemetryCmdParse, QueryVectorGroupTelemetry_Group1_CcError)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(
+        app, "QueryVectorGroupTelemetry",
+        {"-t", "0", "-u", "0", "-i", "0", "-g", "1", "-s", "1", "-l", "0"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryVectorGroupTelemetry")];
+
+    auto err = makeCcErrorResp();
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(err.data()),
+                              err.size() - sizeof(nsm_msg_hdr)));
+
+    nsm_query_vector_group_1_data data{};
+    data.cdr_error_per_lane = 7;
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                             sizeof(nsm_query_vector_group_1_data));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_query_vector_group_telemetry_v2_group1_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                       &data, msg);
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(msg, buf.size() - sizeof(nsm_msg_hdr)));
+}
+
+// ---- GPM metrics ------------------------------------------------------------
+
+TEST(NsmTelemetryCmdParse, GetSupportedGPMMetrics_BitmaskBits)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetSupportedGPMMetrics", {"-t", "1"});
+    auto& cmd = commands[telemetryCommandIndex(app, "GetSupportedGPMMetrics")];
+
+    const uint8_t bitmask[2] = {0x05, 0x80}; // metric ids 0, 2 and 15
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_get_supported_gpm_metrics_resp) - 1 +
+                             sizeof(bitmask));
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    ASSERT_EQ(encode_get_supported_gpm_metrics_resp(
+                  0, NSM_SUCCESS, ERR_NULL, sizeof(bitmask), 4, bitmask, msg),
+              NSM_SW_SUCCESS);
+    EXPECT_NO_THROW(cmd->parseResponseMsg(msg, buf.size()));
+}
+
+TEST(NsmTelemetryCmdParse, QueryAggregatedGPMMetrics_BadSampleLengths)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "QueryAggregatedGPMMetrics",
+                    {"-r", "0", "-g", "0", "-c", "0", "-b", "1"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "QueryAggregatedGPMMetrics")];
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp));
+    encode_aggregate_resp(0, NSM_QUERY_AGGREGATE_GPM_METRICS, NSM_SUCCESS, 2,
+                          reinterpret_cast<nsm_msg*>(buf.data()));
+    const uint8_t d[8]{};
+    appendAggSample(buf, 0, d, 1); // percentage metric, wrong length
+    appendAggSample(buf, 8, d, 1); // bandwidth metric, wrong length
+    EXPECT_NO_THROW(
+        cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                              buf.size() - sizeof(nsm_msg_hdr)));
+}
+
+TEST(NsmTelemetryCmdParse, QueryPerInstanceGPMMetrics_BothUnits_BadLengths)
+{
+    for (const char* name :
+         {"QueryPerInstanceGPMMetrics", "QueryPerInstanceGPMMetricsV2"})
+    {
+        for (const char* metricId : {"0", "8"}) // percentage, bandwidth
+        {
+            CLI::App app;
+            setupTelemetryCommands(app);
+            parseSubcmdArgs(
+                app, name,
+                {"-r", "0", "-g", "0", "-c", "0", "-i", metricId, "-b", "1"});
+            auto& cmd = commands[telemetryCommandIndex(app, name)];
+
+            std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                                     sizeof(nsm_aggregate_resp));
+            encode_aggregate_resp(0, NSM_QUERY_PER_INSTANCE_GPM_METRICS,
+                                  NSM_SUCCESS, 3,
+                                  reinterpret_cast<nsm_msg*>(buf.data()));
+            const uint8_t d[8]{};
+            appendAggSample(buf, 0, d, 1); // wrong length for either unit
+            appendAggSample(buf, 1, d, 4); // valid percentage
+            appendAggSample(buf, 2, d, 8); // valid bandwidth
+            EXPECT_NO_THROW(
+                cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                                      buf.size() - sizeof(nsm_msg_hdr)))
+                << name << " metric " << metricId;
+        }
+    }
+}
+
+// ---- Power smoothing V2 parsers: every tag with a bad sample length --------
+
+TEST(NsmTelemetryCmdParse, PowerSmoothingV2_AllTags_BadSampleLength)
+{
+    struct SmoothingCase
+    {
+        const char* name;
+        std::vector<uint8_t> tags;
+    };
+    const std::vector<SmoothingCase> cases = {
+        {"GetPowerSmoothingFeatureInfoV2", {0, 1, 2, 3, 4, 5, 6, 7, 8}},
+        {"GetPowerSmoothingCurrentProfileInformationV2",
+         {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}},
+        {"GetPowerSmoothingAdminOverrideProfileInformationV2",
+         {0, 1, 2, 3, 4, 5, 6, 7, 8}},
+        // Preset profile tags carry the profile id in the low three bits.
+        {"GetPowerSmoothingPresetProfileInformationV2",
+         {0 << 3, 1 << 3, 2 << 3, 3 << 3, 4 << 3, 5 << 3, 6 << 3, 7 << 3,
+          8 << 3}},
+    };
+    // Samples are padded to a power of two, so 1-byte samples fail the
+    // uint16/uint32 decoders and 2-byte samples fail the uint8/uint32 ones.
+    for (const auto& c : cases)
+    {
+        for (size_t dataLen : {size_t{1}, size_t{2}})
+        {
+            CLI::App app;
+            setupTelemetryCommands(app);
+            auto& cmd = commands[telemetryCommandIndex(app, c.name)];
+
+            std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                                     sizeof(nsm_aggregate_resp));
+            encode_aggregate_resp(0, 0, NSM_SUCCESS,
+                                  static_cast<uint16_t>(c.tags.size()),
+                                  reinterpret_cast<nsm_msg*>(buf.data()));
+            const uint8_t d[8]{};
+            for (uint8_t tag : c.tags)
+            {
+                appendAggSample(buf, tag, d, dataLen);
+            }
+            EXPECT_NO_THROW(
+                cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                                      buf.size() - sizeof(nsm_msg_hdr)))
+                << c.name << " len " << dataLen;
+        }
+    }
+}
+
+// ---- GetListAvailablePciePorts: internal port type -------------------------
+
+TEST(NsmTelemetryCmdParse, GetListAvailablePciePorts_InternalPort)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "GetListAvailablePciePorts")];
+
+    // The parser decodes into a stack nsm_list_available_pcie_ports_info,
+    // which only has room for a single upstream port.
+    nsm_list_available_pcie_ports_info info{};
+    info.ports_count = 1;
+    info.ports[0].type = 1; // internal
+    info.ports[0].downstream_ports_count = 1;
+
+    std::vector<uint8_t> buf(NSM_LIST_AVAILABLE_PCIE_PORTS_RESPONSE_MIN_LEN);
+    auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
+    ASSERT_EQ(encode_list_available_pcie_ports_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                    &info, msg),
+              NSM_SW_SUCCESS);
+    EXPECT_NO_THROW(cmd->parseResponseMsg(msg, buf.size()));
+}
+
+// ---- Network port aggregate parsers: decode failures -----------------------
+
+TEST(NsmTelemetryCmdParse, NetworkPortAggregates_BadSampleLength)
+{
+    for (const char* name : {"GetEthPortTelemetryCounter",
+                             "GetPortNetworkAddresses", "GetPortEccCounters"})
+    {
+        CLI::App app;
+        setupTelemetryCommands(app);
+        parseSubcmdArgs(app, name, {"-p", "1"});
+        auto& cmd = commands[telemetryCommandIndex(app, name)];
+
+        std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_aggregate_resp));
+        encode_aggregate_resp(0, 0, NSM_SUCCESS, 2,
+                              reinterpret_cast<nsm_msg*>(buf.data()));
+        const uint8_t d[8]{};
+        appendAggSample(buf, 0, d, 3);    // wrong length for tag 0
+        appendAggSample(buf, 0x7F, d, 8); // unknown tag
+        EXPECT_NO_THROW(
+            cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                                  buf.size() - sizeof(nsm_msg_hdr)))
+            << name;
+    }
+}
+
+// ---- SetLeakDetectionThresholds: request validation ------------------------
+
+TEST(NsmTelemetryCmdParse, SetLeakDetectionThresholds_CreateRequest)
+{
+    CLI::App mismatch;
+    setupTelemetryCommands(mismatch);
+    parseSubcmdArgs(mismatch, "SetLeakDetectionThresholds",
+                    {"-s", "1", "-n", "2", "-t", "100"});
+    auto& mismatchCmd =
+        commands[telemetryCommandIndex(mismatch, "SetLeakDetectionThresholds")];
+    auto [badRc, badRequest] = mismatchCmd->createRequestMsg();
+    EXPECT_EQ(badRc, NSM_SW_ERROR_DATA);
+    EXPECT_TRUE(badRequest.empty());
+
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "SetLeakDetectionThresholds",
+                    {"-s", "1", "-n", "2", "-t", "100", "200"});
+    auto& cmd =
+        commands[telemetryCommandIndex(app, "SetLeakDetectionThresholds")];
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_FALSE(request.empty());
+}
+
+// ---- SetPCIePortConfig: request with matching sample data ------------------
+
+TEST(NsmTelemetryCmdParse, SetPCIePortConfig_CreateRequest_Valid)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "SetPCIePortConfig",
+                    {"-p", "0", "-t", "0", "-i", "0", "-c", "1", "-d", "0", "1",
+                     "2", "3", "4", "5", "6", "7"});
+    auto& cmd = commands[telemetryCommandIndex(app, "SetPCIePortConfig")];
+
+    auto [rc, request] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_FALSE(request.empty());
 }
 
 } // namespace nsmtool::telemetry
