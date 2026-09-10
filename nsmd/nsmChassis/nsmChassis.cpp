@@ -83,10 +83,24 @@ void createAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
     }
 }
 
-void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name)
+void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name,
+               bool notSupported)
 {
     auto chassisSKU = std::make_shared<NsmChassis<NsmApSkuIdIntf>>(name);
+    if (notSupported)
+    {
+        // Tombstone the placeholder SKU so bmcweb omits it from Redfish,
+        // rather than advertising the default "NA" on chassis that have no SKU
+        // (e.g. a logical Zone). "NA" remains reserved for genuine read/FRU
+        // failures. See nvbug 6339053.
+        chassisSKU->invoke(pdiMethod(sku), std::string(propertyNotSupported));
+    }
     device->addStaticSensor(chassisSKU);
+}
+
+void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name)
+{
+    createSKU(device, name, false);
 }
 
 void createFPGAAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
@@ -356,7 +370,10 @@ void createChassisAttributes(std::shared_ptr<NsmDevice> device,
             device->getDeviceType(), device->getDeviceRole());
         createAsset(device, name, allCurrentIfaceProperties, unsupported);
     }
-    createSKU(device, name);
+    // Baseboard-class chassis (a logical Zone or ProcessorModule) have no SKU
+    // of their own; tombstone it so bmcweb omits it rather than the default
+    // "NA". See nvbug 6339053.
+    createSKU(device, name, isSkuUnsupported(device->getDeviceType()));
     // Handle Location and LocationCode from ChassisAttributes
     if (allCurrentIfaceProperties.count("LocationType"))
     {

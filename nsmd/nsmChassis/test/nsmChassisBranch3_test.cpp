@@ -76,6 +76,8 @@ void createAsset(
     const dbus::PropertyMap& allCurrentIfaceProperties,
     const std::unordered_set<nsm_inventory_property_identifiers>& unsupported);
 void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name);
+void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name,
+               bool notSupported);
 void createFPGAAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
                      const dbus::PropertyMap& allCurrentIfaceProperties);
 void createDimension(std::shared_ptr<NsmDevice> device,
@@ -210,6 +212,46 @@ TEST_F(NsmChassisBranch3Test, MarkAssetNotSupported_DefaultCase)
         PRODUCT_LENGTH};
     EXPECT_NO_THROW(
         markAssetPropertiesNotSupported(*chassisAsset, unsupported));
+}
+
+// ============================================================================
+// isSkuUnsupported: baseboard-class devices have no SKU (keyed on device type)
+// ============================================================================
+
+TEST_F(NsmChassisBranch3Test, IsSkuUnsupported_Baseboard)
+{
+    // Baseboard (logical Zone / ProcessorModule) has no SKU of its own
+    EXPECT_TRUE(isSkuUnsupported(NSM_DEV_ID_BASEBOARD));
+    // Other device types keep their SKU
+    EXPECT_FALSE(isSkuUnsupported(NSM_DEV_ID_GPU));
+    EXPECT_FALSE(isSkuUnsupported(NSM_DEV_ID_SWITCH));
+}
+
+// ============================================================================
+// createSKU: notSupported=true tombstones the SKU value so bmcweb omits it
+// ============================================================================
+
+TEST_F(NsmChassisBranch3Test, CreateSKU_NotSupported_Tombstoned)
+{
+    const size_t before = device->deviceSensors.size();
+    EXPECT_NO_THROW(createSKU(device, name, true));
+    EXPECT_EQ(device->deviceSensors.size(), before + 1);
+    auto sensor = std::dynamic_pointer_cast<NsmChassis<NsmApSkuIdIntf>>(
+        device->deviceSensors.back());
+    ASSERT_NE(sensor, nullptr);
+    EXPECT_EQ(propertyNotSupported, sensor->invoke(pdiMethod(sku)));
+}
+
+TEST_F(NsmChassisBranch3Test, CreateSKU_Supported_KeepsDefault)
+{
+    const size_t before = device->deviceSensors.size();
+    EXPECT_NO_THROW(createSKU(device, name, false));
+    ASSERT_EQ(device->deviceSensors.size(), before + 1);
+    auto sensor = std::dynamic_pointer_cast<NsmChassis<NsmApSkuIdIntf>>(
+        device->deviceSensors.back());
+    ASSERT_NE(sensor, nullptr);
+    // Default construction value is retained (not tombstoned)
+    EXPECT_NE(propertyNotSupported, sensor->invoke(pdiMethod(sku)));
 }
 
 // ============================================================================

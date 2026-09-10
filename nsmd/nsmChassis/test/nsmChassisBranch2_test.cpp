@@ -64,6 +64,8 @@ using namespace nsm;
 namespace nsm
 {
 void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name);
+void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name,
+               bool notSupported);
 void createFPGAAsset(std::shared_ptr<NsmDevice> device, const std::string& name,
                      const dbus::PropertyMap& allCurrentIfaceProperties);
 void createDimension(std::shared_ptr<NsmDevice> device,
