@@ -438,6 +438,10 @@ struct UpstreamPortGroup
  *        - Downstream reduced: remove from back of downstreamPorts per upstream
  *        - Ports added:        append new groups
  *        - No change:          no-op (skip teardown entirely)
+ *
+ *        If an upstreamPortIndex is specified, then D-Bus objects for the
+ *        upstream port and its child downstream ports will only be created if
+ *        the device reports an upstream port ID equal to upstreamPortIndex.
  */
 class NsmPCIePortDiscovery : public NsmSensor
 {
@@ -448,6 +452,7 @@ class NsmPCIePortDiscovery : public NsmSensor
                          const std::string& downstreamPortName,
                          bool portSensorPriority,
                          const std::vector<utils::Association>& associations,
+                         std::optional<uint8_t> upstreamPortIndex,
                          std::shared_ptr<NsmDevice> device);
 
     std::optional<std::vector<uint8_t>>
@@ -464,6 +469,7 @@ class NsmPCIePortDiscovery : public NsmSensor
     std::string downstreamPortName;
     bool portSensorPriority;
     std::vector<utils::Association> associations;
+    std::optional<uint8_t> upstreamPortIndex;
     std::shared_ptr<NsmDevice> device;
     bool portsCreated{false};
     std::vector<UpstreamPortGroup> upstreamPortGroups;
@@ -478,30 +484,46 @@ class NsmPCIePortDiscovery : public NsmSensor
     /** @brief Remove all sensors in a single port group from device queues. */
     void removePortSensorGroup(PortSensorGroup& group);
 
+    /** @brief Returns the number of downstream ports to create for each
+     *  upstream port. */
+    std::vector<uint8_t>
+        portsToPlace(const nsm_list_available_pcie_ports_info* portInfo) const;
+
+    /** @brief Return the upstream port ID to use over NSM for a given index
+     *  in upstreamPortGroups. */
+    uint8_t devicePortAt(size_t slot) const
+    {
+        return upstreamPortIndex ? *upstreamPortIndex
+                                 : static_cast<uint8_t>(slot);
+    }
+
     /** @brief Compare old vs new port counts at upstream & downstream level. */
-    bool hasTopologyChanged(const nsm_list_available_pcie_ports_info* portInfo,
-                            uint16_t newUpstreamPortsCount) const;
+    bool hasTopologyChanged(const std::vector<uint8_t>& downstreamCounts) const;
 
     /** @brief remove excess upstream port groups (and their associated
      downstream ports) from back. */
-    void removeExcessUpstreamPorts(uint16_t targetUpstreamCount);
+    void removeExcessUpstreamPorts(size_t targetUpstreamCount);
 
     /** @brief Adjust downstream port count for a surviving upstream port.
+     *  @param slot position in upstreamPortGroups, which names the port
+     *  @param devicePort the device's number for it
      *  @return total downstream ports */
-    uint16_t reconcileDownstreamPorts(sdbusplus::bus_t& bus,
-                                      uint16_t upstreamIndex,
-                                      uint8_t newDownstreamPortsCount,
-                                      uint16_t downstreamPortIndex,
-                                      bool includeInboundCounters);
+    size_t reconcileDownstreamPorts(sdbusplus::bus_t& bus, size_t slot,
+                                    uint8_t devicePort,
+                                    uint8_t newDownstreamPortsCount,
+                                    size_t downstreamPortIndex,
+                                    bool includeInboundCounters);
 
     /** @brief Create a new upstream port group with all associated downstream
      * ports.
+     *  @param slot position in upstreamPortGroups, which names the port
+     *  @param devicePort the device's number for it
      *  @return number of downstream ports created. */
-    uint16_t createUpstreamPortGroup(sdbusplus::bus_t& bus,
-                                     uint16_t upstreamIndex,
-                                     uint8_t downstreamPortsCount,
-                                     uint16_t downstreamPortIndex,
-                                     bool includeInboundCounters);
+    size_t createUpstreamPortGroup(sdbusplus::bus_t& bus, size_t slot,
+                                   uint8_t devicePort,
+                                   uint8_t downstreamPortsCount,
+                                   size_t downstreamPortIndex,
+                                   bool includeInboundCounters);
 };
 
 } // namespace nsm
