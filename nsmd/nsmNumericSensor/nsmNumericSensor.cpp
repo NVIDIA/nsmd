@@ -179,7 +179,9 @@ NsmNumericSensorDbusValueTimestamp::NsmNumericSensorDbusValueTimestamp(
 void NsmNumericSensorDbusValueTimestamp::updateReading(double value,
                                                        uint64_t timestamp)
 {
-    timestampIntf.elapsed(timestamp);
+    // Stamp ReadingTime with the wall-clock time at publish. `timestamp` is a
+    // monotonic value used only for pacing; publishing it renders as 1970.
+    timestampIntf.elapsed(utils::getReadingTimestamp());
     NsmNumericSensorDbusValue::updateReading(value, timestamp);
 }
 
@@ -188,11 +190,14 @@ NsmNumericSensorDbusPeakValueTimestamp::NsmNumericSensorDbusPeakValueTimestamp(
     peakValueIntf(bus, objectPath)
 {}
 
-void NsmNumericSensorDbusPeakValueTimestamp::updateReading(double value,
-                                                           uint64_t timestamp)
+void NsmNumericSensorDbusPeakValueTimestamp::updateReading(
+    double value, [[maybe_unused]] uint64_t timestamp)
 {
+    // PeakReadingTime (Sensor.PeakValue.Timestamp) is epoch time, so stamp it
+    // with the wall-clock time at publish. The monotonic `timestamp` argument
+    // is not used here; publishing it would render as 1970.
     peakValueIntf.peakValue(value);
-    peakValueIntf.timestamp(timestamp);
+    peakValueIntf.timestamp(utils::getReadingTimestamp());
 }
 
 void NsmNumericSensorValueAggregate::append(

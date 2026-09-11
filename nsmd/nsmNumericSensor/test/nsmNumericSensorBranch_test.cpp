@@ -150,11 +150,18 @@ TEST_F(NsmNumericSensorBranchTest, PeakValueTimestamp_UpdateReading_SetsFields)
 
     constexpr double testValue = 1234.5;
     constexpr uint64_t testTs = 9876543210ULL;
+    constexpr uint64_t fixedReadingTime = 1789043400000ULL;
+
+    // PeakReadingTime is epoch time stamped from the system clock at publish,
+    // not the monotonic `timestamp` argument. Pin the provider to verify.
+    utils::setReadingTimestampProvider([] { return fixedReadingTime; });
 
     pv.updateReading(testValue, testTs);
 
     EXPECT_DOUBLE_EQ(pv.peakValueIntf.peakValue(), testValue);
-    EXPECT_EQ(pv.peakValueIntf.timestamp(), testTs);
+    EXPECT_EQ(pv.peakValueIntf.timestamp(), fixedReadingTime);
+
+    utils::setReadingTimestampProvider(nullptr);
 }
 
 // ============================================================================
