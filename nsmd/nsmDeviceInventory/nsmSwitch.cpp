@@ -963,6 +963,251 @@ inline void createNsmSwitchPowerCappingMode(std::shared_ptr<NsmDevice> device,
                                   nvSwitchPowerCappingMode, device});
 }
 
+// Map NSM wire enum8 to TAVMode. Wire Default (0) is published to D-Bus
+// as-is; nsmd does not resolve it to a concrete Enabled/Disabled value.
+// Only the device knows what its configured default is -- bmcweb already
+// treats a still-Default CurrentMode/PendingMode as "not yet resolved by
+// firmware" (skips the property on Settings, errors on the active
+// resource) rather than guessing, matching LTXMode/UPhyRecoveryMode.
+static std::optional<TAVMode> toTAVModeFromGet(uint8_t nsmMode)
+{
+    switch (nsmMode)
+    {
+        case NSM_TAV_MODE_ENABLED:
+            return TAVMode::Enabled;
+        case NSM_TAV_MODE_DISABLED:
+            return TAVMode::Disabled;
+        case NSM_TAV_MODE_DEFAULT:
+            return TAVMode::Default;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmSwitchTAVMode::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_device_mode_settings_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_device_mode_settings_v2_req(
+        instanceId, DEVICE_MODE_TAV, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug("encode_get_device_mode_settings_v2_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmSwitchTAVMode::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint8_t currentMode = 0;
+    uint8_t pendingMode = 0;
+    uint16_t currentModeLength = 0;
+    uint16_t pendingModeLength = 0;
+
+    /* Probe lengths with null data pointers so decode cannot overflow the
+     * 1-byte mode buffers below on a malformed oversized payload. */
+    auto rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reason_code, nullptr,
+        &currentModeLength, nullptr, &pendingModeLength);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+    if (currentModeLength != TAV_MODE_DATA_SIZE ||
+        (pendingModeLength != 0 && pendingModeLength != TAV_MODE_DATA_SIZE))
+    {
+        return NSM_SW_ERROR_LENGTH;
+    }
+
+    rc = decode_get_device_mode_settings_v2_resp(
+        responseMsg, responseLen, &cc, &reason_code, &currentMode,
+        &currentModeLength, &pendingMode, &pendingModeLength);
+
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        if (currentModeLength != TAV_MODE_DATA_SIZE)
+        {
+            return NSM_SW_ERROR_LENGTH;
+        }
+        auto current = toTAVModeFromGet(currentMode);
+        if (!current)
+        {
+            return NSM_SW_ERROR_DATA;
+        }
+        // Publish the wire value as-is -- nsmd does not decide what
+        // Default resolves to. bmcweb's active-resource handler already
+        // treats a still-Default CurrentMode as not-yet-resolved and
+        // surfaces it as an error rather than accepting a guess.
+        tavModeIntf->currentMode(*current);
+
+        if (pendingModeLength != 0 && pendingModeLength != TAV_MODE_DATA_SIZE)
+        {
+            return NSM_SW_ERROR_LENGTH;
+        }
+        if (pendingModeLength == TAV_MODE_DATA_SIZE)
+        {
+            auto pending = toTAVModeFromGet(pendingMode);
+            if (!pending)
+            {
+                return NSM_SW_ERROR_DATA;
+            }
+            // Same as above: publish as-is. bmcweb's Settings handler
+            // already skips a still-Default PendingMode until a later
+            // poll reports the device's resolved value.
+            tavModeIntf->pendingMode(*pending);
+        }
+        else
+        {
+            // No pending override from device; keep Settings in sync.
+            tavModeIntf->pendingMode(*current);
+        }
+    }
+    return cc ? cc : rc;
+}
+
+requester::Coroutine NsmSwitchTAVMode::setTAVMode(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const std::string* requested = std::get_if<std::string>(&value);
+    if (!requested)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    auto eid = device->getEid();
+    auto mode = TAVModeServer::convertTAVModeValueFromString(*requested);
+
+    uint8_t data = 0;
+    if (mode == TAVMode::Default)
+    {
+        data = NSM_TAV_MODE_DEFAULT;
+    }
+    else if (mode == TAVMode::Enabled)
+    {
+        data = NSM_TAV_MODE_ENABLED;
+    }
+    else if (mode == TAVMode::Disabled)
+    {
+        data = NSM_TAV_MODE_DISABLED;
+    }
+    else
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    if (!tavModeIntf->isModeConfigurable())
+    {
+        *status = AsyncOperationStatusType::Unavailable;
+        throw sdbusplus::error::xyz::openbmc_project::common::NotAllowed{};
+    }
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_device_mode_settings_v2_req) +
+                    TAV_MODE_DATA_SIZE - 1);
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    auto rc = encode_set_device_mode_settings_v2_req(
+        0, DEVICE_MODE_TAV, &data, TAV_MODE_DATA_SIZE, requestMsg);
+    if (shouldLog("setTAVMode encode", uint16_t(0), uint8_t(0), rc))
+    {
+        lg2::error("Encoding TAV mode failed. eid={EID} rc={RC}", "EID", eid,
+                   "RC", rc);
+    }
+    if (rc)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
+    if (shouldLog("setTAVMode postPatchIO", uint16_t(0), uint8_t(0), rc_))
+    {
+        lg2::error("Setting TAV mode failed. eid={EID} rc={RC}", "EID", eid,
+                   "RC", utils::nsmSwCodeToString(rc_));
+    }
+    if (rc_)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_set_device_mode_settings_v2_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reason_code);
+    if (shouldLog("setTAVMode response", reason_code, cc, rc))
+    {
+        lg2::error(
+            "Setting TAV mode returned an error. eid={EID} cc={CC} reasonCode={REASON} rc={RC}",
+            "EID", eid, "CC", cc, "REASON", reason_code, "RC", rc);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        // Publish exactly what was requested, including Default -- a
+        // reset-to-default request is genuinely pending until the device
+        // reports a resolved value on a later poll. Do not guess Enabled.
+        tavModeIntf->pendingMode(mode);
+    }
+    else
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
+inline void createNsmSwitchTAVMode(std::shared_ptr<NsmDevice> device,
+                                   sdbusplus::bus_t& bus,
+                                   const std::string& objPath,
+                                   const std::string& type,
+                                   const std::string& name)
+{
+    auto dbusObjPath = objPath + name + "/Oem/Nvidia/TAVMode";
+    std::vector<utils::Association> associations{
+        {"parent_switch", "tav_mode", objPath + name}};
+    auto tavModeAssociationIntf =
+        std::make_unique<AssociationDefinitionsInft>(bus, dbusObjPath.c_str());
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    for (const auto& association : associations)
+    {
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
+    }
+    tavModeAssociationIntf->associations(associationsList);
+
+    auto tavModeIntf = std::make_shared<TAVModeIntf>(bus, dbusObjPath.c_str());
+    tavModeIntf->currentMode(TAVMode::Enabled);
+    tavModeIntf->pendingMode(TAVMode::Enabled);
+    // Configurability is sourced solely from the SupportTAVMode
+    // entity-manager capability flag via the createNsmSwitchDI gate below.
+    tavModeIntf->isModeConfigurable(true);
+    auto nvSwitchTAVMode = std::make_shared<NsmSwitchTAVMode>(
+        name, type, tavModeIntf, std::move(tavModeAssociationIntf));
+    device->addSensor(nvSwitchTAVMode, false);
+
+    nsm::AsyncSetOperationHandler setTAVModeHandler = std::bind(
+        &NsmSwitchTAVMode::setTAVMode, nvSwitchTAVMode, std::placeholders::_1,
+        std::placeholders::_2, std::placeholders::_3);
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(dbusObjPath)
+        ->addAsyncSetOperation(
+            std::string(TAVModeServer::interface), "PendingMode",
+            AsyncSetOperationInfo{setTAVModeHandler, nvSwitchTAVMode, device});
+}
+
 // Map NSM wire enum8 to LTXModeEnum. Wire Default (0) is resolved to Enabled
 // at D-Bus publish time per the LTX mode contract.
 static std::optional<LTXModeEnum> toLTXModeFromGet(uint8_t nsmMode)
@@ -1578,6 +1823,16 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         {
             createNsmSwitchPowerCappingMode(device, bus, inventoryObjPath, type,
                                             name);
+        }
+
+        // An absent support property means TAV mode is not exposed. Read it
+        // from the cached base properties so absence needs no D-Bus fetch.
+        // dbusPropertyMapAsBool also normalizes an integer-encoded EM value.
+        const bool supportTAVMode =
+            dbusPropertyMapAsBool(allBaseIfaceProperties, "SupportTAVMode");
+        if (supportTAVMode)
+        {
+            createNsmSwitchTAVMode(device, bus, inventoryObjPath, type, name);
         }
 
         bool supportLTXMode = false;

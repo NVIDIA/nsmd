@@ -1234,3 +1234,271 @@ TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_HandleResponse_BadLength)
     rc = sensor.handleResponseMsg(response, responseMsg.size());
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+// ============================================================================
+// NsmSwitchTAVMode -- NSM Type 5 Device Mode index 20 coverage.
+// ============================================================================
+
+TEST_F(NsmSwitchFactoryBranchTest, TAVMode_GenRequestMsg_EncodeFail)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto tavIntf = std::make_shared<TAVModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_genreq_fail");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_genreq_fail");
+    NsmSwitchTAVMode sensor("Tav_genreq", "NSM_NVSwitch", tavIntf, assocIntf);
+
+    auto request = sensor.genRequestMsg(12, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+
+TEST_F(NsmSwitchFactoryBranchTest, TAVMode_HandleResponse_AllModes)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto tavIntf = std::make_shared<TAVModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_all_modes");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_all_modes");
+    NsmSwitchTAVMode sensor("Tav_modes", "NSM_NVSwitch", tavIntf, assocIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            TAV_MODE_DATA_SIZE * 2,
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t currentMode = NSM_TAV_MODE_ENABLED;
+    uint8_t pendingMode = NSM_TAV_MODE_DISABLED;
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, &currentMode, TAV_MODE_DATA_SIZE,
+        &pendingMode, TAV_MODE_DATA_SIZE, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(tavIntf->currentMode(), TAVMode::Enabled);
+    EXPECT_EQ(tavIntf->pendingMode(), TAVMode::Disabled);
+}
+
+TEST_F(NsmSwitchFactoryBranchTest,
+       TAVMode_HandleResponse_DefaultWirePassedThrough)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto tavIntf = std::make_shared<TAVModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_default_wire");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_default_wire");
+    NsmSwitchTAVMode sensor("Tav_defwire", "NSM_NVSwitch", tavIntf, assocIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            TAV_MODE_DATA_SIZE * 2,
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t currentMode = NSM_TAV_MODE_DEFAULT;
+    uint8_t pendingMode = NSM_TAV_MODE_DEFAULT;
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, &currentMode, TAV_MODE_DATA_SIZE,
+        &pendingMode, TAV_MODE_DATA_SIZE, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    // nsmd never resolves Default -- it publishes the wire value as-is and
+    // leaves resolution to the device / to bmcweb's not-yet-resolved
+    // handling (skip on Settings, error on the active resource).
+    EXPECT_EQ(tavIntf->currentMode(), TAVMode::Default);
+    EXPECT_EQ(tavIntf->pendingMode(), TAVMode::Default);
+}
+
+TEST_F(NsmSwitchFactoryBranchTest, TAVMode_HandleResponse_InvalidMode)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto tavIntf = std::make_shared<TAVModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_invalid_mode");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_invalid_mode");
+    NsmSwitchTAVMode sensor("Tav_invalid", "NSM_NVSwitch", tavIntf, assocIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            TAV_MODE_DATA_SIZE,
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t currentMode = 99;
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, &currentMode, TAV_MODE_DATA_SIZE, nullptr, 0,
+        response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST_F(NsmSwitchFactoryBranchTest, SetTAVMode_NotConfigurable_NotAllowed)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto tavIntf = std::make_shared<TAVModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_not_cfg");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_not_cfg");
+    tavIntf->isModeConfigurable(false);
+    NsmSwitchTAVMode sensor("Tav_nocfg", "NSM_NVSwitch", tavIntf, assocIntf);
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        TAVModeServer::convertTAVModeValueToString(TAVMode::Default);
+
+    EXPECT_THROW_COROUTINE(
+        sensor.setTAVMode(value, &status, nvswitch),
+        sdbusplus::error::xyz::openbmc_project::common::NotAllowed);
+    EXPECT_EQ(status, AsyncOperationStatusType::Unavailable);
+}
+
+TEST_F(NsmSwitchFactoryBranchTest, SetTAVMode_Default_Success)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto tavIntf = std::make_shared<TAVModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_set_default");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_set_default");
+    // The factory publishes IsModeConfigurable true; the PDI default is false.
+    tavIntf->isModeConfigurable(true);
+    NsmSwitchTAVMode sensor("Tav_setdef", "NSM_NVSwitch", tavIntf, assocIntf);
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        TAVModeServer::convertTAVModeValueToString(TAVMode::Default);
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto* responseMsg = reinterpret_cast<nsm_msg*>(responseData.data());
+    encode_set_device_mode_settings_v2_resp(0, NSM_SUCCESS, ERR_NULL,
+                                            responseMsg);
+
+    EXPECT_CALL(*nvswitch, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(responseData));
+
+    sensor.setTAVMode(value, &status, nvswitch);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+    // A reset-to-default request publishes Default on PendingMode -- it is
+    // genuinely pending until the device reports a resolved value on a
+    // later poll; nsmd does not guess Enabled.
+    EXPECT_EQ(tavIntf->pendingMode(), TAVMode::Default);
+}
+
+// ============================================================================
+// createNsmSwitchDI gate: SupportTAVMode true/false
+// ============================================================================
+
+static size_t countTAVModeSensors(const std::shared_ptr<MockNsmDevice>& dev)
+{
+    size_t count = 0;
+    for (const auto& sensor : dev->roundRobinSensors)
+    {
+        if (std::dynamic_pointer_cast<NsmSwitchTAVMode>(sensor))
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
+TEST_F(NsmSwitchFactoryBranchTest, Factory_NVSwitch_SupportTAVModeTrue)
+{
+    const std::string path = inventoryPath + "nvs_tav_true";
+    setupBaseProperties(path, {{"Type", std::string("NSM_NVSwitch")},
+                               {"SupportL1PredictionMode", bool(false)},
+                               {"SupportTAVMode", bool(true)}});
+
+    ASSERT_EQ(countTAVModeSensors(nvswitch), 0u);
+    createNsmSwitchDI(mockManager, baseIntf, path);
+    EXPECT_EQ(countTAVModeSensors(nvswitch), 1u);
+}
+
+TEST_F(NsmSwitchFactoryBranchTest, Factory_NVSwitch_SupportTAVModeFalse)
+{
+    const std::string path = inventoryPath + "nvs_tav_false";
+    setupBaseProperties(path, {{"Type", std::string("NSM_NVSwitch")},
+                               {"SupportL1PredictionMode", bool(false)},
+                               {"SupportTAVMode", bool(false)}});
+
+    const size_t before = nvswitch->roundRobinSensors.size();
+    createNsmSwitchDI(mockManager, baseIntf, path);
+    // Gate closed for TAV mode, other NVSwitch sensors still created.
+    EXPECT_EQ(countTAVModeSensors(nvswitch), 0u);
+    EXPECT_GT(nvswitch->roundRobinSensors.size(), before);
+}
+
+TEST_F(NsmSwitchFactoryBranchTest, Factory_NVSwitch_SupportTAVModeAbsent)
+{
+    const std::string path = inventoryPath + "nvs_tav_absent";
+    // SupportTAVMode omitted entirely from the base properties.
+    setupBaseProperties(path, {{"Type", std::string("NSM_NVSwitch")},
+                               {"SupportL1PredictionMode", bool(false)}});
+
+    const size_t before = nvswitch->roundRobinSensors.size();
+    createNsmSwitchDI(mockManager, baseIntf, path);
+    EXPECT_EQ(countTAVModeSensors(nvswitch), 0u);
+    EXPECT_GT(nvswitch->roundRobinSensors.size(), before);
+}
+
+TEST_F(NsmSwitchFactoryBranchTest, TAVMode_HandleResponse_NoPendingSyncsPending)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto tavIntf = std::make_shared<TAVModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_no_pending");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_no_pending");
+    // Stale pending from a prior write / factory seed.
+    tavIntf->pendingMode(TAVMode::Disabled);
+    NsmSwitchTAVMode sensor("Tav_nopending", "NSM_NVSwitch", tavIntf,
+                            assocIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            TAV_MODE_DATA_SIZE,
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t currentMode = NSM_TAV_MODE_ENABLED;
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, &currentMode, TAV_MODE_DATA_SIZE, nullptr, 0,
+        response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(tavIntf->currentMode(), TAVMode::Enabled);
+    EXPECT_EQ(tavIntf->pendingMode(), TAVMode::Enabled);
+}
+
+TEST_F(NsmSwitchFactoryBranchTest, TAVMode_HandleResponse_BadLength)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto tavIntf = std::make_shared<TAVModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_bad_len");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/tav_bad_len");
+    NsmSwitchTAVMode sensor("Tav_badlen", "NSM_NVSwitch", tavIntf, assocIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) + 4,
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    // Two source bytes so the encoder stays in bounds while still emitting a
+    // 2-byte current payload, which is malformed for enum8 index 20.
+    uint8_t currentMode[2] = {NSM_TAV_MODE_ENABLED, 0};
+    uint8_t pendingMode = NSM_TAV_MODE_DISABLED;
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, currentMode, uint16_t(sizeof(currentMode)),
+        &pendingMode, TAV_MODE_DATA_SIZE, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}

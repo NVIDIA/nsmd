@@ -588,7 +588,7 @@ TEST(ConfigBranch, GetLTXMode_ValidResponse_PrintsCurrentAndPendingMode)
     ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
     testing::internal::CaptureStdout();
-    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
     std::string output = testing::internal::GetCapturedStdout();
     EXPECT_NE(output.find("CurrentMode"), std::string::npos);
     EXPECT_NE(output.find("PendingMode"), std::string::npos);
@@ -614,7 +614,7 @@ TEST(ConfigBranch, GetLTXMode_CurrentLengthZero_ReturnsError)
 
     testing::internal::CaptureStdout();
     testing::internal::CaptureStderr();
-    EXPECT_NO_THROW(commands[24]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
     std::string stdoutput = testing::internal::GetCapturedStdout();
     std::string stderrOutput = testing::internal::GetCapturedStderr();
     // No partial-success JSON on stdout ...
@@ -629,13 +629,13 @@ TEST(ConfigBranch, SetLTXMode_Success)
     setupConfigCommands(app);
     parseSubcmdArgs(app, "SetLTXMode", {"-M", "Enabled"});
 
-    auto [rc, reqMsg] = commands[25]->createRequestMsg();
+    auto [rc, reqMsg] = commands[27]->createRequestMsg();
     ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_device_mode_settings_v2_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[25]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[27]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(ConfigBranch, SetLTXMode_InvalidMode_ReturnsError)
@@ -644,7 +644,7 @@ TEST(ConfigBranch, SetLTXMode_InvalidMode_ReturnsError)
     setupConfigCommands(app);
     parseSubcmdArgs(app, "SetLTXMode", {"-M", "NotAMode"});
 
-    auto [rc, reqMsg] = commands[25]->createRequestMsg();
+    auto [rc, reqMsg] = commands[27]->createRequestMsg();
     EXPECT_NE(rc, NSM_SW_SUCCESS);
     EXPECT_TRUE(reqMsg.empty());
 }
@@ -672,7 +672,7 @@ TEST(ConfigBranch, GetUPhyMode_ValidResponse_PrintsCurrentAndPendingMode)
     ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
     testing::internal::CaptureStdout();
-    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
     std::string output = testing::internal::GetCapturedStdout();
     EXPECT_NE(output.find("CurrentMode"), std::string::npos);
     EXPECT_NE(output.find("PendingMode"), std::string::npos);
@@ -697,7 +697,7 @@ TEST(ConfigBranch, GetUPhyMode_CurrentLengthZero_ReturnsError)
 
     testing::internal::CaptureStdout();
     testing::internal::CaptureStderr();
-    EXPECT_NO_THROW(commands[26]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[28]->parseResponseMsg(msg, buf.size()));
     std::string stdoutput = testing::internal::GetCapturedStdout();
     std::string stderrOutput = testing::internal::GetCapturedStderr();
     EXPECT_TRUE(stdoutput.empty());
@@ -711,13 +711,13 @@ TEST(ConfigBranch, SetUPhyMode_Success)
     setupConfigCommands(app);
     parseSubcmdArgs(app, "SetUPhyMode", {"-M", "Enabled"});
 
-    auto [rc, reqMsg] = commands[27]->createRequestMsg();
+    auto [rc, reqMsg] = commands[29]->createRequestMsg();
     ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
     std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
     auto* msg = reinterpret_cast<nsm_msg*>(buf.data());
     encode_set_device_mode_settings_v2_resp(0, NSM_SUCCESS, ERR_NULL, msg);
-    EXPECT_NO_THROW(commands[27]->parseResponseMsg(msg, buf.size()));
+    EXPECT_NO_THROW(commands[29]->parseResponseMsg(msg, buf.size()));
 }
 
 TEST(ConfigBranch, SetUPhyMode_InvalidMode_ReturnsError)
@@ -726,7 +726,7 @@ TEST(ConfigBranch, SetUPhyMode_InvalidMode_ReturnsError)
     setupConfigCommands(app);
     parseSubcmdArgs(app, "SetUPhyMode", {"-M", "NotAMode"});
 
-    auto [rc, reqMsg] = commands[27]->createRequestMsg();
+    auto [rc, reqMsg] = commands[29]->createRequestMsg();
     EXPECT_NE(rc, NSM_SW_SUCCESS);
     EXPECT_TRUE(reqMsg.empty());
 }
