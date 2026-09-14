@@ -14,6 +14,7 @@
 
 #include <com/nvidia/DeviceMode/LTXMode/server.hpp>
 #include <com/nvidia/DeviceMode/PowerCappingMode/server.hpp>
+#include <com/nvidia/DeviceMode/TAVMode/server.hpp>
 #include <com/nvidia/DeviceMode/UPhyRecoveryMode/server.hpp>
 #include <com/nvidia/PowerMode/server.hpp>
 #include <com/nvidia/SwitchIsolation/server.hpp>
@@ -48,6 +49,13 @@ using PowerCapMode = PowerCappingModeServer::PowerCapMode;
 using LTXModeServer = sdbusplus::com::nvidia::DeviceMode::server::LTXMode;
 using LTXModeIntf = object_t<LTXModeServer>;
 using LTXModeEnum = LTXModeServer::LinkTrainingExtendedMode;
+// TAVMode PDI shape: CurrentMode/PendingMode/IsModeConfigurable,
+// TAVModeValue{Default,Enabled,Disabled}. Gated on the PDI
+// com.nvidia.DeviceMode.TAVMode interface merging so this
+// generated header exists to compile against.
+using TAVModeServer = sdbusplus::com::nvidia::DeviceMode::server::TAVMode;
+using TAVModeIntf = object_t<TAVModeServer>;
+using TAVMode = TAVModeServer::TAVModeValue;
 using UPhyModeServer =
     sdbusplus::com::nvidia::DeviceMode::server::UPhyRecoveryMode;
 using UPhyModeIntf = object_t<UPhyModeServer>;
@@ -193,6 +201,37 @@ class NsmSwitchPowerCappingMode : public NsmSensor
 
   private:
     std::shared_ptr<PowerCappingModeIntf> powerCappingModeIntf;
+    std::shared_ptr<AssociationDefinitionsInft> associationDefIntf;
+};
+
+/** @brief TAV (Temperature Aware Voltage) mode using NSM Type 5 Device Mode
+ *         index 20 (DEVICE_MODE_TAV).
+ *
+ *         enum8 {0 Default, 1 Enabled, 2 Disabled}; 1-byte payload via the
+ *         generic v2 codec. */
+class NsmSwitchTAVMode : public NsmSensor
+{
+  public:
+    NsmSwitchTAVMode(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<TAVModeIntf> tavModeIntf,
+        std::shared_ptr<AssociationDefinitionsInft> associationDefIntf) :
+        NsmSensor(name, type), tavModeIntf(tavModeIntf),
+        associationDefIntf(associationDefIntf)
+    {}
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+    requester::Coroutine
+        setTAVMode(const AsyncSetOperationValueType& value,
+                   [[maybe_unused]] AsyncOperationStatusType* status,
+                   std::shared_ptr<NsmDevice> device);
+
+  private:
+    std::shared_ptr<TAVModeIntf> tavModeIntf;
     std::shared_ptr<AssociationDefinitionsInft> associationDefIntf;
 };
 

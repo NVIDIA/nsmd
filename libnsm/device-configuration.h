@@ -605,6 +605,7 @@ enum device_mode_index {
 	DEVICE_MODE_PERSISTENT_CPU_POWER_LIMIT_GPU_COPY = 14,
 	DEVICE_MODE_ONE_SHOT_GPU_COPY_SWITCH_POWER_LIMIT = 15,
 	DEVICE_MODE_PERSISTENT_GPU_COPY_SWITCH_POWER_LIMIT = 16,
+	DEVICE_MODE_TAV = 20,
 	DEVICE_MODE_ADAPTIVE_TGPMODE = 21,
 	DEVICE_MODE_LLDP = 24,
 	DEVICE_MODE_PROTECTION_OPTIONS_MODE = 26,
@@ -639,6 +640,18 @@ enum nsm_power_capping_mode {
 
 /** @brief Data size (in bytes) of the Power Capping Mode (index 27) payload. */
 #define POWER_CAPPING_MODE_DATA_SIZE 1
+
+/** @brief TAV (Temperature Aware Voltage) Mode values per NSM Type 5 Device
+ *         Mode Index 20 (DEVICE_MODE_TAV). Single enum8 data byte.
+ */
+enum nsm_tav_mode {
+	NSM_TAV_MODE_DEFAULT = 0,
+	NSM_TAV_MODE_ENABLED = 1,
+	NSM_TAV_MODE_DISABLED = 2,
+};
+
+/** @brief Data size (in bytes) of the TAV Mode (index 20) payload. */
+#define TAV_MODE_DATA_SIZE 1
 
 /** @brief LTX (Link Training Extended) Mode values per NSM Type 5 Device Mode
  *         Index 29 (DEVICE_MODE_LTX). Single enum8 data byte. Non-volatile;
