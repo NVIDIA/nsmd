@@ -49,11 +49,6 @@ std::optional<Request> NsmSetMigMode::genRequestMsg(eid_t eid,
 uint8_t NsmSetMigMode::handleResponseMsg(const nsm_msg* responseMsg,
                                          size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;

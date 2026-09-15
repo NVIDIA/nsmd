@@ -52,6 +52,15 @@ requester::Coroutine NsmSensor::update(std::shared_ptr<NsmDevice> nsmDevice)
         co_return rc;
     }
 
+    if (!responseMsg)
+    {
+        lg2::error(
+            "NsmSensor::update: null response after successful sensorIO, name={NAME}, eid={EID}",
+            "NAME", getName(), "EID", nsmDevice->getEid());
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR_NULL;
+    }
+
     rc = handleResponseMsg(responseMsg.get(), responseLen);
 
 #ifdef LTTNG_TRACING

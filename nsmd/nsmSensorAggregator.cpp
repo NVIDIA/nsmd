@@ -36,11 +36,6 @@ NsmSensorAggregator::NsmSensorAggregator(const std::string& name,
 uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
                                                size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t returnValue = NSM_SW_SUCCESS;
     uint8_t cc{};
     uint16_t telemetryCount{};

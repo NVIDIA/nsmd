@@ -81,11 +81,6 @@ std::optional<std::vector<uint8_t>> NsmPower::genRequestMsg(eid_t eid,
 uint8_t NsmPower::handleResponseMsg(const struct nsm_msg* responseMsg,
                                     size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
 
