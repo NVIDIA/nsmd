@@ -75,11 +75,6 @@ std::optional<Request> NsmErrorInjection::genRequestMsg(eid_t eid,
 uint8_t NsmErrorInjection::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     nsm_error_injection_mode_v1 data;
@@ -135,11 +130,6 @@ std::optional<Request>
 uint8_t NsmErrorInjectionSupported::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     nsm_error_injection_types_mask data;
@@ -183,11 +173,6 @@ std::optional<Request>
 uint8_t NsmErrorInjectionEnabled::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     nsm_error_injection_types_mask data;
@@ -240,11 +225,6 @@ std::optional<Request>
 uint8_t NsmErrorInjectionPayload::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     std::vector<uint8_t> data(responseLen, 0);

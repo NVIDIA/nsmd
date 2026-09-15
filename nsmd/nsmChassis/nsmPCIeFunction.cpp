@@ -103,11 +103,6 @@ std::optional<Request> NsmPCIeFunction::genRequestMsg(eid_t eid,
 uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
                                            size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     nsm_query_scalar_group_telemetry_group_0 data = {};
@@ -202,11 +197,6 @@ std::optional<Request>
 uint8_t NsmPCIeDeviceFunctionAsio::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     nsm_query_scalar_group_telemetry_group_0 data = {};

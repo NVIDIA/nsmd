@@ -642,11 +642,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmGPMPerInstance::handleResponseMsg(const nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     uint8_t returnValue = NSM_SW_SUCCESS;
     uint8_t cc = NSM_SUCCESS;
     size_t consumedLen{};
@@ -982,11 +977,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmGetSupportedGPMMetrics::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     // Guard against re-execution - sensors should only be created once
     if (responseReceived)
     {
@@ -1186,11 +1176,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmGetSupportedPerInstanceGPMMetrics::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    if (responseMsg == nullptr)
-    {
-        lg2::error("handleResponseMsg called with nullptr responseMsg");
-        return NSM_SW_ERROR_NULL;
-    }
     // Guard against re-execution - sensors should only be created once
     if (responseReceived)
     {

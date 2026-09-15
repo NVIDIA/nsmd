@@ -377,6 +377,14 @@ requester::Coroutine
         co_return rc;
     }
 
+    if (!responseMsg)
+    {
+        lg2::error(
+            "NsmNumericSensor::update: null response after successful sensorIO, name={NAME}, eid={EID}",
+            "NAME", getName(), "EID", nsmDevice->getEid());
+        co_return NSM_SW_ERROR_NULL;
+    }
+
     rc = handleResponseMsg(responseMsg.get(), responseLen);
 
 #ifdef LTTNG_TRACING

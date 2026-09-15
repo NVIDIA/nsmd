@@ -41,6 +41,11 @@ bool NsmLongRunningEvent::initAcceptInstanceId(uint8_t instanceId, uint8_t cc,
 int NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
                                        size_t eventLen)
 {
+    if (event == nullptr)
+    {
+        LG2_ERROR("LongRunning event is null, eid: {EID}", "EID", eid);
+        return NSM_SW_ERROR_NULL;
+    }
     uint8_t instanceId = 0xFF;
     auto rc = decode_long_running_event(event, eventLen, &instanceId, nullptr,
                                         nullptr);
