@@ -553,7 +553,22 @@ class QueryPortTelemetryV2 : public CommandInterface
 
             // Group 0x09 tags are four contiguous 8-lane blocks (NVBug
             // 6253174); block base identifies the metric, and (tag - base)
-            // is the lane index.
+            // is the lane index. Tag 0x20 is a single per-module record.
+            if (tag == NSM_OPTICAL_MODULE_TAG_BIAS_SCALING_FACTOR)
+            {
+                uint8_t scale = 0;
+                int rc = decode_optical_module_bias_scaling_record(
+                    data, data_len, &scale);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Metric"] = "TXBiasScalingFactor";
+                sample_json["RawValue"] = data[0];
+                sample_json["Scale"] = scale;
+                return NSM_SW_SUCCESS;
+            }
+
             const uint8_t lane = static_cast<uint8_t>(tag % 8);
             const uint8_t metricBase = static_cast<uint8_t>(tag - lane);
 
@@ -568,6 +583,7 @@ class QueryPortTelemetryV2 : public CommandInterface
                 }
                 sample_json["Lane"] = lane;
                 sample_json["Metric"] = "SignalToNoiseRatio";
+                sample_json["RawValue"] = rawValue;
                 sample_json["ValueDb"] = static_cast<double>(rawValue) / 256.0;
                 return NSM_SW_SUCCESS;
             }
@@ -580,22 +596,31 @@ class QueryPortTelemetryV2 : public CommandInterface
                 return rc;
             }
             sample_json["Lane"] = lane;
+            sample_json["RawValue"] = value;
             switch (metricBase)
             {
                 case NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE:
                     sample_json["Metric"] = "TXOutputPowerMilliWatts";
+                    // 1 uW LSB.
+                    sample_json["Value"] = static_cast<double>(value) / 1000.0;
                     break;
                 case NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE:
                     sample_json["Metric"] = "RXInputPowerMilliWatts";
+                    sample_json["Value"] = static_cast<double>(value) / 1000.0;
                     break;
                 case NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE:
-                    sample_json["Metric"] = "TXBiasCurrentMilliAmps";
+                    // 2 uA LSB before the tag 0x20 scaling factor. That tag
+                    // follows the bias tags and may land on a later page, so
+                    // this tool reports the raw value only; apply
+                    // raw * 2 * scale / 1000 once TXBiasScalingFactor is
+                    // known.
+                    sample_json["Metric"] = "TXBiasCurrentRaw";
                     break;
                 default:
                     sample_json["Metric"] = "Unknown";
+                    sample_json["Value"] = value;
                     break;
             }
-            sample_json["Value"] = value;
             return NSM_SW_SUCCESS;
         }
 

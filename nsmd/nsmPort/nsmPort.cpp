@@ -3166,6 +3166,33 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
+uint8_t NsmOpticalModuleTelemetry::biasScaleFromEncoding(uint8_t encoded)
+{
+    /* The wire carries an encoded index; the multiplier each encoding maps
+     * to is defined by the spec table, so map explicitly. An encoding this
+     * build does not know cannot be converted at all -- the multiplier is
+     * not on the wire -- so fall back to 1x and report it. */
+    switch (encoded)
+    {
+        case NSM_OPTICAL_MODULE_BIAS_SCALE_1X:
+            return 1;
+        case NSM_OPTICAL_MODULE_BIAS_SCALE_2X:
+            return 2;
+        case NSM_OPTICAL_MODULE_BIAS_SCALE_4X:
+            return 4;
+        default:
+            if (shouldLog("NsmOpticalModuleTelemetry:unknownBiasScale", true))
+            {
+                lg2::error(
+                    "NsmOpticalModuleTelemetry: unrecognized tx_bias_scaling"
+                    "_factor encoding={ENC}; reported bias current will be"
+                    " wrong unless the module is 1x. sensor={NAME}",
+                    "ENC", encoded, "NAME", getName().c_str());
+            }
+            return 1;
+    }
+}
+
 int NsmOpticalModuleTelemetry::handleSample(const TelemetrySample& sample)
 {
     // Group 0x09 (Optical Module Metrics) tags are four contiguous 8-lane
@@ -3192,8 +3219,32 @@ int NsmOpticalModuleTelemetry::handleSample(const TelemetrySample& sample)
             }
             return rc;
         }
-        /* Raw PRM value -> dB */
-        snrDB_[lane] = static_cast<double>(rawValue) / kSnrRawToDbScale;
+        rawSnr_[lane] = rawValue;
+        return NSM_SW_SUCCESS;
+    }
+
+    if (sample.tag == NSM_OPTICAL_MODULE_TAG_BIAS_SCALING_FACTOR)
+    {
+        uint8_t encodedScale = 0;
+        int rc = decode_optical_module_bias_scaling_record(
+            sample.data, sample.data_len, &encodedScale);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            if (shouldLog("NsmOpticalModuleTelemetry:decodeBiasScale",
+                          nsm_sw_codes(rc)))
+            {
+                lg2::error(
+                    "NsmOpticalModuleTelemetry: decode bias scaling record"
+                    " failed. sensor={NAME} tag={TAG} data_len={LEN}",
+                    "NAME", getName().c_str(), "TAG", sample.tag, "LEN",
+                    sample.data_len);
+            }
+            /* Keep the default 1x rather than discarding the whole
+             * collection: a bad scaling record must not cost us the power
+             * and SNR readings in the same response. */
+            return NSM_SW_SUCCESS;
+        }
+        encodedBiasScale_ = encodedScale;
         return NSM_SW_SUCCESS;
     }
 
@@ -3217,13 +3268,13 @@ int NsmOpticalModuleTelemetry::handleSample(const TelemetrySample& sample)
     switch (metricBase)
     {
         case NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE:
-            txPowerMW_[lane] = static_cast<double>(value);
+            rawTxPower_[lane] = value;
             break;
         case NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE:
-            rxPowerMW_[lane] = static_cast<double>(value);
+            rawRxPower_[lane] = value;
             break;
         case NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE:
-            txBiasmA_[lane] = static_cast<double>(value);
+            rawBiasCurrent_[lane] = value;
             break;
         default:
             if (shouldLog("NsmOpticalModuleTelemetry:unknownTag", true))
@@ -3237,12 +3288,41 @@ int NsmOpticalModuleTelemetry::handleSample(const TelemetrySample& sample)
     return NSM_SW_SUCCESS;
 }
 
+void NsmOpticalModuleTelemetry::convertSamples()
+{
+    const auto biasScale = biasScaleFromEncoding(encodedBiasScale_);
+
+    for (size_t lane = 0; lane < NUMBER_OF_LANES; ++lane)
+    {
+        /* 1 uW LSB */
+        txPowerMW_[lane] = static_cast<double>(rawTxPower_[lane]) /
+                           kOpticalPowerRawToMilliWatts;
+        rxPowerMW_[lane] = static_cast<double>(rawRxPower_[lane]) /
+                           kOpticalPowerRawToMilliWatts;
+        /* 2 uA LSB, scaled by the tag 0x20 multiplier */
+        txBiasmA_[lane] = static_cast<double>(rawBiasCurrent_[lane]) *
+                          kBiasRawToMicroAmps * static_cast<double>(biasScale) /
+                          kMicroAmpsToMilliAmps;
+        /* 1/256 dB */
+        snrDB_[lane] = static_cast<double>(rawSnr_[lane]) / kSnrRawToDbScale;
+    }
+}
+
 void NsmOpticalModuleTelemetry::postUpdate()
 {
+    convertSamples();
+
     opticalMetricsIntf_->rxInputPowerMilliWatts(rxPowerMW_);
     opticalMetricsIntf_->txOutputPowerMilliWatts(txPowerMW_);
     opticalMetricsIntf_->txBiasCurrentMilliAmps(txBiasmA_);
     opticalMetricsIntf_->signalToNoiseRatioPerLane(snrDB_);
+
+    /* The spec determines whether a telemetry item is available per
+     * response, and directs consumers to Multiply_1x when the scaling
+     * factor is unavailable. Clear it here so a factor reported in this
+     * collection is not applied to the next one: resetState() only runs on
+     * the error paths, so this is the only place the success path can. */
+    encodedBiasScale_ = NSM_OPTICAL_MODULE_BIAS_SCALE_1X;
 }
 
 void NsmOpticalModuleTelemetry::resetState()
@@ -3251,6 +3331,11 @@ void NsmOpticalModuleTelemetry::resetState()
     txPowerMW_.assign(NUMBER_OF_LANES, 0.0);
     txBiasmA_.assign(NUMBER_OF_LANES, 0.0);
     snrDB_.assign(NUMBER_OF_LANES, 0.0);
+    rawTxPower_.assign(NUMBER_OF_LANES, 0);
+    rawRxPower_.assign(NUMBER_OF_LANES, 0);
+    rawBiasCurrent_.assign(NUMBER_OF_LANES, 0);
+    rawSnr_.assign(NUMBER_OF_LANES, 0);
+    encodedBiasScale_ = NSM_OPTICAL_MODULE_BIAS_SCALE_1X;
 }
 
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)

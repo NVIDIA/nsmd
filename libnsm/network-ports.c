@@ -2834,3 +2834,18 @@ int decode_optical_module_snr_lane_record(const uint8_t *data, size_t data_len,
 	*out_raw_value = le32toh(raw);
 	return NSM_SW_SUCCESS;
 }
+
+int decode_optical_module_bias_scaling_record(const uint8_t *data,
+					      size_t data_len,
+					      uint8_t *out_encoded_scale)
+{
+	if (!data || !out_encoded_scale)
+		return NSM_SW_ERROR_NULL;
+	if (data_len != sizeof(struct nsm_optical_module_bias_scaling_record))
+		return NSM_SW_ERROR_LENGTH;
+
+	struct nsm_optical_module_bias_scaling_record record;
+	memcpy(&record, data, sizeof(record));
+	*out_encoded_scale = record.value;
+	return NSM_SW_SUCCESS;
+}

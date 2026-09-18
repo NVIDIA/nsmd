@@ -488,6 +488,15 @@ class NsmOpticalModuleTelemetry : public NsmSensorAggregatorPaginated
     void postUpdate() override;
     void resetState() override;
 
+    /** @brief Map a tag 0x20 encoded scaling factor to its multiplier.
+     *  Unrecognized encodings fall back to the 1x default and are logged. */
+    uint8_t biasScaleFromEncoding(uint8_t encoded);
+
+    /** @brief Convert every buffered raw sample into the units the D-Bus
+     *  properties declare. Called from postUpdate(), once the whole
+     *  collection - including the tag 0x20 scaling factor - has arrived. */
+    void convertSamples();
+
   private:
     uint16_t portNumber_;
     std::string objPath_;
@@ -509,11 +518,38 @@ class NsmOpticalModuleTelemetry : public NsmSensorAggregatorPaginated
     std::vector<double> txBiasmA_ = std::vector<double>(NUMBER_OF_LANES, 0.0);
     std::vector<double> snrDB_ = std::vector<double>(NUMBER_OF_LANES, 0.0);
 
+    /* Raw samples as received on the wire. handleSample() only decodes and
+     * stores; convertSamples() applies the units once the collection is
+     * complete. Bias in particular cannot be converted at sample time: its
+     * tag 0x20 scaling factor follows the bias tags in tag order and may
+     * land on a later page. */
+    std::vector<uint16_t> rawTxPower_ = std::vector<uint16_t>(NUMBER_OF_LANES,
+                                                              0);
+    std::vector<uint16_t> rawRxPower_ = std::vector<uint16_t>(NUMBER_OF_LANES,
+                                                              0);
+    std::vector<uint16_t> rawBiasCurrent_ =
+        std::vector<uint16_t>(NUMBER_OF_LANES, 0);
+    std::vector<uint32_t> rawSnr_ = std::vector<uint32_t>(NUMBER_OF_LANES, 0);
+
+    /* Encoded tx_bias_scaling_factor from tag 0x20, as received. Zero is
+     * Multiply_1x, which is also what the spec directs consumers to assume
+     * when the tag is absent -- as pre-0x20 firmware leaves it -- so the
+     * zero-initialized value is already the correct fallback. */
+    uint8_t encodedBiasScale_ = NSM_OPTICAL_MODULE_BIAS_SCALE_1X;
+
     static constexpr uint8_t kGroupId = NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE;
 
-    /* SNR PRM raw value -> dB: raw / kSnrRawToDbScale (e.g. 5665 -> 22.13 dB)
-     */
+    /* SNR raw value -> dB: raw / kSnrRawToDbScale (e.g. 5665 -> 22.13 dB) */
     static constexpr double kSnrRawToDbScale = 256.0;
+
+    /* TX/RX optical power raw value -> mW: the device reports a 1 uW LSB,
+     * so mW = raw / 1000. */
+    static constexpr double kOpticalPowerRawToMilliWatts = 1000.0;
+
+    /* TX bias current raw value -> mA: the device reports a 2 uA LSB before
+     * the tag 0x20 scaling factor, so mA = raw * 2 * scale / 1000. */
+    static constexpr double kBiasRawToMicroAmps = 2.0;
+    static constexpr double kMicroAmpsToMilliAmps = 1000.0;
 };
 
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)
