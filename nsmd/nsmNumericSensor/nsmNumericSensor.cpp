@@ -367,6 +367,14 @@ requester::Coroutine
     size_t responseLen = 0;
     auto rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), *requestMsg,
                                            responseMsg, responseLen, false);
+    if (!rc && !responseMsg)
+    {
+        lg2::error(
+            "NsmNumericSensor::update: null response after successful sensorIO, name={NAME}, eid={EID}",
+            "NAME", getName(), "EID", nsmDevice->getEid());
+        rc = NSM_SW_ERROR_NULL;
+    }
+
     if (rc)
     {
         for (const auto& sensor : sensorValue->getObjects())
@@ -375,14 +383,6 @@ requester::Coroutine
         }
 
         co_return rc;
-    }
-
-    if (!responseMsg)
-    {
-        lg2::error(
-            "NsmNumericSensor::update: null response after successful sensorIO, name={NAME}, eid={EID}",
-            "NAME", getName(), "EID", nsmDevice->getEid());
-        co_return NSM_SW_ERROR_NULL;
     }
 
     rc = handleResponseMsg(responseMsg.get(), responseLen);

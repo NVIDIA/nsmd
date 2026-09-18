@@ -89,19 +89,18 @@ requester::Coroutine NsmAsyncLongRunningSensor::updateLongRunningSensor(
         LG2_ERROR("SendRecvNsmMsg failed, rc: {RC}, eid: {EID}", "RC", rc,
                   "EID", nsmDevice->getEid());
     }
+    if (!rc && !responseMsg)
+    {
+        lg2::error(
+            "NsmAsyncLongRunningSensor::updateLongRunningSensor: null response after successful sensorIO, name={NAME}, eid={EID}",
+            "NAME", NsmSensor::getName(), "EID", nsmDevice->getEid());
+        rc = NSM_SW_ERROR_NULL;
+    }
     if (rc)
     {
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return rc;
-    }
-    if (!responseMsg)
-    {
-        lg2::error(
-            "NsmAsyncLongRunningSensor::updateLongRunningSensor: null response after successful sensorIO, name={NAME}, eid={EID}",
-            "NAME", NsmSensor::getName(), "EID", nsmDevice->getEid());
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_NULL;
     }
     uint8_t cc;
     uint16_t reasonCode = 0, dataSize = 0;
