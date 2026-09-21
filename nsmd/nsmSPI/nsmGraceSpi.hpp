@@ -45,12 +45,14 @@ using SpiIntf = object_t<sdbusplus::com::nvidia::server::GraceSPI>;
 // handed to callers through the GetReadFd method (the GraceSPIData interface
 // exposes a unixfd, which cannot be a D-Bus property). readFd is non-owning;
 // its lifetime is managed by the operation code that populates it.
-class SpiProgress :
-    public object_t<sdbusplus::server::xyz::openbmc_project::common::Progress,
-                    sdbusplus::com::nvidia::server::GraceSPIData>
+using SpiProgressBase =
+    object_t<sdbusplus::server::xyz::openbmc_project::common::Progress,
+             sdbusplus::com::nvidia::server::GraceSPIData>;
+
+class SpiProgress : public SpiProgressBase
 {
   public:
-    using object_t::object_t;
+    using SpiProgressBase::SpiProgressBase;
 
     sdbusplus::message::unix_fd getReadFd() override
     {
