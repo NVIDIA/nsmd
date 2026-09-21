@@ -82,13 +82,12 @@ sdbusplus::object_path NsmGraceSpiObject::readSpi()
     {
         try
         {
-            auto currentFd = currentProgress->spiReadFd();
-            if (currentFd.fd >= 0)
+            if (currentProgress->readFd >= 0)
             {
-                close(currentFd.fd);
+                close(currentProgress->readFd);
             }
             // Reset the file descriptor
-            currentProgress->spiReadFd(sdbusplus::message::unix_fd(-1));
+            currentProgress->readFd = -1;
         }
         catch (const std::exception& e)
         {
@@ -141,7 +140,7 @@ uint8_t NsmGraceSpiObject::startSpiOperation()
             .count());
     newProgress->status(SpiProgress::OperationStatus::InProgress);
     newProgress->progress(0);
-    newProgress->spiReadFd(sdbusplus::message::unix_fd(-1));
+    newProgress->readFd = -1;
 
     // Add to history
     progressHistory.push_back(std::move(newProgress));
@@ -955,8 +954,7 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
     // Update the file descriptor in current progress
     if (auto currentProgress = getCurrentProgress())
     {
-        sdbusplus::message::unix_fd unixFd(fileDesc);
-        currentProgress->spiReadFd(unixFd);
+        currentProgress->readFd = fileDesc;
     }
     finishSpiOperation(SpiProgress::OperationStatus::Completed);
     co_return NSM_SW_SUCCESS;

@@ -32,6 +32,7 @@
 #include <com/nvidia/GraceSPI/server.hpp>
 #include <com/nvidia/GraceSPIData/server.hpp>
 #include <xyz/openbmc_project/Common/Progress/server.hpp>
+#include <xyz/openbmc_project/Common/error.hpp>
 
 namespace nsm
 {
@@ -40,9 +41,28 @@ using namespace sdbusplus::server;
 
 using SpiIntf = object_t<sdbusplus::com::nvidia::server::GraceSPI>;
 
-using SpiProgress =
-    object_t<sdbusplus::server::xyz::openbmc_project::common::Progress,
-             sdbusplus::com::nvidia::server::GraceSPIData>;
+// Progress object for a single SPI operation. The read file descriptor is
+// handed to callers through the GetReadFd method (the GraceSPIData interface
+// exposes a unixfd, which cannot be a D-Bus property). readFd is non-owning;
+// its lifetime is managed by the operation code that populates it.
+class SpiProgress :
+    public object_t<sdbusplus::server::xyz::openbmc_project::common::Progress,
+                    sdbusplus::com::nvidia::server::GraceSPIData>
+{
+  public:
+    using object_t::object_t;
+
+    sdbusplus::message::unix_fd getReadFd() override
+    {
+        if (readFd < 0)
+        {
+            throw sdbusplus::xyz::openbmc_project::Common::Error::Unavailable();
+        }
+        return sdbusplus::message::unix_fd(readFd);
+    }
+
+    int readFd{-1};
+};
 
 class NsmGraceSpiObject : public NsmObject, public SpiIntf
 {
