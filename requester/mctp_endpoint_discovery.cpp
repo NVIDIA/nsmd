@@ -43,16 +43,6 @@
 
 namespace mctp
 {
-// Bounded application-level retry budget when coSetdeviceStateOnlineTask
-// returns NSM_SW_ERROR_TIMEOUT for an EID. The transport layer already
-// exhausts its retries before escalating; this protects against transient
-// post-reboot unresponsiveness (e.g., late MCTP link-up, device in
-// firmware-update mode) where the device is alive but answers a moment late.
-// Mirrors the LinearBackoffConfig defaults used by MctpEndpointProber for
-// NSM_ERR_NOT_READY retries (see requester/retry_backoff_utils.hpp).
-constexpr uint8_t DiscoveryTimeoutMaxRetries = 3;
-constexpr uint32_t DiscoveryTimeoutRetryDelayMs = 2000;
-
 std::unique_ptr<MctpDiscovery> mctpDiscoveryInstance;
 
 MctpDiscovery& MctpDiscovery::getInstance()
@@ -1229,62 +1219,12 @@ requester::Coroutine MctpDiscovery::discoverNsmDeviceTask(eid_t eid)
                 auto rc = co_await coSetdeviceStateOnlineTask(mctpInfos);
                 discoveryEvents(eid).setValue(
                     nsm::DiscoveryEventType::SetDeviceStateOnline, rc);
-                if (rc == NSM_SW_ERROR_TIMEOUT &&
-                    perEidDiscoveryTimeoutRetries[eid] <
-                        DiscoveryTimeoutMaxRetries)
-                {
-                    ++perEidDiscoveryTimeoutRetries[eid];
-                    lg2::info(
-                        "discoverNsmDeviceTask: ping/QDI timeout, re-queueing eid={EID} attempt={ATTEMPT}/{MAX} delayMs={DELAY}",
-                        "EID", eid, "ATTEMPT",
-                        perEidDiscoveryTimeoutRetries[eid], "MAX",
-                        DiscoveryTimeoutMaxRetries, "DELAY",
-                        DiscoveryTimeoutRetryDelayMs);
-                    auto event = sdeventplus::Event::get_default();
-                    co_await common::Sleep(
-                        event,
-                        static_cast<uint64_t>(DiscoveryTimeoutRetryDelayMs) *
-                            1000,
-                        common::NonPriority);
-                    // A newer transition for this EID may have been queued
-                    // while we slept (e.g. InterfacesRemoved or
-                    // Connectivity=Unavailable). The snapshot we just processed
-                    // is still at the front (popped below), so size() > 1 means
-                    // a fresher state is already pending. Re-queueing the stale
-                    // active snapshot would re-probe the EID after that newer
-                    // (possibly offline) transition runs, clobbering it. Only
-                    // retry while this snapshot is still the latest known state
-                    // for the EID.
-                    if (perEidQueuedMctpInfos[eid].size() == 1)
-                    {
-                        perEidQueuedMctpInfos[eid].emplace(mctpInfo);
-                    }
-                    else
-                    {
-                        lg2::info(
-                            "discoverNsmDeviceTask: newer transition queued during retry sleep, dropping stale retry eid={EID}",
-                            "EID", eid);
-                        perEidDiscoveryTimeoutRetries.erase(eid);
-                    }
-                }
-                else
-                {
-                    if (rc == NSM_SW_ERROR_TIMEOUT)
-                    {
-                        lg2::error(
-                            "discoverNsmDeviceTask: timeout retry budget exhausted, eid={EID} attempts={ATTEMPTS}",
-                            "EID", eid, "ATTEMPTS",
-                            perEidDiscoveryTimeoutRetries[eid]);
-                    }
-                    perEidDiscoveryTimeoutRetries.erase(eid);
-                }
             }
             else
             {
                 auto rc = co_await coSetdeviceStateOfflineTask(mctpInfos);
                 discoveryEvents(eid).setValue(
                     nsm::DiscoveryEventType::SetDeviceStateOffline, rc);
-                perEidDiscoveryTimeoutRetries.erase(eid);
             }
         }
         catch (const std::exception& e)
