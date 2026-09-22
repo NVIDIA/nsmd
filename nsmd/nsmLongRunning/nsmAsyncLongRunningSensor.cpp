@@ -92,8 +92,8 @@ requester::Coroutine NsmAsyncLongRunningSensor::updateLongRunningSensor(
     if (!rc && !responseMsg)
     {
         lg2::error(
-            "NsmAsyncLongRunningSensor::updateLongRunningSensor: null response after successful sensorIO, name={NAME}, eid={EID}",
-            "NAME", NsmSensor::getName(), "EID", nsmDevice->getEid());
+            "NsmAsyncLongRunningSensor::updateLongRunningSensor: null response after successful sensorIO, name={NAME}, eid={EID}, rc={RC}",
+            "NAME", NsmSensor::getName(), "EID", nsmDevice->getEid(), "RC", rc);
         rc = NSM_SW_ERROR_NULL;
     }
     if (rc)
