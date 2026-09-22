@@ -36,6 +36,7 @@ using namespace ::testing;
 #include "libnsm/device-configuration.h"
 
 #include "nsmNetworkAdapter.hpp"
+#include "nsmNetworkAdapterRegistry.hpp"
 
 #undef private
 #undef protected
@@ -541,4 +542,39 @@ TEST_F(ProtectionOptionsModeV2Test, Factory_ModeNotSupported_NoSensorCreated)
     const size_t before = countProtectionModeSensors(device);
     createNSMNetworkAdapter(mockManager, intf, testPath);
     EXPECT_EQ(countProtectionModeSensors(device), before);
+}
+
+// ============================================================================
+// Registration: adapters are found by parent chassis and Name
+// ============================================================================
+
+using NetworkAdapterRegistrationTest = ProtectionOptionsModeV2Test;
+
+TEST_F(NetworkAdapterRegistrationTest, RecordedUnderItsParentChassis)
+{
+    const std::string testPath = "/xyz/test/registration/parent_chassis";
+    const std::string chassisPath =
+        "/xyz/openbmc_project/inventory/system/chassis/CX_REG";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm["Name"] = std::string("CX_REG_NIC");
+    pm["UUID"] = deviceUuid;
+    pm["Type"] = std::string("NSM_NetworkAdapter");
+    pm["InventoryObjPath"] = chassisPath + "/NetworkAdapters/";
+
+    const std::string associationIntf = intf + ".Associations0";
+    auto& association = utils::MockDbusAsync::propertyMap(testPath,
+                                                          associationIntf);
+    association["Forward"] = std::string("parent_chassis");
+    association["Backward"] = std::string("network_adapters");
+    association["AbsolutePath"] = chassisPath;
+    utils::MockDbusAsync::serviceMap() = {
+        {utils::entityManagerServiceStr, {intf, associationIntf}}};
+
+    createNSMNetworkAdapter(mockManager, intf, testPath);
+
+    const auto adapter =
+        NetworkAdapterRegistry::instance().find({"CX_REG", "CX_REG_NIC"});
+    ASSERT_NE(adapter, nullptr);
+    EXPECT_EQ(adapter->path, chassisPath + "/NetworkAdapters/CX_REG_NIC");
+    EXPECT_EQ(adapter->deviceModeIntf, nullptr);
 }

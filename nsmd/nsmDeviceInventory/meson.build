@@ -38,7 +38,11 @@ if include_all_dev_inv or include_dev_inv_list.contains('pcie-retimer-switch')
     sources += ['nsmDeviceInventory/nsmPCIeRetimerSwitchDI.cpp']
 endif
 if include_all_dev_inv or include_dev_inv_list.contains('network-adapter')
-    sources += ['nsmDeviceInventory/nsmNetworkAdapter.cpp']
+    sources += [
+        'nsmDeviceInventory/nsmAstra.cpp',
+        'nsmDeviceInventory/nsmNetworkAdapter.cpp',
+        'nsmDeviceInventory/nsmAstraRegistry.cpp',
+    ]
 endif
 
 nsmd_headers += ['.', '..', 'nsmDebugToken', 'nsmDumpCollection']

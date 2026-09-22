@@ -18,6 +18,7 @@
 #include "nsmNetworkAdapter.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "nsmNetworkAdapterRegistry.hpp"
 #if defined(ENABLE_DEBUG_INFO)
 #include "nsmDebugInfo.hpp"
 #endif
@@ -39,6 +40,7 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <algorithm>
 #include <cstring>
 #include <optional>
 #include <vector>
@@ -593,10 +595,30 @@ NsmPCIeDeviceModeDeviceModeSettingsV2Get::
     NsmPCIeDeviceModeDeviceModeSettingsV2Get(
         const std::string& name, const std::string& type,
         uint8_t patchabilityBitmap,
-        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf) :
+        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf,
+        NetworkAdapterId adapterId) :
     NsmDeviceModeSettingsV2GetBase(name, type, modeIndex, patchabilityBitmap),
-    pcieDeviceModeIntf(std::move(pcieDeviceModeIntf))
+    pcieDeviceModeIntf(std::move(pcieDeviceModeIntf)),
+    adapterId(std::move(adapterId))
 {}
+
+requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Get::update(
+    std::shared_ptr<NsmDevice> nsmDevice)
+{
+    // So a response without East/West doesn't leave a stale value.
+    ewPendingMode.reset();
+    auto rc = co_await NsmSensor::update(std::move(nsmDevice));
+    // On every poll: a resumed poll is the only sign a device is back.
+    NetworkAdapterRegistry::instance().changed(adapterId);
+    co_return rc;
+}
+
+void NsmPCIeDeviceModeDeviceModeSettingsV2Get::handleOfflineState()
+{
+    ewCurrentRead = false;
+    ewPendingRead = false;
+    NetworkAdapterRegistry::instance().changed(adapterId);
+}
 
 static EWTrafficMode rawByteToEWTrafficMode(uint8_t val)
 {
@@ -632,13 +654,16 @@ uint8_t NsmPCIeDeviceModeDeviceModeSettingsV2Get::handleDeviceModeGetPayload(
             pcieDeviceModeIntf->PCIeControlledEWTrafficServer::currentMode(
                 rawByteToEWTrafficMode(
                     currentData[SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC]));
+            ewCurrentRead = true;
         }
         if (isValid(pendingData, pendingLength,
                     SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC))
         {
+            ewPendingMode = rawByteToEWTrafficMode(
+                pendingData[SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC]);
             pcieDeviceModeIntf->PCIeControlledEWTrafficServer::pendingMode(
-                rawByteToEWTrafficMode(
-                    pendingData[SUB_MODE_PCIE_CONTROLLED_EW_TRAFFIC]));
+                *ewPendingMode);
+            ewPendingRead = true;
         }
         if (isValid(currentData, currentLength, SUB_MODE_PCIE_BIFURCATION))
         {
@@ -659,9 +684,11 @@ NsmPCIeDeviceModeDeviceModeSettingsV2Set::
     NsmPCIeDeviceModeDeviceModeSettingsV2Set(
         const std::string& name, const std::string& type,
         uint8_t patchabilityBitmap,
-        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf) :
+        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf,
+        NetworkAdapterId adapterId) :
     NsmDeviceModeSettingsV2SetBase(name, type, modeIndex, patchabilityBitmap),
-    pcieDeviceModeIntf(std::move(pcieDeviceModeIntf))
+    pcieDeviceModeIntf(std::move(pcieDeviceModeIntf)),
+    adapterId(std::move(adapterId))
 {}
 
 std::vector<uint8_t>
@@ -791,6 +818,7 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
             pcieDeviceModeIntf->PCIeBifurcationServer::pendingMode(
                 bifurcationRawMode);
         }
+        NetworkAdapterRegistry::instance().changed(adapterId);
     }
 
     *status = AsyncOperationStatusType::Success;
@@ -1179,13 +1207,12 @@ static void createDpuModeSensors(sdbusplus::bus::bus& bus,
         setDpuOperationModeHandler, dpuSetSensor, nsmDevice);
 }
 
-static void createPcieModeSensors(sdbusplus::bus::bus& bus,
-                                  const std::shared_ptr<NsmDevice>& nsmDevice,
-                                  const std::string& name,
-                                  const std::string& type,
-                                  const std::string& inventoryObjPath,
-                                  uint8_t pcieModeBitmap,
-                                  const std::string& networkAdapterPath)
+/** @brief Create the PCIe device mode objects and record them in @p adapter. */
+static void createPcieModeSensors(
+    sdbusplus::bus::bus& bus, const std::shared_ptr<NsmDevice>& nsmDevice,
+    const std::string& name, const std::string& type,
+    const std::string& inventoryObjPath, uint8_t pcieModeBitmap,
+    const std::string& networkAdapterPath, NetworkAdapter& adapter)
 {
     auto pcieDeviceModeIntf = createPCIeDeviceModeInterface(
         bus, inventoryObjPath, networkAdapterPath, pcieModeBitmap);
@@ -1193,13 +1220,13 @@ static void createPcieModeSensors(sdbusplus::bus::bus& bus,
     auto pcieGetSensor =
         std::make_shared<NsmPCIeDeviceModeDeviceModeSettingsV2Get>(
             name + "_PCIeDeviceMode_Get", type, pcieModeBitmap,
-            pcieDeviceModeIntf);
+            pcieDeviceModeIntf, adapter.id());
     nsmDevice->addSensor(pcieGetSensor, false);
 
     auto pcieSetSensor =
         std::make_shared<NsmPCIeDeviceModeDeviceModeSettingsV2Set>(
             name + "_PCIeDeviceMode_Set", type, pcieModeBitmap,
-            pcieDeviceModeIntf);
+            pcieDeviceModeIntf, adapter.id());
     // Registered as a static sensor: tracked in deviceSensors for lifecycle,
     // but its no-op update() drops it from the polling queue after one pass.
     nsmDevice->addStaticSensor(pcieSetSensor);
@@ -1216,6 +1243,10 @@ static void createPcieModeSensors(sdbusplus::bus::bus& bus,
                                "PendingModes",
                                AsyncSetOperationInfo{setPcieModesHandler,
                                                      pcieSetSensor, nsmDevice});
+
+    adapter.deviceModeIntf = pcieDeviceModeIntf;
+    adapter.getSensor = pcieGetSensor;
+    adapter.setSensor = pcieSetSensor;
 }
 
 static void createDeviceModeSensors(
@@ -1223,7 +1254,7 @@ static void createDeviceModeSensors(
     const std::string& name, const std::string& type,
     const std::string& inventoryObjPath, bool hasDpuModeSupport,
     uint8_t dpuModeBitmap, bool hasPcieModeSupport, uint8_t pcieModeBitmap,
-    const std::string& networkAdapterPath)
+    const std::string& networkAdapterPath, NetworkAdapter& adapter)
 {
     if (hasDpuModeSupport)
     {
@@ -1233,8 +1264,23 @@ static void createDeviceModeSensors(
     if (hasPcieModeSupport)
     {
         createPcieModeSensors(bus, nsmDevice, name, type, inventoryObjPath,
-                              pcieModeBitmap, networkAdapterPath);
+                              pcieModeBitmap, networkAdapterPath, adapter);
     }
+}
+
+/** @brief The Name of the chassis the parent_chassis association names. */
+static std::string
+    parentChassisName(const std::vector<utils::Association>& associations)
+{
+    auto parent = std::ranges::find_if(
+        associations, [](const utils::Association& association) {
+        return association.forward == "parent_chassis";
+    });
+    if (parent == associations.end())
+    {
+        return {};
+    }
+    return sdbusplus::message::object_path(parent->absolutePath).filename();
 }
 
 requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
@@ -1303,6 +1349,14 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
     createDeviceProtectionOptions(nsmDevice, type, inventoryObjPath, name);
 #endif
 
+    NetworkAdapter adapter{.device = nsmDevice,
+                           .chassis = parentChassisName(associations),
+                           .name = name,
+                           .path = inventoryObjPath + name,
+                           .deviceModeIntf = nullptr,
+                           .getSensor = nullptr,
+                           .setSensor = nullptr};
+
     if (allCurrentIfaceProperties.count("DeviceModesSupported"))
     {
         // DeviceModesSupported: DEVICE_MODE_NOT_SUPPORTED (-1) = mode not
@@ -1336,7 +1390,7 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
         createDeviceModeSensors(bus, nsmDevice, name, type,
                                 networkAdapterObjPath, dpuSupported,
                                 dpuPatchability, pcieSupported,
-                                pciePatchability, networkAdapterPath);
+                                pciePatchability, networkAdapterPath, adapter);
 
         // OOB Miswiring Detection
 #if defined(ENABLE_LLDP)
@@ -1354,6 +1408,15 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
                                                networkAdapterObjPath,
                                                networkAdapterPath);
         }
+    }
+
+    // Without a parent chassis nothing could list the adapter.
+    if (!adapter.chassis.empty() &&
+        !NetworkAdapterRegistry::instance().add(std::move(adapter)))
+    {
+        lg2::error("createNSMNetworkAdapter: {NAME} on {CHASSIS} was already "
+                   "created, keeping the first",
+                   "NAME", name, "CHASSIS", parentChassisName(associations));
     }
 
     // coverity[missing_return]

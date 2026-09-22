@@ -25,8 +25,21 @@
 #include <xyz/openbmc_project/Inventory/Item/NetworkInterface/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
 
+#include <compare>
+#include <optional>
+#include <string>
+
 namespace nsm
 {
+
+/** @brief Identifies a network adapter by its parent chassis and its Name. */
+struct NetworkAdapterId
+{
+    std::string chassis;
+    std::string name;
+
+    auto operator<=>(const NetworkAdapterId&) const = default;
+};
 
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
@@ -194,6 +207,11 @@ class NsmDeviceModeSettingsV2SetBase : public NsmDeviceModeSettingsV2Base
     // update() is a no-op that returns success
     requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
+    bool isPatchInProgress() const
+    {
+        return asyncPatchInProgress;
+    }
+
   protected:
     std::optional<std::vector<uint8_t>>
         createSetRequestMsg(uint8_t instanceId,
@@ -255,7 +273,42 @@ class NsmPCIeDeviceModeDeviceModeSettingsV2Get :
     NsmPCIeDeviceModeDeviceModeSettingsV2Get(
         const std::string& name, const std::string& type,
         uint8_t patchabilityBitmap,
-        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf);
+        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf,
+        NetworkAdapterId adapterId);
+
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
+
+    /**
+     * @brief Forget the modes read so far and tell the device's groups.
+     *
+     * A power cycle while offline may apply the pending mode.
+     */
+    void handleOfflineState() override;
+
+    /**
+     * @brief East/West PendingMode from the last poll, empty if omitted.
+     *
+     * Unlike the PendingMode property, which keeps its previous value.
+     */
+    std::optional<EWTrafficMode> latestEWPendingMode() const
+    {
+        return ewPendingMode;
+    }
+
+    /**
+     * @brief Whether East/West CurrentMode has been read since startup or the
+     * device last went offline.
+     */
+    bool ewCurrentModeRead() const
+    {
+        return ewCurrentRead;
+    }
+
+    /** @brief As ewCurrentModeRead, for PendingMode. */
+    bool ewPendingModeRead() const
+    {
+        return ewPendingRead;
+    }
 
   protected:
     uint8_t handleDeviceModeGetPayload(const uint8_t* currentData,
@@ -265,6 +318,12 @@ class NsmPCIeDeviceModeDeviceModeSettingsV2Get :
 
   private:
     std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf;
+    const NetworkAdapterId adapterId;
+    std::optional<EWTrafficMode> ewPendingMode;
+
+    // Separate, since a response may carry either mode alone.
+    bool ewCurrentRead = false;
+    bool ewPendingRead = false;
 };
 
 class NsmPCIeDeviceModeDeviceModeSettingsV2Set :
@@ -277,7 +336,8 @@ class NsmPCIeDeviceModeDeviceModeSettingsV2Set :
     NsmPCIeDeviceModeDeviceModeSettingsV2Set(
         const std::string& name, const std::string& type,
         uint8_t patchabilityBitmap,
-        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf);
+        std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf,
+        NetworkAdapterId adapterId);
 
     requester::Coroutine
         setPendingModes(const AsyncSetOperationValueType& value,
@@ -291,6 +351,7 @@ class NsmPCIeDeviceModeDeviceModeSettingsV2Set :
                                 uint8_t bifurcationRawMode);
 
     std::shared_ptr<PCIeDeviceModeIntf> pcieDeviceModeIntf;
+    const NetworkAdapterId adapterId;
 };
 
 // ---- Protection Options Mode V2 (NSM Type 5, Device Mode Index 26) ----
