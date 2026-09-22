@@ -390,8 +390,8 @@ requester::Coroutine
     if (!rc && !responseMsg)
     {
         lg2::error(
-            "NsmNumericSensor::update: null response after successful sensorIO, name={NAME}, eid={EID}",
-            "NAME", getName(), "EID", nsmDevice->getEid());
+            "NsmNumericSensor::update: null response after successful sensorIO, name={NAME}, eid={EID}, rc={RC}",
+            "NAME", getName(), "EID", nsmDevice->getEid(), "RC", rc);
         rc = NSM_SW_ERROR_NULL;
     }
 
