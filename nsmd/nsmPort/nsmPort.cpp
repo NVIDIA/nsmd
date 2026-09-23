@@ -2741,16 +2741,6 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
         supportFECHistogram =
             std::get<bool>(allCurrentIfaceProperties.at("SupportFECHistogram"));
     }
-    // "LinkHealthExtensionSupported": true selects the Query Port
-    // Characteristics v2 (0x12) sensor for the NVLink ports of this entry;
-    // absent = false keeps the Phase 1 sensor.
-    bool linkHealthExtensionSupported = false;
-    if (allCurrentIfaceProperties.count("LinkHealthExtensionSupported"))
-    {
-        linkHealthExtensionSupported = std::get<bool>(
-            allCurrentIfaceProperties.at("LinkHealthExtensionSupported"));
-    }
-
     std::vector<std::string> portNameMap{};
     if (allCurrentIfaceProperties.count("PortNameMap"))
     {
@@ -2954,34 +2944,14 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
                 nsmDevice->addSensor(portStatusSensor, priority);
             }
 
-            if (linkHealthExtensionSupported)
-            {
-                auto portCharacteristicsV2Sensor =
-                    std::make_shared<NsmPortCharacteristicsV2>(
-                        bus, portName, logicalPortNum, type, deviceType,
-                        portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
-                        objPath, nsmDevice);
-                nsmDevice->addSensor(portCharacteristicsV2Sensor, priority);
-            }
-            else
-            {
-                auto portCharacteristicsSensor =
-                    std::make_shared<NsmPortCharacteristics>(
-                        bus, portName, logicalPortNum, type, deviceType,
-                        portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
-                        objPath);
-                if (!portCharacteristicsSensor)
-                {
-                    lg2::error(
-                        "Failed to create NSM Port characteristics sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                        "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                        objPath);
-                }
-                else
-                {
-                    nsmDevice->addSensor(portCharacteristicsSensor, priority);
-                }
-            }
+            // Owns the Query Port Characteristics (0x42) fallback for devices
+            // that do not support 0x12, so no separate sensor is created.
+            auto portCharacteristicsV2Sensor =
+                std::make_shared<NsmPortCharacteristicsV2>(
+                    bus, portName, logicalPortNum, type, deviceType,
+                    portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
+                    objPath, nsmDevice);
+            nsmDevice->addSensor(portCharacteristicsV2Sensor, priority);
         }
 
         auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
