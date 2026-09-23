@@ -520,3 +520,60 @@ TEST(OpticalModuleCodec, DecodeQueryPortTelemetryCapsResp_TooShort)
 							&a, &b, out);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+// ---------------------------------------------------------------------------
+// tx_bias_scaling_factor record (group 0x09 tag 0x20)
+// ---------------------------------------------------------------------------
+
+TEST(OpticalModuleCodec, DecodeBiasScaling_ReturnsEncodedWireValue)
+{
+	// The decoder returns the wire value as-is; mapping an encoding to its
+	// multiplier is the caller's responsibility.
+	const uint8_t encoded[] = {NSM_OPTICAL_MODULE_BIAS_SCALE_1X,
+				   NSM_OPTICAL_MODULE_BIAS_SCALE_2X,
+				   NSM_OPTICAL_MODULE_BIAS_SCALE_4X};
+
+	for (size_t i = 0; i < sizeof(encoded); ++i) {
+		uint8_t value = 0xFF;
+		auto rc = decode_optical_module_bias_scaling_record(
+		    &encoded[i], sizeof(uint8_t), &value);
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+		EXPECT_EQ(value, encoded[i]);
+	}
+}
+
+TEST(OpticalModuleCodec, DecodeBiasScaling_PassesThroughUnknownEncodings)
+{
+	// Encodings this build does not recognize are returned verbatim, so a
+	// future scaling factor reaches the caller instead of being rejected
+	// inside the codec.
+	for (uint8_t raw = 3; raw < 8; ++raw) {
+		uint8_t value = 0xFF;
+		auto rc = decode_optical_module_bias_scaling_record(
+		    &raw, sizeof(raw), &value);
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+		EXPECT_EQ(value, raw);
+	}
+}
+
+TEST(OpticalModuleCodec, DecodeBiasScaling_WrongLengthRejected)
+{
+	const uint8_t data[2] = {NSM_OPTICAL_MODULE_BIAS_SCALE_2X, 0};
+	uint8_t value = 0;
+
+	EXPECT_EQ(decode_optical_module_bias_scaling_record(data, 2, &value),
+		  NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(decode_optical_module_bias_scaling_record(data, 0, &value),
+		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(OpticalModuleCodec, DecodeBiasScaling_NullParams)
+{
+	const uint8_t data = NSM_OPTICAL_MODULE_BIAS_SCALE_2X;
+	uint8_t value = 0;
+
+	EXPECT_EQ(decode_optical_module_bias_scaling_record(nullptr, 1, &value),
+		  NSM_SW_ERROR_NULL);
+	EXPECT_EQ(decode_optical_module_bias_scaling_record(&data, 1, nullptr),
+		  NSM_SW_ERROR_NULL);
+}

@@ -1748,12 +1748,37 @@ int encode_query_port_telemetry_caps_resp(
  *   0x15  bias_current_lane_5        0x1D  snr_lane_5
  *   0x16  bias_current_lane_6        0x1E  snr_lane_6
  *   0x17  bias_current_lane_7        0x1F  snr_lane_7
+ *
+ * Tag 0x20 (tx_bias_scaling_factor) is a single per-module record, not part
+ * of a lane block.
+ *
+ * Units, per the Type 1 spec group 0x09 BMC conversion rules. Lanes 0-7 are
+ * module media lanes, not port SerDes lanes:
+ *   TX power (0x00-0x07): 1 uW LSB; mW = raw / 1000
+ *   RX power (0x08-0x0F): 1 uW LSB; mW = raw / 1000
+ *   TX bias  (0x10-0x17): 2 uA LSB before scaling;
+ *                         uA = raw * 2 * scale, mA = uA / 1000
+ *   Bias scale (0x20):    scale is 1, 2 or 4; assume 1x when the tag is
+ *                         absent
+ *   Media SNR (0x18-0x1F): dB = raw / 256; zero is a valid reading
  */
 enum nsm_optical_module_tag_base {
 	NSM_OPTICAL_MODULE_TAG_TX_POWER_BASE = 0x00,
 	NSM_OPTICAL_MODULE_TAG_RX_POWER_BASE = 0x08,
 	NSM_OPTICAL_MODULE_TAG_BIAS_CURRENT_BASE = 0x10,
 	NSM_OPTICAL_MODULE_TAG_SNR_BASE = 0x18,
+	NSM_OPTICAL_MODULE_TAG_BIAS_SCALING_FACTOR = 0x20,
+};
+
+/**
+ * Encoded values of the tx_bias_scaling_factor record (tag 0x20). The wire
+ * value is an encoded index, not the multiplier itself; the spec table
+ * defines which multiplier each encoding maps to.
+ */
+enum nsm_optical_module_bias_scaling_factor {
+	NSM_OPTICAL_MODULE_BIAS_SCALE_1X = 0,
+	NSM_OPTICAL_MODULE_BIAS_SCALE_2X = 1,
+	NSM_OPTICAL_MODULE_BIAS_SCALE_4X = 2,
 };
 
 /**
@@ -1768,8 +1793,8 @@ struct nsm_optical_module_power_bias_record {
  * Per-lane optical module SNR sample record payload.
  * Used for group 0x09 tags 0x18-0x1F (signal-to-noise ratio).
  *
- * Raw PRM value; caller must divide by 256 to get dB (e.g. raw 5665 ->
- * 22.13 dB). Not an IEEE 754 float.
+ * Raw value; caller must divide by 256 to get dB (e.g. raw 5665 ->
+ * 22.13 dB). Not an IEEE 754 float. Zero is a valid reading.
  */
 struct nsm_optical_module_snr_record {
 	uint32_t raw_value_le; /* raw PRM value, little-endian */
@@ -1782,7 +1807,10 @@ struct nsm_optical_module_snr_record {
  * @param[in]  data       Pointer to the sample data field
  * @param[in]  data_len   Must equal 2 (sizeof NvU16), as derived from the
  *                        aggregate sample metadata length field
- * @param[out] out_value  Decoded NvU16 value, host byte order
+ * @param[out] out_value  Decoded NvU16 value, host byte order. Raw device
+ *                        units: 1 uW per LSB for TX/RX power, 2 uA per LSB
+ *                        (before the tag 0x20 scaling factor) for bias
+ *                        current. The caller applies the conversion.
  * @return NSM_SW_SUCCESS; NSM_SW_ERROR_LENGTH if data_len != 2
  */
 int decode_optical_module_power_bias_lane_record(const uint8_t *data,
@@ -1804,6 +1832,33 @@ int decode_optical_module_power_bias_lane_record(const uint8_t *data,
  */
 int decode_optical_module_snr_lane_record(const uint8_t *data, size_t data_len,
 					  uint32_t *out_raw_value);
+
+/**
+ * Optical module TX bias-current scaling factor record payload.
+ * Used for group 0x09 tag 0x20. One record per module, not per lane.
+ */
+struct nsm_optical_module_bias_scaling_record {
+	uint8_t value; /* enum nsm_optical_module_bias_scaling_factor */
+} __attribute__((packed));
+
+/**
+ * @brief Decode the optical module TX bias-current scaling factor record
+ * from a group 0x09 sample (tag 0x20).
+ *
+ * Returns the encoded wire value as received. The multiplier each encoding
+ * maps to is defined by the spec table, not by the wire, so the caller owns
+ * that mapping and decides how to treat encodings it does not recognize.
+ *
+ * @param[in]  data               Pointer to the sample data field
+ * @param[in]  data_len           Must equal 1, as derived from the aggregate
+ *                                sample metadata length field
+ * @param[out] out_encoded_scale  Decoded wire value; see
+ *                                enum nsm_optical_module_bias_scaling_factor
+ * @return NSM_SW_SUCCESS; NSM_SW_ERROR_LENGTH if data_len != 1
+ */
+int decode_optical_module_bias_scaling_record(const uint8_t *data,
+					      size_t data_len,
+					      uint8_t *out_encoded_scale);
 
 #ifdef __cplusplus
 }
