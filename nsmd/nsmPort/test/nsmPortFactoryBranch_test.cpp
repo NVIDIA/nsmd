@@ -215,8 +215,8 @@ TEST_F(NsmPortFactoryBranchTest, DISABLED_FactoryWithNetAddr_AllPropsAbsent)
 }
 
 // ============================================================================
-// LinkHealthExtensionSupported selects the port characteristics sensor:
-// true -> NsmPortCharacteristicsV2 (0x12), false or absent -> Phase 1 (0x42)
+// Every NVLink port gets NsmPortCharacteristicsV2; the device, not the
+// entity-manager entry, decides between 0x12 and the 0x42 fallback.
 // ============================================================================
 namespace
 {
@@ -235,22 +235,22 @@ size_t countSensors(const std::shared_ptr<MockNsmDevice>& device)
 }
 } // namespace
 
-TEST_F(NsmPortFactoryBranchTest, Factory_LinkHealthExtensionSupported_CreatesV2)
+TEST_F(NsmPortFactoryBranchTest, Factory_NvlinkPort_CreatesV2)
 {
-    const std::string objPath = "/xyz/openbmc_project/config/port_fb_lhx_true";
+    const std::string objPath = "/xyz/openbmc_project/config/port_fb_v2";
     auto& propMap = utils::MockDbusAsync::propertyMap(objPath, portInterface);
-    propMap["Name"] = std::string("NVLink_LHX");
+    propMap["Name"] = std::string("NVLink_V2");
     propMap["UUID"] = gpuUuid;
     propMap["ParentObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/GPU_LHX");
+        std::string("/xyz/openbmc_project/inventory/system/GPU_V2");
     propMap["Priority"] = false;
     propMap["Count"] = uint64_t{2};
     propMap["DeviceType"] = uint64_t{NSM_DEV_ID_GPU};
-    propMap["LinkHealthExtensionSupported"] = true;
 
     createNsmPortSensorGeneric(mockManager, portInterface, objPath);
 
-    // One v2 sensor per port, no Phase 1 sensor.
+    // One v2 sensor per port; the 0x42 fallback sensor is owned by it, not
+    // registered on the device.
     EXPECT_EQ(countSensors<NsmPortCharacteristicsV2>(gpu), 2u);
     EXPECT_EQ(countSensors<NsmPortCharacteristics>(gpu), 0u);
     for (const auto& sensor : gpu->roundRobinSensors)
@@ -266,40 +266,23 @@ TEST_F(NsmPortFactoryBranchTest, Factory_LinkHealthExtensionSupported_CreatesV2)
     }
 }
 
-TEST_F(NsmPortFactoryBranchTest,
-       Factory_LinkHealthExtensionFalseOrAbsent_CreatesPhase1)
+TEST_F(NsmPortFactoryBranchTest, Factory_StaleLinkHealthKey_IsIgnored)
 {
-    const std::string falsePath =
-        "/xyz/openbmc_project/config/port_fb_lhx_false";
-    auto& falseProps = utils::MockDbusAsync::propertyMap(falsePath,
-                                                         portInterface);
-    falseProps["Name"] = std::string("NVLink_LHX_False");
-    falseProps["UUID"] = gpuUuid;
-    falseProps["ParentObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/GPU_LHX_F");
-    falseProps["Priority"] = false;
-    falseProps["Count"] = uint64_t{1};
-    falseProps["DeviceType"] = uint64_t{NSM_DEV_ID_GPU};
-    falseProps["LinkHealthExtensionSupported"] = false;
+    // A configuration that still carries the withdrawn
+    // LinkHealthExtensionSupported key must not change the sensor choice.
+    const std::string objPath = "/xyz/openbmc_project/config/port_fb_stale";
+    auto& propMap = utils::MockDbusAsync::propertyMap(objPath, portInterface);
+    propMap["Name"] = std::string("NVLink_Stale");
+    propMap["UUID"] = gpuUuid;
+    propMap["ParentObjPath"] =
+        std::string("/xyz/openbmc_project/inventory/system/GPU_Stale");
+    propMap["Priority"] = false;
+    propMap["Count"] = uint64_t{1};
+    propMap["DeviceType"] = uint64_t{NSM_DEV_ID_GPU};
+    propMap["LinkHealthExtensionSupported"] = false;
 
-    createNsmPortSensorGeneric(mockManager, portInterface, falsePath);
-    EXPECT_EQ(countSensors<NsmPortCharacteristics>(gpu), 1u);
-    EXPECT_EQ(countSensors<NsmPortCharacteristicsV2>(gpu), 0u);
+    createNsmPortSensorGeneric(mockManager, portInterface, objPath);
 
-    // Absent property: the previous behavior (Phase 1 sensor) is preserved.
-    const std::string absentPath =
-        "/xyz/openbmc_project/config/port_fb_lhx_absent";
-    auto& absentProps = utils::MockDbusAsync::propertyMap(absentPath,
-                                                          portInterface);
-    absentProps["Name"] = std::string("NVLink_LHX_Absent");
-    absentProps["UUID"] = gpuUuid;
-    absentProps["ParentObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/GPU_LHX_A");
-    absentProps["Priority"] = false;
-    absentProps["Count"] = uint64_t{1};
-    absentProps["DeviceType"] = uint64_t{NSM_DEV_ID_GPU};
-
-    createNsmPortSensorGeneric(mockManager, portInterface, absentPath);
-    EXPECT_EQ(countSensors<NsmPortCharacteristics>(gpu), 2u);
-    EXPECT_EQ(countSensors<NsmPortCharacteristicsV2>(gpu), 0u);
+    EXPECT_EQ(countSensors<NsmPortCharacteristicsV2>(gpu), 1u);
+    EXPECT_EQ(countSensors<NsmPortCharacteristics>(gpu), 0u);
 }

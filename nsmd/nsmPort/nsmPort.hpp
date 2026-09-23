@@ -237,8 +237,9 @@ class NsmPortCharacteristics : public NsmSensor
 /** @class NsmPortCharacteristicsV2
  *
  *  Per-port sensor for NSM Type 1 Query Port Characteristics v2 (0x12), the
- *  Link Health Indication Extension. Created instead of NsmPortCharacteristics
- *  on ports whose entity-manager entry sets LinkHealthExtensionSupported.
+ *  Link Health Indication Extension. Created for every GPU and NVSwitch
+ *  NVLink port; the device answer decides whether the port runs the v2
+ *  query or falls back to Query Port Characteristics (0x42).
  *
  *  Records: Tags 0x00-0x03 feed the Phase 1 publishers of the owned
  *  NsmPortCharacteristics (health bits of Tag 0x00 are ignored); Tag 0x04
