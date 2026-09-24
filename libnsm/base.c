@@ -277,41 +277,45 @@ void letohArrayData(uint8_t *data, uint16_t num_of_element, uint8_t data_type)
 	}
 }
 
+static int get_histogram_array_size(uint16_t num_of_element, uint8_t data_type,
+				    size_t *data_size)
+{
+	if (data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	switch (data_type) {
+	case NvU8:
+	case NvS8:
+		*data_size = sizeof(uint8_t) * num_of_element;
+		break;
+	case NvU16:
+	case NvS16:
+		*data_size = sizeof(uint16_t) * num_of_element;
+		break;
+	case NvU32:
+	case NvS32:
+		*data_size = sizeof(uint32_t) * num_of_element;
+		break;
+	case NvS24_8:
+		*data_size = sizeof(float) * num_of_element;
+		break;
+	case NvU64:
+	case NvS64:
+		*data_size = sizeof(uint64_t) * num_of_element;
+		break;
+	default:
+		return NSM_SW_ERROR_DATA;
+	}
+	return NSM_SW_SUCCESS;
+}
+
 void dataCopy(uint8_t *srcData, uint8_t *destData, uint16_t numOfElement,
 	      uint8_t dataType)
 {
 	size_t dataSize = 0;
-	switch (dataType) {
-	case NvU8:
-		dataSize = sizeof(uint8_t) * numOfElement;
-		break;
-	case NvS8:
-		dataSize = sizeof(int8_t) * numOfElement;
-		break;
-	case NvU16:
-		dataSize = sizeof(uint16_t) * numOfElement;
-		break;
-	case NvS16:
-		dataSize = sizeof(int16_t) * numOfElement;
-		break;
-	case NvU32:
-		dataSize = sizeof(uint32_t) * numOfElement;
-		break;
-	case NvS32:
-		dataSize = sizeof(int32_t) * numOfElement;
-		break;
-	case NvS24_8:
-		dataSize = sizeof(float) * numOfElement;
-		break;
-	case NvU64:
-		dataSize = sizeof(uint64_t) * numOfElement;
-		break;
-	case NvS64:
-		dataSize = sizeof(int64_t) * numOfElement;
-		break;
-	default:
-		// No operation for 8-bit types
-		break;
+	if (get_histogram_array_size(numOfElement, dataType, &dataSize) !=
+	    NSM_SW_SUCCESS) {
+		return;
 	}
 	memcpy(destData, srcData, dataSize);
 }
@@ -1315,6 +1319,17 @@ int encode_get_histogram_format_resp(
 			return NSM_SW_ERROR_NULL;
 		}
 
+		size_t expected_size = 0;
+		if (get_histogram_array_size(
+			meta_data->num_of_buckets, meta_data->bucket_data_type,
+			&expected_size) != NSM_SW_SUCCESS ||
+		    expected_size != bucket_offsets_size ||
+		    sizeof(struct nsm_histogram_format_metadata) +
+			    bucket_offsets_size >
+			UINT16_MAX) {
+			return NSM_SW_ERROR_DATA;
+		}
+
 		htoleArrayData(bucket_offsets, meta_data->num_of_buckets,
 			       meta_data->bucket_data_type);
 		dataCopy(bucket_offsets, resp->bucket_offsets,
@@ -1350,6 +1365,13 @@ int decode_get_histogram_format_resp(
 	    (struct nsm_get_histogram_format_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+	if (*data_size < sizeof(struct nsm_histogram_format_metadata)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_common_resp) + *data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	meta_data->num_of_buckets = le16toh(resp->metadata.num_of_buckets);
 	meta_data->min_sampling_time =
 	    le32toh(resp->metadata.min_sampling_time);
@@ -1364,6 +1386,14 @@ int decode_get_histogram_format_resp(
 	meta_data->reserved2 = 0;
 	*bucket_offsets_size =
 	    *data_size - sizeof(struct nsm_histogram_format_metadata);
+
+	size_t expected_size = 0;
+	if (get_histogram_array_size(meta_data->num_of_buckets,
+				     meta_data->bucket_data_type,
+				     &expected_size) != NSM_SW_SUCCESS ||
+	    expected_size != *bucket_offsets_size) {
+		return NSM_SW_ERROR_DATA;
+	}
 
 	dataCopy(resp->bucket_offsets, bucket_offsets,
 		 meta_data->num_of_buckets, meta_data->bucket_data_type);
@@ -1467,6 +1497,17 @@ int encode_get_histogram_data_resp(
 			return NSM_SW_ERROR_NULL;
 		}
 
+		size_t expected_size = 0;
+		if (get_histogram_array_size(num_of_buckets, bucket_data_type,
+					     &expected_size) !=
+			NSM_SW_SUCCESS ||
+		    expected_size != bucket_data_size ||
+		    sizeof(num_of_buckets) + sizeof(bucket_data_type) +
+			    bucket_data_size >
+			UINT16_MAX) {
+			return NSM_SW_ERROR_DATA;
+		}
+
 		htoleArrayData(bucket_data, num_of_buckets, bucket_data_type);
 		dataCopy(bucket_data, resp->bucket_data, num_of_buckets,
 			 bucket_data_type);
@@ -1500,10 +1541,25 @@ int decode_get_histogram_data_resp(
 	    (struct nsm_get_histogram_data_resp *)msg->payload;
 
 	*data_size = le16toh(resp->hdr.data_size);
+	if (*data_size <
+	    sizeof(resp->num_of_buckets) + sizeof(resp->bucket_data_type)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_common_resp) + *data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 	*bucket_data_type = resp->bucket_data_type;
 	*num_of_buckets = le16toh(resp->num_of_buckets);
 	*bucket_data_size = *data_size - sizeof(resp->num_of_buckets) -
 			    sizeof(resp->bucket_data_type);
+
+	size_t expected_size = 0;
+	if (get_histogram_array_size(*num_of_buckets, *bucket_data_type,
+				     &expected_size) != NSM_SW_SUCCESS ||
+	    expected_size != *bucket_data_size) {
+		return NSM_SW_ERROR_DATA;
+	}
 
 	dataCopy(resp->bucket_data, bucket_data, *num_of_buckets,
 		 *bucket_data_type);
