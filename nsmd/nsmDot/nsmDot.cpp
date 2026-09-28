@@ -247,14 +247,14 @@ void NsmDotObject::handleSendError(int sendRc, int eid,
         auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
                                      "MCTP timeout - device not responding");
         valueIntf->value(error);
-        statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        statusIntf->status(AsyncOperationStatusType::Unavailable);
     }
     else
     {
         auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
                                      "Communication or send error");
         valueIntf->value(error);
-        statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        statusIntf->status(AsyncOperationStatusType::Unavailable);
     }
 }
 

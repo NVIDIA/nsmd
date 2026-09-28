@@ -1745,12 +1745,12 @@ TEST_F(NsmDotCreateTestFixture, CreateDot_BasePropertiesFail_NoSensor)
 // Branch coverage: handleSendError – NSM_SW_ERROR_TIMEOUT branch
 // =============================================================================
 
-TEST_F(NsmDotTest, HandleSendError_Timeout_SetsWriteFailureWithTimeoutMsg)
+TEST_F(NsmDotTest, HandleSendError_Timeout_SetsUnavailableWithTimeoutMsg)
 {
     // bypassAsyncHandler: postPatchIO returns NSM_SW_ERROR_TIMEOUT
     // → handleSendError called with NSM_SW_ERROR_TIMEOUT
-    // → "else if (sendRc == NSM_SW_ERROR_TIMEOUT)" branch taken
-    // → status = WriteFailure, value = "MCTP timeout"
+    // → "if (sendRc == NSM_SW_ERROR_TIMEOUT)" branch taken
+    // → status = Unavailable (MCTP-level failure, device unreachable)
     // → first "if (sendRc && sendRc != NSM_SW_ERROR_TIMEOUT)" is FALSE (no
     // log)
     EXPECT_CALL(*mockDevice, postPatchIO)
@@ -1761,26 +1761,23 @@ TEST_F(NsmDotTest, HandleSendError_Timeout_SetsWriteFailureWithTimeoutMsg)
     const auto [rc, statusInterface, valueInterface] = callBypassAsync();
 
     EXPECT_EQ(rc, NSM_SW_ERROR_TIMEOUT);
-    EXPECT_EQ(statusInterface->status(),
-              AsyncOperationStatusType::WriteFailure);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Unavailable);
     auto value = valueInterface->value();
     auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
     EXPECT_NE(std::get<1>(tuple).find("timeout"), std::string::npos);
 }
 
 // =============================================================================
-// Branch coverage: handleSendError – NSM_ERR_UNSUPPORTED_COMMAND_CODE
-// branch
+// Branch coverage: handleSendError – non-timeout send error branch
 // =============================================================================
 
 TEST_F(NsmDotTest,
-       HandleSendError_UnsupportedCommand_SetsUnsupportedRequestStatus)
+       HandleSendError_SendError_SetsUnavailableWithCommunicationMsg)
 {
-    // bypassAsyncHandler: postPatchIO returns
-    // NSM_ERR_UNSUPPORTED_COMMAND_CODE → handleSendError called with
-    // NSM_ERR_UNSUPPORTED_COMMAND_CODE → "if (sendRc ==
-    // NSM_ERR_UNSUPPORTED_COMMAND_CODE)" branch taken → status =
-    // UnsupportedRequest
+    // bypassAsyncHandler: postPatchIO returns NSM_ERR_UNSUPPORTED_COMMAND_CODE
+    // → handleSendError called; does not match timeout branch
+    // → else branch taken → status = Unavailable, value = "Communication or
+    // send error"
     EXPECT_CALL(*mockDevice, postPatchIO)
         .WillOnce(mockPostPatchIO(createDotBypassResponse(),
                                   static_cast<nsm_completion_codes>(
@@ -1789,8 +1786,10 @@ TEST_F(NsmDotTest,
     const auto [rc, statusInterface, valueInterface] = callBypassAsync();
 
     EXPECT_EQ(rc, NSM_ERR_UNSUPPORTED_COMMAND_CODE);
-    EXPECT_EQ(statusInterface->status(),
-              AsyncOperationStatusType::UnsupportedRequest);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Unavailable);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_NE(std::get<1>(tuple).find("send error"), std::string::npos);
 }
 
 // =============================================================================
