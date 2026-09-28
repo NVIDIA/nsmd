@@ -781,6 +781,8 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
                                               responseMsg, responseLen);
     if (rc != NSM_SW_SUCCESS)
     {
+        lg2::error("PCIe setPendingModes: request to EID={EID} failed, rc={RC}",
+                   "EID", nsmDevice->getEid(), "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         asyncPatchInProgress = false;
         co_return rc;
@@ -790,8 +792,20 @@ requester::Coroutine NsmPCIeDeviceModeDeviceModeSettingsV2Set::setPendingModes(
     uint16_t reasonCode = ERR_NULL;
     rc = decode_set_device_mode_settings_v2_resp(responseMsg.get(), responseLen,
                                                  &cc, &reasonCode);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_ERR_NOT_READY)
+    {
+        lg2::info("PCIe setPendingModes: EID={EID} not ready, reason={REASON}",
+                  "EID", nsmDevice->getEid(), "REASON", reasonCode);
+        *status = AsyncOperationStatusType::Unavailable;
+        asyncPatchInProgress = false;
+        co_return cc;
+    }
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
+        lg2::error(
+            "PCIe setPendingModes: EID={EID} answered rc={RC} cc={CC} reason={REASON}",
+            "EID", nsmDevice->getEid(), "RC", rc, "CC", cc, "REASON",
+            reasonCode);
         *status = AsyncOperationStatusType::WriteFailure;
         asyncPatchInProgress = false;
         if (cc != NSM_SUCCESS)
