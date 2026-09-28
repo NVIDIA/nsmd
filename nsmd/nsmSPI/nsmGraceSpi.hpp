@@ -29,6 +29,8 @@
 
 #include "nsmObjectFactory.hpp"
 
+#include <unistd.h>
+
 #include <com/nvidia/GraceSPI/server.hpp>
 #include <com/nvidia/GraceSPIData/server.hpp>
 #include <xyz/openbmc_project/Common/Progress/server.hpp>
@@ -61,6 +63,15 @@ class SpiProgress : public SpiProgressBase
             throw sdbusplus::xyz::openbmc_project::Common::Error::Unavailable();
         }
         return sdbusplus::message::unix_fd(readFd);
+    }
+
+    ~SpiProgress()
+    {
+        if (readFd >= 0)
+        {
+            close(readFd);
+            readFd = -1;
+        }
     }
 
     int readFd{-1};
