@@ -5574,7 +5574,7 @@ class QueryAggregatedGPMMetrics : public CommandInterface
 
                 case GPMMetricsUnit::BANDWIDTH:
                 {
-                    uint64_t val;
+                    uint64_t val{};
                     rc = decode_aggregate_gpm_metric_bandwidth_data(
                         data, data_len, &val);
 
@@ -5658,7 +5658,7 @@ class QueryPerInstanceGPMMetricsAggregateResponseParser :
 
             case GPMMetricsUnit::BANDWIDTH:
             {
-                uint64_t val;
+                uint64_t val{};
                 rc = decode_aggregate_gpm_metric_bandwidth_data(data, data_len,
                                                                 &val);
 

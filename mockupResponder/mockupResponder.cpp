@@ -5049,7 +5049,6 @@ std::optional<std::vector<uint8_t>>
     uint8_t group_id;
     auto rc = decode_query_available_clearable_scalar_data_sources_v1_req(
         requestMsg, requestLen, &device_index, &group_id);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -5081,7 +5080,6 @@ std::optional<std::vector<uint8_t>>
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
                 data_size, mask_length, (uint8_t*)available_source,
                 (uint8_t*)clearable_source, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -5110,7 +5108,6 @@ std::optional<std::vector<uint8_t>>
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
                 data_size, mask_length, (uint8_t*)available_source,
                 (uint8_t*)clearable_source, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -5139,7 +5136,6 @@ std::optional<std::vector<uint8_t>>
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
                 data_size, mask_length, (uint8_t*)available_source,
                 (uint8_t*)clearable_source, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -5169,7 +5165,6 @@ std::optional<std::vector<uint8_t>>
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
                 data_size, mask_length, (uint8_t*)available_source,
                 (uint8_t*)clearable_source, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -5199,7 +5194,6 @@ std::optional<std::vector<uint8_t>>
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
                 data_size, mask_length, (uint8_t*)available_source,
                 (uint8_t*)clearable_source, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -5224,7 +5218,6 @@ std::optional<std::vector<uint8_t>>
     uint8_t action;
     auto rc = decode_assert_pcie_fundamental_reset_req(requestMsg, requestLen,
                                                        &device_index, &action);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_assert_pcie_fundamental_reset_req failed: rc={RC}",
@@ -5257,7 +5250,6 @@ std::optional<std::vector<uint8_t>>
     uint8_t dsId;
     auto rc = decode_clear_data_source_v1_req(requestMsg, requestLen,
                                               &device_index, &groupId, &dsId);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_clear_data_source_v1_req failed: rc={RC}", "RC", rc);
@@ -5285,7 +5277,6 @@ std::optional<std::vector<uint8_t>>
                                                  size_t requestLen)
 {
     [[maybe_unused]] auto rc = decode_common_req(requestMsg, requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -5307,7 +5298,6 @@ std::optional<std::vector<uint8_t>>
     rc = encode_get_programmable_EDPp_scaling_factor_resp(
         requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &scaling_factors,
         responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -5327,7 +5317,6 @@ std::optional<std::vector<uint8_t>>
     uint8_t scaling_factor;
     auto rc = decode_set_programmable_EDPp_scaling_factor_req(
         requestMsg, requestLen, &action, &persistence, &scaling_factor);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -5402,7 +5391,6 @@ std::optional<std::vector<uint8_t>>
     uint32_t limit_max;
     auto rc = decode_set_clock_limit_req(requestMsg, requestLen, &clock_id,
                                          &flags, &limit_min, &limit_max);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_set_clock_limit_req failed: rc={RC}", "RC", rc);
@@ -5473,7 +5461,6 @@ std::optional<std::vector<uint8_t>>
 
     auto rc = decode_get_current_clock_event_reason_code_req(requestMsg,
                                                              requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -5564,7 +5551,6 @@ std::optional<std::vector<uint8_t>>
     uint32_t power_limit;
     auto rc = decode_set_power_limit_req(requestMsg, requestLen, &id, &action,
                                          &persistent, &power_limit);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_set_power_limit_req failed: rc={RC}", "RC", rc);
@@ -5687,7 +5673,6 @@ std::optional<std::vector<uint8_t>>
                                              size_t requestLen)
 {
     auto rc = decode_get_row_remap_state_req(requestMsg, requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_get_row_remap_state_req failed: rc={RC}", "RC", rc);
@@ -5740,7 +5725,6 @@ std::optional<std::vector<uint8_t>>
     rc = encode_get_row_remapping_counts_resp(
         requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
         correctable_error, uncorrectable_error, responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_row_remapping_counts_resp failed: rc={RC}", "RC",
@@ -5775,7 +5759,6 @@ std::optional<std::vector<uint8_t>>
     rc = encode_get_row_remap_availability_resp(requestMsg->hdr.instance_id,
                                                 NSM_SUCCESS, reason_code, &data,
                                                 responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_row_remap_availability_resp failed: rc={RC}",
@@ -5916,7 +5899,6 @@ std::optional<Response> MockupResponder::getMemoryCapacityUtilHandler(
                                                   NSM_SUCCESS, ERR_NULL, &data,
                                                   responseMsg);
     }
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_memory_capacity_util_resp failed: rc={RC}", "RC",
@@ -6006,7 +5988,6 @@ std::optional<std::vector<uint8_t>>
             rc = encode_get_fpga_diagnostics_settings_wp_resp(
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
                 &state.writeProtected, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -6029,7 +6010,6 @@ std::optional<std::vector<uint8_t>>
             rc = encode_get_fpga_diagnostics_settings_wp_jumper_resp(
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &data,
                 responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -6050,7 +6030,6 @@ std::optional<std::vector<uint8_t>>
             rc = encode_get_power_supply_status_resp(
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
                 0b00110011, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -6070,7 +6049,6 @@ std::optional<std::vector<uint8_t>>
             rc = encode_get_gpu_presence_resp(requestMsg->hdr.instance_id,
                                               NSM_SUCCESS, reason_code,
                                               0b11111111, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -6090,7 +6068,6 @@ std::optional<std::vector<uint8_t>>
             rc = encode_get_gpu_power_status_resp(requestMsg->hdr.instance_id,
                                                   NSM_SUCCESS, reason_code,
                                                   0b11110111, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -6110,7 +6087,6 @@ std::optional<std::vector<uint8_t>>
             rc = encode_get_gpu_ist_mode_resp(requestMsg->hdr.instance_id,
                                               NSM_SUCCESS, reason_code,
                                               state.istMode, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
@@ -7219,6 +7195,12 @@ std::optional<std::vector<uint8_t>>
         &compute_instance, &metric_id, &instance_bitfield);
 
     std::vector<uint8_t> response(
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_per_instance_gpm_metrics_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
         sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
     response.reserve(256);
 
@@ -7433,7 +7415,6 @@ std::optional<std::vector<uint8_t>>
     uint8_t value = 0;
     [[maybe_unused]] auto rc = decode_enable_disable_gpu_ist_mode_req(
         requestMsg, requestLen, &device_index, &value);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -7462,7 +7443,6 @@ std::optional<std::vector<uint8_t>>
     uint16_t reason_code = ERR_NULL;
     rc = encode_enable_disable_gpu_ist_mode_resp(
         requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -7485,7 +7465,6 @@ std::optional<std::vector<uint8_t>>
     reconfiguration_permissions_v1_index settingsIndex;
     [[maybe_unused]] auto rc = decode_get_reconfiguration_permissions_v1_req(
         requestMsg, requestLen, &settingsIndex);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -7508,7 +7487,6 @@ std::optional<std::vector<uint8_t>>
     rc = encode_get_reconfiguration_permissions_v1_resp(
         requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode,
         &state.prcKnobs[settingsIndex], responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -7534,7 +7512,6 @@ std::optional<std::vector<uint8_t>>
     uint8_t permission;
     [[maybe_unused]] auto rc = decode_set_reconfiguration_permissions_v1_req(
         requestMsg, requestLen, &settingsIndex, &configuration, &permission);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -7554,7 +7531,6 @@ std::optional<std::vector<uint8_t>>
     uint16_t reasonCode = ERR_NULL;
     rc = encode_set_reconfiguration_permissions_v1_resp(
         requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode, responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -7609,7 +7585,6 @@ std::optional<std::vector<uint8_t>>
 {
     auto rc = decode_get_confidential_compute_mode_v1_req(requestMsg,
                                                           requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -7646,7 +7621,6 @@ std::optional<std::vector<uint8_t>>
     uint8_t mode;
     auto rc = decode_set_confidential_compute_mode_v1_req(requestMsg,
                                                           requestLen, &mode);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -8062,7 +8036,6 @@ std::optional<std::vector<uint8_t>>
         lg2::info("getEgmModeHandler: request length={LEN}", "LEN", requestLen);
     }
     auto rc = decode_common_req(requestMsg, requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode request for getEgmModeHandler failed: rc={RC}", "RC",
@@ -8093,7 +8066,6 @@ std::optional<std::vector<uint8_t>>
 {
     uint8_t requested_mode;
     auto rc = decode_set_EGM_mode_req(requestMsg, requestLen, &requested_mode);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_set_EGM_mode_req failed: rc={RC}", "RC", rc);
