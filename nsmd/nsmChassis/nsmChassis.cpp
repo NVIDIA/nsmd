@@ -90,9 +90,8 @@ void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name,
     if (notSupported)
     {
         // Tombstone the placeholder SKU so bmcweb omits it from Redfish,
-        // rather than advertising the default "NA" on chassis that have no SKU
-        // (e.g. a logical Zone). "NA" remains reserved for genuine read/FRU
-        // failures. See nvbug 6339053.
+        // rather than leaving it empty on chassis that have no SKU
+        // (e.g. a logical Zone). See nvbug 6339053.
         chassisSKU->invoke(pdiMethod(sku), std::string(propertyNotSupported));
     }
     device->addStaticSensor(chassisSKU);

@@ -25,6 +25,6 @@ using ApSkuIdIntf = sdbusplus::server::object_t<
 NsmApSkuIdIntf::NsmApSkuIdIntf(sdbusplus::bus_t& bus, const char* path) :
     ApSkuIdIntf(bus, path)
 {
-    ApSkuIdIntf::sku("NA");
+    ApSkuIdIntf::sku("");
 };
 } // namespace nsm

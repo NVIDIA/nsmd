@@ -69,7 +69,7 @@ TEST(NsmApSkuIdIntf, Constructor)
     NsmApSkuIdIntf skuIntf(bus, path);
 
     // Verify default value is set
-    EXPECT_EQ(skuIntf.sku(), "NA");
+    EXPECT_EQ(skuIntf.sku(), "");
 }
 
 TEST(NsmApSkuIdIntf, SetValue)
