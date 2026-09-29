@@ -815,7 +815,7 @@ int decode_query_port_characteristics_v2_req(const struct nsm_msg *msg,
 	struct nsm_query_port_characteristics_v2_req *request =
 	    (struct nsm_query_port_characteristics_v2_req *)msg->payload;
 
-	const uint8_t expected_data_size =
+	const size_t expected_data_size =
 	    sizeof(request->port_number) + sizeof(request->reserved);
 	if (request->hdr.data_size != expected_data_size) {
 		return NSM_SW_ERROR_DATA;

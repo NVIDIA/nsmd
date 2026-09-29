@@ -1733,10 +1733,12 @@ std::optional<std::vector<uint8_t>>
     // Packed from the struct status bit layout (link_state:3, sub_link_state:5,
     // rx_detect_state:2, ...) so the word does not depend on the compiler's
     // bitfield placement.
+    constexpr uint32_t kMockSubLinkState = 6;  // representative sub_link_state
+    constexpr uint32_t kMockRxDetectState = 1; // receiver detected
     uint32_t portStatusWord = 0;
     portStatusWord |= static_cast<uint32_t>(NSM_PORTSTATE_UP) << 0;
-    portStatusWord |= static_cast<uint32_t>(6) << 3;
-    portStatusWord |= static_cast<uint32_t>(1) << 8;
+    portStatusWord |= kMockSubLinkState << 3;
+    portStatusWord |= kMockRxDetectState << 8;
 
     struct nsm_link_health_record record{};
     record.link_health = hc.health;
@@ -7193,14 +7195,14 @@ std::optional<std::vector<uint8_t>>
     auto rc = decode_query_per_instance_gpm_metrics_req(
         requestMsg, requestLen, &retrieval_source, &gpu_instance,
         &compute_instance, &metric_id, &instance_bitfield);
-
-    std::vector<uint8_t> response(
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_query_per_instance_gpm_metrics_req failed: rc={RC}",
                    "RC", rc);
         return std::nullopt;
     }
+
+    std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
     response.reserve(256);
 
