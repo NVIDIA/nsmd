@@ -90,10 +90,9 @@ void createSKU(std::shared_ptr<NsmDevice> device, const std::string& name,
     auto chassisSKU = std::make_shared<NsmChassis<NsmApSkuIdIntf>>(name);
     if (notSupported)
     {
-        // Tombstone the placeholder SKU so bmcweb omits it from Redfish,
-        // rather than advertising the default "NA" on chassis that have no SKU
-        // (e.g. a logical Zone). "NA" remains reserved for genuine read/FRU
-        // failures. See nvbug 6339053.
+        // Tombstone the SKU so bmcweb omits it from Redfish. The empty seed
+        // means a SKU that is not known yet; a chassis with no SKU of its own
+        // (e.g. a logical Zone) has none to report. See nvbug 6339053.
         chassisSKU->invoke(pdiMethod(sku), std::string(propertyNotSupported));
     }
     device->addStaticSensor(chassisSKU);

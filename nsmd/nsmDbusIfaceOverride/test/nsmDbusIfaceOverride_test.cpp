@@ -68,8 +68,8 @@ TEST(NsmApSkuIdIntf, Constructor)
     const char* path = "/xyz/openbmc_project/inventory/test/sku";
     NsmApSkuIdIntf skuIntf(bus, path);
 
-    // Verify default value is set
-    EXPECT_EQ(skuIntf.sku(), "NA");
+    // Empty until a producer supplies the SKU
+    EXPECT_EQ(skuIntf.sku(), "");
 }
 
 TEST(NsmApSkuIdIntf, SetValue)
