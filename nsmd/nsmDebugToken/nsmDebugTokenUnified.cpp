@@ -452,6 +452,13 @@ sdbusplus::object_path NsmDebugTokenUnifiedObject::eraseToken(
     using EraseTypeEnum =
         sdbusplus::server::com::nvidia::debug_token::Action::EraseType;
 
+    const auto [objPath, statusIntf, valueIntf] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+    if (objPath.empty())
+    {
+        throw Common::Error::Unavailable();
+    }
+
     uint32_t tokenTypeValue = 0;
 
     switch (eraseType)
@@ -462,10 +469,25 @@ sdbusplus::object_path NsmDebugTokenUnifiedObject::eraseToken(
                                                             deviceTypeStr);
             if (tokenTypeValue == 0)
             {
+                // tokenTypeToUint32() returns 0 when this device's table
+                // has no entry for the type (None included), so there is
+                // no token of it to erase. That is what the device itself
+                // reports as UnsupportedType, so report it the same way:
+                // throwing here would publish nothing and leave the caller
+                // nothing to classify.
+                constexpr auto errorCode =
+                    static_cast<uint16_t>(debug_token::UnsupportedType);
                 lg2::error(
-                    "DebugToken: Invalid or unsupported token type for erase: {TYPE}",
-                    "TYPE", sdbusplus::message::convert_to_string(tokenType));
-                throw Common::Error::InvalidArgument();
+                    "DebugToken: eraseToken: token type {TYPE} is not applicable to device type {DEVTYPE}, rc={RC}",
+                    "TYPE", sdbusplus::message::convert_to_string(tokenType),
+                    "DEVTYPE", deviceTypeStr, "RC", errorCode);
+                valueIntf->value(std::make_tuple(
+                    errorCode,
+                    std::format("{}: {}",
+                                debug_token::Error(errorCode).to_string(),
+                                errorCode)));
+                statusIntf->status(AsyncOperationStatusType::InternalFailure);
+                return objPath;
             }
             break;
         }
@@ -481,12 +503,6 @@ sdbusplus::object_path NsmDebugTokenUnifiedObject::eraseToken(
         }
     }
 
-    const auto [objPath, statusIntf, valueIntf] =
-        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
-    if (objPath.empty())
-    {
-        throw Common::Error::Unavailable();
-    }
     eraseTokenAsyncHandler(tokenTypeValue, statusIntf, valueIntf).detach();
     return objPath;
 }

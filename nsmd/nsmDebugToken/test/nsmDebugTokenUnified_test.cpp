@@ -57,6 +57,22 @@ TEST_F(NsmDebugTokenUnifiedTest, testConstructor)
     EXPECT_EQ(debugToken->getType(), "NSM_DebugTokenUnified");
 }
 
+TEST_F(NsmDebugTokenUnifiedTest, eraseTokenNoMappingIsReportedNotThrown)
+{
+    using EraseTypeEnum =
+        sdbusplus::server::com::nvidia::debug_token::Action::EraseType;
+    using TokenTypesEnum =
+        sdbusplus::common::com::nvidia::debug_token::Common::Types;
+    auto& bus = utils::DBusHandler::getBus();
+    auto debugToken = std::make_shared<NsmDebugTokenUnifiedObject>(
+        bus, name, uuid, debugTokenDeviceType);
+    // No mapping resolves for this device type and token type, so there is
+    // no token of it to erase. That is reported on the async pair rather
+    // than thrown, so the caller has a result to classify.
+    EXPECT_NO_THROW(
+        debugToken->eraseToken(EraseTypeEnum::TokenType, TokenTypesEnum::CRCS));
+}
+
 TEST_F(NsmDebugTokenUnifiedTest, testConstructorWithDifferentNames)
 {
     auto& bus = utils::DBusHandler::getBus();
@@ -835,16 +851,23 @@ TEST_F(NsmDebugTokenUnifiedWithDeviceTest, deviceTypeStrStored)
 // eraseToken() TokenType tests
 // ============================================================================
 
-TEST_F(NsmDebugTokenUnifiedWithDeviceTest, eraseTokenTokenTypeInvalid)
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, eraseTokenTokenTypeNotApplicable)
 {
     using EraseTypeEnum =
         sdbusplus::server::com::nvidia::debug_token::Action::EraseType;
     using TokenTypesEnum =
         sdbusplus::common::com::nvidia::debug_token::Common::Types;
-    // CRCS is not a valid GPU token type → tokenTypeToUint32 returns 0 → throws
-    EXPECT_THROW(
-        debugToken->eraseToken(EraseTypeEnum::TokenType, TokenTypesEnum::CRCS),
-        Common::Error::InvalidArgument);
+    // CRCS is a NIC token type and gpuTokenTypes does not carry it, so this
+    // device cannot hold one and nothing may go out on the wire for it.
+    EXPECT_CALL(*mockDevice, postPatchIO).Times(0);
+    // The erase is rejected here rather than by the device, but it is
+    // reported on the async object instead of thrown. A throw returns before
+    // any value is published and leaves the caller with no result to
+    // classify, so it can name neither the device nor the reason.
+    sdbusplus::object_path objPath;
+    EXPECT_NO_THROW(objPath = debugToken->eraseToken(EraseTypeEnum::TokenType,
+                                                     TokenTypesEnum::CRCS));
+    EXPECT_FALSE(objPath.str.empty());
 }
 
 TEST_F(NsmDebugTokenUnifiedWithDeviceTest, eraseTokenTokenTypeValid)
