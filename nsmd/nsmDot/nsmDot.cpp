@@ -242,14 +242,7 @@ void NsmDotObject::handleSendError(int sendRc, int eid,
                    "EID", eid, "RC", sendRc, "RCNAME", nsm_sw_codes(sendRc));
     }
 
-    if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
-    {
-        auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
-                                     "Unsupported command");
-        valueIntf->value(error);
-        statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
-    }
-    else if (sendRc == NSM_SW_ERROR_TIMEOUT)
+    if (sendRc == NSM_SW_ERROR_TIMEOUT)
     {
         auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
                                      "MCTP timeout - device not responding");
