@@ -46,6 +46,26 @@ struct NsmDebugTokenUnifiedTest :
     NsmDebugTokenUnifiedTest() : SensorManagerTest(devices) {}
 };
 
+// Read back the async pair eraseToken() published for objPath and assert
+// the payload names the reason: UnsupportedType (0x1005 = 4101), the same
+// answer the device itself gives for this case. The interface maps are
+// reachable because this TU already compiles the manager with private
+// members public (see the #define above nsmDebugTokenUnified.hpp).
+static void expectUnsupportedTypePublished(
+    const sdbusplus::message::object_path& objPath)
+{
+    auto* manager = AsyncOperationManager::getInstance();
+    const uint64_t index = std::stoull(objPath.filename());
+    ASSERT_TRUE(manager->statusInterfaces.contains(index));
+    ASSERT_TRUE(manager->valueInterfaces.contains(index));
+    EXPECT_EQ(manager->statusInterfaces.at(index)->status(),
+              AsyncOperationStatusType::InternalFailure);
+    const auto value = std::get<std::tuple<uint16_t, std::string>>(
+        manager->valueInterfaces.at(index)->value());
+    EXPECT_EQ(std::get<0>(value), 4101);
+    EXPECT_EQ(std::get<1>(value), "Unsupported type: 4101");
+}
+
 TEST_F(NsmDebugTokenUnifiedTest, testConstructor)
 {
     auto& bus = utils::DBusHandler::getBus();
@@ -55,6 +75,25 @@ TEST_F(NsmDebugTokenUnifiedTest, testConstructor)
     EXPECT_EQ(debugToken->uuid, uuid);
     EXPECT_EQ(debugToken->getName(), name);
     EXPECT_EQ(debugToken->getType(), "NSM_DebugTokenUnified");
+}
+
+TEST_F(NsmDebugTokenUnifiedTest, eraseTokenNoMappingIsReportedNotThrown)
+{
+    using EraseTypeEnum =
+        sdbusplus::server::com::nvidia::debug_token::Action::EraseType;
+    using TokenTypesEnum =
+        sdbusplus::common::com::nvidia::debug_token::Common::Types;
+    auto& bus = utils::DBusHandler::getBus();
+    auto debugToken = std::make_shared<NsmDebugTokenUnifiedObject>(
+        bus, name, uuid, debugTokenDeviceType);
+    // No mapping resolves for this device type and token type, so there is
+    // no token of it to erase. That is reported on the async pair rather
+    // than thrown, so the caller has a result to classify.
+    sdbusplus::message::object_path objPath;
+    EXPECT_NO_THROW(objPath = debugToken->eraseToken(EraseTypeEnum::TokenType,
+                                                     TokenTypesEnum::CRCS));
+    EXPECT_FALSE(objPath.str.empty());
+    expectUnsupportedTypePublished(objPath);
 }
 
 TEST_F(NsmDebugTokenUnifiedTest, testConstructorWithDifferentNames)
@@ -835,16 +874,24 @@ TEST_F(NsmDebugTokenUnifiedWithDeviceTest, deviceTypeStrStored)
 // eraseToken() TokenType tests
 // ============================================================================
 
-TEST_F(NsmDebugTokenUnifiedWithDeviceTest, eraseTokenTokenTypeInvalid)
+TEST_F(NsmDebugTokenUnifiedWithDeviceTest, eraseTokenTokenTypeNotApplicable)
 {
     using EraseTypeEnum =
         sdbusplus::server::com::nvidia::debug_token::Action::EraseType;
     using TokenTypesEnum =
         sdbusplus::common::com::nvidia::debug_token::Common::Types;
-    // CRCS is not a valid GPU token type → tokenTypeToUint32 returns 0 → throws
-    EXPECT_THROW(
-        debugToken->eraseToken(EraseTypeEnum::TokenType, TokenTypesEnum::CRCS),
-        Common::Error::InvalidArgument);
+    // CRCS is a NIC token type and gpuTokenTypes does not carry it, so this
+    // device cannot hold one and nothing may go out on the wire for it.
+    EXPECT_CALL(*mockDevice, postPatchIO).Times(0);
+    // The erase is rejected here rather than by the device, but it is
+    // reported on the async object instead of thrown. A throw returns before
+    // any value is published and leaves the caller with no result to
+    // classify, so it can name neither the device nor the reason.
+    sdbusplus::message::object_path objPath;
+    EXPECT_NO_THROW(objPath = debugToken->eraseToken(EraseTypeEnum::TokenType,
+                                                     TokenTypesEnum::CRCS));
+    EXPECT_FALSE(objPath.str.empty());
+    expectUnsupportedTypePublished(objPath);
 }
 
 TEST_F(NsmDebugTokenUnifiedWithDeviceTest, eraseTokenTokenTypeValid)
