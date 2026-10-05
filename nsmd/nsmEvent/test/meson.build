@@ -17,6 +17,7 @@ tests = [
     'nsmEventInfoBranch_test',
     'nsmEventBranch_test',
     'nsmRediscoveryEventBranch_test',
+    'nsmEventLogRecordV2_test',
 ]
 
 foreach t : tests
