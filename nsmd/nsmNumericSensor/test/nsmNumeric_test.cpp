@@ -75,12 +75,19 @@ TEST(NsmNumericSensorDbusValueTimestamp, GoodTest)
         nullptr,       maxAllowableValue,
         maxValue,      minValue,
         &readingBasis, &description};
-    auto timestamp = utils::getCurrentSteadyClockTimestamp();
-    value.updateReading(val, timestamp);
+    // ReadingTime is stamped from the wall-clock provider at publish time,
+    // not from the steady-clock value passed to updateReading(). Pin the
+    // provider so the expected epoch value is deterministic.
+    constexpr uint64_t fixedReadingTime = 1789043400000ULL; // 2026-09-11T10:30Z
+    utils::setReadingTimestampProvider([] { return fixedReadingTime; });
 
-    EXPECT_EQ(value.timestampIntf.elapsed(), timestamp);
+    value.updateReading(val, utils::getCurrentSteadyClockTimestamp());
+
+    EXPECT_EQ(value.timestampIntf.elapsed(), fixedReadingTime);
     EXPECT_EQ(value.valueIntf.value(), val);
     EXPECT_EQ(value.valueIntf.unit(), nsm::SensorUnit::DegreesC);
+
+    utils::setReadingTimestampProvider(nullptr); // restore default clock
 }
 
 TEST(SMBPBIPowerSMBusSensorBytesConverter, GoodTest)
