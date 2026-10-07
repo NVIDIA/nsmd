@@ -9,6 +9,7 @@ tests = [
     'common_utils_branch4_test',
     'coroutineSemaphore_test',
     'timer_test',
+    'registry_test',
 ]
 
 foreach t : tests
