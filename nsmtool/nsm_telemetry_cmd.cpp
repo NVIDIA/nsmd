@@ -53,6 +53,24 @@ namespace
 using namespace nsmtool::helper;
 std::vector<std::unique_ptr<CommandInterface>> commands;
 
+// Names the link_health value of the 0x42 status word and the Tag 0x04 record.
+inline std::string linkHealthToString(uint32_t linkHealth)
+{
+    switch (linkHealth)
+    {
+        case NSM_LINK_HEALTH_DISABLED:
+            return "Disabled";
+        case NSM_LINK_HEALTH_ATTENTION:
+            return "Attention";
+        case NSM_LINK_HEALTH_HEALTHY:
+            return "Healthy";
+        case NSM_LINK_HEALTH_NOT_MONITORED:
+            return "NotMonitored";
+        default:
+            return "Unknown";
+    }
+}
+
 } // namespace
 
 class GetPortTelemetryCounter : public CommandInterface
@@ -780,6 +798,8 @@ class QueryPortCharacteristics : public CommandInterface
                 static_cast<uint32_t>(portCharData.status_lane_info);
             result["Link Health"] =
                 static_cast<uint32_t>(portCharData.port_status.link_health);
+            result["Link Health State"] =
+                linkHealthToString(portCharData.port_status.link_health);
             result["Attention Trigger"] = static_cast<uint32_t>(
                 portCharData.port_status.attention_trigger);
             nsmtool::helper::DisplayInJson(result);
@@ -933,6 +953,8 @@ class QueryPortCharacteristicsV2 : public CommandInterface
                     {
                         record["Link Health"] =
                             static_cast<uint32_t>(linkHealth.link_health);
+                        record["Link Health State"] =
+                            linkHealthToString(linkHealth.link_health);
                         record["Attention Trigger"] =
                             static_cast<uint32_t>(linkHealth.attention_trigger);
                         record["AttentionTriggerMetricId"] =

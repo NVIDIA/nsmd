@@ -136,10 +136,13 @@ enum nsm_fm_report_status {
 	NSM_FM_REPORT_STATUS_TIMEOUT = 0x03
 };
 
+/* link_health: 0 Disabled (unsupported or no metric enabled), 1 Attention,
+ * 2 Healthy, 3 Not Monitored (link down); 4-15 unassigned. */
 enum nsm_link_health_state {
-	NSM_LINK_HEALTH_NA = 0,
+	NSM_LINK_HEALTH_DISABLED = 0,
 	NSM_LINK_HEALTH_ATTENTION = 1,
-	NSM_LINK_HEALTH_HEALTHY = 2
+	NSM_LINK_HEALTH_HEALTHY = 2,
+	NSM_LINK_HEALTH_NOT_MONITORED = 3
 };
 
 /** @brief Metric type that triggered the transition to Attention state
@@ -578,7 +581,8 @@ struct nsm_query_port_characteristics_v2_req {
 /** @struct nsm_link_health_record
  *
  *  Decoded Link Health record (Tag 0x04 of Query Port Characteristics v2).
- *  Wire layout of the u32: [3:0] link_health, [4] reserved,
+ *  Wire layout of the u32: [3:0] link_health (0 Disabled, 1 Attention,
+ *  2 Healthy, 3 Not Monitored, 4-15 unassigned), [4] reserved,
  *  [12:5] attention_trigger, [19:13] attention_trigger_metric,
  *  [21:20] link_health_config_changed, [31:22] reserved.
  */

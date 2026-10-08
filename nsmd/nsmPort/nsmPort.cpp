@@ -455,11 +455,15 @@ uint8_t
         updateLinkDownCode(data.port_status.port_down_reason_code);
     }
 
-    // Decode link_health (bits 17:16) → EarlyHealthIndication. The 0x42
-    // status word carries no metric slot or configuration field, so
-    // the extension properties stay neutral on this path.
-    updateHealth(decodeLinkHealth(data.port_status.link_health),
-                 decodeAttentionTrigger(data.port_status.attention_trigger), 0,
+    // Decode link_health (bits 17:16) → EarlyHealthIndication. The trigger
+    // is defined only in Attention; the 0x42 status word carries no metric
+    // slot or configuration field, so those stay neutral on this path.
+    const auto state = decodeLinkHealth(data.port_status.link_health);
+    const auto reason =
+        state == EarlyHealthIndicationValues::Attention
+            ? decodeAttentionTrigger(data.port_status.attention_trigger)
+            : AttentionTriggerReasonValues::Unknown;
+    updateHealth(state, reason, 0,
                  AttentionTriggerConfigurationValues::Unknown);
 
     updateMetricOnSharedMemory();
@@ -533,10 +537,10 @@ EarlyHealthIndicationValues
 {
     auto state = EarlyHealthIndicationValues::Unknown;
     bool reserved = false;
-    switch (static_cast<nsm_link_health_state>(linkHealth))
+    switch (linkHealth)
     {
-        case NSM_LINK_HEALTH_NA:
-            state = EarlyHealthIndicationValues::Unknown;
+        case NSM_LINK_HEALTH_DISABLED:
+            state = EarlyHealthIndicationValues::Disabled;
             break;
         case NSM_LINK_HEALTH_ATTENTION:
             state = EarlyHealthIndicationValues::Attention;
@@ -544,19 +548,22 @@ EarlyHealthIndicationValues
         case NSM_LINK_HEALTH_HEALTHY:
             state = EarlyHealthIndicationValues::Healthy;
             break;
+        case NSM_LINK_HEALTH_NOT_MONITORED:
+            state = EarlyHealthIndicationValues::NotMonitored;
+            break;
         default:
-            // 0b11 (0x42) and 3..15 (0x12) are reserved; any unexpected value
-            // is invalid → Unknown.
+            // 4..15 are unassigned on the Tag 0x04 record; the 2-bit 0x42
+            // field cannot carry them.
             reserved = true;
             break;
     }
-    // Throttled: one warning when a reserved value first appears, re-armed
+    // Throttled: one warning when an unassigned value first appears, re-armed
     // once a valid value is read again.
     if (shouldLog("NsmPortCharacteristics::decodeLinkHealth", reserved) &&
         reserved)
     {
         lg2::warning(
-            "NsmPortCharacteristics: link_health=0x{VALUE} is invalid/reserved, reporting Unknown on {PATH}",
+            "NsmPortCharacteristics: link_health={VALUE} is unassigned, reporting Unknown on {PATH}",
             "VALUE", linkHealth, "PATH", objPath);
     }
     return state;
@@ -571,43 +578,16 @@ void NsmPortCharacteristics::emitHealthStateChangeEvent(
     {
         healthStateInitialized = true;
         previousEarlyHealthIndication = newHealthState;
-        if (newHealthState != EarlyHealthIndicationValues::Unavailable)
-        {
-            lastKnownHealthState = newHealthState;
-            lastKnownHealthStateValid = true;
-        }
         return;
     }
     if (newHealthState == previousEarlyHealthIndication)
     {
         return;
     }
+    using NvidiaMetrics = com::nvidia::nv_link::PortHealthMetrics;
+    const auto previousState = previousEarlyHealthIndication;
     previousEarlyHealthIndication = newHealthState;
 
-    // Unavailable means the Link Health record could not be read, not a
-    // health transition: no event into it, and none for merely leaving it.
-    // The new state is compared against the last known state instead, so a
-    // change bracketed by Unavailable (Healthy -> Unavailable -> Attention)
-    // is still reported once the record is readable again.
-    if (newHealthState == EarlyHealthIndicationValues::Unavailable)
-    {
-        return;
-    }
-    if (!lastKnownHealthStateValid)
-    {
-        // First readable state after starting in Unavailable: baseline.
-        lastKnownHealthState = newHealthState;
-        lastKnownHealthStateValid = true;
-        return;
-    }
-    const auto previousState = lastKnownHealthState;
-    lastKnownHealthState = newHealthState;
-    if (newHealthState == previousState)
-    {
-        return;
-    }
-
-    using NvidiaMetrics = com::nvidia::nv_link::PortHealthMetrics;
     auto newStateStr =
         NvidiaMetrics::convertEarlyHealthIndicationValuesToString(
             newHealthState);
@@ -618,9 +598,8 @@ void NsmPortCharacteristics::emitHealthStateChangeEvent(
         NvidiaMetrics::convertAttentionTriggerReasonValuesToString(
             portHealthMetricsIntf->attentionTriggerReason());
 
-    // Warning for Attention and Unknown (loss of a known health signal),
-    // Informational (OK) for Healthy — see isWarningSeverity() — and for any
-    // transition that follows an operator clear.
+    // Informational for Healthy and transitions following an operator clear;
+    // Warning for every other state — see isWarningSeverity().
     auto severity = (!operatorCleared && isWarningSeverity(newHealthState))
                         ? Level::Warning
                         : Level::Informational;

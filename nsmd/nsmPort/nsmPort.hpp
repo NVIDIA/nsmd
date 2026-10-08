@@ -195,9 +195,10 @@ class NsmPortCharacteristics : public NsmSensor
                       AttentionTriggerReasonValues reason, uint8_t metricId,
                       AttentionTriggerConfigurationValues configuration,
                       bool operatorCleared = false);
-    // Range-checked decoders of the wire fields; reserved values map to
-    // Unknown with a warning naming the port, throttled through this
-    // object's StateChangeLogger (one warning per reserved episode).
+    // Range-checked decoders of the wire fields. link_health maps 0 Disabled,
+    // 1 Attention, 2 Healthy, 3 NotMonitored (both queries); unassigned or
+    // out-of-spec values map to Unknown with a warning naming the port,
+    // throttled through this object's StateChangeLogger (one per episode).
     EarlyHealthIndicationValues decodeLinkHealth(uint8_t linkHealth);
     AttentionTriggerReasonValues decodeAttentionTrigger(uint8_t triggerValue);
 
@@ -210,26 +211,17 @@ class NsmPortCharacteristics : public NsmSensor
     {
         return state != EarlyHealthIndicationValues::Healthy;
     }
-
     EarlyHealthIndicationValues previousEarlyHealthIndication =
         EarlyHealthIndicationValues::Unknown;
     bool healthStateInitialized = false;
-    // Last state other than Unavailable; the transition event compares
-    // against it so that a state change bracketed by Unavailable is still
-    // reported once the record is readable again.
-    EarlyHealthIndicationValues lastKnownHealthState =
-        EarlyHealthIndicationValues::Unknown;
-    bool lastKnownHealthStateValid = false;
     uint8_t portNumber;
     // GPU exposes the full port-characteristics telemetry; a switch exposes
     // only the health counters. Gates non-health publishes.
     uint8_t deviceType;
     std::string objPath;
     void updateLinkDownCode(const uint32_t linkDownCode);
-    // Emits NVLinkPortHealthStateChanged on a health-state transition (the
-    // first observation is baselined, not reported; no event to or from
-    // Unavailable). Isolated from the publish path for readability and to
-    // localize the flood policy.
+    // Emits NVLinkPortHealthStateChanged whenever the state changes after
+    // the first observation, which establishes the baseline.
     void emitHealthStateChangeEvent(EarlyHealthIndicationValues newHealthState,
                                     bool operatorCleared);
 };

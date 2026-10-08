@@ -1555,15 +1555,16 @@ std::optional<std::vector<uint8_t>>
     if (failureCycle)
     {
         // Each successive poll advances link_health and attention_trigger
-        // through every defined state, exercising the full health range and
-        // the state-change event path. link_state is UP so health is valid.
+        // through every defined state including Not Monitored, exercising the
+        // full health range and the state-change event path. link_state is UP
+        // so health is valid.
         struct PortHealthCase
         {
             uint8_t health;
             uint8_t trigger;
         };
-        static constexpr std::array<PortHealthCase, 11> kPortHealthCycle = {{
-            {NSM_LINK_HEALTH_NA, NSM_ATTENTION_TRIGGER_NA},
+        static constexpr std::array<PortHealthCase, 12> kPortHealthCycle = {{
+            {NSM_LINK_HEALTH_DISABLED, NSM_ATTENTION_TRIGGER_NA},
             {NSM_LINK_HEALTH_ATTENTION,
              NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS},
             {NSM_LINK_HEALTH_ATTENTION,
@@ -1579,6 +1580,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_LINK_DOWN_COUNT},
             {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_SYMBOL_BER},
             {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA},
+            {NSM_LINK_HEALTH_NOT_MONITORED, NSM_ATTENTION_TRIGGER_NA},
         }};
         const PortHealthCase& hc = kPortHealthCycle[portHealthCycleIndex];
         portCharData.port_status.link_state = NSM_PORTSTATE_UP;
@@ -1656,10 +1658,10 @@ std::optional<std::vector<uint8_t>>
     if (failureCycle)
     {
         // Each successive poll walks every health state, all nine causes with
-        // a slot index and both configuration states, then N/A, a Valid = 0
-        // record and a reserved-encoding record (link_health 3,
-        // attention_trigger 10, metric 20, config_changed 3).
-        static constexpr std::array<LinkHealthCase, 14> kLinkHealthV2Cycle = {{
+        // a slot index and both configuration states, then Disabled, Not
+        // Monitored, a Valid = 0 record and an unassigned encoding
+        // (link_health 4, attention_trigger 10, metric 20, config_changed 3).
+        static constexpr std::array<LinkHealthCase, 15> kLinkHealthV2Cycle = {{
             {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA, 0,
              NSM_LINK_HEALTH_CONFIG_NA, true},
             {NSM_LINK_HEALTH_ATTENTION,
@@ -1686,11 +1688,13 @@ std::optional<std::vector<uint8_t>>
             {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_SYMBOL_BER,
              NSM_LINK_HEALTH_METRIC_SLOT_MAX, NSM_LINK_HEALTH_CONFIG_CURRENT,
              true},
-            {NSM_LINK_HEALTH_NA, NSM_ATTENTION_TRIGGER_NA, 0,
+            {NSM_LINK_HEALTH_DISABLED, NSM_ATTENTION_TRIGGER_NA, 0,
+             NSM_LINK_HEALTH_CONFIG_NA, true},
+            {NSM_LINK_HEALTH_NOT_MONITORED, NSM_ATTENTION_TRIGGER_NA, 0,
              NSM_LINK_HEALTH_CONFIG_NA, true},
             {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER, 3,
              NSM_LINK_HEALTH_CONFIG_CURRENT, false},
-            {3, 10, 20, 3, true},
+            {4, 10, 20, 3, true},
             {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA, 0,
              NSM_LINK_HEALTH_CONFIG_NA, true},
         }};

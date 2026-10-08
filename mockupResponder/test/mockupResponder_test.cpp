@@ -10119,9 +10119,9 @@ TEST_F(MockupDumpCycleTest, CycleOn_EraseCmdSkipsIterationOnlyCase)
 
 // ---------------------------------------------------------------------------
 // Link Health (0x12) --failure_cycle walk: every health state, all nine
-// causes with a slot index and both configuration states, N/A, a Valid = 0
-// record and a reserved-encoding record, wrapping to the start. 0x13 leaves
-// the global walk untouched.
+// causes with a slot index and both configuration states, Disabled, Not
+// Monitored, a Valid = 0 record and an unassigned encoding, wrapping to the
+// start. 0x13 leaves the global walk untouched.
 // ---------------------------------------------------------------------------
 TEST_F(MockupDumpCycleTest, LinkHealthV2FailureCycleWalk)
 {
@@ -10135,7 +10135,7 @@ TEST_F(MockupDumpCycleTest, LinkHealthV2FailureCycleWalk)
         uint8_t config;
         bool valid;
     };
-    const std::array<ExpectedCase, 14> expected = {{
+    const std::array<ExpectedCase, 15> expected = {{
         {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA, 0,
          NSM_LINK_HEALTH_CONFIG_NA, true},
         {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_PLR_TX_BANDWIDTH_LOSS,
@@ -10158,11 +10158,13 @@ TEST_F(MockupDumpCycleTest, LinkHealthV2FailureCycleWalk)
          NSM_LINK_HEALTH_CONFIG_PREVIOUS, true},
         {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_SYMBOL_BER,
          NSM_LINK_HEALTH_METRIC_SLOT_MAX, NSM_LINK_HEALTH_CONFIG_CURRENT, true},
-        {NSM_LINK_HEALTH_NA, NSM_ATTENTION_TRIGGER_NA, 0,
+        {NSM_LINK_HEALTH_DISABLED, NSM_ATTENTION_TRIGGER_NA, 0,
+         NSM_LINK_HEALTH_CONFIG_NA, true},
+        {NSM_LINK_HEALTH_NOT_MONITORED, NSM_ATTENTION_TRIGGER_NA, 0,
          NSM_LINK_HEALTH_CONFIG_NA, true},
         {NSM_LINK_HEALTH_ATTENTION, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER, 3,
          NSM_LINK_HEALTH_CONFIG_CURRENT, false},
-        {3, 10, 20, 3, true},
+        {4, 10, 20, 3, true},
         {NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_NA, 0,
          NSM_LINK_HEALTH_CONFIG_NA, true},
     }};
@@ -10223,7 +10225,7 @@ TEST_F(MockupDumpCycleTest, testQueryPortCharacteristicsFailureCycle)
     buildMock(/*failureCycle=*/true);
 
     std::vector<std::pair<int, int>> seen;
-    for (int i = 0; i < 12; ++i)
+    for (int i = 0; i < 13; ++i)
     {
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_query_port_characteristics_req));
@@ -10253,8 +10255,9 @@ TEST_F(MockupDumpCycleTest, testQueryPortCharacteristicsFailureCycle)
                           static_cast<int>(trigger));
     }
 
-    // Per-instance index starts at 0: NA, Attention/1..9, Healthy, then wraps.
-    EXPECT_EQ(seen[0].first, static_cast<int>(NSM_LINK_HEALTH_NA));
+    // Per-instance index starts at 0: Disabled, Attention/1..9, Healthy,
+    // Not Monitored, then wraps.
+    EXPECT_EQ(seen[0].first, static_cast<int>(NSM_LINK_HEALTH_DISABLED));
     EXPECT_EQ(seen[0].second, 0);
     for (int i = 1; i <= 9; ++i)
     {
@@ -10264,7 +10267,9 @@ TEST_F(MockupDumpCycleTest, testQueryPortCharacteristicsFailureCycle)
     }
     EXPECT_EQ(seen[10].first, static_cast<int>(NSM_LINK_HEALTH_HEALTHY));
     EXPECT_EQ(seen[10].second, 0);
-    EXPECT_EQ(seen[11], seen[0]); // 12th poll wraps to the first case
+    EXPECT_EQ(seen[11].first, static_cast<int>(NSM_LINK_HEALTH_NOT_MONITORED));
+    EXPECT_EQ(seen[11].second, static_cast<int>(NSM_ATTENTION_TRIGGER_NA));
+    EXPECT_EQ(seen[12], seen[0]); // 13th poll wraps to the first case
 }
 
 TEST_F(MockupDumpCycleTest, testQueryPortCharacteristicsNoCycleLegacy)

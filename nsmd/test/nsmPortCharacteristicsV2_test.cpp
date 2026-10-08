@@ -793,6 +793,30 @@ TEST_F(NsmPortCharacteristicsV2Test, Publish_ValidZero_UnavailableNeutral)
     expectNeutral(EarlyHealthIndicationValues::Unavailable);
 }
 
+TEST_F(NsmPortCharacteristicsV2Test, Publish_NotMonitoredAndDisabled_Neutral)
+{
+    confirmExtension();
+    // Trigger fields publish neutral outside Attention. Each state change
+    // updates the event baseline to the newly published state.
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(sensorAnswer(v2Response(fullRecordSet(healthRecord(
+            NSM_LINK_HEALTH_NOT_MONITORED, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER,
+            3, NSM_LINK_HEALTH_CONFIG_CURRENT)))));
+    EXPECT_EQ(poll(), NSM_SW_SUCCESS);
+    expectNeutral(EarlyHealthIndicationValues::NotMonitored);
+    EXPECT_EQ(sensor->phase1->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::NotMonitored);
+
+    EXPECT_CALL(*gpu, sensorIO)
+        .WillOnce(sensorAnswer(v2Response(fullRecordSet(healthRecord(
+            NSM_LINK_HEALTH_DISABLED, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER, 3,
+            NSM_LINK_HEALTH_CONFIG_CURRENT)))));
+    EXPECT_EQ(poll(), NSM_SW_SUCCESS);
+    expectNeutral(EarlyHealthIndicationValues::Disabled);
+    EXPECT_EQ(sensor->phase1->previousEarlyHealthIndication,
+              EarlyHealthIndicationValues::Disabled);
+}
+
 TEST_F(NsmPortCharacteristicsV2Test, Publish_NoLinkHealthRecord_Unknown)
 {
     confirmExtension();
@@ -806,10 +830,10 @@ TEST_F(NsmPortCharacteristicsV2Test, Publish_NoLinkHealthRecord_Unknown)
 
 TEST_F(NsmPortCharacteristicsV2Test, Publish_ReservedEncodings_Unknown)
 {
-    // Reserved state: Unknown with neutral trigger fields.
+    // Unassigned state (4..15): Unknown with neutral trigger fields.
     EXPECT_CALL(*gpu, sensorIO)
         .WillOnce(sensorAnswer(v2Response(
-            fullRecordSet(healthRecord(3, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER,
+            fullRecordSet(healthRecord(9, NSM_ATTENTION_TRIGGER_EFFECTIVE_BER,
                                        3, NSM_LINK_HEALTH_CONFIG_CURRENT)))));
     EXPECT_EQ(poll(), NSM_SW_SUCCESS);
     expectNeutral(EarlyHealthIndicationValues::Unknown);

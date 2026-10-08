@@ -79,6 +79,12 @@ static constexpr uint32_t attentionStatus(uint32_t trigger)
            (trigger << 18);
 }
 
+// Build a status word with the given link_health and attention_trigger.
+static constexpr uint32_t healthStatus(uint32_t health, uint32_t trigger)
+{
+    return (health << 16) | (trigger << 18);
+}
+
 // Build a properly-encoded non-success response using the real encoder
 // so the NSM header is well-formed and the decode path sees a real error CC.
 static std::vector<uint8_t> buildErrorResponse()
@@ -155,16 +161,16 @@ TEST_F(NsmPortHealthMetricsTest, ConstructorSetsHealthStateNotInitialized)
 // 2. link_health → EarlyHealthIndication mapping
 // ===========================================================================
 
-TEST_F(NsmPortHealthMetricsTest, HandleResponse_LinkHealthNA)
+TEST_F(NsmPortHealthMetricsTest, HandleResponse_LinkHealthDisabled)
 {
-    // bits 17:16 = 00b → NA (0x00000000)
+    // bits 17:16 = 00b → Disabled (0x00000000)
     auto buf = buildResponse(0x00000000u);
     auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
     auto rc = sensor->handleResponseMsg(msg, buf.size());
 
     EXPECT_EQ(rc, NSM_SUCCESS);
     EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
-              EarlyHealthIndicationValues::Unknown);
+              EarlyHealthIndicationValues::Disabled);
 }
 
 TEST_F(NsmPortHealthMetricsTest, HandleResponse_LinkHealthAttention)
@@ -191,18 +197,17 @@ TEST_F(NsmPortHealthMetricsTest, HandleResponse_LinkHealthHealthy)
               EarlyHealthIndicationValues::Healthy);
 }
 
-TEST_F(NsmPortHealthMetricsTest, HandleResponse_LinkHealthReserved)
+TEST_F(NsmPortHealthMetricsTest, HandleResponse_LinkHealthNotMonitored)
 {
-    // bits 17:16 = 11b (0x00030000) is reserved for a future bitmap extension
-    // and is not a real state → treated as invalid and reported as Unknown
-    // (throttled warning, not a per-poll error).
+    // bits 17:16 = 11b (0x00030000) → NotMonitored: the link is down and
+    // health is not evaluated (same decode table as the Tag 0x04 record).
     auto buf = buildResponse(0x00030000u);
     auto* msg = reinterpret_cast<const nsm_msg*>(buf.data());
     auto rc = sensor->handleResponseMsg(msg, buf.size());
 
     EXPECT_EQ(rc, NSM_SUCCESS);
     EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
-              EarlyHealthIndicationValues::Unknown);
+              EarlyHealthIndicationValues::NotMonitored);
 }
 
 // ===========================================================================
@@ -315,6 +320,40 @@ TEST_F(NsmPortHealthMetricsTest,
               AttentionTriggerReasonValues::Unknown);
 }
 
+TEST_F(NsmPortHealthMetricsTest, HandleResponse_TriggerOnlyInAttention)
+{
+    // The trigger is defined only in Attention: the same bits 25:18 publish
+    // the decoded reason under Attention and neutral under any other state.
+    auto attention =
+        buildResponse(attentionStatus(NSM_ATTENTION_TRIGGER_RAW_BER));
+    auto* attentionMsg = reinterpret_cast<const nsm_msg*>(attention.data());
+    EXPECT_EQ(sensor->handleResponseMsg(attentionMsg, attention.size()),
+              NSM_SUCCESS);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
+              AttentionTriggerReasonValues::RawBER);
+
+    auto healthy = buildResponse(
+        healthStatus(NSM_LINK_HEALTH_HEALTHY, NSM_ATTENTION_TRIGGER_RAW_BER));
+    auto* healthyMsg = reinterpret_cast<const nsm_msg*>(healthy.data());
+    EXPECT_EQ(sensor->handleResponseMsg(healthyMsg, healthy.size()),
+              NSM_SUCCESS);
+    EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
+              EarlyHealthIndicationValues::Healthy);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
+              AttentionTriggerReasonValues::Unknown);
+
+    auto notMonitored = buildResponse(healthStatus(
+        NSM_LINK_HEALTH_NOT_MONITORED, NSM_ATTENTION_TRIGGER_RAW_BER));
+    auto* notMonitoredMsg =
+        reinterpret_cast<const nsm_msg*>(notMonitored.data());
+    EXPECT_EQ(sensor->handleResponseMsg(notMonitoredMsg, notMonitored.size()),
+              NSM_SUCCESS);
+    EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
+              EarlyHealthIndicationValues::NotMonitored);
+    EXPECT_EQ(portHealthMetricsIntf->attentionTriggerReason(),
+              AttentionTriggerReasonValues::Unknown);
+}
+
 TEST_F(NsmPortHealthMetricsTest, DecodeAttentionTrigger_AllDefinedValues)
 {
     const std::vector<std::pair<uint8_t, AttentionTriggerReasonValues>>
@@ -346,6 +385,18 @@ TEST_F(NsmPortHealthMetricsTest, DecodeAttentionTrigger_AllDefinedValues)
     }
 }
 
+TEST_F(NsmPortHealthMetricsTest, DecodeLinkHealth_AllDefinedValues)
+{
+    EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_DISABLED),
+              EarlyHealthIndicationValues::Disabled);
+    EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_ATTENTION),
+              EarlyHealthIndicationValues::Attention);
+    EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_HEALTHY),
+              EarlyHealthIndicationValues::Healthy);
+    EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_NOT_MONITORED),
+              EarlyHealthIndicationValues::NotMonitored);
+}
+
 TEST_F(NsmPortHealthMetricsTest, DecodeReservedThenValid_RearmsThrottles)
 {
     // An out-of-spec value warns once; a valid value re-arms the throttle.
@@ -358,14 +409,15 @@ TEST_F(NsmPortHealthMetricsTest, DecodeReservedThenValid_RearmsThrottles)
     EXPECT_EQ(sensor->decodeAttentionTrigger(10),
               AttentionTriggerReasonValues::Unknown);
 
+    // 3 is Not Monitored, a defined state; 9 is unassigned and warns once.
     EXPECT_EQ(sensor->decodeLinkHealth(3),
-              EarlyHealthIndicationValues::Unknown);
-    EXPECT_EQ(sensor->decodeLinkHealth(3),
+              EarlyHealthIndicationValues::NotMonitored);
+    EXPECT_EQ(sensor->decodeLinkHealth(9),
               EarlyHealthIndicationValues::Unknown);
     EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_HEALTHY),
               EarlyHealthIndicationValues::Healthy);
-    EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_NA),
-              EarlyHealthIndicationValues::Unknown);
+    EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_DISABLED),
+              EarlyHealthIndicationValues::Disabled);
     EXPECT_EQ(sensor->decodeLinkHealth(NSM_LINK_HEALTH_ATTENTION),
               EarlyHealthIndicationValues::Attention);
 }
@@ -410,15 +462,14 @@ TEST_F(NsmPortHealthMetricsTest, SecondPollSameStatePreviousStateUpdated)
 TEST_F(NsmPortHealthMetricsTest,
        StateChangeUpdatesPreviousEarlyHealthIndication)
 {
-    // First poll: NA (initialization, no event)
+    // First poll: Disabled (initialization, no event)
     auto buf1 = buildResponse(0x00000000u);
     auto* msg1 = reinterpret_cast<const nsm_msg*>(buf1.data());
     sensor->handleResponseMsg(msg1, buf1.size());
     EXPECT_EQ(sensor->previousEarlyHealthIndication,
-              EarlyHealthIndicationValues::Unknown);
+              EarlyHealthIndicationValues::Disabled);
 
-    // Second poll: Healthy (state change — event fires fire-and-forget, safe in
-    // test)
+    // Second poll: Healthy (state change, event emitted)
     auto buf2 = buildResponse(0x00020000u);
     auto* msg2 = reinterpret_cast<const nsm_msg*>(buf2.data());
     sensor->handleResponseMsg(msg2, buf2.size());
@@ -464,7 +515,7 @@ TEST_F(NsmPortHealthMetricsTest, HandleResponse_ErrorCC_PropertiesUnchanged)
 }
 
 // ===========================================================================
-// 6. Event severity mapping (Warning for Attention/Unknown, OK for Healthy)
+// 6. Event severity mapping (Warning for non-Healthy, OK for Healthy)
 // ===========================================================================
 
 TEST_F(NsmPortHealthMetricsTest, SeverityIsWarningForAttention)
@@ -486,9 +537,9 @@ TEST_F(NsmPortHealthMetricsTest, SeverityIsInformationalForHealthy)
         EarlyHealthIndicationValues::Healthy));
 }
 
-// Exercise the event-firing path on a Healthy -> Unknown transition (the new
+// Exercise the event-firing path on a Healthy -> Attention transition (a
 // Warning-severity case): first poll initializes, second fires the event.
-TEST_F(NsmPortHealthMetricsTest, TransitionHealthyToUnknownFiresEvent)
+TEST_F(NsmPortHealthMetricsTest, TransitionHealthyToAttentionFiresEvent)
 {
     auto b1 = buildResponse(0x00020000u); // Healthy (init, no event)
     sensor->handleResponseMsg(reinterpret_cast<const nsm_msg*>(b1.data()),
@@ -496,23 +547,19 @@ TEST_F(NsmPortHealthMetricsTest, TransitionHealthyToUnknownFiresEvent)
     ASSERT_EQ(sensor->previousEarlyHealthIndication,
               EarlyHealthIndicationValues::Healthy);
 
-    auto b2 = buildResponse(0x00000000u); // Unknown (state change -> event)
+    auto b2 = buildResponse(0x00010000u); // Attention (state change -> event)
     auto rc = sensor->handleResponseMsg(
         reinterpret_cast<const nsm_msg*>(b2.data()), b2.size());
     EXPECT_EQ(rc, NSM_SUCCESS);
     EXPECT_EQ(sensor->previousEarlyHealthIndication,
-              EarlyHealthIndicationValues::Unknown);
+              EarlyHealthIndicationValues::Attention);
     EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
-              EarlyHealthIndicationValues::Unknown);
+              EarlyHealthIndicationValues::Attention);
 }
 
 // ===========================================================================
-// 7. Unavailable bracketing of the transition event
-//
-// Unavailable means the Link Health record could not be read, not a health
-// transition: no event into it or for merely leaving it, and a change
-// bracketed by it is reported once against the last known state. The event
-// itself is fire-and-forget; the state the emitter keeps is asserted.
+// 7. State transitions: every state participates, including Unavailable,
+// Disabled and NotMonitored. The first observation establishes the baseline.
 // ===========================================================================
 
 namespace
@@ -521,80 +568,20 @@ constexpr auto kNeutralReason = AttentionTriggerReasonValues::Unknown;
 constexpr auto kNeutralConfig = AttentionTriggerConfigurationValues::Unknown;
 } // namespace
 
-TEST_F(NsmPortHealthMetricsTest, Event_NoEventIntoOrOutOfUnavailable)
+TEST_F(NsmPortHealthMetricsTest, Event_AllStatesTrackImmediatePreviousState)
 {
-    sensor->updateHealth(EarlyHealthIndicationValues::Healthy, kNeutralReason,
-                         0, kNeutralConfig);
-    ASSERT_TRUE(sensor->healthStateInitialized);
-    ASSERT_TRUE(sensor->lastKnownHealthStateValid);
-    ASSERT_EQ(sensor->lastKnownHealthState,
-              EarlyHealthIndicationValues::Healthy);
-
-    // Into Unavailable: published, but the last known state is kept.
-    sensor->updateHealth(EarlyHealthIndicationValues::Unavailable,
-                         kNeutralReason, 0, kNeutralConfig);
-    EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
-              EarlyHealthIndicationValues::Unavailable);
-    EXPECT_EQ(sensor->previousEarlyHealthIndication,
-              EarlyHealthIndicationValues::Unavailable);
-    EXPECT_EQ(sensor->lastKnownHealthState,
-              EarlyHealthIndicationValues::Healthy);
-
-    // Back to the same readable state: nothing changed since the last known
-    // state, so no transition is recorded.
-    sensor->updateHealth(EarlyHealthIndicationValues::Healthy, kNeutralReason,
-                         0, kNeutralConfig);
-    EXPECT_EQ(sensor->previousEarlyHealthIndication,
-              EarlyHealthIndicationValues::Healthy);
-    EXPECT_EQ(sensor->lastKnownHealthState,
-              EarlyHealthIndicationValues::Healthy);
-}
-
-TEST_F(NsmPortHealthMetricsTest, Event_BracketedChangeReportedOnce)
-{
-    sensor->updateHealth(EarlyHealthIndicationValues::Healthy, kNeutralReason,
-                         0, kNeutralConfig);
-    sensor->updateHealth(EarlyHealthIndicationValues::Unavailable,
-                         kNeutralReason, 0, kNeutralConfig);
-    ASSERT_EQ(sensor->lastKnownHealthState,
-              EarlyHealthIndicationValues::Healthy);
-
-    // Healthy -> Unavailable -> Attention: reported once the record is
-    // readable again, against the last known state.
-    sensor->updateHealth(EarlyHealthIndicationValues::Attention,
-                         AttentionTriggerReasonValues::RawBER, 5,
-                         AttentionTriggerConfigurationValues::Current);
-    EXPECT_EQ(sensor->previousEarlyHealthIndication,
-              EarlyHealthIndicationValues::Attention);
-    EXPECT_EQ(sensor->lastKnownHealthState,
-              EarlyHealthIndicationValues::Attention);
-
-    // Repeating the state reports nothing further.
-    sensor->updateHealth(EarlyHealthIndicationValues::Attention,
-                         AttentionTriggerReasonValues::RawBER, 5,
-                         AttentionTriggerConfigurationValues::Current);
-    EXPECT_EQ(sensor->lastKnownHealthState,
-              EarlyHealthIndicationValues::Attention);
-}
-
-TEST_F(NsmPortHealthMetricsTest, Event_StartInUnavailableBaselinesFirstReadable)
-{
-    sensor->updateHealth(EarlyHealthIndicationValues::Unavailable,
-                         kNeutralReason, 0, kNeutralConfig);
-    EXPECT_TRUE(sensor->healthStateInitialized);
-    EXPECT_FALSE(sensor->lastKnownHealthStateValid);
-    EXPECT_EQ(sensor->previousEarlyHealthIndication,
-              EarlyHealthIndicationValues::Unavailable);
-
-    // The first readable state is the baseline, not a transition.
-    sensor->updateHealth(EarlyHealthIndicationValues::Attention,
-                         AttentionTriggerReasonValues::EffectiveBER, 3,
-                         AttentionTriggerConfigurationValues::Current);
-    EXPECT_TRUE(sensor->lastKnownHealthStateValid);
-    EXPECT_EQ(sensor->lastKnownHealthState,
-              EarlyHealthIndicationValues::Attention);
-    EXPECT_EQ(sensor->previousEarlyHealthIndication,
-              EarlyHealthIndicationValues::Attention);
+    for (const auto state : {EarlyHealthIndicationValues::Healthy,
+                             EarlyHealthIndicationValues::Unavailable,
+                             EarlyHealthIndicationValues::Attention,
+                             EarlyHealthIndicationValues::NotMonitored,
+                             EarlyHealthIndicationValues::Disabled,
+                             EarlyHealthIndicationValues::Unknown})
+    {
+        sensor->updateHealth(state, kNeutralReason, 0, kNeutralConfig);
+        EXPECT_TRUE(sensor->healthStateInitialized);
+        EXPECT_EQ(sensor->previousEarlyHealthIndication, state);
+        EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(), state);
+    }
 }
 
 // ===========================================================================
@@ -606,7 +593,6 @@ TEST_F(NsmPortHealthMetricsTest, ConstructorSetsExtensionDefaults)
     EXPECT_EQ(portHealthMetricsIntf->attentionTriggerMetricId(), 0);
     EXPECT_EQ(portHealthMetricsIntf->attentionTriggerConfiguration(),
               AttentionTriggerConfigurationValues::Unknown);
-    EXPECT_FALSE(sensor->lastKnownHealthStateValid);
 }
 
 TEST_F(NsmPortHealthMetricsTest, UpdateHealth_PublishesAllFourProperties)
@@ -633,7 +619,7 @@ TEST_F(NsmPortHealthMetricsTest, UpdateHealth_OperatorClearedTransition)
                          AttentionTriggerConfigurationValues::Current);
     sensor->updateHealth(EarlyHealthIndicationValues::Healthy, kNeutralReason,
                          0, kNeutralConfig, /*operatorCleared=*/true);
-    EXPECT_EQ(sensor->lastKnownHealthState,
+    EXPECT_EQ(sensor->previousEarlyHealthIndication,
               EarlyHealthIndicationValues::Healthy);
     EXPECT_EQ(portHealthMetricsIntf->earlyHealthIndication(),
               EarlyHealthIndicationValues::Healthy);

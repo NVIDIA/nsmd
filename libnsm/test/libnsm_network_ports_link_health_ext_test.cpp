@@ -308,6 +308,27 @@ TEST(linkHealthRecord, testGoodDecodeBitPlacement)
 		  NSM_LINK_HEALTH_CONFIG_CURRENT);
 }
 
+TEST(linkHealthRecord, testDecodeDisabledAndNotMonitored)
+{
+	// 0 Disabled (formerly N/A) and 3 Not Monitored are defined states of
+	// the 4-bit field and decode unchanged.
+	EXPECT_EQ(static_cast<int>(NSM_LINK_HEALTH_DISABLED), 0);
+	EXPECT_EQ(static_cast<int>(NSM_LINK_HEALTH_NOT_MONITORED), 3);
+
+	for (const auto health :
+	     {NSM_LINK_HEALTH_DISABLED, NSM_LINK_HEALTH_NOT_MONITORED}) {
+		auto data =
+		    le32Bytes(linkHealthWord(health, NSM_ATTENTION_TRIGGER_NA,
+					     0, NSM_LINK_HEALTH_CONFIG_NA));
+		struct nsm_link_health_record record{};
+		EXPECT_EQ(decode_link_health_record(data.data(), data.size(),
+						    &record),
+			  NSM_SW_SUCCESS);
+		EXPECT_EQ(record.link_health, health);
+		EXPECT_EQ(record.attention_trigger, NSM_ATTENTION_TRIGGER_NA);
+	}
+}
+
 TEST(linkHealthRecord, testEncodeMaskTruncation)
 {
 	// Out-of-range field values are truncated to the field width rather
