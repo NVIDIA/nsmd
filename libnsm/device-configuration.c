@@ -2938,3 +2938,253 @@ int decode_nsm_device_config_request_event_v1(const struct nsm_msg *msg,
 	}
 	return NSM_SW_SUCCESS;
 }
+
+/* MMIO access configuration type over Device Config v2 */
+
+static int mmio_request_valid(uint64_t address, uint16_t length_dwords)
+{
+	if (address % NSM_MMIO_DWORD_BYTES != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (length_dwords < NSM_MMIO_ACCESS_MIN_LENGTH_DWORDS ||
+	    length_dwords > NSM_MMIO_ACCESS_MAX_LENGTH_DWORDS) {
+		return NSM_SW_ERROR_DATA;
+	}
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_device_config_mmio_req(uint8_t instance_id,
+				      uint32_t device_config_type,
+				      uint64_t address, uint16_t length_dwords,
+				      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = mmio_request_valid(address, length_dwords);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	struct nsm_mmio_access_query query;
+	query.address = htole64(address);
+	query.length_dwords = htole16(length_dwords);
+	query.reserved = 0;
+	return encode_get_device_config_v2_req(instance_id, device_config_type,
+					       (const uint8_t *)&query,
+					       (uint16_t)sizeof(query), msg);
+}
+
+int decode_get_device_config_mmio_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint16_t length_dwords,
+				       uint8_t *cc, uint16_t *reason_code,
+				       uint8_t *data)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (length_dwords < NSM_MMIO_ACCESS_MIN_LENGTH_DWORDS ||
+	    length_dwords > NSM_MMIO_ACCESS_MAX_LENGTH_DWORDS) {
+		return NSM_SW_ERROR_DATA;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_device_config_v2_resp, config_data)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	const struct nsm_get_device_config_v2_resp *resp =
+	    (const struct nsm_get_device_config_v2_resp *)msg->payload;
+	const uint16_t expected =
+	    (uint16_t)(NSM_MMIO_DWORD_BYTES * length_dwords);
+	if (le16toh(resp->current_config_length) != expected ||
+	    le16toh(resp->pending_config_length) != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (le16toh(resp->hdr.data_size) !=
+	    (uint16_t)(sizeof(resp->current_config_length) +
+		       sizeof(resp->pending_config_length) + expected)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		offsetof(struct nsm_get_device_config_v2_resp, config_data) +
+		expected) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	memcpy(data, resp->config_data, expected);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_device_config_mmio_req(uint8_t instance_id,
+				      uint32_t device_config_type,
+				      uint64_t address, uint16_t length_dwords,
+				      const uint8_t *data, struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = mmio_request_valid(address, length_dwords);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	uint8_t body[sizeof(struct nsm_mmio_access_query) +
+		     NSM_MMIO_DWORD_BYTES * NSM_MMIO_ACCESS_MAX_LENGTH_DWORDS];
+	struct nsm_mmio_access_query query;
+	query.address = htole64(address);
+	query.length_dwords = htole16(length_dwords);
+	query.reserved = 0;
+	const size_t data_bytes = NSM_MMIO_DWORD_BYTES * length_dwords;
+	memcpy(body, &query, sizeof(query));
+	memcpy(body + sizeof(query), data, data_bytes);
+	return encode_set_device_config_v2_req(
+	    instance_id, device_config_type, body,
+	    (uint16_t)(sizeof(query) + data_bytes), msg);
+}
+
+/* Get Supported Device Configs (Type 5, command 0x12) */
+
+int encode_get_supported_device_configs_req(uint8_t instance_id,
+					    uint32_t handle,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	struct nsm_get_supported_device_configs_req *request =
+	    (struct nsm_get_supported_device_configs_req *)msg->payload;
+	request->hdr.command = NSM_GET_SUPPORTED_DEVICE_CONFIGS;
+	request->hdr.reserved1 = 0;
+	request->hdr.data_size = htole16(sizeof(request->handle));
+	request->hdr.reserved2 = 0;
+	request->handle = htole32(handle);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_supported_device_configs_req(const struct nsm_msg *msg,
+					    size_t msg_len, uint32_t *handle)
+{
+	if (msg == NULL || handle == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_supported_device_configs_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	const struct nsm_get_supported_device_configs_req *request =
+	    (const struct nsm_get_supported_device_configs_req *)msg->payload;
+	if (request->hdr.command != NSM_GET_SUPPORTED_DEVICE_CONFIGS) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (le16toh(request->hdr.data_size) != sizeof(request->handle)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	*handle = le32toh(request->handle);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_supported_device_configs_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint32_t next_handle,
+    uint32_t total_count, const uint32_t *config_types, uint16_t count,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_SUPPORTED_DEVICE_CONFIGS, msg);
+	}
+	if (count > 0 && config_types == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (count > total_count) {
+		return NSM_SW_ERROR_DATA;
+	}
+	const size_t data_size =
+	    2 * sizeof(uint32_t) + sizeof(uint32_t) * count;
+	if (data_size > UINT16_MAX) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_get_supported_device_configs_resp *resp =
+	    (struct nsm_get_supported_device_configs_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_SUPPORTED_DEVICE_CONFIGS;
+	resp->hdr.completion_code = cc;
+	resp->hdr.reserved = 0;
+	resp->hdr.data_size = htole16((uint16_t)data_size);
+	resp->next_handle = htole32(next_handle);
+	resp->total_count = htole32(total_count);
+	for (uint16_t i = 0; i < count; i++) {
+		resp->config_types[i] = htole32(config_types[i]);
+	}
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_supported_device_configs_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint32_t *next_handle, uint32_t *total_count,
+    uint32_t *config_types, uint16_t capacity, uint16_t *count)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL ||
+	    next_handle == NULL || total_count == NULL || count == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	*count = 0;
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+	const size_t fixed =
+	    sizeof(struct nsm_msg_hdr) +
+	    offsetof(struct nsm_get_supported_device_configs_resp,
+		     config_types);
+	if (msg_len < fixed) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	const struct nsm_get_supported_device_configs_resp *resp =
+	    (const struct nsm_get_supported_device_configs_resp *)msg->payload;
+	const uint16_t data_size = le16toh(resp->hdr.data_size);
+	if (data_size < 2 * sizeof(uint32_t) ||
+	    (data_size - 2 * sizeof(uint32_t)) % sizeof(uint32_t) != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	const uint16_t n =
+	    (uint16_t)((data_size - 2 * sizeof(uint32_t)) / sizeof(uint32_t));
+	if (msg_len < fixed + sizeof(uint32_t) * n) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	*next_handle = le32toh(resp->next_handle);
+	*total_count = le32toh(resp->total_count);
+	*count = n;
+	if (n > *total_count) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (n > capacity) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (n > 0 && config_types == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	for (uint16_t i = 0; i < n; i++) {
+		config_types[i] = le32toh(resp->config_types[i]);
+	}
+	return NSM_SW_SUCCESS;
+}

@@ -9,6 +9,9 @@ tests = [
     'libnsm_base_endian_utils_test',
     'libnsm_debug_token_test',
     'libnsm_device_configuration_test',
+    'libnsm_device_configuration_mmio_test',
+    'libnsm_device_configuration_mmio_negative_test',
+    'libnsm_fpga_maps_test',
     'libnsm_device_capability_discovery_test',
     # 'libnsm_diagnostics_test',  # DISABLED: SIGSEGV crash - Session 7 confirmed: crashes during teardown, requires debugging
     'libnsm_diagnostics_encode_decode_test',
