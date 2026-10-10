@@ -1868,6 +1868,76 @@ class GetDeviceConfig : public CommandInterface
     std::string queryHex;
 };
 
+class GetSupportedDeviceConfigs : public CommandInterface
+{
+  public:
+    ~GetSupportedDeviceConfigs() = default;
+    GetSupportedDeviceConfigs() = delete;
+    GetSupportedDeviceConfigs(const GetSupportedDeviceConfigs&) = delete;
+    GetSupportedDeviceConfigs(GetSupportedDeviceConfigs&&) = default;
+    GetSupportedDeviceConfigs&
+        operator=(const GetSupportedDeviceConfigs&) = delete;
+    GetSupportedDeviceConfigs& operator=(GetSupportedDeviceConfigs&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetSupportedDeviceConfigs(const char* type, const char* name,
+                                       CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-H,--handle", handle,
+                        "Continuation handle, 0 for the first request");
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_device_configs_req),
+            0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        int rc = encode_get_supported_device_configs_req(instanceId, handle,
+                                                         request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        uint32_t nextHandle = 0;
+        uint32_t totalCount = 0;
+        // One 32-bit type per 4 payload bytes is an upper bound on the list
+        std::vector<uint32_t> types(std::max<size_t>(1, payloadLength / 4));
+        uint16_t count = 0;
+        auto rc = decode_get_supported_device_configs_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &nextHandle,
+            &totalCount, types.data(), static_cast<uint16_t>(types.size()),
+            &count);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "GetSupportedDeviceConfigs response error: rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << reasonCode << "\n";
+            return;
+        }
+        ordered_json result;
+        result["Completion Code"] = static_cast<int>(cc);
+        result["Command"] = "GetSupportedDeviceConfigs (0x12)";
+        result["Next Handle"] = nextHandle;
+        result["Total Count"] = totalCount;
+        ordered_json list = ordered_json::array();
+        for (uint16_t i = 0; i < count; i++)
+        {
+            list.push_back(types[i]);
+        }
+        result["Configuration Types"] = list;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint32_t handle = 0;
+};
+
 /* OOB Miswiring Detection: convenience nsmtool
  * subcommands targeting NSM Type 5 DEVICE_MODE_LLDP (index 24) LLDP mode
  * bitfield on devices reporting NSM_DEV_ID_PCIE_BRIDGE via Type 0
@@ -2983,6 +3053,12 @@ void registerCommand(CLI::App& app)
         "SetUPhyMode", "Set UPhy mode (NSM Type 5 idx DEVICE_MODE_UPHY)");
     commands.push_back(
         std::make_unique<SetUPhyMode>("config", "SetUPhyMode", setUPhyMode));
+
+    auto getSupportedDeviceConfigs = config->add_subcommand(
+        "GetSupportedDeviceConfigs",
+        "Get Supported Device Configs Type 5 command 0x12");
+    commands.push_back(std::make_unique<GetSupportedDeviceConfigs>(
+        "config", "GetSupportedDeviceConfigs", getSupportedDeviceConfigs));
 }
 
 } // namespace config

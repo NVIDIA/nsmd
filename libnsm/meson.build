@@ -9,6 +9,7 @@ libnsm_sources = files(
     'device-configuration.c',
     'diagnostics.c',
     'firmware-utils.c',
+    'fpga/fpga-maps.c',
     'network-ports.c',
     'pci-links.c',
     'platform-environmental.c',

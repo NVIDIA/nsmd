@@ -36,6 +36,7 @@
 #include <sdbusplus/server.hpp>
 #include <xyz/openbmc_project/Software/SecurityCommon/common.hpp>
 
+#include <cmath>
 #include <exception>
 #include <filesystem>
 #include <functional>
@@ -762,6 +763,65 @@ std::string typeName()
     // Free memory allocated by abi::__cxa_demangle
     std::free(demangled);
     return type;
+}
+
+/** @brief String property of an entity-manager property map, nullopt when
+ *  the key is missing or holds another type */
+template <typename Map>
+std::optional<std::string> getOptionalString(const Map& properties,
+                                             const std::string& key)
+{
+    auto it = properties.find(key);
+    if (it == properties.end())
+    {
+        return std::nullopt;
+    }
+    if (const auto* value = std::get_if<std::string>(&it->second))
+    {
+        return *value;
+    }
+    return std::nullopt;
+}
+
+/** @brief Unsigned property of an entity-manager property map. JSON numbers
+ *  arrive as int64, uint64 or double, every integral non negative one is
+ *  accepted, anything else is nullopt */
+template <typename Map>
+std::optional<uint64_t> getOptionalUnsigned(const Map& properties,
+                                            const std::string& key)
+{
+    auto it = properties.find(key);
+    if (it == properties.end())
+    {
+        return std::nullopt;
+    }
+    return std::visit([](const auto& value) -> std::optional<uint64_t> {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>)
+        {
+            if constexpr (std::is_signed_v<T>)
+            {
+                if (value < 0)
+                {
+                    return std::nullopt;
+                }
+            }
+            return static_cast<uint64_t>(value);
+        }
+        else if constexpr (std::is_same_v<T, double>)
+        {
+            if (!std::isfinite(value) || value < 0 ||
+                value >= 18446744073709551616.0 || std::floor(value) != value)
+            {
+                return std::nullopt;
+            }
+            return static_cast<uint64_t>(value);
+        }
+        else
+        {
+            return std::nullopt;
+        }
+    }, it->second);
 }
 
 template <typename T>

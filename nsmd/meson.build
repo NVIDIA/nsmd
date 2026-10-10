@@ -116,6 +116,7 @@ valid_nsmd_subdirs = [
     'nsmHistograms',
     'nsmReady',
     'nsmSelectiveWipe',
+    'nsmFpgaTelemetry',
 ]
 
 # Validate requested subdirs

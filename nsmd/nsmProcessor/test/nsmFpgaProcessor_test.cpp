@@ -480,18 +480,52 @@ TEST_F(NsmFpgaProcessorFactoryBranchTest, MissingFpgaType_NoSensor)
     EXPECT_EQ(before, fpga->deviceSensors.size());
 }
 
-// Missing "Health" → health="" → invalid enum conversion →
-// exception caught by factory try-catch → no sensor
-TEST_F(NsmFpgaProcessorFactoryBranchTest, MissingHealth_NoSensor)
+// A managed FPGA publishes the location decorators as standalone objects
+TEST_F(NsmFpgaProcessorFactoryBranchTest, NsmManagedStatusPublishesLocation)
 {
-    const std::string testPath = "/xyz/test/fpgaproc/missing_health";
+    const std::string testPath = "/xyz/test/fpgaproc/managed";
     auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
     pm = validProps;
     pm.erase("Health");
+    pm["NsmManagedStatus"] = true;
+    pm["LocationCode"] = std::string("FPGA_0");
+    pm["LocationContext"] = std::string("HGX_Chassis_0");
+    pm["FieldReplaceable"] = false;
+
+    const size_t beforeStatic = fpga->staticSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    // LocationCode, LocationContext and FieldReplaceable as standalone objects
+    EXPECT_EQ(beforeStatic + 3, fpga->staticSensors.size());
+}
+
+// A managed entry with a stray Health still creates the processor
+TEST_F(NsmFpgaProcessorFactoryBranchTest, NsmManagedStatusWithStrayHealth)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/managed_stray_health";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm["NsmManagedStatus"] = true;
 
     const size_t before = fpga->deviceSensors.size();
     createNsmFpgaProcessorSensor(mockManager, intf, testPath);
-    EXPECT_EQ(before, fpga->deviceSensors.size());
+    EXPECT_EQ(before + 1, fpga->deviceSensors.size());
+}
+
+// A standard FPGA omits NsmManagedStatus and publishes no location decorators
+TEST_F(NsmFpgaProcessorFactoryBranchTest, StandardFpgaHasNoLocation)
+{
+    const std::string testPath = "/xyz/test/fpgaproc/standard";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
+    pm = validProps;
+    pm["LocationCode"] = std::string("FPGA_0");
+    pm["LocationContext"] = std::string("HGX_Chassis_0");
+    pm["FieldReplaceable"] = false;
+
+    const size_t before = fpga->deviceSensors.size();
+    const size_t beforeStatic = fpga->staticSensors.size();
+    createNsmFpgaProcessorSensor(mockManager, intf, testPath);
+    ASSERT_EQ(before + 1, fpga->deviceSensors.size());
+    EXPECT_EQ(beforeStatic, fpga->staticSensors.size());
 }
 
 // Missing "UUID" → count("UUID") FALSE → uuid="" →
