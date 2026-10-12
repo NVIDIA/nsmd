@@ -215,7 +215,25 @@ requester::Coroutine SensorManagerImpl::interfaceAddedTask()
 
         co_await NsmObjectFactory::instance().createObjects(*this, interface,
                                                             objPath);
+
+#ifdef NVIDIA_SHMEM
+        // Drain per interface; the threshold skips the many tiny ones.
+        constexpr size_t drainThreshold = 100;
+        if (nsm_shmem_utils::SharedMemoryManager::pendingTelemetryCount() >
+            drainThreshold)
+        {
+            nsm_shmem_utils::SharedMemoryManager::
+                updateAggregateTelemetryOnTAL();
+        }
+#endif
     }
+#ifdef NVIDIA_SHMEM
+    // Push what the threshold left; the first polling flush cannot yield.
+    if (nsm_shmem_utils::SharedMemoryManager::pendingTelemetryCount() > 0)
+    {
+        nsm_shmem_utils::SharedMemoryManager::updateAggregateTelemetryOnTAL();
+    }
+#endif
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
         event, [&](sdeventplus::source::EventBase&) { startPolling(); });
     // coverity[missing_return]

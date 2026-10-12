@@ -86,6 +86,28 @@ struct NsmPortFactoryBranchTest :
     {
         cleanupDeviceSensors(devices);
     }
+
+    /** @brief Drive the event loop until the task finishes.
+     *
+     * createNsmPortSensor yields between ports, so for a device with more
+     * than one port the loop has to run for construction to complete.
+     * Bounded so a task that never finishes fails here instead of hanging.
+     *
+     * Every call must stay above the tests that discard a
+     * createNsmPortSensor result. Those leave a timer armed on the loop
+     * pointing at a coroutine frame the temporary's destructor has already
+     * freed; running the loop afterwards would dispatch it.
+     */
+    void runUntilDone(const requester::Coroutine& task) const
+    {
+        auto* loop =
+            static_cast<const sdeventplus::Event&>(gpu->getEvent()).get();
+        for (int i = 0; i < 1000 && !task.done(); ++i)
+        {
+            sd_event_run(loop, 0);
+        }
+        ASSERT_TRUE(task.done());
+    }
 };
 
 // ============================================================================
@@ -153,7 +175,9 @@ TEST_F(NsmPortFactoryBranchTest, Factory_NoParentObjPath)
     propMap["Count"] = uint64_t{1};
     propMap["DeviceType"] = uint64_t{NSM_DEV_ID_GPU};
 
-    createNsmPortSensorGeneric(mockManager, portInterface, objPath);
+    auto result = createNsmPortSensorGeneric(mockManager, portInterface,
+                                             objPath);
+    runUntilDone(result);
 
     // Port sensors created using empty parent path
     EXPECT_GE(gpu->roundRobinSensors.size(), 1u);
@@ -173,7 +197,9 @@ TEST_F(NsmPortFactoryBranchTest, Factory_NoDeviceType)
     propMap["Count"] = uint64_t{1};
     // DeviceType absent -> deviceType defaults to 0
 
-    createNsmPortSensorGeneric(mockManager, portInterface, objPath);
+    auto result = createNsmPortSensorGeneric(mockManager, portInterface,
+                                             objPath);
+    runUntilDone(result);
 
     EXPECT_GE(gpu->roundRobinSensors.size(), 1u);
 }
@@ -193,7 +219,9 @@ TEST_F(NsmPortFactoryBranchTest, Factory_NoPriority)
     propMap["DeviceType"] = uint64_t{NSM_DEV_ID_GPU};
     // Priority absent
 
-    createNsmPortSensorGeneric(mockManager, portInterface, objPath);
+    auto result = createNsmPortSensorGeneric(mockManager, portInterface,
+                                             objPath);
+    runUntilDone(result);
 
     EXPECT_GE(gpu->roundRobinSensors.size(), 1u);
 }
@@ -247,7 +275,9 @@ TEST_F(NsmPortFactoryBranchTest, Factory_NvlinkPort_CreatesV2)
     propMap["Count"] = uint64_t{2};
     propMap["DeviceType"] = uint64_t{NSM_DEV_ID_GPU};
 
-    createNsmPortSensorGeneric(mockManager, portInterface, objPath);
+    auto result = createNsmPortSensorGeneric(mockManager, portInterface,
+                                             objPath);
+    runUntilDone(result);
 
     // One v2 sensor per port; the 0x42 fallback sensor is owned by it, not
     // registered on the device.

@@ -58,6 +58,11 @@ class SharedMemoryManager
     */
     static void initTALNamespace();
 
+    /**
+     * @brief Number of cached entries waiting to be pushed to TAL
+     */
+    static size_t pendingTelemetryCount();
+
   private:
     // Static member variables (previously global)
     static std::vector<tal::TelemetryData> telemetryData;

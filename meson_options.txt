@@ -172,8 +172,8 @@ option(
     type: 'integer',
     min: 1,
     max: 4294967295,
-    description: 'The interval time of NSM instance id expiration in seconds',
-    value: 5,
+    description: 'The interval time of NSM instance id expiration in seconds. Must cover every attempt the retry budget allows: (number-of-request-retries + 1) * response-time-out. With 2 retries and a 2000ms response timeout that is 3 * 2000ms = 6s.',
+    value: 6,
 )
 option(
     'number-of-request-retries',

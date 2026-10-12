@@ -62,5 +62,10 @@ void SharedMemoryManager::initTALNamespace()
     telemetryData.reserve(20);
 }
 
+size_t SharedMemoryManager::pendingTelemetryCount()
+{
+    return telemetryData.size();
+}
+
 } // namespace nsm_shmem_utils
 #endif

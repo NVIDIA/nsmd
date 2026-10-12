@@ -618,6 +618,14 @@ class NsmDevice :
 
     void dumpNsmDeviceInfo();
 
+    /** @brief The daemon's event loop, for coroutines that need to yield
+     *         back to it from outside this class.
+     */
+    const common::Event& getEvent() const
+    {
+        return event;
+    }
+
   private:
     template <typename SensorType>
     void registerBuildTypeSensor(const std::shared_ptr<SensorType>& sensor)
