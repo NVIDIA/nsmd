@@ -27,7 +27,8 @@
  * path)
  * - isEMReady: D-Bus catch branch + already-set outer-if branch
  * - scanInventory: D-Bus failure → catch block
- * - interfaceAddedTask: empty queue → Defer event created
+ * - interfaceAddedTask: empty queue → Defer event created; non-empty queue
+ *   with and without cached telemetry → both sides of the drain condition
  * - checkAllDevicesReady: device online/ready/offline combinations
  */
 
@@ -36,10 +37,13 @@
 using ::testing::_;
 using ::testing::Return;
 
+#include "config.h"
+
 #include "base.h"
 #include "platform-environmental.h"
 
 #include "common/test/mockEvent.hpp"
+#include "sharedMemCommon.hpp"
 
 #include <boost/asio/io_context.hpp>
 #include <sdbusplus/asio/connection.hpp>
@@ -169,6 +173,81 @@ TEST_F(SensorManagerBranchTest, InterfaceAddedTask_EmptyQueue_LoopNotEntered)
     }
     EXPECT_NO_THROW(mgr->interfaceAddedTask());
 }
+
+#ifdef NVIDIA_SHMEM
+
+// Non-empty queue → the while body runs. The interface is not registered
+// with NsmObjectFactory, so createObjects is a no-op and the task finishes
+// without suspending. One entry is below the drain threshold, so the
+// flush after the loop is what empties the cache.
+TEST_F(SensorManagerBranchTest, InterfaceAddedTask_NonEmptyQueue_DrainsCache)
+{
+    while (!mgr->queuedAddedInterfaces.empty())
+    {
+        mgr->queuedAddedInterfaces.pop();
+    }
+    mgr->queuedAddedInterfaces.emplace("/test/drain", "Unregistered.Iface");
+
+    std::vector<uint8_t> raw = {0x05, 0x06};
+    nv::sensor_aggregation::DbusVariantType val{uint32_t{11}};
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        "/test/drain", "TestIface", "TestProp", raw, val, "/assoc/path", 0);
+    ASSERT_GT(nsm_shmem_utils::SharedMemoryManager::pendingTelemetryCount(),
+              0u);
+
+    EXPECT_NO_THROW(mgr->interfaceAddedTask());
+
+    EXPECT_EQ(nsm_shmem_utils::SharedMemoryManager::pendingTelemetryCount(),
+              0u);
+    EXPECT_TRUE(mgr->queuedAddedInterfaces.empty());
+}
+
+// Above the drain threshold → the in-loop drain runs instead.
+TEST_F(SensorManagerBranchTest, InterfaceAddedTask_AboveThreshold_DrainsInLoop)
+{
+    while (!mgr->queuedAddedInterfaces.empty())
+    {
+        mgr->queuedAddedInterfaces.pop();
+    }
+    mgr->queuedAddedInterfaces.emplace("/test/bulk", "Unregistered.Iface");
+
+    std::vector<uint8_t> raw = {0x07, 0x08};
+    nv::sensor_aggregation::DbusVariantType val{uint32_t{13}};
+    for (int i = 0; i < 150; ++i)
+    {
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            "/test/bulk", "TestIface", "TestProp", raw, val, "/assoc/path", 0);
+    }
+    ASSERT_GT(nsm_shmem_utils::SharedMemoryManager::pendingTelemetryCount(),
+              100u);
+
+    EXPECT_NO_THROW(mgr->interfaceAddedTask());
+
+    EXPECT_EQ(nsm_shmem_utils::SharedMemoryManager::pendingTelemetryCount(),
+              0u);
+    EXPECT_TRUE(mgr->queuedAddedInterfaces.empty());
+}
+
+// Same path with nothing cached → both drain conditions are FALSE, so the
+// aggregate push is skipped and the queue still drains normally.
+TEST_F(SensorManagerBranchTest, InterfaceAddedTask_NonEmptyQueue_EmptyCache)
+{
+    while (!mgr->queuedAddedInterfaces.empty())
+    {
+        mgr->queuedAddedInterfaces.pop();
+    }
+    mgr->queuedAddedInterfaces.emplace("/test/nodrain", "Unregistered.Iface");
+
+    nsm_shmem_utils::SharedMemoryManager::updateAggregateTelemetryOnTAL();
+    ASSERT_EQ(nsm_shmem_utils::SharedMemoryManager::pendingTelemetryCount(),
+              0u);
+
+    EXPECT_NO_THROW(mgr->interfaceAddedTask());
+
+    EXPECT_TRUE(mgr->queuedAddedInterfaces.empty());
+}
+
+#endif // NVIDIA_SHMEM
 
 // ============================================================================
 // pollPrioritySensors() real-implementation branch coverage

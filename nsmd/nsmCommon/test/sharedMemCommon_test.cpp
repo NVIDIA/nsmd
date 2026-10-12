@@ -80,6 +80,32 @@ TEST(SharedMemoryManager, UpdateAggregateTelemetryOnTAL_EmptyData_NoOp)
 }
 
 // =============================================================================
+// pendingTelemetryCount
+// =============================================================================
+
+// Reports how many entries are waiting to be pushed to TAL. This is the
+// condition interfaceAddedTask tests before draining, so it has to track
+// cacheTALData on the way up and updateAggregateTelemetryOnTAL on the way
+// back down.
+TEST(SharedMemoryManager, PendingTelemetryCount_TracksCachedEntries)
+{
+    SharedMemoryManager::telemetryData.clear();
+    EXPECT_EQ(SharedMemoryManager::pendingTelemetryCount(), 0u);
+
+    std::vector<uint8_t> raw = {0x03, 0x04};
+    nv::sensor_aggregation::DbusVariantType val{uint32_t{7}};
+    SharedMemoryManager::cacheTALData("/test/pending", "TestIface", "TestProp",
+                                      raw, val, "/assoc/path", 0);
+
+    EXPECT_GT(SharedMemoryManager::pendingTelemetryCount(), 0u);
+    EXPECT_EQ(SharedMemoryManager::pendingTelemetryCount(),
+              SharedMemoryManager::telemetryData.size());
+
+    SharedMemoryManager::updateAggregateTelemetryOnTAL();
+    EXPECT_EQ(SharedMemoryManager::pendingTelemetryCount(), 0u);
+}
+
+// =============================================================================
 // initTALNamespace
 // =============================================================================
 

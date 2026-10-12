@@ -1,5 +1,6 @@
 #include "nsmPort.hpp"
 
+#include "common/sleep.hpp"
 #include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmAsyncStatusMapping.hpp"
@@ -3095,6 +3096,11 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
 #endif
 
         manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
+
+        // This loop builds every port on the device with no suspension
+        // point of its own, so the event loop cannot run until the last
+        // one is done. Yield per port to keep it responsive.
+        co_await common::Sleep(nsmDevice->getEvent(), 0, common::NonPriority);
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
