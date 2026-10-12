@@ -41,6 +41,9 @@ requester::Coroutine
     nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
                                       const std::string& interface,
                                       const std::string& objPath);
+void createChassisPCIeDeviceAsset(std::shared_ptr<NsmDevice> device,
+                                  std::string& name,
+                                  const std::string& chassisName);
 } // namespace nsm
 
 using namespace nsm;
@@ -340,6 +343,26 @@ TEST_F(NsmChassisPCIeDeviceTest, CreateSensors_BasePropertiesFail_ReturnsEarly)
     const size_t before = gpu->deviceSensors.size();
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, uniquePath);
     EXPECT_EQ(before, gpu->deviceSensors.size());
+}
+
+TEST_F(NsmChassisPCIeDeviceTest, goodTestLateAssetMergeRequeuesStaticSensor)
+{
+    auto device = std::make_shared<MockNsmDevice>(
+        NSM_DEV_ID_GPU, 0, "NSM_DEVICE_INSTANCE_NUMBER", "0", 0);
+    const auto baseline = device->deviceSensors.size();
+    std::string first = "IRoT_0";
+    std::string late = "PCIeDevice_0";
+
+    createChassisPCIeDeviceAsset(device, first, chassisName);
+    EXPECT_EQ(baseline + 3, device->deviceSensors.size());
+    EXPECT_EQ(3, device->staticSensors.size());
+
+    // every static read succeeded: the poll loop drops them from the queue
+    device->staticSensors.clear();
+
+    createChassisPCIeDeviceAsset(device, late, chassisName);
+    EXPECT_EQ(baseline + 3, device->deviceSensors.size());
+    EXPECT_EQ(3, device->staticSensors.size());
 }
 
 struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest

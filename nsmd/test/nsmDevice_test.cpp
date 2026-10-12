@@ -30,7 +30,9 @@ using ::testing::ElementsAre;
 #include "commonMock.hpp"
 #include "nsmDevice.hpp"
 #include "nsmEvent/nsmLongRunningEvent.hpp"
+#include "nsmInterface.hpp"
 #include "nsmNumericSensor/nsmNumericAggregator.hpp"
+#include "nsmSensor.hpp"
 
 #undef private
 #undef protected
@@ -3086,4 +3088,58 @@ TEST_F(NsmDeviceGpuDriverTest, SetOffline_WithGpuDriverSensor_ResetsDriverState)
 
     EXPECT_FALSE(dev.isDeviceActive);
     EXPECT_EQ(dev.gpuDriverSensor->driverState, static_cast<uint8_t>(0));
+}
+
+namespace
+{
+struct FakeIntf
+{
+    static constexpr const char* interface = "xyz.openbmc_project.Fake";
+};
+
+class FakeStaticSensor :
+    public nsm::NsmSensor,
+    public nsm::NsmInterfaceContainer<FakeIntf>
+{
+  public:
+    FakeStaticSensor(const std::string& name, uint8_t property,
+                     const std::filesystem::path& path) :
+        NsmSensor(name, "FakeStatic"),
+        NsmInterfaceContainer<FakeIntf>(
+            nsm::Interfaces<FakeIntf>{{path, std::make_shared<FakeIntf>()}}),
+        property(property)
+    {}
+    std::optional<std::vector<uint8_t>> genRequestMsg(eid_t, uint8_t) override
+    {
+        return std::vector<uint8_t>{property};
+    }
+    uint8_t handleResponseMsg(const nsm_msg*, size_t) override
+    {
+        return 0;
+    }
+    uint8_t property;
+};
+} // namespace
+
+TEST(nsmDevice, LateStaticSensorMergeRequeuesExistingSensor)
+{
+    MockNsmDevice device(1, 1, "MCTP_EID", "101", 0);
+    const auto baseline = device.deviceSensors.size();
+    auto first = std::make_shared<FakeStaticSensor>("IRoT", 41, "/first");
+    device.addSensor(first, nsm::PollingType::Static);
+    EXPECT_EQ(baseline + 1, device.deviceSensors.size());
+    EXPECT_EQ(1, device.staticSensors.size());
+
+    // the poll loop drops a static sensor from the queue after a good read
+    device.staticSensors.clear();
+    first->setLastUpdatedTimeStamp(123456789);
+
+    auto late = std::make_shared<FakeStaticSensor>("PCIeDevice", 41, "/late");
+    device.addSensor(late, nsm::PollingType::Static);
+
+    EXPECT_EQ(baseline + 1, device.deviceSensors.size());
+    EXPECT_EQ(first, late);
+    EXPECT_EQ(2, first->interfaces.size());
+    EXPECT_EQ(1, device.staticSensors.size());
+    EXPECT_TRUE(first->needsUpdate(123456789 + 1));
 }

@@ -365,6 +365,14 @@ class NsmDevice :
                     "EXISTING_TYPE", existingSensor->NsmObject::getType(), 
                     "COUNT", existingSensor->size());
                 // clang-format on
+                if (pollingType == PollingType::Static &&
+                    std::ranges::find(staticSensors, *it) ==
+                        staticSensors.end())
+                {
+                    // Late PDI joined a finished static read: read it once more
+                    (*it)->setLastUpdatedTimeStamp(INIT_TIMESTAMP);
+                    staticSensors.push(*it);
+                }
             }
             // updating sensor with existing sensor
             sensor = existingSensor;
