@@ -84,6 +84,22 @@ struct NsmPortBranch7Test :
         cleanupDeviceSensors(devices);
     }
 
+    /** @brief Drive the event loop until the task finishes.
+     *
+     * createNsmPortSensorGeneric yields between ports, so the loop has to
+     * run for construction to complete. Bounded so a task that never
+     * finishes fails here instead of hanging.
+     */
+    void runUntilDone(const requester::Coroutine& task) const
+    {
+        auto loop = sdeventplus::Event::get_default();
+        for (int i = 0; i < 1000 && !task.done(); ++i)
+        {
+            sd_event_run(loop.get(), 0);
+        }
+        ASSERT_TRUE(task.done());
+    }
+
     // Run the factory with Count=1 and the given configuration.
     // supportFEC == nullopt means the "SupportFECHistogram" key is absent.
     std::shared_ptr<MockNsmDevice> runFactory(const std::string& objPath,
@@ -105,7 +121,9 @@ struct NsmPortBranch7Test :
             propMap["SupportFECHistogram"] = supportFEC.value();
         }
 
-        createNsmPortSensorGeneric(mockManager, portInterface, objPath);
+        auto task = createNsmPortSensorGeneric(mockManager, portInterface,
+                                               objPath);
+        runUntilDone(task);
 
         return std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(uuid));
