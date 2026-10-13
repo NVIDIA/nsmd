@@ -38,6 +38,7 @@
 
 #include <exception>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <queue>
 #include <string>
@@ -479,6 +480,30 @@ uint64_t getCurrentSteadyClockTimestamp();
  *  @return - uint64_t equivalent of the system time
  */
 uint64_t getCurrentSteadyClockTimestampUs();
+
+/** @brief Clock source used to stamp Redfish ReadingTime, in milliseconds
+ *  since the Unix epoch (wall clock). Defaults to std::chrono::system_clock;
+ *  overridable so unit tests can pin a deterministic value.
+ */
+using ReadingTimestampProvider = std::function<uint64_t()>;
+
+/** @brief Current wall-clock time in ms since the Unix epoch, taken from the
+ *  installed provider. Use this to stamp ReadingTime on any reading being
+ *  published to D-Bus. Unlike getCurrentSteadyClockTimestamp() (a monotonic
+ *  uptime counter used only for update pacing), this returns a true epoch
+ *  time suitable for rendering as a calendar date.
+ *
+ *  @return - uint64_t wall-clock milliseconds since 1970-01-01 UTC
+ */
+uint64_t getReadingTimestamp();
+
+/** @brief Replace the ReadingTime clock source. Intended as a test seam so
+ *  units can pin a deterministic value. Passing nullptr restores the default
+ *  std::chrono::system_clock source.
+ *
+ *  @param[in] provider - callable returning ms since the Unix epoch
+ */
+void setReadingTimestampProvider(ReadingTimestampProvider provider);
 
 /** @brief Get UUID from the eid
  *

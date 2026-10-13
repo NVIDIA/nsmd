@@ -64,6 +64,12 @@ TEST(NsmDiagBranch2, QueryTokenParams_AllDeviceTypes)
                           NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX7,
                           NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_MCU,
                           NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NIC,
+                          NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_BMC_VROT,
+                          NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_SOC,
+                          NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_ARCUS,
+                          NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_ETH_SWITCH,
+                          NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_BMC_IROT,
+                          NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CABLE_MCU,
                           99};
     uint8_t statuses[] = {
         NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_OK,

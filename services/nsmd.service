@@ -8,7 +8,6 @@ After=xyz.openbmc_project.EntityManager.service
 Restart=always
 Type=dbus
 WatchdogSec=60s
-ExecStartPre=/usr/bin/sleep 20
 ExecStart=/usr/bin/env nsmd
 SyslogIdentifier=nsmd
 BusName=xyz.openbmc_project.NSM

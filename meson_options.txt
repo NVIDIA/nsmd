@@ -337,6 +337,13 @@ option(
 )
 
 option(
+    'enable-selective-wipe',
+    type: 'feature',
+    description: 'Enable Selective Data Wipe on Network Adapter objects',
+    value: 'disabled',
+)
+
+option(
     'enable-error-injection',
     type: 'feature',
     description: 'Enable Error Injection sensors and interfaces',

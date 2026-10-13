@@ -178,6 +178,10 @@ conf_data.set10(
     get_option('enable-diagnostic-dump').enabled(),
 )
 
+if get_option('enable-selective-wipe').enabled() and not cx8_features
+    add_project_arguments('-DENABLE_SELECTIVE_WIPE', language: ['cpp', 'c'])
+endif
+
 if get_option('enable-network-adapter-reset').enabled() and not cx8_features
     add_project_arguments(
         '-DENABLE_NETWORK_ADAPTER_RESET',

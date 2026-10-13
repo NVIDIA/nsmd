@@ -825,6 +825,8 @@ std::optional<Response>
                                                             requestLen);
                 case NSM_ERASE_TRACE:
                     return eraseTraceHandler(request, requestLen);
+                case NSM_SELECTIVE_DATA_WIPE:
+                    return selectiveDataWipeHandler(request, requestLen);
                 case NSM_GET_NETWORK_DEVICE_LOG_INFO:
                     return getNetworkDeviceLogInfoHandler(request, requestLen);
                 case NSM_ERASE_DEBUG_INFO:
@@ -1126,7 +1128,8 @@ std::optional<std::vector<uint8_t>>
                   {NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_QUERY_TOKEN_PARAMETERS,
                    NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
-                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
+                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS,
+                   NSM_SELECTIVE_DATA_WIPE}},
                  {5, {3, 4, 5, 6, 7, 128, 129, 130, 131}},
              }},
             {NSM_DEV_ID_GPU,
@@ -6602,6 +6605,41 @@ std::optional<std::vector<uint8_t>>
         lg2::error("encode_erase_trace_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::selectiveDataWipeHandler(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    uint16_t targetMask = 0;
+    auto rc = decode_selective_data_wipe_req(requestMsg, requestLen,
+                                             &targetMask);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("selectiveDataWipeHandler: decode request failed. rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("selectiveDataWipeHandler: logically invalidated mask={MASK}",
+                  "MASK", lg2::hex, targetMask);
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_selective_data_wipe_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_selective_data_wipe_resp(requestMsg->hdr.instance_id,
+                                         NSM_SUCCESS, ERR_NULL, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("selectiveDataWipeHandler: encode response failed. rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
     return response;
 }
 

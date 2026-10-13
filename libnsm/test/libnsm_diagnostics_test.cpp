@@ -494,6 +494,81 @@ TEST(resetNetworkDevice, testGoodDecodeResponse)
 	EXPECT_EQ(cc, NSM_SUCCESS);
 }
 
+/* ---- Selective Data Wipe (cmd 0x08) ---- */
+
+TEST(selectiveDataWipe, testGoodEncodeDecodeRequest)
+{
+	uint16_t requestedMask =
+	    NSM_SELECTIVE_DATA_WIPE_TARGET_BIT(NSM_WIPE_TARGET_SCRATCH_DATA) |
+	    NSM_SELECTIVE_DATA_WIPE_TARGET_BIT(NSM_WIPE_TARGET_USER_DATA);
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_selective_data_wipe_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_selective_data_wipe_req(3, requestedMask, request);
+	ASSERT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(3, request->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, request->hdr.nvidia_msg_type);
+
+	auto *payload =
+	    reinterpret_cast<nsm_selective_data_wipe_req *>(request->payload);
+	EXPECT_EQ(NSM_SELECTIVE_DATA_WIPE, payload->hdr.command);
+	EXPECT_EQ(4, payload->hdr.data_size);
+	EXPECT_EQ(requestedMask, le16toh(payload->wipe_target_mask));
+	EXPECT_EQ(0, payload->reserved);
+
+	uint16_t decodedMask = 0;
+	rc = decode_selective_data_wipe_req(request, requestMsg.size(),
+					    &decodedMask);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(requestedMask, decodedMask);
+}
+
+TEST(selectiveDataWipe, testGoodEncodeDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_selective_data_wipe_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc =
+	    encode_selective_data_wipe_resp(2, NSM_SUCCESS, ERR_NULL, response);
+	ASSERT_EQ(NSM_SW_SUCCESS, rc);
+
+	auto *payload =
+	    reinterpret_cast<nsm_selective_data_wipe_resp *>(response->payload);
+	EXPECT_EQ(NSM_SELECTIVE_DATA_WIPE, payload->command);
+	EXPECT_EQ(NSM_SUCCESS, payload->completion_code);
+	EXPECT_EQ(0, payload->data_size);
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	rc = decode_selective_data_wipe_resp(response, responseMsg.size(), &cc,
+					     &reasonCode);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+}
+
+TEST(selectiveDataWipe, testErrorResponse)
+{
+	constexpr uint16_t invalidDataReason = 0x1234;
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc = encode_selective_data_wipe_resp(0, NSM_ERR_INVALID_DATA,
+						  invalidDataReason, response);
+	ASSERT_EQ(NSM_SW_SUCCESS, rc);
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reasonCode = ERR_NULL;
+	rc = decode_selective_data_wipe_resp(response, responseMsg.size(), &cc,
+					     &reasonCode);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, cc);
+	EXPECT_EQ(invalidDataReason, reasonCode);
+}
+
 TEST(getNetworkDeviceDebugInfo, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(

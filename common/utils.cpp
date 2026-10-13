@@ -325,6 +325,32 @@ uint64_t getCurrentSteadyClockTimestampUs()
         .count();
 }
 
+namespace
+{
+// Default ReadingTime source: wall-clock ms since the Unix epoch.
+uint64_t defaultSystemClockMs()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+// Installed clock source (not a frozen value); sampled fresh per call.
+ReadingTimestampProvider readingTsProvider = defaultSystemClockMs;
+} // namespace
+
+uint64_t getReadingTimestamp()
+{
+    return readingTsProvider();
+}
+
+void setReadingTimestampProvider(ReadingTimestampProvider provider)
+{
+    readingTsProvider = provider
+                            ? std::move(provider)
+                            : ReadingTimestampProvider(defaultSystemClockMs);
+}
+
 eid_t getEidFromUUID(
     const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
         eidTable,

@@ -3722,6 +3722,164 @@ TEST_F(NsmPCIeRetimerPortsFactoryFixture,
     EXPECT_GT(cx9Device->deviceSensors.size(), before);
 }
 
+static uint8_t
+    listPciePortsRespond(NsmPCIePortDiscovery& discovery,
+                         const std::vector<uint8_t>& downstreamCounts)
+{
+    const size_t portsSize = downstreamCounts.size() *
+                             sizeof(nsm_pcie_upstream_port_info);
+    std::vector<uint8_t> infoBuf(sizeof(uint16_t) + portsSize, 0);
+    auto* info =
+        reinterpret_cast<nsm_list_available_pcie_ports_info*>(infoBuf.data());
+    info->ports_count = static_cast<uint16_t>(downstreamCounts.size());
+    for (size_t i = 0; i < downstreamCounts.size(); i++)
+    {
+        info->ports[i].downstream_ports_count = downstreamCounts[i];
+    }
+
+    std::vector<uint8_t> respBuf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                                     sizeof(uint16_t) + portsSize,
+                                 0);
+    auto* resp = reinterpret_cast<nsm_msg*>(respBuf.data());
+    EXPECT_EQ(encode_list_available_pcie_ports_resp(0, NSM_SUCCESS, ERR_NULL,
+                                                    info, resp),
+              NSM_SW_SUCCESS);
+    return discovery.handleResponseMsg(resp, respBuf.size());
+}
+
+static uint8_t wireUpstreamPortIndex(const PortSensorGroup& port)
+{
+    for (const auto& sensor : port.sensors)
+    {
+        auto group = std::dynamic_pointer_cast<NsmPcieGroup>(sensor);
+        if (!group)
+        {
+            continue;
+        }
+        auto request = group->genRequestMsg(0, 0);
+        EXPECT_TRUE(request.has_value());
+        auto* req = reinterpret_cast<
+            nsm_multiport_query_scalar_group_telemetry_v2_req*>(
+            reinterpret_cast<nsm_msg*>(request->data())->payload);
+        return req->data.upstream_port_index;
+    }
+    ADD_FAILURE() << "no telemetry sensor on " << port.portObjPath;
+    return UINT8_MAX;
+}
+
+static std::shared_ptr<NsmPCIePortDiscovery>
+    findPortDiscovery(const std::shared_ptr<MockNsmDevice>& device)
+{
+    for (auto& sensor : device->deviceSensors)
+    {
+        auto discovery =
+            std::dynamic_pointer_cast<NsmPCIePortDiscovery>(sensor);
+        if (discovery)
+        {
+            return discovery;
+        }
+    }
+    return nullptr;
+}
+
+// UpstreamPortIndex places only that device port, named from 0 on D-Bus, while
+// telemetry still addresses the device's own port number.
+TEST_F(NsmPCIeRetimerPortsFactoryFixture,
+       MultiFactory_UpstreamPortIndex_PlacesThatPortFromZero)
+{
+    const std::string testPath = "/xyz/test/multiport/selective";
+    const std::string inv = "/xyz/openbmc_project/inventory/multiport/";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
+    pm = {{"Name", std::string("PCIePorts")},
+          {"InventoryObjPath", inv},
+          {"UUID", retimerUuid},
+          {"UpstreamPortName", std::string("UP")},
+          {"DownstreamPortName", std::string("DOWN")},
+          {"UpstreamPortIndex", uint64_t(1)}};
+
+    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
+
+    auto discovery = findPortDiscovery(retimer);
+    ASSERT_NE(discovery, nullptr);
+
+    EXPECT_EQ(listPciePortsRespond(*discovery, {2, 3}), NSM_SUCCESS);
+    ASSERT_EQ(discovery->upstreamPortGroups.size(), 1u);
+    const auto& group = discovery->upstreamPortGroups[0];
+    EXPECT_EQ(group.upstream.portObjPath, inv + "UP_0");
+    ASSERT_EQ(group.downstreamPorts.size(), 3u);
+    EXPECT_EQ(group.downstreamPorts[0].portObjPath, inv + "DOWN_0");
+    EXPECT_EQ(wireUpstreamPortIndex(group.upstream), 1);
+    EXPECT_EQ(wireUpstreamPortIndex(group.downstreamPorts[0]), 1);
+}
+
+// Without UpstreamPortIndex, every reported port is placed, upstream ports
+// named by device port number and one downstream counter running across all of
+// them.
+TEST_F(NsmPCIeRetimerPortsFactoryFixture,
+       MultiFactory_NoUpstreamPortIndex_PlacesEveryPortWithFlatNumbering)
+{
+    const std::string testPath = "/xyz/test/multiport/all";
+    const std::string inv = "/xyz/openbmc_project/inventory/multiport_all/";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
+    pm = {{"Name", std::string("AllPCIePorts")},
+          {"InventoryObjPath", inv},
+          {"UUID", retimerUuid},
+          {"UpstreamPortName", std::string("UP")},
+          {"DownstreamPortName", std::string("DOWN")}};
+
+    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
+
+    auto discovery = findPortDiscovery(retimer);
+    ASSERT_NE(discovery, nullptr);
+    EXPECT_FALSE(discovery->upstreamPortIndex.has_value());
+
+    EXPECT_EQ(listPciePortsRespond(*discovery, {2, 2}), NSM_SUCCESS);
+    ASSERT_EQ(discovery->upstreamPortGroups.size(), 2u);
+
+    const auto& first = discovery->upstreamPortGroups[0];
+    EXPECT_EQ(first.upstream.portObjPath, inv + "UP_0");
+    ASSERT_EQ(first.downstreamPorts.size(), 2u);
+    EXPECT_EQ(first.downstreamPorts[0].portObjPath, inv + "DOWN_0");
+    EXPECT_EQ(first.downstreamPorts[1].portObjPath, inv + "DOWN_1");
+    EXPECT_EQ(wireUpstreamPortIndex(first.upstream), 0);
+
+    const auto& second = discovery->upstreamPortGroups[1];
+    EXPECT_EQ(second.upstream.portObjPath, inv + "UP_1");
+    ASSERT_EQ(second.downstreamPorts.size(), 2u);
+    EXPECT_EQ(second.downstreamPorts[0].portObjPath, inv + "DOWN_2");
+    EXPECT_EQ(second.downstreamPorts[1].portObjPath, inv + "DOWN_3");
+    EXPECT_EQ(wireUpstreamPortIndex(second.upstream), 1);
+    EXPECT_EQ(wireUpstreamPortIndex(second.downstreamPorts[0]), 1);
+}
+
+// An UpstreamPortIndex the device does not report is placed nowhere, rather
+// than falling back to a port it does report.
+TEST_F(NsmPCIeRetimerPortsFactoryFixture,
+       MultiFactory_UpstreamPortIndexBeyondTopology_PlacesNothing)
+{
+    const std::string testPath = "/xyz/test/multiport/beyond";
+    const std::string inv = "/xyz/openbmc_project/inventory/multiport_beyond/";
+    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
+    pm = {{"Name", std::string("BeyondPCIePorts")},
+          {"InventoryObjPath", inv},
+          {"UUID", retimerUuid},
+          {"UpstreamPortName", std::string("UP")},
+          {"DownstreamPortName", std::string("DOWN")},
+          {"UpstreamPortIndex", uint64_t(2)}};
+
+    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
+
+    auto discovery = findPortDiscovery(retimer);
+    ASSERT_NE(discovery, nullptr);
+    const size_t before = retimer->deviceSensors.size();
+
+    // The device reports upstream ports 0 and 1 only.
+    EXPECT_EQ(listPciePortsRespond(*discovery, {2, 2}), NSM_SUCCESS);
+
+    EXPECT_TRUE(discovery->upstreamPortGroups.empty());
+    EXPECT_EQ(retimer->deviceSensors.size(), before);
+}
+
 // NsmPCIeLaneManager::genRequestMsg always returns nullopt (lines 377-380)
 TEST(NsmPCIeLaneManager, GenRequestMsg_AlwaysReturnsNullopt)
 {
