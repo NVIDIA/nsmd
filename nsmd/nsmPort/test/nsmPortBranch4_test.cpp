@@ -102,6 +102,24 @@ struct NsmPortBranch4Test :
         cleanupDeviceSensors(devices);
     }
 
+    /** @brief Drive the event loop until the task finishes.
+     *
+     * The port factories yield between ports, so the loop has to run for
+     * construction to complete. Every call site must hold the returned
+     * task and run this: discarding the temporary destroys a suspended
+     * coroutine frame while its timer is still armed on the loop.
+     * Bounded so a task that never finishes fails here instead of hanging.
+     */
+    void runUntilDone(const requester::Coroutine& task) const
+    {
+        auto loop = sdeventplus::Event::get_default();
+        for (int i = 0; i < 1000 && !task.done(); ++i)
+        {
+            sd_event_run(loop.get(), 0);
+        }
+        ASSERT_TRUE(task.done());
+    }
+
     void setupPortProperties(const std::string& path, const std::string& intf,
                              const uuid_t& uuid, uint64_t devType,
                              uint64_t count = 1, dbus::PropertyMap extra = {})
@@ -184,7 +202,8 @@ TEST_F(NsmPortBranch4Test, Factory_BadUUID_NoDevice)
     pm["Count"] = uint64_t(1);
     pm["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
     // No crash, returns NSM_ERROR
 }
 
@@ -197,7 +216,8 @@ TEST_F(NsmPortBranch4Test, Factory_GPU_Count1)
     setupPortProperties(path, portIntf, gpuUuid, uint64_t(NSM_DEV_ID_GPU), 1);
 
     const size_t before = gpu->roundRobinSensors.size();
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
     EXPECT_GT(gpu->roundRobinSensors.size(), before);
 }
 
@@ -210,7 +230,8 @@ TEST_F(NsmPortBranch4Test, Factory_GPU_WithNetworkPortAddresses)
     setupPortProperties(path, portIntf, gpuUuid, uint64_t(NSM_DEV_ID_GPU), 1);
 
     const size_t before = gpu->roundRobinSensors.size();
-    createNsmPortSensor(mockManager, portIntf, path, true);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, true);
+    runUntilDone(task);
     EXPECT_GT(gpu->roundRobinSensors.size(), before);
 }
 
@@ -224,7 +245,8 @@ TEST_F(NsmPortBranch4Test, Factory_CX8Bridge_Count1)
                         uint64_t(NSM_DEV_ID_PCIE_BRIDGE), 1);
 
     const size_t before = cx8Dev->roundRobinSensors.size();
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
     EXPECT_GT(cx8Dev->roundRobinSensors.size(), before);
 }
 
@@ -238,7 +260,8 @@ TEST_F(NsmPortBranch4Test, Factory_CX9Bridge_Count1)
                         uint64_t(NSM_DEV_ID_PCIE_BRIDGE), 1);
 
     const size_t before = cx9Dev->roundRobinSensors.size();
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
     EXPECT_GT(cx9Dev->roundRobinSensors.size(), before);
 }
 
@@ -251,7 +274,8 @@ TEST_F(NsmPortBranch4Test, Factory_Count0_NoPorts)
     setupPortProperties(path, portIntf, gpuUuid, uint64_t(NSM_DEV_ID_GPU), 0);
 
     const size_t before = gpu->roundRobinSensors.size();
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
     EXPECT_EQ(gpu->roundRobinSensors.size(), before);
 }
 
@@ -264,7 +288,8 @@ TEST_F(NsmPortBranch4Test, Factory_Count2)
     setupPortProperties(path, portIntf, gpuUuid, uint64_t(NSM_DEV_ID_GPU), 2);
 
     const size_t before = gpu->roundRobinSensors.size();
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
     EXPECT_GT(gpu->roundRobinSensors.size(), before);
 }
 
@@ -283,7 +308,8 @@ TEST_F(NsmPortBranch4Test, Factory_MissingName)
     pm["Count"] = uint64_t(1);
     pm["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -300,7 +326,8 @@ TEST_F(NsmPortBranch4Test, Factory_MissingParentObjPath)
     pm["Count"] = uint64_t(1);
     pm["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -318,7 +345,8 @@ TEST_F(NsmPortBranch4Test, Factory_MissingPriority)
     pm["Count"] = uint64_t(1);
     pm["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -336,7 +364,8 @@ TEST_F(NsmPortBranch4Test, Factory_MissingCount)
     // No "Count"
     pm["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -354,7 +383,8 @@ TEST_F(NsmPortBranch4Test, Factory_MissingDeviceType)
     pm["Count"] = uint64_t(1);
     // No "DeviceType"
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -367,7 +397,9 @@ TEST_F(NsmPortBranch4Test, WrapperNetworkPortAddresses)
     const std::string path = "/test/portb4/wrap_net";
     setupPortProperties(path, netIntf, gpuUuid, uint64_t(NSM_DEV_ID_GPU), 1);
 
-    createNsmPortSensorWithNetworkPortAddresses(mockManager, netIntf, path);
+    auto task = createNsmPortSensorWithNetworkPortAddresses(mockManager,
+                                                            netIntf, path);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -378,7 +410,8 @@ TEST_F(NsmPortBranch4Test, WrapperGeneric)
     const std::string path = "/test/portb4/wrap_gen";
     setupPortProperties(path, portIntf, gpuUuid, uint64_t(NSM_DEV_ID_GPU), 1);
 
-    createNsmPortSensorGeneric(mockManager, portIntf, path);
+    auto task = createNsmPortSensorGeneric(mockManager, portIntf, path);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -415,7 +448,8 @@ TEST_F(NsmPortBranch4Test, Factory_SWITCH_DeviceType)
     setupPortProperties(path, portIntf, gpuUuid, uint64_t(NSM_DEV_ID_SWITCH),
                         1);
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -426,7 +460,8 @@ TEST_F(NsmPortBranch4Test, Factory_EROT_DeviceType)
     const std::string path = "/test/portb4/erot";
     setupPortProperties(path, portIntf, gpuUuid, uint64_t(NSM_DEV_ID_EROT), 1);
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -437,7 +472,8 @@ TEST_F(NsmPortBranch4Test, Factory_CPU_DeviceType)
     const std::string path = "/test/portb4/cpu";
     setupPortProperties(path, portIntf, gpuUuid, uint64_t(NSM_DEV_ID_CPU), 1);
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
 }
 
 // ===========================================================================
@@ -448,5 +484,6 @@ TEST_F(NsmPortBranch4Test, Factory_UnknownDeviceType)
     const std::string path = "/test/portb4/unknown";
     setupPortProperties(path, portIntf, gpuUuid, uint64_t(0xFF), 1);
 
-    createNsmPortSensor(mockManager, portIntf, path, false);
+    auto task = createNsmPortSensor(mockManager, portIntf, path, false);
+    runUntilDone(task);
 }
