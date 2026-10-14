@@ -95,6 +95,18 @@ class NsmNumericSensorValue
         (void)evaluator;
         return false;
     }
+
+    /**
+     * @brief Deassert the threshold alarms of this sensor value object.
+     *
+     * No-op for observers without a threshold evaluator.
+     *
+     * @return true if at least one alarm was cleared.
+     */
+    virtual bool clearThresholdAlarms()
+    {
+        return false;
+    }
 };
 
 class NsmNumericSensorDbusValue : public NsmNumericSensorValue
@@ -124,6 +136,12 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
      */
     bool setThresholdEvaluator(
         std::unique_ptr<NsmThresholdEvaluator>& evaluator) override;
+
+    /**
+     * @brief Deassert the alarms of the attached threshold evaluator. The
+     * Deasserted signals carry the current reading.
+     */
+    bool clearThresholdAlarms() override;
 
   private:
     uint64_t nextUpdateTimestamp = 0;
@@ -182,6 +200,10 @@ class NsmNumericSensorValueAggregate : public NsmNumericSensorValue
     void append(std::unique_ptr<NsmNumericSensorValue> elem);
 
     void updateReading(double value, uint64_t timestamp = 0) override;
+
+    /** @brief Clear the threshold alarms of every object in the aggregate. */
+    bool clearThresholdAlarms() override;
+
     const std::vector<std::unique_ptr<NsmNumericSensorValue>>&
         getObjects() const
     {
@@ -212,6 +234,11 @@ class NsmNumericSensor : public NsmSensor
             sensorValue->updateReading(
                 std::numeric_limits<double>::quiet_NaN());
         }
+    }
+
+    bool clearThresholdAlarms() override
+    {
+        return sensorValue && sensorValue->clearThresholdAlarms();
     }
 
     virtual std::string getSensorType() = 0;

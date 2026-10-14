@@ -286,6 +286,15 @@ requester::Coroutine NsmDevice::updateSensorsForOffline()
         {
             auto sensor = sensors[sensorIndex];
             sensor->handleOfflineState();
+            // A stale alarm must not outlive the device: with the device
+            // powered off, sensor-monitor would otherwise act on it again at
+            // the next power on, before the device can report a new value.
+            if (sensor->clearThresholdAlarms())
+            {
+                lg2::info(
+                    "NSM device EID {EID} went offline, cleared threshold alarms of sensor {NAME}.",
+                    "EID", eid, "NAME", sensor->getName());
+            }
             ++sensorIndex;
             ++count;
         }

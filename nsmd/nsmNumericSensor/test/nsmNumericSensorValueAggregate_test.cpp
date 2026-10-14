@@ -35,6 +35,7 @@
 #include "nsmNumericSensorValue_mock.hpp"
 #include "nsmPower.hpp"
 #include "nsmTemp.hpp"
+#include "nsmThresholdEvaluator.hpp"
 #include "test/mockSensorManager.hpp"
 
 struct NsmNumericSensorValueAggregateDevicesStorage
@@ -494,4 +495,57 @@ TEST_F(NsmNumericSensorValueAggregateTest, MultipleUpdatesWithDelays)
     aggregate->updateReading(readings[2], timestamp3);
     nextUpdateTimestamps.push_back(dbusValue->nextUpdateTimestamp);
     EXPECT_GT(nextUpdateTimestamps[1], nextUpdateTimestamps[0]);
+}
+
+// Device offline: NsmNumericSensor::clearThresholdAlarms() reaches the
+// threshold evaluator of the D-Bus value through the aggregate. A NaN
+// reading alone (read error) keeps the alarm.
+TEST_F(NsmNumericSensorValueAggregateTest, ClearThresholdAlarmsOnOffline)
+{
+    nsm::NsmTemp tempSensor{bus,
+                            sensorName,
+                            sensorType,
+                            1,
+                            associations,
+                            associations[0].absolutePath,
+                            physicalContext,
+                            nullptr,
+                            maxAllowableValue,
+                            maxValue,
+                            minValue,
+                            &readingBasis,
+                            &description};
+    auto aggregate = tempSensor.getSensorValueObject();
+    ASSERT_NE(aggregate, nullptr);
+    // An observer without threshold support is skipped
+    aggregate->append(
+        std::make_unique<testing::NiceMock<MockNsmNumericSensorValue>>());
+
+    auto hardShutdownIntf =
+        std::make_shared<nsm::NsmThresholdEvaluator::HardShutdownIntf>(
+            bus, "/xyz/openbmc_project/sensors/temperature/offline_alarm");
+    hardShutdownIntf->hardShutdownHigh(100.0);
+    hardShutdownIntf->hardShutdownLow(std::numeric_limits<double>::quiet_NaN());
+    auto evaluator = std::make_unique<nsm::NsmThresholdEvaluator>(
+        nullptr, nullptr, hardShutdownIntf);
+    bool attached = false;
+    for (const auto& obj : aggregate->objects)
+    {
+        if (obj->setThresholdEvaluator(evaluator))
+        {
+            attached = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(attached);
+
+    aggregate->updateReading(110.0, 1000);
+    ASSERT_TRUE(hardShutdownIntf->hardShutdownAlarmHigh());
+
+    tempSensor.handleOfflineState();
+    EXPECT_TRUE(hardShutdownIntf->hardShutdownAlarmHigh());
+
+    EXPECT_TRUE(tempSensor.clearThresholdAlarms());
+    EXPECT_FALSE(hardShutdownIntf->hardShutdownAlarmHigh());
+    EXPECT_FALSE(tempSensor.clearThresholdAlarms());
 }

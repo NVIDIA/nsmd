@@ -114,7 +114,8 @@ void NsmNumericSensorDbusValue::updateReading(double value, uint64_t timestamp)
         // always passes canUpdate regardless of which timebase it uses.
         // Alarm state is intentionally frozen at its last value: alarm
         // de-assertion during transient device outages would generate
-        // spurious events.
+        // spurious events. Alarms are cleared only when the device goes
+        // offline (NsmDevice::updateSensorsForOffline()).
         nextUpdateTimestamp = 0;
         return;
     }
@@ -135,6 +136,12 @@ bool NsmNumericSensorDbusValue::setThresholdEvaluator(
 {
     thresholdEvaluator = std::move(evaluator);
     return true;
+}
+
+bool NsmNumericSensorDbusValue::clearThresholdAlarms()
+{
+    return thresholdEvaluator &&
+           thresholdEvaluator->clearAlarms(valueIntf.value());
 }
 bool NsmNumericSensorDbusValue::canUpdate(const uint64_t& timestamp) const
 {
@@ -204,6 +211,16 @@ void NsmNumericSensorValueAggregate::append(
     std::unique_ptr<NsmNumericSensorValue> elem)
 {
     objects.push_back(std::move(elem));
+}
+
+bool NsmNumericSensorValueAggregate::clearThresholdAlarms()
+{
+    bool cleared = false;
+    for (const auto& elem : objects)
+    {
+        cleared |= elem->clearThresholdAlarms();
+    }
+    return cleared;
 }
 
 void NsmNumericSensorValueAggregate::updateReading(double value,

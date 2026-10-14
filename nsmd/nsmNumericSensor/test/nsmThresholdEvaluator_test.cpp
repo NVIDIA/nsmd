@@ -983,3 +983,104 @@ TEST_F(NsmThresholdEvaluatorTest,
     EXPECT_TRUE(capture.received);
     EXPECT_DOUBLE_EQ(capture.value, 85.0);
 }
+
+// ===========================================================================
+// clearAlarms() — device offline
+// ===========================================================================
+
+// Every asserted alarm of every tier and direction is deasserted, on both
+// the evaluator state and the D-Bus property.
+TEST_F(NsmThresholdEvaluatorTest, ClearAlarms_DeassertsAllTiers)
+{
+    warnIntf->warningHigh(80.0);
+    critIntf->criticalHigh(90.0);
+    hardShutdownIntf->hardShutdownHigh(100.0);
+    softShutdownIntf->softShutdownHigh(95.0);
+    perfLossIntf->performanceLossHigh(85.0);
+    warnIntf->warningLow(20.0);
+    critIntf->criticalLow(10.0);
+    hardShutdownIntf->hardShutdownLow(0.0);
+    softShutdownIntf->softShutdownLow(5.0);
+    perfLossIntf->performanceLossLow(15.0);
+    NsmThresholdEvaluator evaluator(warnIntf, critIntf, hardShutdownIntf,
+                                    softShutdownIntf, perfLossIntf);
+
+    evaluator.evaluate(120.0); // every high alarm asserts
+    ASSERT_TRUE(hardShutdownIntf->hardShutdownAlarmHigh());
+    EXPECT_TRUE(evaluator.clearAlarms(std::nan("")));
+    EXPECT_FALSE(evaluator.warningAlarmHigh);
+    EXPECT_FALSE(evaluator.criticalAlarmHigh);
+    EXPECT_FALSE(evaluator.hardShutdownAlarmHigh);
+    EXPECT_FALSE(evaluator.softShutdownAlarmHigh);
+    EXPECT_FALSE(evaluator.performanceLossAlarmHigh);
+    EXPECT_FALSE(warnIntf->warningAlarmHigh());
+    EXPECT_FALSE(critIntf->criticalAlarmHigh());
+    EXPECT_FALSE(hardShutdownIntf->hardShutdownAlarmHigh());
+    EXPECT_FALSE(softShutdownIntf->softShutdownAlarmHigh());
+    EXPECT_FALSE(perfLossIntf->performanceLossAlarmHigh());
+
+    evaluator.evaluate(-10.0); // every low alarm asserts
+    ASSERT_TRUE(hardShutdownIntf->hardShutdownAlarmLow());
+    EXPECT_TRUE(evaluator.clearAlarms(std::nan("")));
+    EXPECT_FALSE(evaluator.warningAlarmLow);
+    EXPECT_FALSE(evaluator.criticalAlarmLow);
+    EXPECT_FALSE(evaluator.hardShutdownAlarmLow);
+    EXPECT_FALSE(evaluator.softShutdownAlarmLow);
+    EXPECT_FALSE(evaluator.performanceLossAlarmLow);
+    EXPECT_FALSE(warnIntf->warningAlarmLow());
+    EXPECT_FALSE(critIntf->criticalAlarmLow());
+    EXPECT_FALSE(hardShutdownIntf->hardShutdownAlarmLow());
+    EXPECT_FALSE(softShutdownIntf->softShutdownAlarmLow());
+    EXPECT_FALSE(perfLossIntf->performanceLossAlarmLow());
+}
+
+// Nothing asserted: nothing to clear.
+TEST_F(NsmThresholdEvaluatorTest, ClearAlarms_ReturnsFalseWhenNoneAsserted)
+{
+    warnIntf->warningHigh(80.0);
+    NsmThresholdEvaluator evaluator(warnIntf, critIntf, hardShutdownIntf,
+                                    softShutdownIntf, perfLossIntf);
+
+    evaluator.evaluate(50.0);
+    EXPECT_FALSE(evaluator.clearAlarms(std::nan("")));
+}
+
+// Tiers without an interface are skipped.
+TEST_F(NsmThresholdEvaluatorTest, ClearAlarms_SkipsUnconfiguredTiers)
+{
+    NsmThresholdEvaluator evaluator(nullptr, nullptr);
+
+    EXPECT_FALSE(evaluator.clearAlarms(std::nan("")));
+}
+
+// The Deasserted signal carries the value passed in (NaN when offline).
+TEST_F(NsmThresholdEvaluatorTest, ClearAlarms_EmitsDeassertedSignal)
+{
+    hardShutdownIntf->hardShutdownHigh(100.0);
+    NsmThresholdEvaluator evaluator(nullptr, nullptr, hardShutdownIntf);
+    evaluator.evaluate(110.0);
+    ASSERT_TRUE(hardShutdownIntf->hardShutdownAlarmHigh());
+
+    auto capture =
+        expectSignal("/xyz/openbmc_project/sensors/threshold/test_hardshutdown",
+                     NsmThresholdEvaluator::HardShutdownIntf::interface,
+                     "HardShutdownHighAlarmDeasserted",
+                     [&]() { evaluator.clearAlarms(std::nan("")); });
+
+    EXPECT_TRUE(capture.received);
+    EXPECT_TRUE(std::isnan(capture.value));
+}
+
+// A device that is still hot when it comes back asserts the alarm again.
+TEST_F(NsmThresholdEvaluatorTest, ClearAlarms_ReassertsOnNextValidReading)
+{
+    hardShutdownIntf->hardShutdownHigh(100.0);
+    NsmThresholdEvaluator evaluator(nullptr, nullptr, hardShutdownIntf);
+    evaluator.evaluate(110.0);
+    ASSERT_TRUE(evaluator.clearAlarms(std::nan("")));
+    ASSERT_FALSE(hardShutdownIntf->hardShutdownAlarmHigh());
+
+    evaluator.evaluate(110.0);
+    EXPECT_TRUE(evaluator.hardShutdownAlarmHigh);
+    EXPECT_TRUE(hardShutdownIntf->hardShutdownAlarmHigh());
+}
