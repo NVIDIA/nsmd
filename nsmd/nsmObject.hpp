@@ -85,6 +85,15 @@ class NsmObject : virtual public StateChangeLogger
         return;
     }
 
+    /** @brief Deassert the threshold alarms of this object, if it has any.
+     *  Called when the device goes offline, after handleOfflineState().
+     *  @return true if at least one alarm was cleared.
+     */
+    virtual bool clearThresholdAlarms()
+    {
+        return false;
+    }
+
     virtual void updateMetricOnSharedMemory() {}
 
     /** @brief Hook invoked when device transitions from offline to online. */

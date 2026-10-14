@@ -90,6 +90,19 @@ class NsmThresholdEvaluator
      */
     void evaluate(double value);
 
+    /**
+     * @brief Deassert every asserted alarm of all configured tiers.
+     *
+     * Called when the device goes offline (e.g. its power is off), so a
+     * stale alarm cannot outlive the device that raised it. The next valid
+     * reading passed to evaluate() asserts the alarms again if needed.
+     *
+     * @param value  Current sensor reading, sent with the Deasserted
+     *               signals (NaN once the device is offline).
+     * @return true if at least one alarm was asserted and is now cleared.
+     */
+    bool clearAlarms(double value);
+
   private:
     std::shared_ptr<WarnIntf> warnIntf;
     std::shared_ptr<CritIntf> critIntf;

@@ -72,6 +72,24 @@ void evaluateTransition(const char* tierLabel, const char* dirLabel,
     cachedAlarm = newAlarm;
 }
 
+// Deasserts a single tier/direction alarm if it is asserted: clears the
+// cached alarm and the D-Bus property, and fires the Deasserted signal with
+// `value`. Returns true if the alarm was asserted.
+template <typename SetAlarmFn, typename OnDeassertedFn>
+bool clearAlarm(bool& cachedAlarm, double value, SetAlarmFn&& setAlarm,
+                OnDeassertedFn&& onDeasserted)
+{
+    if (!cachedAlarm)
+    {
+        return false;
+    }
+
+    setAlarm(false);
+    onDeasserted(value);
+    cachedAlarm = false;
+    return true;
+}
+
 } // namespace
 
 NsmThresholdEvaluator::NsmThresholdEvaluator(
@@ -193,6 +211,75 @@ void NsmThresholdEvaluator::evaluate(double value)
             perfLossIntf->performanceLossLowAlarmDeasserted(v);
         });
     }
+}
+
+bool NsmThresholdEvaluator::clearAlarms(double value)
+{
+    bool cleared = false;
+
+    if (warnIntf)
+    {
+        cleared |= clearAlarm(warningAlarmHigh, value, [this](bool a) {
+            warnIntf->warningAlarmHigh(a);
+        }, [this](double v) { warnIntf->warningHighAlarmDeasserted(v); });
+        cleared |= clearAlarm(warningAlarmLow, value, [this](bool a) {
+            warnIntf->warningAlarmLow(a);
+        }, [this](double v) { warnIntf->warningLowAlarmDeasserted(v); });
+    }
+
+    if (critIntf)
+    {
+        cleared |= clearAlarm(criticalAlarmHigh, value, [this](bool a) {
+            critIntf->criticalAlarmHigh(a);
+        }, [this](double v) { critIntf->criticalHighAlarmDeasserted(v); });
+        cleared |= clearAlarm(criticalAlarmLow, value, [this](bool a) {
+            critIntf->criticalAlarmLow(a);
+        }, [this](double v) { critIntf->criticalLowAlarmDeasserted(v); });
+    }
+
+    if (hardShutdownIntf)
+    {
+        cleared |= clearAlarm(hardShutdownAlarmHigh, value, [this](bool a) {
+            hardShutdownIntf->hardShutdownAlarmHigh(a);
+        }, [this](double v) {
+            hardShutdownIntf->hardShutdownHighAlarmDeasserted(v);
+        });
+        cleared |= clearAlarm(hardShutdownAlarmLow, value, [this](bool a) {
+            hardShutdownIntf->hardShutdownAlarmLow(a);
+        }, [this](double v) {
+            hardShutdownIntf->hardShutdownLowAlarmDeasserted(v);
+        });
+    }
+
+    if (softShutdownIntf)
+    {
+        cleared |= clearAlarm(softShutdownAlarmHigh, value, [this](bool a) {
+            softShutdownIntf->softShutdownAlarmHigh(a);
+        }, [this](double v) {
+            softShutdownIntf->softShutdownHighAlarmDeasserted(v);
+        });
+        cleared |= clearAlarm(softShutdownAlarmLow, value, [this](bool a) {
+            softShutdownIntf->softShutdownAlarmLow(a);
+        }, [this](double v) {
+            softShutdownIntf->softShutdownLowAlarmDeasserted(v);
+        });
+    }
+
+    if (perfLossIntf)
+    {
+        cleared |= clearAlarm(performanceLossAlarmHigh, value, [this](bool a) {
+            perfLossIntf->performanceLossAlarmHigh(a);
+        }, [this](double v) {
+            perfLossIntf->performanceLossHighAlarmDeasserted(v);
+        });
+        cleared |= clearAlarm(performanceLossAlarmLow, value, [this](bool a) {
+            perfLossIntf->performanceLossAlarmLow(a);
+        }, [this](double v) {
+            perfLossIntf->performanceLossLowAlarmDeasserted(v);
+        });
+    }
+
+    return cleared;
 }
 
 } // namespace nsm

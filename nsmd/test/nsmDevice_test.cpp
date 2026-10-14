@@ -2636,6 +2636,56 @@ TEST(nsmDevice, UpdateSensorsForOffline_MultipleBatches_FirstBatchHandled)
     EXPECT_NO_THROW_COROUTINE(device.updateSensorsForOffline());
 }
 
+// Records the offline hooks that updateSensorsForOffline() calls.
+class OfflineAlarmSensor : public MockSensor
+{
+  public:
+    OfflineAlarmSensor(const std::string& name, bool hasAlarms) :
+        MockSensor(name, "T"), hasAlarms(hasAlarms)
+    {}
+
+    void handleOfflineState() override
+    {
+        offlineHandled = true;
+    }
+
+    bool clearThresholdAlarms() override
+    {
+        clearedAfterOffline = offlineHandled;
+        ++clearCalls;
+        const bool cleared = hasAlarms;
+        hasAlarms = false;
+        return cleared;
+    }
+
+    bool hasAlarms;
+    bool offlineHandled = false;
+    bool clearedAfterOffline = false;
+    int clearCalls = 0;
+};
+
+TEST(nsmDevice, UpdateSensorsForOffline_ClearsThresholdAlarms)
+{
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
+    MockNsmDevice device(1, 1, "MCTP_UUID", uuid, 1);
+    device.deviceSensors.clear();
+
+    auto withAlarms = std::make_shared<OfflineAlarmSensor>("hot", true);
+    auto withoutAlarms = std::make_shared<OfflineAlarmSensor>("cool", false);
+    device.deviceSensors.push_back(withAlarms);
+    device.deviceSensors.push_back(withoutAlarms);
+
+    EXPECT_NO_THROW_COROUTINE(device.updateSensorsForOffline());
+
+    for (const auto& sensor : {withAlarms, withoutAlarms})
+    {
+        EXPECT_TRUE(sensor->offlineHandled);
+        EXPECT_TRUE(sensor->clearedAfterOffline);
+        EXPECT_EQ(sensor->clearCalls, 1);
+    }
+    EXPECT_FALSE(withAlarms->hasAlarms);
+}
+
 // --------------------------------------------------------------------------
 // waitForNsmDeviceUpdate()
 // --------------------------------------------------------------------------
