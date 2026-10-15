@@ -2621,7 +2621,7 @@ class SetLTXMode : public CommandInterface
         ordered_json result;
         result["Completion Code"] = cc;
         result["Note"] =
-            "Non-volatile; new mode applies after the next link toggle.";
+            "Non-volatile; new mode applies after the next device reset.";
         nsmtool::helper::DisplayInJson(result);
     }
 
@@ -2804,7 +2804,7 @@ class SetUPhyMode : public CommandInterface
         ordered_json result;
         result["Completion Code"] = cc;
         result["Note"] =
-            "Non-volatile; new mode applies after the next link toggle.";
+            "Non-volatile; new mode applies after the next device reset.";
         nsmtool::helper::DisplayInJson(result);
     }
 

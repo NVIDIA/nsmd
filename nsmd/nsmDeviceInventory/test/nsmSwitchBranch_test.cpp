@@ -1108,6 +1108,69 @@ TEST_F(NsmSwitchBranchTest,
     EXPECT_EQ(decodedData[0], NSM_UPHY_MODE_DISABLED);
 }
 
+TEST_F(NsmSwitchBranchTest, UPhyMode_WireValues_MatchNsmType5Spec)
+{
+    // NSM Type 5 Device Mode Index 28: 0 - Default, 1 - Enabled, 2 - Disabled.
+    EXPECT_EQ(static_cast<int>(NSM_UPHY_MODE_DEFAULT), 0);
+    EXPECT_EQ(static_cast<int>(NSM_UPHY_MODE_ENABLED), 1);
+    EXPECT_EQ(static_cast<int>(NSM_UPHY_MODE_DISABLED), 2);
+}
+
+TEST_F(NsmSwitchBranchTest, UPhyMode_HandleResponseMsg_WireValueTwo_IsDisabled)
+{
+    auto uphyModeIntf = std::make_shared<UPhyModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/branchtest/uphy_wire_two");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/branchtest/uphy_wire_two");
+    NsmSwitchUPhyMode sensor("UPhy_wire_two", "NSM_NVSwitch", uphyModeIntf,
+                             assocIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            UPHY_MODE_DATA_SIZE * 2,
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint8_t currentMode = 2;
+    uint8_t pendingMode = 2;
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, &currentMode, UPHY_MODE_DATA_SIZE,
+        &pendingMode, UPHY_MODE_DATA_SIZE, response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(uphyModeIntf->currentMode(), UPhyModeEnum::Disabled);
+    EXPECT_EQ(uphyModeIntf->pendingMode(), UPhyModeEnum::Disabled);
+}
+
+TEST_F(NsmSwitchBranchTest,
+       UPhyMode_HandleResponseMsg_WireValueThree_ReturnsDataError)
+{
+    auto uphyModeIntf = std::make_shared<UPhyModeIntf>(
+        testBus, "/xyz/openbmc_project/inventory/branchtest/uphy_wire_three");
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/branchtest/uphy_wire_three");
+    NsmSwitchUPhyMode sensor("UPhy_wire_three", "NSM_NVSwitch", uphyModeIntf,
+                             assocIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            UPHY_MODE_DATA_SIZE,
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    // Value 3 was the pre-spec-change Disabled encoding and is now reserved.
+    uint8_t currentMode = 3;
+    auto rc = encode_get_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL, &currentMode, UPHY_MODE_DATA_SIZE, nullptr, 0,
+        response);
+    ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
 TEST_F(NsmSwitchBranchTest,
        UPhyMode_SetUPhyMode_DefaultTarget_ResolvesToDisabled)
 {
@@ -1172,7 +1235,7 @@ TEST_F(NsmSwitchBranchTest,
        DISABLED_LTXUPhyMode_SetModeRoundTrip_RequiresLiveMctpHardware)
 {
     // GAP: real hardware applies the mode change asynchronously after "the
-    // next link toggle" (see SetLTXMode::parseResponseMsg note in
+    // next device reset" (see SetLTXMode::parseResponseMsg note in
     // nsm_config_cmd.cpp); verifying that timing/state transition requires a
     // live MCTP-connected NVSwitch and is not reproducible with the
     // in-memory postPatchIO mock used by the rest of this file.

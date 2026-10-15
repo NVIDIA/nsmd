@@ -655,7 +655,7 @@ enum nsm_tav_mode {
 
 /** @brief LTX (Link Training Extended) Mode values per NSM Type 5 Device Mode
  *         Index 29 (DEVICE_MODE_LTX). Single enum8 data byte. Non-volatile;
- *         requires a link toggle to take effect.
+ *         requires a device reset to take effect.
  */
 enum nsm_ltx_mode {
 	NSM_LTX_MODE_DEFAULT = 0,
@@ -668,13 +668,13 @@ enum nsm_ltx_mode {
 
 /** @brief UPhy (Unit Physical Layer) Mode values per NSM Type 5 Device Mode
  *         Index 28 (DEVICE_MODE_UPHY). Single enum8 data byte. Non-volatile;
- *         requires a link toggle to take effect.
+ *         requires a device reset to take effect. Disabled is 2; value 3 is
+ *         reserved.
  */
 enum nsm_uphy_mode {
 	NSM_UPHY_MODE_DEFAULT = 0,
 	NSM_UPHY_MODE_ENABLED = 1,
-	NSM_UPHY_MODE_RESERVED = 2,
-	NSM_UPHY_MODE_DISABLED = 3,
+	NSM_UPHY_MODE_DISABLED = 2,
 };
 
 /** @brief Data size (in bytes) of the UPhy Mode payload. */
