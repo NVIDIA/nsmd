@@ -371,4 +371,112 @@ TEST(NsmConfigBranch2, GetConfidentialComputeModeV1_Error)
     EXPECT_NO_THROW(commands[12]->parseResponseMsg(msg, buf.size()));
 }
 
+static GetSupportedDeviceModesV2* findSupportedModesV2()
+{
+    for (auto& cmd : commands)
+    {
+        if (auto* typed = dynamic_cast<GetSupportedDeviceModesV2*>(cmd.get()))
+        {
+            return typed;
+        }
+    }
+    return nullptr;
+}
+
+static std::vector<uint8_t>
+    makeSupportedModesPagedResp(uint32_t nextHandle,
+                                const std::vector<uint32_t>& modes)
+{
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+                             2 * sizeof(uint32_t) +
+                             modes.size() * sizeof(uint32_t));
+    encode_get_supported_device_modes_paged_resp(
+        0, NSM_SUCCESS, ERR_NULL, nextHandle,
+        static_cast<uint32_t>(modes.size()),
+        modes.empty() ? nullptr : modes.data(),
+        reinterpret_cast<nsm_msg*>(buf.data()));
+    return buf;
+}
+
+TEST(NsmConfigBranch2, GetSupportedDeviceModesV2_RequestCarriesHandle)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    parseSubcmdArgs(app, "GetSupportedDeviceModesV2", {"-H", "7"});
+    auto* cmd = findSupportedModesV2();
+    ASSERT_NE(cmd, nullptr);
+
+    auto [rc, req] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    ASSERT_EQ(req.size(), sizeof(nsm_msg_hdr) +
+                              sizeof(nsm_get_supported_device_modes_paged_req));
+    auto* msg = reinterpret_cast<nsm_msg*>(req.data());
+    EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_DEVICE_CONFIGURATION);
+    EXPECT_EQ(reinterpret_cast<nsm_common_req*>(msg->payload)->command,
+              NSM_GET_SUPPORTED_DEVICE_MODES_V2);
+}
+
+TEST(NsmConfigBranch2, GetSupportedDeviceModesV2_ParseModes)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    auto* cmd = findSupportedModesV2();
+    ASSERT_NE(cmd, nullptr);
+
+    auto buf = makeSupportedModesPagedResp(0, {3, 27});
+    testing::internal::CaptureStdout();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()), buf.size());
+    auto out = testing::internal::GetCapturedStdout();
+    EXPECT_NE(out.find("Supported Mode Indices"), std::string::npos);
+    EXPECT_NE(out.find("27"), std::string::npos);
+}
+
+TEST(NsmConfigBranch2, GetSupportedDeviceModesV2_ParseEmptyPage)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    auto* cmd = findSupportedModesV2();
+    ASSERT_NE(cmd, nullptr);
+
+    auto buf = makeSupportedModesPagedResp(0, {});
+    testing::internal::CaptureStdout();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()), buf.size());
+    auto out = testing::internal::GetCapturedStdout();
+    EXPECT_NE(out.find("Mode Count"), std::string::npos);
+}
+
+TEST(NsmConfigBranch2, GetSupportedDeviceModesV2_ParseErrorCompletionCode)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    auto* cmd = findSupportedModesV2();
+    ASSERT_NE(cmd, nullptr);
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_common_non_success_resp));
+    encode_cc_only_resp(0, NSM_TYPE_DEVICE_CONFIGURATION,
+                        NSM_GET_SUPPORTED_DEVICE_MODES_V2, NSM_ERR_NOT_READY,
+                        ERR_NOT_SUPPORTED,
+                        reinterpret_cast<nsm_msg*>(buf.data()));
+    testing::internal::CaptureStderr();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()), buf.size());
+    auto err = testing::internal::GetCapturedStderr();
+    EXPECT_NE(err.find("Response message error"), std::string::npos);
+}
+
+TEST(NsmConfigBranch2, GetSupportedDeviceModesV2_ParseTruncated)
+{
+    CLI::App app;
+    setupConfigCommands(app);
+    auto* cmd = findSupportedModesV2();
+    ASSERT_NE(cmd, nullptr);
+
+    auto buf = makeSupportedModesPagedResp(0, {27});
+    testing::internal::CaptureStderr();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                          sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+    auto err = testing::internal::GetCapturedStderr();
+    EXPECT_NE(err.find("Response message error"), std::string::npos);
+}
+
 } // namespace nsmtool::config

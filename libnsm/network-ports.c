@@ -1837,6 +1837,196 @@ int decode_set_switch_isolation_mode_resp(const struct nsm_msg *msg,
 	return decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
 }
 
+int encode_set_power_profile_req(uint8_t instance_id, uint8_t profile_id,
+				 struct nsm_msg *msg)
+{
+	int rc = encode_common_req(instance_id, NSM_TYPE_NETWORK_PORT,
+				   NSM_SET_POWER_PROFILE, msg);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_power_profile_req *req =
+	    (struct nsm_set_power_profile_req *)msg->payload;
+	req->hdr.data_size = sizeof(struct nsm_set_power_profile_req) -
+			     sizeof(struct nsm_common_req);
+	req->profile_id = profile_id;
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_power_profile_req(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *profile_id)
+{
+	if (msg == NULL || profile_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_set_power_profile_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_power_profile_req *req =
+	    (struct nsm_set_power_profile_req *)msg->payload;
+	if (req->hdr.data_size != sizeof(struct nsm_set_power_profile_req) -
+				      sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*profile_id = req->profile_id;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_power_profile_resp(uint8_t instance_id, uint8_t cc,
+				  uint16_t reason_code, struct nsm_msg *msg)
+{
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_NETWORK_PORT, NSM_SET_POWER_PROFILE,
+				  msg);
+}
+
+int decode_set_power_profile_resp(const struct nsm_msg *msg, size_t msg_len,
+				  uint8_t *cc, uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	return decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+}
+
+int encode_get_power_profile_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_NETWORK_PORT,
+				 NSM_GET_POWER_PROFILE, msg);
+}
+
+int decode_get_power_profile_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+/* Fixed payload bytes preceding the entries: active ID and profile count. */
+#define NSM_POWER_PROFILE_FIXED_DATA_SIZE 2
+
+int encode_get_power_profile_resp(uint8_t instance_id, uint8_t cc,
+				  uint16_t reason_code,
+				  uint8_t active_profile_id,
+				  uint8_t profile_count,
+				  const struct nsm_power_profile_entry *entries,
+				  struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (profile_count > NSM_POWER_PROFILE_MAX_COUNT) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (profile_count > 0 && entries == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_POWER_PROFILE, msg);
+	}
+
+	struct nsm_get_power_profile_resp *response =
+	    (struct nsm_get_power_profile_resp *)msg->payload;
+	response->hdr.command = NSM_GET_POWER_PROFILE;
+	response->hdr.completion_code = cc;
+	response->hdr.reserved = 0;
+	response->hdr.data_size =
+	    htole16(NSM_POWER_PROFILE_FIXED_DATA_SIZE +
+		    profile_count * sizeof(struct nsm_power_profile_entry));
+	response->active_profile_id = active_profile_id;
+	response->profile_count = profile_count;
+	if (profile_count > 0) {
+		memcpy(response->entries, entries,
+		       profile_count * sizeof(struct nsm_power_profile_entry));
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_power_profile_resp(const struct nsm_msg *msg, size_t msg_len,
+				  uint8_t *cc, uint16_t *reason_code,
+				  uint8_t *active_profile_id,
+				  uint8_t *profile_count,
+				  struct nsm_power_profile_entry *entries,
+				  uint8_t max_entries)
+{
+	if (active_profile_id == NULL || profile_count == NULL ||
+	    (entries == NULL && max_entries > 0)) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	const size_t fixed_len = sizeof(struct nsm_msg_hdr) +
+				 sizeof(struct nsm_common_resp) +
+				 NSM_POWER_PROFILE_FIXED_DATA_SIZE;
+	if (msg_len < fixed_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_get_power_profile_resp *resp =
+	    (const struct nsm_get_power_profile_resp *)msg->payload;
+	const uint8_t count = resp->profile_count;
+	if (count > NSM_POWER_PROFILE_MAX_COUNT) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	const size_t entries_len =
+	    (size_t)count * sizeof(struct nsm_power_profile_entry);
+	if (le16toh(resp->hdr.data_size) !=
+	    NSM_POWER_PROFILE_FIXED_DATA_SIZE + entries_len) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (msg_len != fixed_len + entries_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (count > max_entries) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	for (uint8_t i = 0; i < count; ++i) {
+		for (uint8_t j = 0; j < i; ++j) {
+			if (resp->entries[i].profile_id ==
+			    resp->entries[j].profile_id) {
+				return NSM_SW_ERROR_DATA;
+			}
+		}
+	}
+
+	for (uint8_t i = 0; i < count; ++i) {
+		entries[i].profile_id = resp->entries[i].profile_id;
+		memcpy(entries[i].profile_name, resp->entries[i].profile_name,
+		       NSM_POWER_PROFILE_NAME_LEN);
+		entries[i].profile_name[NSM_POWER_PROFILE_NAME_LEN - 1] = '\0';
+	}
+
+	*active_profile_id = resp->active_profile_id;
+	*profile_count = count;
+	return NSM_SW_SUCCESS;
+}
+
 int encode_get_fabric_manager_state_req(uint8_t instance_id,
 					struct nsm_msg *msg)
 {

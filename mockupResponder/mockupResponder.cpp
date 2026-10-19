@@ -39,6 +39,7 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstdint>
@@ -607,6 +608,10 @@ std::optional<Response>
                     return getSwitchIsolationMode(request, requestLen);
                 case NSM_SET_SWITCH_ISOLATION_MODE:
                     return setSwitchIsolationMode(request, requestLen);
+                case NSM_GET_POWER_PROFILE:
+                    return getPowerProfileHandler(request, requestLen);
+                case NSM_SET_POWER_PROFILE:
+                    return setPowerProfileHandler(request, requestLen);
                 case NSM_GET_ETH_PORT_TELEMETRY_COUNTER:
                     return getEthPortTelemetryCounterHandler(request,
                                                              requestLen);
@@ -894,6 +899,9 @@ std::optional<Response>
                     return getDeviceModeSettingsV2Handler(request, requestLen);
                 case NSM_SET_DEVICE_MODE_SETTINGS_V2:
                     return setDeviceModeSettingsV2Handler(request, requestLen);
+                case NSM_GET_SUPPORTED_DEVICE_MODES_V2:
+                    return getSupportedDeviceModesV2Handler(request,
+                                                            requestLen);
                 case NSM_SET_DEVICE_CONFIG_V2:
                     return setDeviceConfigV2Handler(request, requestLen);
                 case NSM_GET_DEVICE_CONFIG_V2:
@@ -1092,7 +1100,8 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
                    NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1,
-                  {1, 8, 9, 10, 11, 14, NSM_QUERY_PORT_CHARACTERISTICS_V2,
+                  {1, 8, 9, 10, 11, NSM_SET_POWER_PROFILE,
+                   NSM_GET_POWER_PROFILE, 14, NSM_QUERY_PORT_CHARACTERISTICS_V2,
                    NSM_CLEAR_PORT_METRIC_STATE, NSM_QUERY_PORT_CHARACTERISTICS,
                    68, 69}},
                  {2, {4}},
@@ -1105,7 +1114,9 @@ std::optional<std::vector<uint8_t>>
                    NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS,
                    NSM_GET_DEVICE_DEBUG_PARAMETERS,
                    NSM_SET_DEVICE_DEBUG_PARAMETERS}},
-                 {5, {3, 4, 5, 6, 7, 128, 129, 130, 131}},
+                 {5,
+                  {3, 4, 5, 6, 7, 128, 129, 130, 131,
+                   NSM_GET_SUPPORTED_DEVICE_MODES_V2}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
@@ -2230,6 +2241,148 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("encode_set_switch_isolation_mode_resp failed: rc={RC}",
                    "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+namespace
+{
+const std::vector<std::pair<uint8_t, const char*>> mockPowerProfiles = {
+    {1, "compute"},
+    {2, "networking"},
+    {3, "reduced-bandwidth"},
+};
+} // namespace
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getPowerProfileHandler(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPowerProfileHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_power_profile_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_power_profile_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<nsm_power_profile_entry> entries;
+    for (const auto& [id, name] : mockPowerProfiles)
+    {
+        nsm_power_profile_entry entry{};
+        entry.profile_id = id;
+        strncpy(entry.profile_name, name, NSM_POWER_PROFILE_NAME_LEN - 1);
+        entries.push_back(entry);
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + 2 +
+            entries.size() * sizeof(nsm_power_profile_entry),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_power_profile_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                       ERR_NULL, activePowerProfileId,
+                                       static_cast<uint8_t>(entries.size()),
+                                       entries.data(), responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_power_profile_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setPowerProfileHandler(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setPowerProfileHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t profileId = 0;
+    auto rc = decode_set_power_profile_req(requestMsg, requestLen, &profileId);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_power_profile_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    const bool known = profileId == NSM_POWER_PROFILE_ID_HW_DEFAULT ||
+                       std::ranges::any_of(mockPowerProfiles,
+                                           [profileId](const auto& p) {
+        return p.first == profileId;
+    });
+    uint8_t cc = known ? NSM_SUCCESS : NSM_ERR_INVALID_DATA;
+    if (known)
+    {
+        activePowerProfileId = profileId;
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + (cc == NSM_SUCCESS
+                                   ? sizeof(nsm_common_resp)
+                                   : sizeof(nsm_common_non_success_resp)),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_set_power_profile_resp(requestMsg->hdr.instance_id, cc,
+                                       ERR_NULL, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_set_power_profile_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getSupportedDeviceModesV2Handler(const nsm_msg* requestMsg,
+                                                      size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getSupportedDeviceModesV2Handler: request length={LEN}",
+                  "LEN", requestLen);
+    }
+
+    uint32_t handle = 0;
+    auto rc = decode_get_supported_device_modes_paged_req(requestMsg,
+                                                          requestLen, &handle);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode_get_supported_device_modes_paged_req failed: rc={RC}", "RC",
+            rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint32_t> modes{0, 1};
+    if (mockDeviceType == NSM_DEV_ID_SWITCH)
+    {
+        modes.push_back(DEVICE_MODE_POWER_CAPPING);
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + 2 * sizeof(uint32_t) +
+            modes.size() * sizeof(uint32_t),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_supported_device_modes_paged_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, 0,
+        static_cast<uint32_t>(modes.size()), modes.data(), responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_get_supported_device_modes_paged_resp failed: rc={RC}",
+            "RC", rc);
         return std::nullopt;
     }
     return response;
@@ -9224,6 +9377,12 @@ std::vector<uint8_t>
             memcpy(data.data(), &view, sizeof(view));
             break;
         }
+        case DEVICE_MODE_POWER_CAPPING:
+        {
+            data.resize(POWER_CAPPING_MODE_DATA_SIZE);
+            data[0] = NSM_POWER_CAPPING_MODE_DEFAULT;
+            break;
+        }
         default:
         {
             uint32_t defaultValue = htole32(0);
@@ -9354,6 +9513,9 @@ std::optional<std::vector<uint8_t>>
             /* OOB Miswiring Detection (NVBug 6136040): 1-byte bitfield. */
             expectedLen = sizeof(uint8_t);
             break;
+        case DEVICE_MODE_POWER_CAPPING:
+            expectedLen = POWER_CAPPING_MODE_DATA_SIZE;
+            break;
         default:
             expectedLen = deviceModeDataLength;
             break;
@@ -9362,7 +9524,13 @@ std::optional<std::vector<uint8_t>>
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
 
-    if (deviceModeDataLength != expectedLen)
+    if (deviceModeIndex == DEVICE_MODE_POWER_CAPPING &&
+        deviceModeDataLength == expectedLen &&
+        deviceModeData[0] > NSM_POWER_CAPPING_MODE_DISABLED)
+    {
+        cc = NSM_ERR_INVALID_DATA;
+    }
+    else if (deviceModeDataLength != expectedLen)
     {
         lg2::error(
             "setDeviceModeSettingsV2Handler: invalid data length={LEN} expected={EXP} for modeIndex={IDX}",
@@ -9375,8 +9543,13 @@ std::optional<std::vector<uint8_t>>
         deviceModeData.resize(deviceModeDataLength);
 
         // Store as pending device mode (current remains unchanged until reset).
+        // Switch firmware applies a power capping mode change immediately.
         auto& modeSettings = state.deviceModeSettingsV2[deviceModeIndex];
         modeSettings.second = deviceModeData;
+        if (deviceModeIndex == DEVICE_MODE_POWER_CAPPING)
+        {
+            modeSettings.first = deviceModeData;
+        }
     }
 
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),

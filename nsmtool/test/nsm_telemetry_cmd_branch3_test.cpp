@@ -586,4 +586,172 @@ TEST(NsmTelBranch3, AvailClearable_Group9_NoBits)
     EXPECT_NO_THROW(commands[30]->parseResponseMsg(msg, buf.size()));
 }
 
+template <typename Cmd>
+static Cmd* findCommand()
+{
+    for (auto& cmd : commands)
+    {
+        if (auto* typed = dynamic_cast<Cmd*>(cmd.get()))
+        {
+            return typed;
+        }
+    }
+    return nullptr;
+}
+
+static std::vector<uint8_t>
+    makeGetPowerProfileResp(uint8_t active,
+                            const std::vector<nsm_power_profile_entry>& entries)
+{
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + 2 +
+                             entries.size() * sizeof(nsm_power_profile_entry));
+    encode_get_power_profile_resp(0, NSM_SUCCESS, ERR_NULL, active,
+                                  static_cast<uint8_t>(entries.size()),
+                                  entries.empty() ? nullptr : entries.data(),
+                                  reinterpret_cast<nsm_msg*>(buf.data()));
+    return buf;
+}
+
+static std::vector<uint8_t> makeNonSuccessResp(uint8_t command)
+{
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+                             sizeof(nsm_common_non_success_resp));
+    encode_cc_only_resp(0, NSM_TYPE_NETWORK_PORT, command, NSM_ERR_NOT_READY,
+                        ERR_NOT_SUPPORTED,
+                        reinterpret_cast<nsm_msg*>(buf.data()));
+    return buf;
+}
+
+TEST(NsmTelBranch3, GetPowerProfile_RequestEncodesCommand)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "GetPowerProfile");
+    auto* cmd = findCommand<GetPowerProfile>();
+    ASSERT_NE(cmd, nullptr);
+
+    auto [rc, req] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    ASSERT_EQ(req.size(), sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto* msg = reinterpret_cast<nsm_msg*>(req.data());
+    EXPECT_EQ(msg->hdr.nvidia_msg_type, NSM_TYPE_NETWORK_PORT);
+    EXPECT_EQ(reinterpret_cast<nsm_common_req*>(msg->payload)->command,
+              NSM_GET_POWER_PROFILE);
+}
+
+TEST(NsmTelBranch3, GetPowerProfile_ParseProfiles)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto* cmd = findCommand<GetPowerProfile>();
+    ASSERT_NE(cmd, nullptr);
+
+    std::vector<nsm_power_profile_entry> entries(2);
+    entries[0].profile_id = 1;
+    std::strncpy(entries[0].profile_name, "Balanced",
+                 NSM_POWER_PROFILE_NAME_LEN - 1);
+    entries[1].profile_id = 2;
+    std::strncpy(entries[1].profile_name, "PowerSaver",
+                 NSM_POWER_PROFILE_NAME_LEN - 1);
+    auto buf = makeGetPowerProfileResp(2, entries);
+    testing::internal::CaptureStdout();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()), buf.size());
+    auto out = testing::internal::GetCapturedStdout();
+    EXPECT_NE(out.find("PowerSaver"), std::string::npos);
+    EXPECT_NE(out.find("Active Profile ID"), std::string::npos);
+}
+
+TEST(NsmTelBranch3, GetPowerProfile_ParseEmptyList)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto* cmd = findCommand<GetPowerProfile>();
+    ASSERT_NE(cmd, nullptr);
+
+    auto buf = makeGetPowerProfileResp(0, {});
+    testing::internal::CaptureStdout();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()), buf.size());
+    auto out = testing::internal::GetCapturedStdout();
+    EXPECT_NE(out.find("Available Profiles"), std::string::npos);
+}
+
+TEST(NsmTelBranch3, GetPowerProfile_ParseErrorCompletionCode)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto* cmd = findCommand<GetPowerProfile>();
+    ASSERT_NE(cmd, nullptr);
+
+    auto buf = makeNonSuccessResp(NSM_GET_POWER_PROFILE);
+    testing::internal::CaptureStderr();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()), buf.size());
+    auto err = testing::internal::GetCapturedStderr();
+    EXPECT_NE(err.find("decode_get_power_profile_resp"), std::string::npos);
+}
+
+TEST(NsmTelBranch3, GetPowerProfile_ParseTruncated)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto* cmd = findCommand<GetPowerProfile>();
+    ASSERT_NE(cmd, nullptr);
+
+    auto buf = makeGetPowerProfileResp(0, {});
+    testing::internal::CaptureStderr();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()),
+                          buf.size() - 1);
+    auto err = testing::internal::GetCapturedStderr();
+    EXPECT_NE(err.find("decode_get_power_profile_resp"), std::string::npos);
+}
+
+TEST(NsmTelBranch3, SetPowerProfile_RequestCarriesProfileId)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    parseSubcmdArgs(app, "SetPowerProfile", {"-p", "3"});
+    auto* cmd = findCommand<SetPowerProfile>();
+    ASSERT_NE(cmd, nullptr);
+
+    auto [rc, req] = cmd->createRequestMsg();
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    ASSERT_EQ(req.size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_profile_req));
+    uint8_t profileId = 0xFF;
+    EXPECT_EQ(
+        decode_set_power_profile_req(reinterpret_cast<nsm_msg*>(req.data()),
+                                     req.size(), &profileId),
+        NSM_SW_SUCCESS);
+    EXPECT_EQ(profileId, 3);
+}
+
+TEST(NsmTelBranch3, SetPowerProfile_ParseSuccess)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto* cmd = findCommand<SetPowerProfile>();
+    ASSERT_NE(cmd, nullptr);
+
+    std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+    encode_set_power_profile_resp(0, NSM_SUCCESS, ERR_NULL,
+                                  reinterpret_cast<nsm_msg*>(buf.data()));
+    testing::internal::CaptureStdout();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()), buf.size());
+    auto out = testing::internal::GetCapturedStdout();
+    EXPECT_NE(out.find("Completion Code"), std::string::npos);
+}
+
+TEST(NsmTelBranch3, SetPowerProfile_ParseErrorCompletionCode)
+{
+    CLI::App app;
+    setupTelemetryCommands(app);
+    auto* cmd = findCommand<SetPowerProfile>();
+    ASSERT_NE(cmd, nullptr);
+
+    auto buf = makeNonSuccessResp(NSM_SET_POWER_PROFILE);
+    testing::internal::CaptureStderr();
+    cmd->parseResponseMsg(reinterpret_cast<nsm_msg*>(buf.data()), buf.size());
+    auto err = testing::internal::GetCapturedStderr();
+    EXPECT_NE(err.find("decode_set_power_profile_resp"), std::string::npos);
+}
+
 } // namespace nsmtool::telemetry

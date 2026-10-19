@@ -1302,3 +1302,49 @@ TEST(NsmHistogramDataTest, HandleResponseMsg_CheckSizeMismatch_ShouldLog)
     rc = sensor.handleResponseMsg(response, msg_len);
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
+
+TEST(NsmHistogramData, DataStatusTracksReadOutcome)
+{
+    auto formatIntf = std::make_shared<FormatIntf>(bus,
+                                                   inventoryObjPath.c_str());
+    auto bucketInfoIntf =
+        std::make_shared<BucketInfoIntf>(bus, inventoryObjPath.c_str());
+    auto dataStatusIntf =
+        std::make_shared<DataStatusIntf>(bus, inventoryObjPath.c_str());
+    NsmHistogramData sensor(sensorName, sensorType, formatIntf, bucketInfoIntf,
+                            2, 0);
+    sensor.setDataStatusIntf(dataStatusIntf);
+    EXPECT_EQ(DataStates::Unknown, dataStatusIntf->status());
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_histogram_data_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    const size_t errorLen = sizeof(nsm_msg_hdr) +
+                            sizeof(nsm_common_non_success_resp);
+    uint8_t noBuckets = 0;
+
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              encode_get_histogram_data_resp(0, NSM_ERR_NOT_READY, ERR_NULL,
+                                             NvU8, 0, &noBuckets, 0, response));
+    sensor.handleResponseMsg(response, errorLen);
+    EXPECT_EQ(DataStates::AsicNotReady, dataStatusIntf->status());
+    EXPECT_FALSE(dataStatusIntf->reason().empty());
+    EXPECT_EQ(0u, dataStatusIntf->lastSampleTimestamp());
+
+    ASSERT_EQ(NSM_SW_SUCCESS, encode_get_histogram_data_resp(
+                                  0, NSM_ERR_UNSUPPORTED_COMMAND_CODE, ERR_NULL,
+                                  NvU8, 0, &noBuckets, 0, response));
+    sensor.handleResponseMsg(response, errorLen);
+    EXPECT_EQ(DataStates::UnsupportedFirmware, dataStatusIntf->status());
+
+    sensor.handleResponseMsg(response, 0);
+    EXPECT_EQ(DataStates::ProtocolError, dataStatusIntf->status());
+
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              encode_get_histogram_data_resp(0, NSM_SUCCESS, ERR_NULL, NvU8, 0,
+                                             &noBuckets, 0, response));
+    sensor.handleResponseMsg(response, responseMsg.size());
+    EXPECT_EQ(DataStates::Valid, dataStatusIntf->status());
+    EXPECT_TRUE(dataStatusIntf->reason().empty());
+    EXPECT_NE(0u, dataStatusIntf->lastSampleTimestamp());
+}

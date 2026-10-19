@@ -1017,3 +1017,78 @@ TEST_F(MockupResponderBranchTest, ProcessRxMsgFirmwareGetRotInfo)
     auto resp = mockupResponder->processRxMsg(request, longRunning);
     EXPECT_TRUE(resp.has_value());
 }
+
+// =============================================================================
+// Power profiles (Type 1 0x0C/0x0D) and paged supported device modes (0x84)
+// =============================================================================
+
+TEST_F(MockupResponderBranchTest, PowerProfileSetThenGet)
+{
+    Request setRequest(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_profile_req));
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              encode_set_power_profile_req(
+                  0, 3, reinterpret_cast<nsm_msg*>(setRequest.data())));
+    auto setResp = mockupResponder->setPowerProfileHandler(
+        reinterpret_cast<nsm_msg*>(setRequest.data()), setRequest.size());
+    ASSERT_TRUE(setResp.has_value());
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason = ERR_NULL;
+    ASSERT_EQ(NSM_SW_SUCCESS, decode_set_power_profile_resp(
+                                  reinterpret_cast<nsm_msg*>(setResp->data()),
+                                  setResp->size(), &cc, &reason));
+    EXPECT_EQ(NSM_SUCCESS, cc);
+
+    Request getRequest(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              encode_get_power_profile_req(
+                  0, reinterpret_cast<nsm_msg*>(getRequest.data())));
+    auto getResp = mockupResponder->getPowerProfileHandler(
+        reinterpret_cast<nsm_msg*>(getRequest.data()), getRequest.size());
+    ASSERT_TRUE(getResp.has_value());
+
+    uint8_t active = 0;
+    uint8_t count = 0;
+    nsm_power_profile_entry entries[NSM_POWER_PROFILE_MAX_COUNT]{};
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              decode_get_power_profile_resp(
+                  reinterpret_cast<nsm_msg*>(getResp->data()), getResp->size(),
+                  &cc, &reason, &active, &count, entries,
+                  NSM_POWER_PROFILE_MAX_COUNT));
+    EXPECT_EQ(3, active);
+    ASSERT_EQ(3, count);
+    EXPECT_STREQ("compute", entries[0].profile_name);
+}
+
+TEST_F(MockupResponderBranchTest, PowerProfileUnknownIdRejected)
+{
+    Request setRequest(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_profile_req));
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              encode_set_power_profile_req(
+                  0, 42, reinterpret_cast<nsm_msg*>(setRequest.data())));
+    auto setResp = mockupResponder->setPowerProfileHandler(
+        reinterpret_cast<nsm_msg*>(setRequest.data()), setRequest.size());
+    ASSERT_TRUE(setResp.has_value());
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason = ERR_NULL;
+    ASSERT_EQ(NSM_SW_SUCCESS, decode_set_power_profile_resp(
+                                  reinterpret_cast<nsm_msg*>(setResp->data()),
+                                  setResp->size(), &cc, &reason));
+    EXPECT_EQ(NSM_ERR_INVALID_DATA, cc);
+    EXPECT_EQ(1, mockupResponder->activePowerProfileId);
+}
+
+TEST_F(MockupResponderBranchTest, PowerProfileBadDecode)
+{
+    Request request(sizeof(nsm_msg_hdr), 0);
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    EXPECT_FALSE(
+        mockupResponder->getPowerProfileHandler(requestMsg, request.size())
+            .has_value());
+    EXPECT_FALSE(
+        mockupResponder->setPowerProfileHandler(requestMsg, request.size())
+            .has_value());
+    EXPECT_FALSE(
+        mockupResponder
+            ->getSupportedDeviceModesV2Handler(requestMsg, request.size())
+            .has_value());
+}

@@ -28,6 +28,7 @@ endforeach
 if include_all_dev_inv or include_dev_inv_list.contains('switch')
     sources += [
         'nsmDeviceInventory/nsmSwitch.cpp',
+        'nsmDeviceInventory/nsmSwitchPowerProfile.cpp',
         'nsmDeviceInventory/nsmNvSwitchDeviceConfiguration.cpp',
     ]
 endif

@@ -65,6 +65,7 @@ tests = [
     'libnsm_device_configuration_branch4_test',
     'libnsm_network_ports_port_health_test',
     'libnsm_network_ports_link_health_ext_test',
+    'libnsm_power_profile_test',
 ]
 
 fs = import('fs')

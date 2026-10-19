@@ -22,6 +22,7 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <chrono>
 #include <optional>
 #include <string>
 #include <vector>
@@ -391,9 +392,93 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
+static DataStates histogramDataStatus(int rc, uint8_t cc, uint16_t reasonCode)
+{
+    if (rc != NSM_SW_SUCCESS)
+    {
+        return DataStates::ProtocolError;
+    }
+    if (cc == NSM_SUCCESS)
+    {
+        return DataStates::Valid;
+    }
+    if (reasonCode == ERR_NOT_SUPPORTED ||
+        reasonCode == ERR_PROPERTY_NOT_SUPPORTED)
+    {
+        return DataStates::UnsupportedFirmware;
+    }
+    if (reasonCode == ERR_NO_BOOT_COMPLETE ||
+        reasonCode == ERR_UPDATE_IN_PROGRESS)
+    {
+        return DataStates::AsicNotReady;
+    }
+    switch (cc)
+    {
+        case NSM_ERR_UNSUPPORTED_COMMAND_CODE:
+        case NSM_ERR_UNSUPPORTED_MSG_TYPE:
+        case NSM_ERR_INVALID_DATA:
+            return DataStates::UnsupportedFirmware;
+        case NSM_ERR_NOT_READY:
+        case NSM_BUSY:
+            return DataStates::AsicNotReady;
+        default:
+            return DataStates::ProtocolError;
+    }
+}
+
+void NsmHistogramData::publishDataStatus(DataStates status, int rc, uint8_t cc,
+                                         uint16_t reasonCode)
+{
+    if (!dataStatusIntf)
+    {
+        return;
+    }
+    dataStatusIntf->status(status);
+    if (status == DataStates::Valid)
+    {
+        dataStatusIntf->reason(std::string{});
+        dataStatusIntf->lastSampleTimestamp(static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::system_clock::now().time_since_epoch())
+                .count()));
+    }
+    else
+    {
+        dataStatusIntf->reason("rc=" + std::to_string(rc) +
+                               " cc=" + std::to_string(cc) +
+                               " reasonCode=" + std::to_string(reasonCode));
+    }
+}
+
+requester::Coroutine
+    NsmHistogramData::update(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    if (!dataStatusIntf)
+    {
+        co_return co_await NsmSensor::update(nsmDevice);
+    }
+    if (!nsmDevice->isCommandSupported(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                       NSM_GET_HISTOGRAM_DATA))
+    {
+        publishDataStatus(DataStates::UnsupportedFirmware, NSM_SW_SUCCESS,
+                          NSM_ERR_UNSUPPORTED_COMMAND_CODE, ERR_NULL);
+        co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
+    }
+
+    responseHandled = false;
+    auto rc = co_await NsmSensor::update(nsmDevice);
+    if (!responseHandled)
+    {
+        publishDataStatus(DataStates::TransportError, rc, NSM_SUCCESS,
+                          ERR_NULL);
+    }
+    co_return rc;
+}
+
 uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
+    responseHandled = true;
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
@@ -428,6 +513,8 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
                     "TOTAL", total_bucket_data_size, "CALCULATED",
                     calculatedSize);
             }
+            publishDataStatus(DataStates::ProtocolError,
+                              NSM_SW_ERROR_COMMAND_FAIL, cc, reasonCode);
             return NSM_SW_ERROR_COMMAND_FAIL;
         }
         std::vector<std::tuple<uint16_t, std::tuple<double, double, double>>>
@@ -441,6 +528,8 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
         }
         bucketInfoIntf->bucketData(bucketData);
     }
+    publishDataStatus(histogramDataStatus(rc, cc, reasonCode), rc, cc,
+                      reasonCode);
     return cc ? cc : rc;
 }
 

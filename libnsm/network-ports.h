@@ -694,6 +694,42 @@ struct nsm_set_switch_isolation_mode_req {
 	uint8_t isolation_mode;
 } __attribute__((packed));
 
+#define NSM_POWER_PROFILE_NAME_LEN 20
+#define NSM_POWER_PROFILE_MAX_COUNT 16
+/** Profile ID that applies the hardware (INI) default settings. */
+#define NSM_POWER_PROFILE_ID_HW_DEFAULT 0
+
+/** @struct nsm_set_power_profile_req
+ *
+ *  Structure representing NSM Set Power Profile request (Type 1, 0x0C).
+ */
+struct nsm_set_power_profile_req {
+	struct nsm_common_req hdr;
+	uint8_t profile_id;
+} __attribute__((packed));
+
+/** @struct nsm_power_profile_entry
+ *
+ *  One entry of the Get Power Profile response: profile ID followed by a
+ *  null-terminated ASCII name.
+ */
+struct nsm_power_profile_entry {
+	uint8_t profile_id;
+	char profile_name[NSM_POWER_PROFILE_NAME_LEN];
+} __attribute__((packed));
+
+/** @struct nsm_get_power_profile_resp
+ *
+ *  Structure representing NSM Get Power Profile response (Type 1, 0x0D).
+ *  data_size is 2 + sizeof(struct nsm_power_profile_entry) * profile_count.
+ */
+struct nsm_get_power_profile_resp {
+	struct nsm_common_resp hdr;
+	uint8_t active_profile_id;
+	uint8_t profile_count;
+	struct nsm_power_profile_entry entries[1];
+} __attribute__((packed));
+
 /** @struct nsm_set_power_mode_req
  *
  *  Structure representing NSM set power mode request.
@@ -1597,6 +1633,110 @@ int encode_set_switch_isolation_mode_resp(uint8_t instance, uint8_t cc,
 int decode_set_switch_isolation_mode_resp(const struct nsm_msg *msg,
 					  size_t msg_len, uint8_t *cc,
 					  uint16_t *reason_code);
+
+/** @brief Encode Set Power Profile request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] profile_id - profile to apply; 0 applies the hardware defaults
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_power_profile_req(uint8_t instance_id, uint8_t profile_id,
+				 struct nsm_msg *msg);
+
+/** @brief Decode Set Power Profile request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] profile_id - requested profile ID
+ *  @return nsm_completion_codes
+ */
+int decode_set_power_profile_req(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *profile_id);
+
+/** @brief Encode Set Power Profile response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - Reason Code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_power_profile_resp(uint8_t instance_id, uint8_t cc,
+				  uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode Set Power Profile response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Completion Code
+ *  @param[out] reason_code - Reason Code
+ *  @return nsm_completion_codes
+ */
+int decode_set_power_profile_resp(const struct nsm_msg *msg, size_t msg_len,
+				  uint8_t *cc, uint16_t *reason_code);
+
+/** @brief Encode Get Power Profile request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_power_profile_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode Get Power Profile request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_power_profile_req(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode Get Power Profile response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - Reason Code
+ *  @param[in] active_profile_id - currently applied profile ID
+ *  @param[in] profile_count - number of entries, at most
+ *                             NSM_POWER_PROFILE_MAX_COUNT
+ *  @param[in] entries - profile entries; may be NULL when profile_count is 0
+ *  @param[out] msg - Message will be written to this. Must hold
+ *                    sizeof(struct nsm_msg_hdr) + sizeof(struct
+ *                    nsm_common_resp) + 2 + profile_count * sizeof(struct
+ *                    nsm_power_profile_entry) bytes.
+ *  @return nsm_completion_codes
+ */
+int encode_get_power_profile_resp(uint8_t instance_id, uint8_t cc,
+				  uint16_t reason_code,
+				  uint8_t active_profile_id,
+				  uint8_t profile_count,
+				  const struct nsm_power_profile_entry *entries,
+				  struct nsm_msg *msg);
+
+/** @brief Decode Get Power Profile response message
+ *
+ *  Validates that data_size equals 2 + 21 * profile_count, that the count is
+ *  within NSM_POWER_PROFILE_MAX_COUNT and max_entries, and that profile IDs
+ *  are unique. Each copied name is always null-terminated.
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Completion Code
+ *  @param[out] reason_code - Reason Code
+ *  @param[out] active_profile_id - currently applied profile ID
+ *  @param[out] profile_count - number of entries reported by the device
+ *  @param[out] entries - buffer receiving the entries; may be NULL when
+ *                        max_entries is 0
+ *  @param[in] max_entries - capacity of entries
+ *  @return nsm_completion_codes
+ */
+int decode_get_power_profile_resp(const struct nsm_msg *msg, size_t msg_len,
+				  uint8_t *cc, uint16_t *reason_code,
+				  uint8_t *active_profile_id,
+				  uint8_t *profile_count,
+				  struct nsm_power_profile_entry *entries,
+				  uint8_t max_entries);
 
 /** @brief Encode a get fabric manager state request message
  *

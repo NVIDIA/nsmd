@@ -2146,6 +2146,79 @@ inline std::string uphyModeFromGetWireToString(uint8_t value)
 }
 } // namespace
 
+class GetSupportedDeviceModesV2 : public CommandInterface
+{
+  public:
+    ~GetSupportedDeviceModesV2() = default;
+    GetSupportedDeviceModesV2() = delete;
+    GetSupportedDeviceModesV2(const GetSupportedDeviceModesV2&) = delete;
+    GetSupportedDeviceModesV2(GetSupportedDeviceModesV2&&) = default;
+    GetSupportedDeviceModesV2&
+        operator=(const GetSupportedDeviceModesV2&) = delete;
+    GetSupportedDeviceModesV2& operator=(GetSupportedDeviceModesV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetSupportedDeviceModesV2(const char* type, const char* name,
+                                       CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-H, --handle", handle,
+                        "Page handle (NvU32), 0 for the first page");
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+                sizeof(nsm_get_supported_device_modes_paged_req),
+            0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_supported_device_modes_paged_req(instanceId,
+                                                              handle, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        uint32_t nextHandle = 0;
+        uint32_t modeCount = 0;
+
+        constexpr size_t fixedLen = sizeof(nsm_msg_hdr) +
+                                    sizeof(nsm_common_resp) +
+                                    2 * sizeof(uint32_t);
+        size_t maxModes = payloadLength > fixedLen
+                              ? (payloadLength - fixedLen) / sizeof(uint32_t)
+                              : 0;
+        std::vector<uint32_t> modes(std::max<size_t>(maxModes, 1));
+
+        auto rc = decode_get_supported_device_modes_paged_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &nextHandle,
+            &modeCount, modes.data(), static_cast<uint32_t>(maxModes));
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+        modes.resize(modeCount);
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Next Handle"] = nextHandle;
+        result["Mode Count"] = modeCount;
+        result["Supported Mode Indices"] = modes;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint32_t handle = 0;
+};
+
 /**
  * config subcommands targeting NSM Type 5 DEVICE_MODE_POWER_CAPPING (index 27)
  * so the power-capping enable/disable mode can be read/set without hand-rolling
@@ -2233,11 +2306,6 @@ class GetPowerCappingMode : public CommandInterface
             result["PendingMode"] =
                 powerCappingModeFromGetWireToString(pendingData[0]);
         }
-        if (currentLength == POWER_CAPPING_MODE_DATA_SIZE &&
-            pendingLength == POWER_CAPPING_MODE_DATA_SIZE)
-        {
-            result["ResetRequired"] = (pendingData[0] != currentData[0]);
-        }
         nsmtool::helper::DisplayInJson(result);
     }
 };
@@ -2318,8 +2386,6 @@ class SetPowerCappingMode : public CommandInterface
         }
         ordered_json result;
         result["Completion Code"] = cc;
-        result["Note"] =
-            "Non-volatile; new mode applies after the next device reset.";
         nsmtool::helper::DisplayInJson(result);
     }
 
@@ -2992,7 +3058,6 @@ void registerCommand(CLI::App& app)
         "SetDeviceModeSettingsV2", "Set device mode settings v2 (0x82)");
     commands.push_back(std::make_unique<SetDeviceModeSettingsV2>(
         "config", "SetDeviceModeSettingsV2", setDeviceModeSettingsV2));
-
     auto setDeviceConfig = config->add_subcommand(
         "SetDeviceConfig", "Set Device Config Type 5 command 0x10 (V2)");
     commands.push_back(std::make_unique<SetDeviceConfig>(
@@ -3059,6 +3124,11 @@ void registerCommand(CLI::App& app)
         "Get Supported Device Configs Type 5 command 0x12");
     commands.push_back(std::make_unique<GetSupportedDeviceConfigs>(
         "config", "GetSupportedDeviceConfigs", getSupportedDeviceConfigs));
+
+    auto getSupportedDeviceModesV2 = config->add_subcommand(
+        "GetSupportedDeviceModesV2", "Get supported device modes v2 (0x84)");
+    commands.push_back(std::make_unique<GetSupportedDeviceModesV2>(
+        "config", "GetSupportedDeviceModesV2", getSupportedDeviceModesV2));
 }
 
 } // namespace config

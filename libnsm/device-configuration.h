@@ -798,6 +798,26 @@ struct nsm_get_supported_device_modes_resp {
 	uint32_t supported_mode_list[1];
 } __attribute__((packed));
 
+/** @struct nsm_get_supported_device_modes_paged_req
+ *
+ *  Get Supported Device Modes v2 request with a 4-byte page handle.
+ */
+struct nsm_get_supported_device_modes_paged_req {
+	struct nsm_common_req hdr;
+	uint32_t handle;
+} __attribute__((packed));
+
+/** @struct nsm_get_supported_device_modes_paged_resp
+ *
+ *  Get Supported Device Modes v2 response with 4-byte handle and count.
+ */
+struct nsm_get_supported_device_modes_paged_resp {
+	struct nsm_common_resp hdr;
+	uint32_t next_handle;
+	uint32_t mode_count;
+	uint32_t supported_mode_list[1];
+} __attribute__((packed));
+
 /** @struct nsm_set_device_config_v2_req
  *
  *  Set Device Config request (Type 5, command 0x10). Uses V2 header.
@@ -2103,6 +2123,66 @@ int decode_get_supported_device_modes_resp(const struct nsm_msg *msg,
 					   uint16_t *handle,
 					   uint16_t *mode_count,
 					   uint32_t *supported_mode_list);
+
+/** @brief Encode a paged Get Supported Device Modes v2 request (0x84) carrying
+ *         a 4-byte LE handle, as implemented by switch firmware.
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] handle - page handle, 0 for the first page
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_supported_device_modes_paged_req(uint8_t instance_id,
+						uint32_t handle,
+						struct nsm_msg *msg);
+
+/** @brief Decode a paged Get Supported Device Modes v2 request (0x84)
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] handle - requested page handle
+ *  @return nsm_completion_codes
+ */
+int decode_get_supported_device_modes_paged_req(const struct nsm_msg *msg,
+						size_t msg_len,
+						uint32_t *handle);
+
+/** @brief Encode a paged Get Supported Device Modes v2 response (0x84)
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] next_handle - handle of the next page, 0 when this is the last
+ *  @param[in] mode_count - number of mode indices in this page
+ *  @param[in] supported_mode_list - mode indices (may be NULL if count is 0)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_supported_device_modes_paged_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint32_t next_handle,
+    uint32_t mode_count, const uint32_t *supported_mode_list,
+    struct nsm_msg *msg);
+
+/** @brief Decode a paged Get Supported Device Modes v2 response (0x84)
+ *
+ *  Response data is next_handle (4 bytes LE), mode_count (4 bytes LE) and
+ *  mode_count 4-byte LE mode indices.
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] next_handle - handle of the next page, 0 when this is the last
+ *  @param[out] mode_count - number of mode indices in this page
+ *  @param[out] supported_mode_list - receives up to max_modes indices
+ *  @param[in] max_modes - capacity of supported_mode_list
+ *  @return nsm_completion_codes; NSM_SW_ERROR_LENGTH if mode_count exceeds
+ *          max_modes or disagrees with the message length
+ */
+int decode_get_supported_device_modes_paged_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint32_t *next_handle, uint32_t *mode_count,
+    uint32_t *supported_mode_list, uint32_t max_modes);
 
 /** @brief Encode a Set Device Config request (Type 5, command 0x10, V2 header)
  *

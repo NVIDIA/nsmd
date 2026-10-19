@@ -26,6 +26,7 @@
 #include "utils.hpp"
 
 #include <com/nvidia/Histogram/BucketInfo/server.hpp>
+#include <com/nvidia/Histogram/DataStatus/server.hpp>
 #include <com/nvidia/Histogram/Decorator/Format/server.hpp>
 #include <com/nvidia/Histogram/Decorator/SupportedHistogram/server.hpp>
 #include <phosphor-logging/lg2.hpp>
@@ -46,6 +47,10 @@ using SupportedHistogramIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::histogram::decorator::SupportedHistogram>;
 using FormatIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::histogram::decorator::Format>;
+using DataStatusIntf = sdbusplus::server::object_t<
+    sdbusplus::server::com::nvidia::histogram::DataStatus>;
+using DataStates =
+    sdbusplus::common::com::nvidia::histogram::DataStatus::States;
 using BucketUnits =
     sdbusplus::common::com::nvidia::histogram::decorator::Format::BucketUnits;
 
@@ -94,14 +99,28 @@ class NsmHistogramData : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
+
+    /** @brief Publish per-read status (Valid, AsicNotReady, TransportError,
+     *         ProtocolError, UnsupportedFirmware) and the time of the last
+     *         valid sample, separately from any control status. */
+    void setDataStatusIntf(std::shared_ptr<DataStatusIntf> intf)
+    {
+        dataStatusIntf = std::move(intf);
+    }
 
   private:
+    void publishDataStatus(DataStates status, int rc, uint8_t cc,
+                           uint16_t reasonCode);
+
     std::shared_ptr<FormatIntf> formatIntf = nullptr;
     std::shared_ptr<BucketInfoIntf> bucketInfoIntf = nullptr;
+    std::shared_ptr<DataStatusIntf> dataStatusIntf = nullptr;
     std::string histogramName;
     std::string deviceType;
     uint32_t histogramId;
     uint16_t parameter;
+    bool responseHandled = false;
 };
 
 } // namespace nsm

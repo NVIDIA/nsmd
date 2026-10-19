@@ -627,3 +627,68 @@ TEST_F(MockupResponderBranch4Test, DISABLED_EraseDebugInfoBadDecode)
                                                        request.size());
     EXPECT_FALSE(resp.has_value());
 }
+
+TEST_F(MockupResponderBranch4SwitchTest, SupportedDeviceModesListsPowerCapping)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_supported_device_modes_paged_req));
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              encode_get_supported_device_modes_paged_req(
+                  0, 0, reinterpret_cast<nsm_msg*>(request.data())));
+    auto resp = mockupResponder->getSupportedDeviceModesV2Handler(
+        reinterpret_cast<nsm_msg*>(request.data()), request.size());
+    ASSERT_TRUE(resp.has_value());
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason = ERR_NULL;
+    uint32_t next = 1;
+    uint32_t count = 0;
+    uint32_t modes[8]{};
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              decode_get_supported_device_modes_paged_resp(
+                  reinterpret_cast<nsm_msg*>(resp->data()), resp->size(), &cc,
+                  &reason, &next, &count, modes, 8));
+    EXPECT_EQ(0u, next);
+    ASSERT_EQ(3u, count);
+    EXPECT_EQ(static_cast<uint32_t>(DEVICE_MODE_POWER_CAPPING), modes[2]);
+}
+
+TEST_F(MockupResponderBranch4SwitchTest, SetPowerCappingModeAppliesImmediately)
+{
+    const uint8_t mode = NSM_POWER_CAPPING_MODE_DISABLED;
+    Request setRequest(sizeof(nsm_msg_hdr) +
+                       sizeof(nsm_set_device_mode_settings_v2_req) - 1 +
+                       POWER_CAPPING_MODE_DATA_SIZE);
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              encode_set_device_mode_settings_v2_req(
+                  0, DEVICE_MODE_POWER_CAPPING, &mode,
+                  POWER_CAPPING_MODE_DATA_SIZE,
+                  reinterpret_cast<nsm_msg*>(setRequest.data())));
+    auto setResp = mockupResponder->setDeviceModeSettingsV2Handler(
+        reinterpret_cast<nsm_msg*>(setRequest.data()), setRequest.size());
+    ASSERT_TRUE(setResp.has_value());
+
+    Request getRequest(sizeof(nsm_msg_hdr) +
+                       sizeof(nsm_get_device_mode_settings_v2_req));
+    ASSERT_EQ(NSM_SW_SUCCESS,
+              encode_get_device_mode_settings_v2_req(
+                  0, DEVICE_MODE_POWER_CAPPING,
+                  reinterpret_cast<nsm_msg*>(getRequest.data())));
+    auto getResp = mockupResponder->getDeviceModeSettingsV2Handler(
+        reinterpret_cast<nsm_msg*>(getRequest.data()), getRequest.size());
+    ASSERT_TRUE(getResp.has_value());
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason = ERR_NULL;
+    uint8_t current[POWER_CAPPING_MODE_DATA_SIZE]{};
+    uint8_t pending[POWER_CAPPING_MODE_DATA_SIZE]{};
+    uint16_t currentLength = POWER_CAPPING_MODE_DATA_SIZE;
+    uint16_t pendingLength = POWER_CAPPING_MODE_DATA_SIZE;
+    ASSERT_EQ(NSM_SW_SUCCESS, decode_get_device_mode_settings_v2_resp(
+                                  reinterpret_cast<nsm_msg*>(getResp->data()),
+                                  getResp->size(), &cc, &reason, current,
+                                  &currentLength, pending, &pendingLength));
+    EXPECT_EQ(NSM_SUCCESS, cc);
+    ASSERT_EQ(POWER_CAPPING_MODE_DATA_SIZE, currentLength);
+    EXPECT_EQ(mode, current[0]);
+}

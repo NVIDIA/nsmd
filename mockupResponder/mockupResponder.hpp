@@ -373,6 +373,13 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         setSwitchIsolationMode(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getPowerProfileHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setPowerProfileHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getSupportedDeviceModesV2Handler(const nsm_msg* requestMsg,
+                                         size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
@@ -933,6 +940,7 @@ class MockupResponder
     // the case. The pair is advanced by nextDumpCyclePage() on every dump
     // request and wraps at the end of the list.
     bool failureCycle = false;
+    uint8_t activePowerProfileId = 1;
     uint32_t cycleCaseIndex = 0;
     uint32_t cyclePageIndex = 0;
 

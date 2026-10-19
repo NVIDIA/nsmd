@@ -1633,6 +1633,115 @@ class SetSwitchIsolationMode : public CommandInterface
     uint8_t isolation_mode;
 };
 
+class GetPowerProfile : public CommandInterface
+{
+  public:
+    ~GetPowerProfile() = default;
+    GetPowerProfile() = delete;
+    GetPowerProfile(const GetPowerProfile&) = delete;
+    GetPowerProfile(GetPowerProfile&&) = default;
+    GetPowerProfile& operator=(const GetPowerProfile&) = delete;
+    GetPowerProfile& operator=(GetPowerProfile&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_power_profile_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint8_t activeProfileId = 0;
+        uint8_t profileCount = 0;
+        nsm_power_profile_entry entries[NSM_POWER_PROFILE_MAX_COUNT]{};
+
+        auto rc = decode_get_power_profile_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &activeProfileId,
+            &profileCount, entries, NSM_POWER_PROFILE_MAX_COUNT);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr
+                << "Response message error: decode_get_power_profile_resp "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Active Profile ID"] = activeProfileId;
+        ordered_json profiles = ordered_json::array();
+        for (uint8_t i = 0; i < profileCount; ++i)
+        {
+            ordered_json profile;
+            profile["Profile ID"] = entries[i].profile_id;
+            profile["Profile Name"] = std::string(entries[i].profile_name);
+            profiles.push_back(profile);
+        }
+        result["Available Profiles"] = profiles;
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
+class SetPowerProfile : public CommandInterface
+{
+  public:
+    ~SetPowerProfile() = default;
+    SetPowerProfile() = delete;
+    SetPowerProfile(const SetPowerProfile&) = delete;
+    SetPowerProfile(SetPowerProfile&&) = default;
+    SetPowerProfile& operator=(const SetPowerProfile&) = delete;
+    SetPowerProfile& operator=(SetPowerProfile&&) = default;
+
+    explicit SetPowerProfile(const char* type, const char* name,
+                             CLI::App* app) : CommandInterface(type, name, app)
+    {
+        auto requested = app->add_option_group(
+            "Required", "Power profile ID, 0 applies hardware defaults");
+        requested->add_option("-p, --profile", profileId, "Profile ID");
+        requested->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_set_power_profile_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_power_profile_req(instanceId, profileId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        auto rc = decode_set_power_profile_resp(responsePtr, payloadLength, &cc,
+                                                &reasonCode);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr
+                << "Response message error: decode_set_power_profile_resp "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t profileId = 0;
+};
+
 class GetInventoryInformation : public CommandInterface
 {
   public:
@@ -7551,6 +7660,16 @@ void registerCommand(CLI::App& app)
     commands.push_back(std::make_unique<QueryPortTelemetryCapabilities>(
         "telemetry", "QueryPortTelemetryCapabilities",
         queryPortTelemetryCapabilities));
+
+    auto getPowerProfile = telemetry->add_subcommand(
+        "GetPowerProfile", "Get active and available power profiles");
+    commands.push_back(std::make_unique<GetPowerProfile>(
+        "telemetry", "GetPowerProfile", getPowerProfile));
+
+    auto setPowerProfile = telemetry->add_subcommand(
+        "SetPowerProfile", "Set the active power profile");
+    commands.push_back(std::make_unique<SetPowerProfile>(
+        "telemetry", "SetPowerProfile", setPowerProfile));
 }
 
 } // namespace telemetry

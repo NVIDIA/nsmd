@@ -47,6 +47,7 @@
 #include "nsmNvSwitchDeviceConfiguration.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
+#include "nsmSwitchPowerProfile.hpp"
 #ifdef NVIDIA_SHMEM
 #include "requester/mctp_endpoint_discovery.hpp"
 #include "sharedMemCommon.hpp"
@@ -1725,6 +1726,9 @@ inline void createNvSwitchHistogram(std::shared_ptr<NsmDevice> device,
         histoObjName, histoTypeName, histoFormatIntf, histoBucketDataIntf,
         histogramId, 0);
 
+    getHistoDataObject->setDataStatusIntf(
+        std::make_shared<DataStatusIntf>(bus, histoDbusObjPath.c_str()));
+
     device->addStaticSensor(getHistoFormatObject);
     device->addSensor(getHistoDataObject, false);
 }
@@ -1823,6 +1827,15 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         {
             createNsmSwitchPowerCappingMode(device, bus, inventoryObjPath, type,
                                             name);
+        }
+
+        // Power profiles are independent of the power capping mode; a device
+        // may support one without the other.
+        if (dbusPropertyMapAsBool(allBaseIfaceProperties,
+                                  "SupportPowerProfile"))
+        {
+            createNsmSwitchPowerProfile(device, bus, inventoryObjPath, name,
+                                        type);
         }
 
         // An absent support property means TAV mode is not exposed. Read it

@@ -2573,6 +2573,136 @@ int decode_get_supported_device_modes_resp(const struct nsm_msg *msg,
 	return NSM_SW_SUCCESS;
 }
 
+#define NSM_SUPPORTED_MODES_PAGED_FIXED_DATA_SIZE (2 * sizeof(uint32_t))
+#define NSM_SUPPORTED_MODES_PAGED_MAX_COUNT                                    \
+	((UINT16_MAX - NSM_SUPPORTED_MODES_PAGED_FIXED_DATA_SIZE) /            \
+	 sizeof(uint32_t))
+
+int encode_get_supported_device_modes_paged_req(uint8_t instance_id,
+						uint32_t handle,
+						struct nsm_msg *msg)
+{
+	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_GET_SUPPORTED_DEVICE_MODES_V2, msg);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_supported_device_modes_paged_req *request =
+	    (struct nsm_get_supported_device_modes_paged_req *)msg->payload;
+	request->hdr.data_size = sizeof(request->handle);
+	request->handle = htole32(handle);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_supported_device_modes_paged_req(const struct nsm_msg *msg,
+						size_t msg_len,
+						uint32_t *handle)
+{
+	if (handle == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_common_req(msg, msg_len);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (msg_len !=
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_get_supported_device_modes_paged_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_get_supported_device_modes_paged_req *request =
+	    (const struct nsm_get_supported_device_modes_paged_req *)
+		msg->payload;
+	if (request->hdr.data_size != sizeof(request->handle)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*handle = le32toh(request->handle);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_supported_device_modes_paged_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint32_t next_handle,
+    uint32_t mode_count, const uint32_t *supported_mode_list,
+    struct nsm_msg *msg)
+{
+	if (cc == NSM_SUCCESS) {
+		if (mode_count > NSM_SUPPORTED_MODES_PAGED_MAX_COUNT) {
+			return NSM_SW_ERROR_DATA;
+		}
+		if (mode_count > 0 && supported_mode_list == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+	}
+
+	int rc = encode_common_resp(instance_id, cc, reason_code,
+				    NSM_TYPE_DEVICE_CONFIGURATION,
+				    NSM_GET_SUPPORTED_DEVICE_MODES_V2, msg);
+	if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_supported_device_modes_paged_resp *resp =
+	    (struct nsm_get_supported_device_modes_paged_resp *)msg->payload;
+	resp->hdr.data_size =
+	    htole16(NSM_SUPPORTED_MODES_PAGED_FIXED_DATA_SIZE +
+		    mode_count * sizeof(uint32_t));
+	resp->next_handle = htole32(next_handle);
+	resp->mode_count = htole32(mode_count);
+	for (uint32_t i = 0; i < mode_count; i++) {
+		resp->supported_mode_list[i] = htole32(supported_mode_list[i]);
+	}
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_supported_device_modes_paged_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint32_t *next_handle, uint32_t *mode_count,
+    uint32_t *supported_mode_list, uint32_t max_modes)
+{
+	if (next_handle == NULL || mode_count == NULL ||
+	    (supported_mode_list == NULL && max_modes > 0)) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	const size_t fixed_len = sizeof(struct nsm_msg_hdr) +
+				 sizeof(struct nsm_common_resp) +
+				 NSM_SUPPORTED_MODES_PAGED_FIXED_DATA_SIZE;
+	if (msg_len < fixed_len) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_get_supported_device_modes_paged_resp *resp =
+	    (const struct nsm_get_supported_device_modes_paged_resp *)
+		msg->payload;
+	uint32_t count = le32toh(resp->mode_count);
+	if (count > NSM_SUPPORTED_MODES_PAGED_MAX_COUNT ||
+	    data_size != NSM_SUPPORTED_MODES_PAGED_FIXED_DATA_SIZE +
+			     count * sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (msg_len != fixed_len + count * sizeof(uint32_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (count > max_modes) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	*next_handle = le32toh(resp->next_handle);
+	*mode_count = count;
+	for (uint32_t i = 0; i < count; i++) {
+		supported_mode_list[i] = le32toh(resp->supported_mode_list[i]);
+	}
+	return NSM_SW_SUCCESS;
+}
+
 /* --- Get/Set Device Config (Type 5, commands 0x10, 0x11) — V2 header --- */
 
 int encode_set_device_config_v2_req(uint8_t instance_id,
