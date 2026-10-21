@@ -26,6 +26,7 @@ fs = import('fs')
 if fs.exists('fpga/fpga-tables.h')
     libnsm_sources += files(
         'fpga/fpga-rules-lp30-pdb.c',
+        'fpga/fpga-rules-lp30-sdm.c',
     )
 endif
 

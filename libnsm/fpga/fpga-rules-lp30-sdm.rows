@@ -1,0 +1,96 @@
+# LP30 Secure Device Manager telemetry: chip id, temperature and idcode
+# through the SDM mailbox.
+# gen-fpga-rules.py turns this file into fpga-rules-lp30-sdm.c.
+
+part sdm
+include fpga-rules-lp30.rows
+
+# SDM mailbox: ready word at 0x08 (nonzero when a command may be written),
+# credit word at 0x18 (bit 0 start of packet, bit 1 end, words above bit 2),
+# response words popped from 0x14, command header at 0x00, argument at 0x04
+const SDM_COMMAND_HEADER 0x00
+const SDM_COMMAND_ARG 0x04
+const SDM_READY 0x08
+const SDM_RESPONSE 0x14
+const SDM_CREDIT 0x18
+const SDM_CREDIT_WORDS 0xfffffffc
+const SDM_CREDIT_FRAMING 0x3
+const SDM_PACKET_START 0x1
+const SDM_PACKET_MIDDLE 0x0
+const SDM_PACKET_END 0x2
+
+# Pop the response words a crashed or foreign client left so the mailbox is idle
+# Leftover response words are drained first; skipped while the mailbox is clean
+seq sdm_drain
+  pop SDMMailBox_SecureDeviceManager SDM_CREDIT SDM_CREDIT_WORDS SDM_RESPONSE limit 8 unless_clean
+end
+# The closing drain leaves the mailbox clean for the next item
+seq sdm_drain_last
+  pop SDMMailBox_SecureDeviceManager SDM_CREDIT SDM_CREDIT_WORDS SDM_RESPONSE limit 8 leaves_clean
+end
+seq sdm_ready
+  read32 SDMMailBox_SecureDeviceManager SDM_READY poll any 0xffffffff
+end
+# Wait for response words and check the packet framing bits
+seq sdm_credit framing
+  read32 SDMMailBox_SecureDeviceManager SDM_CREDIT poll any SDM_CREDIT_WORDS expect & SDM_CREDIT_FRAMING == $framing
+end
+# The response header: client 7, the expected length, no firmware error
+seq sdm_header hdr
+  read32 SDMMailBox_SecureDeviceManager SDM_RESPONSE expect & 0xffffffff == $hdr
+end
+seq sdm_data
+  read32 SDMMailBox_SecureDeviceManager SDM_RESPONSE capture item
+end
+
+# FPGA chip id: the argument-less SDM query 0x12 answered by two words
+rule Chip_Id
+  kind identity
+  group FPGA_Identity
+  use sdm_drain
+  use sdm_ready
+  write32 SDMMailBox_SecureDeviceManager SDM_COMMAND_ARG 0x07000012
+  use sdm_credit SDM_PACKET_START
+  use sdm_header 0x07002000
+  use sdm_credit SDM_PACKET_MIDDLE
+  use sdm_data
+  use sdm_credit SDM_PACKET_END
+  use sdm_data
+  cleanup
+  use sdm_drain_last
+end
+
+# FPGA SDM temperature: query 0x19 in its two-word form, a length-1 header at
+# 0x00 then the argument 1 at 0x04, answered by one Q8.8 word
+rule SDM_Temp_0
+  kind numeric temperature
+  group FPGA_Sdm
+  decode fixed item 0 width 16 signed scale 1/256 range -40 125
+  use sdm_drain
+  use sdm_ready
+  write32 SDMMailBox_SecureDeviceManager SDM_COMMAND_HEADER 0x07001019
+  use sdm_ready
+  write32 SDMMailBox_SecureDeviceManager SDM_COMMAND_ARG 0x00000001
+  use sdm_credit SDM_PACKET_START
+  use sdm_header 0x07001000
+  use sdm_credit SDM_PACKET_END
+  use sdm_data
+  cleanup
+  use sdm_drain_last
+end
+
+# FPGA idcode: the argument-less SDM query 0x10 answered by one word
+rule Idcode
+  kind identity
+  group FPGA_Identity
+  field model hex_le item 0 4
+  use sdm_drain
+  use sdm_ready
+  write32 SDMMailBox_SecureDeviceManager SDM_COMMAND_ARG 0x07000010
+  use sdm_credit SDM_PACKET_START
+  use sdm_header 0x07001000
+  use sdm_credit SDM_PACKET_END
+  use sdm_data
+  cleanup
+  use sdm_drain_last
+end

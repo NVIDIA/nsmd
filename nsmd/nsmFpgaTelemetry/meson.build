@@ -10,6 +10,7 @@ sources += [
     '../libnsm/fpga/fpga-run.c',
     '../libnsm/fpga/fpga-rules-lp30.c',
     '../libnsm/fpga/fpga-rules-lp30-pdb.c',
+    '../libnsm/fpga/fpga-rules-lp30-sdm.c',
 ]
 
 nsmd_headers += ['.', '..']

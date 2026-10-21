@@ -48,9 +48,11 @@ static const struct nsm_fpga_station stations_p0[] = {
 };
 
 extern const struct nsm_fpga_part nsm_fpga_part_pdb;
+extern const struct nsm_fpga_part nsm_fpga_part_sdm;
 
 static const struct nsm_fpga_part *const parts_p0[] = {
     &nsm_fpga_part_pdb,
+    &nsm_fpga_part_sdm,
 };
 
 static const struct nsm_fpga_map map_p0 = {

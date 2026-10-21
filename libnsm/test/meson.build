@@ -72,6 +72,7 @@ fs = import('fs')
 if fs.exists('../fpga/fpga-tables.h')
     tests += [
         'libnsm_fpga_rules_pdb_test',
+        'libnsm_fpga_rules_sdm_test',
     ]
 endif
 
@@ -100,6 +101,7 @@ endforeach
 fpga_rows = [
     'fpga-rules-lp30',
     'fpga-rules-lp30-pdb',
+    'fpga-rules-lp30-sdm',
 ]
 python3 = find_program('python3', required: false)
 if python3.found()
