@@ -14,6 +14,10 @@ tests = [
     'libnsm_fpga_maps_test',
     'libnsm_device_capability_discovery_test',
     # 'libnsm_diagnostics_test',  # DISABLED: SIGSEGV crash - Session 7 confirmed: crashes during teardown, requires debugging
+    'libnsm_fpga_tables_test',
+    'libnsm_fpga_run_test',
+    'libnsm_fpga_controller_test',
+    'libnsm_fpga_negative_test',
     'libnsm_diagnostics_encode_decode_test',
     'libnsm_diagnostics_responses_test',
     'libnsm_diagnostics_helpers_test',
@@ -63,11 +67,16 @@ tests = [
 ]
 
 foreach t : tests
+    # FPGA test tables name only the fields a row needs
+    fpga_args = t.startswith('libnsm_fpga_') ? [
+        '-Wno-missing-field-initializers',
+    ] : []
     test(
         t,
         executable(
             t.underscorify(),
             [t + '.cpp', test_common_sources],
+            cpp_args: fpga_args,
             implicit_include_directories: false,
             include_directories: ['.', '..'],
             link_args: dynamic_linker,
@@ -77,3 +86,24 @@ foreach t : tests
         workdir: meson.current_source_dir(),
     )
 endforeach
+
+# Every generated FPGA table must match its rows file
+fpga_rows = [
+    'fpga-rules-lp30',
+]
+python3 = find_program('python3', required: false)
+if python3.found()
+    fpga_dir = meson.current_source_dir() / '..' / 'fpga'
+    foreach r : fpga_rows
+        test(
+            'libnsm_fpga_generated_' + r.underscorify(),
+            python3,
+            args: [
+                fpga_dir / 'gen-fpga-rules.py',
+                fpga_dir / (r + '.rows'),
+                fpga_dir / (r + '.c'),
+                '--check',
+            ],
+        )
+    endforeach
+endif
