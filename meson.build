@@ -121,6 +121,10 @@ conf_data.set(
     get_option('response-time-out-long-running'),
 )
 conf_data.set('DEFAULT_RR_REFRESH_LIMIT_IN_MS', get_option('rr-refresh-limit'))
+conf_data.set('FPGA_IDLE_RELEASE_MS', get_option('fpga-idle-release-ms'))
+conf_data.set('FPGA_RENEW_AFTER_MS', get_option('fpga-renew-after-ms'))
+conf_data.set('FPGA_PENDING_REPEATS', get_option('fpga-pending-repeats'))
+conf_data.set_quoted('FPGA_EPOCH_PATH', get_option('fpga-epoch-path'))
 conf_data.set(
     'ALLOWED_BUFFER_IN_MS',
     get_option('allowed-buffer-in-ms-for-polling'),
