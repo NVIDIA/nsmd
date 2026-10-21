@@ -162,6 +162,36 @@ option(
     value: 30000,
 )
 option(
+    'fpga-idle-release-ms',
+    type: 'integer',
+    min: 10,
+    max: 5000,
+    description: 'Milliseconds without an FPGA read after which the controller releases the session',
+    value: 100,
+)
+option(
+    'fpga-renew-after-ms',
+    type: 'integer',
+    min: 1000,
+    max: 9000,
+    description: 'Age of an FPGA session, in milliseconds, after which a still running round sends RENEW',
+    value: 5000,
+)
+option(
+    'fpga-epoch-path',
+    type: 'string',
+    description: 'File that keeps the last epoch nsmd stamped on an FPGA bank RECOVER, so epochs stay monotonic across restarts',
+    value: '/var/lib/nsmd/fpga-bank-epoch',
+)
+option(
+    'fpga-pending-repeats',
+    type: 'integer',
+    min: 1,
+    max: 1000,
+    description: 'How often an FPGA receipt or completion read is repeated while it reports pending',
+    value: 16,
+)
+option(
     'mockup-responder',
     type: 'feature',
     description: 'Mockup Responder',
