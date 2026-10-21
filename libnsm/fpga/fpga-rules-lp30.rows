@@ -5,6 +5,7 @@ map p0
   window 2 0x1000 0x1020 0x1040 0x1060 0x10a0 0x10e0
   part pdb
   part sdm
+  part dimm
 end
 
 const ETH_WINDOW 0xffff
