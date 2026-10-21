@@ -25,6 +25,7 @@ fs = import('fs')
 # Row part files compile only when the FPGA tables header is present
 if fs.exists('fpga/fpga-tables.h')
     libnsm_sources += files(
+        'fpga/fpga-rules-lp30-dimm.c',
         'fpga/fpga-rules-lp30-pdb.c',
         'fpga/fpga-rules-lp30-sdm.c',
     )
