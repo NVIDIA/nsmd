@@ -1,0 +1,98 @@
+# LP30 C2C and Ethernet link telemetry: pcs ready, faults and high BER
+# from the link AVMM stations.
+# gen-fpga-rules.py turns this file into fpga-rules-lp30-links.c.
+
+part links
+include fpga-rules-lp30.rows
+
+# C2C and Ethernet links: pcs status 0x118 and link fault 0x120 are station
+# relative; rx-pcs status 0x84 and fault enable 0x200 sit in the window the
+# rate field of gui-option 0x100 (bits 5 to 7) selects, 0x4000 for 200GE
+const LINK_PCS_READY_BIT 0x8
+const LINK_LOCAL_FAULT_BIT 0x1
+const LINK_REMOTE_FAULT_BIT 0x2
+const LINK_HIGH_BER_BIT 0x2
+const LINK_FAULT_ENABLE_BIT 0x1
+const LINK_RATE_MASK 0xe0
+const LINK_RATE_200GE 0xa0
+const ETH_RATE_BASE 0x4000
+
+# C2C connection c is bank 13A (c 0) or 13C (c 1); its lane l is channel 3-l
+seq link_ready st grp
+  kind state
+  group $grp
+  state LINK_PCS_READY_BIT LINK_PCS_READY_BIT enabled ok
+  state default unavailable warning
+  read32 $st 0x118
+end
+# Rows in the rate window first confirm the rate, fault rows also that fault
+# reporting is enabled; a disabled fault reports unavailable, never clear
+seq link_rate st
+  read32 $st 0x100 expect & LINK_RATE_MASK == LINK_RATE_200GE
+end
+seq link_fault st bit
+  kind state
+  group Ethernet_Link
+  state $bit $bit fault critical
+  state default enabled ok
+  use link_rate $st
+  read32 $st ETH_RATE_BASE+0x200 expect & LINK_FAULT_ENABLE_BIT == LINK_FAULT_ENABLE_BIT
+  read32 $st 0x120
+end
+seq link_high_ber st
+  kind state
+  group Ethernet_Link
+  state LINK_HIGH_BER_BIT LINK_HIGH_BER_BIT fault critical
+  state default enabled ok
+  use link_rate $st
+  read32 $st ETH_RATE_BASE+0x84
+end
+
+rule C2C_0_Lane_0_Pcs_Ready
+  use link_ready GroqNetV2_reconfig_eth3_mm_B13A_C2C_LOWER_QSFP_3 C2C_Link
+end
+rule C2C_0_Lane_1_Pcs_Ready
+  use link_ready GroqNetV2_reconfig_eth2_mm_B13A_C2C_LOWER_QSFP_2 C2C_Link
+end
+rule C2C_0_Lane_2_Pcs_Ready
+  use link_ready GroqNetV2_reconfig_eth1_mm_B13A_C2C_LOWER_QSFP_1 C2C_Link
+end
+rule C2C_0_Lane_3_Pcs_Ready
+  use link_ready GroqNetV2_reconfig_eth0_mm_B13A_C2C_LOWER_QSFP_0 C2C_Link
+end
+rule C2C_1_Lane_0_Pcs_Ready
+  use link_ready GroqNetV2_reconfig_eth3_mm_B13C_C2C_LOWER_QSFP_3 C2C_Link
+end
+rule C2C_1_Lane_1_Pcs_Ready
+  use link_ready GroqNetV2_reconfig_eth2_mm_B13C_C2C_LOWER_QSFP_2 C2C_Link
+end
+rule C2C_1_Lane_2_Pcs_Ready
+  use link_ready GroqNetV2_reconfig_eth1_mm_B13C_C2C_LOWER_QSFP_1 C2C_Link
+end
+rule C2C_1_Lane_3_Pcs_Ready
+  use link_ready GroqNetV2_reconfig_eth0_mm_B13C_C2C_LOWER_QSFP_0 C2C_Link
+end
+rule Ethernet_0_Pcs_Ready
+  use link_ready Network_reconfig_eth0_mm_B12A_Q2_LOWER_QSFP_200G_LOWER_QSFP Ethernet_Link
+end
+rule Ethernet_0_Local_Fault
+  use link_fault Network_reconfig_eth0_mm_B12A_Q2_LOWER_QSFP_200G_LOWER_QSFP LINK_LOCAL_FAULT_BIT
+end
+rule Ethernet_0_Remote_Fault
+  use link_fault Network_reconfig_eth0_mm_B12A_Q2_LOWER_QSFP_200G_LOWER_QSFP LINK_REMOTE_FAULT_BIT
+end
+rule Ethernet_0_High_Ber
+  use link_high_ber Network_reconfig_eth0_mm_B12A_Q2_LOWER_QSFP_200G_LOWER_QSFP
+end
+rule Ethernet_1_Pcs_Ready
+  use link_ready Network_reconfig_eth0_mm_B12A_Q3_LOWER_QSFP_200G_LOWER_QSFP Ethernet_Link
+end
+rule Ethernet_1_Local_Fault
+  use link_fault Network_reconfig_eth0_mm_B12A_Q3_LOWER_QSFP_200G_LOWER_QSFP LINK_LOCAL_FAULT_BIT
+end
+rule Ethernet_1_Remote_Fault
+  use link_fault Network_reconfig_eth0_mm_B12A_Q3_LOWER_QSFP_200G_LOWER_QSFP LINK_REMOTE_FAULT_BIT
+end
+rule Ethernet_1_High_Ber
+  use link_high_ber Network_reconfig_eth0_mm_B12A_Q3_LOWER_QSFP_200G_LOWER_QSFP
+end
