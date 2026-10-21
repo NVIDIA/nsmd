@@ -70,6 +70,7 @@ fs = import('fs')
 # Row tests build only when the FPGA tables header is present
 if fs.exists('../fpga/fpga-tables.h')
     tests += [
+        'libnsm_fpga_rules_links_test',
         'libnsm_fpga_rules_pdb_test',
         'libnsm_fpga_rules_dimm_test',
         'libnsm_fpga_rules_sdm_test',
@@ -100,6 +101,8 @@ endforeach
 # Every generated FPGA table must match its rows file
 fpga_rows = [
     'fpga-rules-lp30',
+    'fpga-rules-lp30-links',
+    'fpga-rules-lp30-optics',
     'fpga-rules-lp30-pdb',
     'fpga-rules-lp30-sdm',
     'fpga-rules-lp30-dimm',

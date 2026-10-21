@@ -6,6 +6,8 @@ map p0
   part pdb
   part sdm
   part dimm
+  part links
+  part optics
 end
 
 const ETH_WINDOW 0xffff

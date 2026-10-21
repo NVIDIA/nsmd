@@ -9,6 +9,8 @@ sources += [
     '../libnsm/fpga/fpga-tables.c',
     '../libnsm/fpga/fpga-run.c',
     '../libnsm/fpga/fpga-rules-lp30.c',
+    '../libnsm/fpga/fpga-rules-lp30-links.c',
+    '../libnsm/fpga/fpga-rules-lp30-optics.c',
     '../libnsm/fpga/fpga-rules-lp30-pdb.c',
     '../libnsm/fpga/fpga-rules-lp30-dimm.c',
     '../libnsm/fpga/fpga-rules-lp30-sdm.c',

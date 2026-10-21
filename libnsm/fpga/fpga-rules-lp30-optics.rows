@@ -1,0 +1,340 @@
+# LP30 optical module telemetry: presence, power good, state, inventory,
+# temperature and lane vectors of the five CMIS cages on the osfp I2C master.
+# gen-fpga-rules.py turns this file into fpga-rules-lp30-optics.c.
+
+part optics
+include fpga-rules-lp30.rows
+
+# Optical modules on the osfp I2C master, read with bounded transactions. Each
+# module has two groups with the same setup: the module group carries
+# presence, power good, state, inventory and temperature at the temperature
+# rate; the lane group carries the four lane vectors at their own rate. A
+# pointerless mux at 0x71 selects
+# the module or the presence expander; the expander input register carries
+# the present pin (bit 4, active low) and power good (bit 1), its output latch
+# and direction register carry the module reset on bit 3, released when the
+# latch bit is high and the pin is an output; the CMIS module answers at 0x50. Group buffer: 0 mux mask found, 1 expander pins, 2 to 5
+# CMIS bytes 0 to 3, 6 and 7 bank and page found, 8 page 1 byte 142 (bank
+# count code), 9 to 12 page 1 bytes 157 to 160 (monitor capabilities).
+const OPTICS_MUX 0x71
+const OPTICS_MODULE 0x50
+const CMIS_PAGE_REGISTER 126
+
+# Select a mux channel mask and confirm it
+seq mux_select mask
+  xfer i2c_master_osfp OPTICS_MUX w $mask
+  xfer i2c_master_osfp OPTICS_MUX r 1 expect & 0xff == $mask
+end
+# Select a module bank and page and confirm both
+seq page_select bank page
+  xfer i2c_master_osfp OPTICS_MODULE w CMIS_PAGE_REGISTER $bank $page
+  xfer i2c_master_osfp OPTICS_MODULE w CMIS_PAGE_REGISTER r 2 expect & 0xffff == $bank|($page<<8)
+end
+# Read count bytes from a module register
+seq module_read reg count
+  xfer i2c_master_osfp OPTICS_MODULE w $reg r $count capture item
+end
+
+seq optics_setup chan exp_mask exp_addr exp_reg exp_out exp_dir
+  xfer i2c_master_osfp OPTICS_MUX r 1 capture group
+  use mux_select $exp_mask
+  xfer i2c_master_osfp $exp_addr w $exp_reg r 1 capture group
+  check i2c_master_osfp group 1 & 0x10 == 0 else end_group absent ok
+  check i2c_master_osfp group 1 & 0x02 == 0x02 else end_group unavailable warning
+  xfer i2c_master_osfp $exp_addr w $exp_out r 1 expect & 0x08 == 0x08 else end_group standby ok
+  xfer i2c_master_osfp $exp_addr w $exp_dir r 1 expect & 0x08 == 0 else end_group standby ok
+  use mux_select $chan
+  xfer i2c_master_osfp OPTICS_MODULE w 0 r 4 capture group
+  check i2c_master_osfp group 3 & 0xff >= 0x40 else end_group unavailable ok
+  check i2c_master_osfp group 3 & 0xff <= 0x5f else end_group unavailable ok
+  check i2c_master_osfp group 4 & 0x80 == 0 else end_group unavailable ok
+  xfer i2c_master_osfp OPTICS_MODULE w CMIS_PAGE_REGISTER r 2 capture group
+  use page_select 0 1
+  xfer i2c_master_osfp OPTICS_MODULE w 142 r 1 capture group
+  xfer i2c_master_osfp OPTICS_MODULE w 157 r 4 capture group
+end
+# Give back the bank and page found, then the mux mask found
+seq optics_cleanup
+  xfer i2c_master_osfp OPTICS_MODULE w CMIS_PAGE_REGISTER wc 6 wc 7 if group 7 & 0 == 0
+  xfer i2c_master_osfp OPTICS_MUX wc 0 if group 0 & 0 == 0
+end
+
+# Presence from the expander pin, module state from CMIS byte 3 bits 1 to 3
+seq optics_present grp
+  kind state
+  group $grp
+  word group 1
+  state 0x10 0 enabled ok
+  state default absent ok
+end
+# Power good from the expander pin (bit 1), whatever the module state
+seq optics_power_good grp
+  kind state
+  group $grp
+  word group 1
+  state 0x02 0x02 enabled ok
+  state default fault critical
+end
+seq optics_module_state grp
+  kind state
+  group $grp
+  word group 5
+  state 0x0e 0x06 enabled ok
+  state 0x0e 0x04 starting ok
+  state 0x0e 0x02 standby ok
+  state 0x0e 0x08 standby ok
+  state 0x0e 0x0a fault critical
+  state default unavailable warning
+end
+# Inventory: page 0 bytes 129 to 181, vendor, part, revision and serial
+seq optics_inventory grp
+  kind identity
+  group $grp
+  field manufacturer ascii item 0 16
+  field part ascii item 19 16
+  field revision ascii item 35 2
+  field serial ascii item 37 16
+  use page_select 0 0
+  use module_read 129 53
+end
+# Module temperature: lower memory bytes 14 and 15, signed 1/256 degrees
+seq optics_temp grp
+  kind numeric temperature
+  group $grp
+  decode s16be item 0 scale 1/256 range -40 125
+  valid_if group 11 & 0x01 == 0x01
+  use module_read 14 2
+end
+# Per-lane items read page 0x11 of every bank the module has: the bank count
+# code (group byte 8) is 0 for one bank, 1 for two, 2 for four; lanes are read
+# only while the module state is ready
+seq bank_read bank reg count
+  use page_select $bank 0x11
+  use module_read $reg $count
+end
+seq lane_rows reg count
+  use bank_read 0 $reg $count
+  use bank_read 1 $reg $count if group 8 & 0x3 >= 1
+  use bank_read 2 $reg $count if group 8 & 0x3 == 2
+  use bank_read 3 $reg $count if group 8 & 0x3 == 2
+end
+# Flags: one byte per bank, bit i is lane i; valid when the capability is set
+seq lane_flags grp vector reg cap_off cap_bit
+  kind array $vector
+  group $grp
+  decode fixed item 0 width 1 scale 1 range 0 1 count 32 stride 1
+  valid_if group $cap_off & $cap_bit == $cap_bit
+  run_if group 5 & 0x0e == 0x06
+  use lane_rows $reg 1
+end
+# Power: eight big-endian words per bank, 0.1 uW per count
+seq lane_power grp vector reg cap_bit
+  kind array $vector
+  group $grp
+  decode u16be item 0 scale 0.0001 range 0 6.6 count 32 stride 16
+  valid_if group 12 & $cap_bit == $cap_bit
+  run_if group 5 & 0x0e == 0x06
+  use lane_rows $reg 16
+end
+
+rule Optics_0
+  use optics_present Optics_0
+end
+rule Optics_0_Power_Good
+  use optics_power_good Optics_0
+end
+rule Optics_0_Module_State
+  use optics_module_state Optics_0
+end
+rule Optics_0_Inventory
+  use optics_inventory Optics_0
+end
+rule Optics_0_Temp_0
+  use optics_temp Optics_0
+end
+rule Optics_0_Tx_Fault
+  use lane_flags Optics_0_Lanes tx_fault 135 9 0x01
+end
+rule Optics_0_Rx_Los
+  use lane_flags Optics_0_Lanes rx_los 147 10 0x02
+end
+rule Optics_0_Tx_Power
+  use lane_power Optics_0_Lanes tx_power 154 0x02
+end
+rule Optics_0_Rx_Power
+  use lane_power Optics_0_Lanes rx_power 186 0x04
+end
+
+rule Optics_1
+  use optics_present Optics_1
+end
+rule Optics_1_Power_Good
+  use optics_power_good Optics_1
+end
+rule Optics_1_Module_State
+  use optics_module_state Optics_1
+end
+rule Optics_1_Inventory
+  use optics_inventory Optics_1
+end
+rule Optics_1_Temp_0
+  use optics_temp Optics_1
+end
+rule Optics_1_Tx_Fault
+  use lane_flags Optics_1_Lanes tx_fault 135 9 0x01
+end
+rule Optics_1_Rx_Los
+  use lane_flags Optics_1_Lanes rx_los 147 10 0x02
+end
+rule Optics_1_Tx_Power
+  use lane_power Optics_1_Lanes tx_power 154 0x02
+end
+rule Optics_1_Rx_Power
+  use lane_power Optics_1_Lanes rx_power 186 0x04
+end
+
+rule Optics_2
+  use optics_present Optics_2
+end
+rule Optics_2_Power_Good
+  use optics_power_good Optics_2
+end
+rule Optics_2_Module_State
+  use optics_module_state Optics_2
+end
+rule Optics_2_Inventory
+  use optics_inventory Optics_2
+end
+rule Optics_2_Temp_0
+  use optics_temp Optics_2
+end
+rule Optics_2_Tx_Fault
+  use lane_flags Optics_2_Lanes tx_fault 135 9 0x01
+end
+rule Optics_2_Rx_Los
+  use lane_flags Optics_2_Lanes rx_los 147 10 0x02
+end
+rule Optics_2_Tx_Power
+  use lane_power Optics_2_Lanes tx_power 154 0x02
+end
+rule Optics_2_Rx_Power
+  use lane_power Optics_2_Lanes rx_power 186 0x04
+end
+
+rule Optics_3
+  use optics_present Optics_3
+end
+rule Optics_3_Power_Good
+  use optics_power_good Optics_3
+end
+rule Optics_3_Module_State
+  use optics_module_state Optics_3
+end
+rule Optics_3_Inventory
+  use optics_inventory Optics_3
+end
+rule Optics_3_Temp_0
+  use optics_temp Optics_3
+end
+rule Optics_3_Tx_Fault
+  use lane_flags Optics_3_Lanes tx_fault 135 9 0x01
+end
+rule Optics_3_Rx_Los
+  use lane_flags Optics_3_Lanes rx_los 147 10 0x02
+end
+rule Optics_3_Tx_Power
+  use lane_power Optics_3_Lanes tx_power 154 0x02
+end
+rule Optics_3_Rx_Power
+  use lane_power Optics_3_Lanes rx_power 186 0x04
+end
+
+rule Optics_4
+  use optics_present Optics_4
+end
+rule Optics_4_Power_Good
+  use optics_power_good Optics_4
+end
+rule Optics_4_Module_State
+  use optics_module_state Optics_4
+end
+rule Optics_4_Inventory
+  use optics_inventory Optics_4
+end
+rule Optics_4_Temp_0
+  use optics_temp Optics_4
+end
+rule Optics_4_Tx_Fault
+  use lane_flags Optics_4_Lanes tx_fault 135 9 0x01
+end
+rule Optics_4_Rx_Los
+  use lane_flags Optics_4_Lanes rx_los 147 10 0x02
+end
+rule Optics_4_Tx_Power
+  use lane_power Optics_4_Lanes tx_power 154 0x02
+end
+rule Optics_4_Rx_Power
+  use lane_power Optics_4_Lanes rx_power 186 0x04
+end
+
+# Module paths: mux channel mask, expander address, input, output and direction registers
+group Optics_0
+  setup
+  use optics_setup 0x01 0x00 0x74 0 2 6
+  cleanup
+  use optics_cleanup
+end
+group Optics_1
+  setup
+  use optics_setup 0x02 0x00 0x74 1 3 7
+  cleanup
+  use optics_cleanup
+end
+group Optics_2
+  setup
+  use optics_setup 0x08 0x00 0x74 0 2 6
+  cleanup
+  use optics_cleanup
+end
+group Optics_3
+  setup
+  use optics_setup 0x10 0x00 0x74 1 3 7
+  cleanup
+  use optics_cleanup
+end
+group Optics_4
+  setup
+  use optics_setup 0x04 0x04 0x70 0 1 3
+  cleanup
+  use optics_cleanup
+end
+group Optics_0_Lanes
+  setup
+  use optics_setup 0x01 0x00 0x74 0 2 6
+  cleanup
+  use optics_cleanup
+end
+group Optics_1_Lanes
+  setup
+  use optics_setup 0x02 0x00 0x74 1 3 7
+  cleanup
+  use optics_cleanup
+end
+group Optics_2_Lanes
+  setup
+  use optics_setup 0x08 0x00 0x74 0 2 6
+  cleanup
+  use optics_cleanup
+end
+group Optics_3_Lanes
+  setup
+  use optics_setup 0x10 0x00 0x74 1 3 7
+  cleanup
+  use optics_cleanup
+end
+group Optics_4_Lanes
+  setup
+  use optics_setup 0x04 0x04 0x70 0 1 3
+  cleanup
+  use optics_cleanup
+end
