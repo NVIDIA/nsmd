@@ -1146,15 +1146,18 @@ int decode_long_running_resp_with_data(const struct nsm_msg *msg,
 	}
 
 	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	// A successful long-running response carries exactly
+	// sizeof(struct nsm_long_running_resp) + data_size bytes; copy only
+	// data_size bytes and reject any other declared size.
 	if (msg_len < (sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
 		       event->data_size) ||
 	    event->data_size < sizeof(struct nsm_long_running_resp) ||
-	    (event->data_size - sizeof(struct nsm_long_running_resp)) <
+	    (event->data_size - sizeof(struct nsm_long_running_resp)) !=
 		data_size) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 	memcpy(data, event->data + sizeof(struct nsm_long_running_resp),
-	       event->data_size - sizeof(struct nsm_long_running_resp));
+	       data_size);
 
 	return NSM_SW_SUCCESS;
 }

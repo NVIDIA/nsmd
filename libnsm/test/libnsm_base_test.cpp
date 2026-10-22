@@ -965,6 +965,67 @@ TEST(LongRunning, testBadDecode)
 	responseMsg[offset(&longRunning->completion_code)] = NSM_SUCCESS;
 }
 
+// decode_long_running_resp_with_data must reject a self-consistent event whose
+// declared payload differs from the caller's destination capacity, and accept
+// the exact-size case.
+TEST(LongRunning, testDecodeRejectsOversizedData)
+{
+	const uint8_t instanceId = 0;
+	const uint8_t commandCode = 0x4d;
+	// Base message carries sizeof(nsm_long_running_resp) + 2 trailing bytes
+	// (0xAA, 0xBB); each case below sets event->data_size in place. The
+	// caller offers only sizeof(bitfield8_t) == 1 byte of capacity.
+	Response responseMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    (instanceId & 0x1f), // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
+	    0x08,			    // NSM_EVENT_VERSION=0, ACK=1, RES=0
+	    NSM_LONG_RUNNING_EVENT,	    // EVENT_ID
+	    NSM_NVIDIA_GENERAL_EVENT_CLASS, // EVENT_CLASS
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL,	  // EVENT_STATE >> 8
+	    commandCode,			  // EVENT_STATE & 0xFF
+	    sizeof(struct nsm_long_running_resp), // data size (set per case)
+	    instanceId,				  // instance id
+	    NSM_SUCCESS,			  // completion code
+	    0,					  // reserved
+	    0,					  // reserved
+	    0xAA,				  // payload byte 0
+	    0xBB,				  // payload byte 1
+	};
+	uint8_t data = 0;
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	auto event = reinterpret_cast<nsm_event *>(response->payload);
+	auto len = responseMsg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reasonCode = ERR_NULL;
+	const auto offset = [response](uint8_t *p) {
+		return size_t(p) - size_t(response);
+	};
+
+	// Oversized-but-self-consistent payload (2 bytes) into a 1-byte
+	// destination must be rejected, not truncated.
+	responseMsg[offset(&event->data_size)] =
+	    sizeof(struct nsm_long_running_resp) + 2;
+	auto rc = decode_long_running_resp_with_data(
+	    response, len, NSM_TYPE_PLATFORM_ENVIRONMENTAL, commandCode, &cc,
+	    &reasonCode, &data, sizeof(bitfield8_t));
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Exact-size payload (== destination capacity) decodes; the copy is
+	// bounded by data_size, so payload byte 0xAA reaches data.
+	responseMsg[offset(&event->data_size)] =
+	    sizeof(struct nsm_long_running_resp) + sizeof(bitfield8_t);
+	cc = NSM_SUCCESS;
+	rc = decode_long_running_resp_with_data(
+	    response, len, NSM_TYPE_PLATFORM_ENVIRONMENTAL, commandCode, &cc,
+	    &reasonCode, &data, sizeof(bitfield8_t));
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data, 0xAA);
+}
+
 // Tests for uncovered functions - Functional 90% coverage target
 
 TEST(decodeNsmEventAcknowledgement, testGoodDecode)
