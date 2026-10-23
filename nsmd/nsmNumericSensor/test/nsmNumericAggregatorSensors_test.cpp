@@ -164,7 +164,8 @@ TEST(nsmPowerSensorAggregator, GoodHandleSampleData)
     size_t timestamp_datasize;
     size_t reading_datasize;
 
-    EXPECT_CALL(*sensor, updateReading(reading / 1000.0, 10945847)).Times(1);
+    // The device timestamp must not reach the D-Bus publish gate.
+    EXPECT_CALL(*sensor, updateReading(reading / 1000.0, 0)).Times(1);
 
     auto rc = encode_aggregate_timestamp_data(
         timestamp, timestamp_sample.data(), &timestamp_datasize);
@@ -283,7 +284,8 @@ TEST(nsmPeakPowerSensorAggregator, GoodHandleSampleData)
     size_t timestamp_datasize;
     size_t reading_datasize;
 
-    EXPECT_CALL(*sensor, updateReading(reading / 1000.0, 10945847)).Times(1);
+    // The device timestamp must not reach the D-Bus publish gate.
+    EXPECT_CALL(*sensor, updateReading(reading / 1000.0, 0)).Times(1);
 
     auto rc = encode_aggregate_timestamp_data(
         timestamp, timestamp_sample.data(), &timestamp_datasize);

@@ -35,7 +35,6 @@ class NsmPowerAggregator : public NsmNumericAggregator
 
     static constexpr uint8_t sensorId = 255;
     uint8_t averagingInterval;
-    uint64_t timestamp{};
 };
 
 } // namespace nsm
