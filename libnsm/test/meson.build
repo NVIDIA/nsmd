@@ -66,6 +66,14 @@ tests = [
     'libnsm_network_ports_link_health_ext_test',
 ]
 
+fs = import('fs')
+# Row tests build only when the FPGA tables header is present
+if fs.exists('../fpga/fpga-tables.h')
+    tests += [
+        'libnsm_fpga_rules_pdb_test',
+    ]
+endif
+
 foreach t : tests
     # FPGA test tables name only the fields a row needs
     fpga_args = t.startswith('libnsm_fpga_') ? [
@@ -90,6 +98,7 @@ endforeach
 # Every generated FPGA table must match its rows file
 fpga_rows = [
     'fpga-rules-lp30',
+    'fpga-rules-lp30-pdb',
 ]
 python3 = find_program('python3', required: false)
 if python3.found()
