@@ -21,6 +21,14 @@ libnsm_sources = files(
     'requester/mctp.c',
 )
 
+fs = import('fs')
+# Row part files compile only when the FPGA tables header is present
+if fs.exists('fpga/fpga-tables.h')
+    libnsm_sources += files(
+        'fpga/fpga-rules-lp30-pdb.c',
+    )
+endif
+
 libnsm_headers = ['.', '..', '../common']
 
 libnsm_static = static_library(

@@ -1,0 +1,40 @@
+# LP30 power distribution board telemetry: power good of the six rail
+# controllers on the pdb I2C master, one PMBus status word each.
+# gen-fpga-rules.py turns this file into fpga-rules-lp30-pdb.c.
+
+part pdb
+include fpga-rules-lp30.rows
+
+# PMBus STATUS_WORD: two bytes, low first; bit 11 is POWER_GOOD#, set while
+# the rail is not good. A rail controller that does not answer leaves the
+# item unavailable and never fences the bank.
+const PMBUS_STATUS_WORD 0x79
+const PMBUS_POWER_GOOD_N 0x0800
+
+seq rail_power_good dev
+  kind state
+  group PDB
+  state PMBUS_POWER_GOOD_N 0 enabled ok
+  state default fault critical
+  xfer i2c_master_pdb $dev w PMBUS_STATUS_WORD r 2
+end
+
+# Rail controllers in address order: standby, the four LPU groups, run
+rule PDB_Rail_0_Power_Good
+  use rail_power_good 0x55
+end
+rule PDB_Rail_1_Power_Good
+  use rail_power_good 0x56
+end
+rule PDB_Rail_2_Power_Good
+  use rail_power_good 0x57
+end
+rule PDB_Rail_3_Power_Good
+  use rail_power_good 0x58
+end
+rule PDB_Rail_4_Power_Good
+  use rail_power_good 0x59
+end
+rule PDB_Rail_5_Power_Good
+  use rail_power_good 0x5a
+end

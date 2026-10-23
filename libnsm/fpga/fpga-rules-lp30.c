@@ -47,10 +47,18 @@ static const struct nsm_fpga_station stations_p0[] = {
     {37, NSM_FPGA_STATION_SDM, 0, 0x23},
 };
 
+extern const struct nsm_fpga_part nsm_fpga_part_pdb;
+
+static const struct nsm_fpga_part *const parts_p0[] = {
+    &nsm_fpga_part_pdb,
+};
+
 static const struct nsm_fpga_map map_p0 = {
     .window = {2, 0x1000, 0x1020, 0x1040, 0x1060, 0x10a0, 0x10e0},
     .stations = stations_p0,
     .station_count = sizeof(stations_p0) / sizeof(stations_p0[0]),
+    .parts = parts_p0,
+    .part_count = sizeof(parts_p0) / sizeof(parts_p0[0]),
 };
 
 const struct nsm_fpga_map *nsm_fpga_map_p0(void)
