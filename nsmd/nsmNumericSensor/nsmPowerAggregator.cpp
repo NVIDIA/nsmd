@@ -65,6 +65,10 @@ int NsmPowerAggregator::handleSample(const TelemetrySample& sample)
 
     if (sample.tag == TIMESTAMP)
     {
+        // Decode the device timestamp only to validate the sample. Its unit
+        // is device-defined, while the D-Bus publish pacing counts HMC
+        // steady-clock milliseconds, so it is not passed on.
+        uint64_t timestamp{};
         auto rc = decode_aggregate_timestamp_data(sample.data, sample.data_len,
                                                   &timestamp);
 
@@ -85,7 +89,7 @@ int NsmPowerAggregator::handleSample(const TelemetrySample& sample)
             // unit of power is milliwatt in NSM Command Response and
             // selected unit in SensorValue PDI is Watts. Hence it is
             // converted to Watts.
-            updateSensorReading(sample.tag, reading / 1000.0, timestamp);
+            updateSensorReading(sample.tag, reading / 1000.0);
         }
         else
         {
