@@ -69,6 +69,16 @@ requester::Coroutine
     {
         priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
     }
+    // Devices that report their PCIe link only through the multi-port query
+    // (e.g. CX9) set UpstreamPortCount. Without it the slot keeps the
+    // single-port query on DeviceIndex.
+    uint64_t upstreamPortCount{};
+    if (allCurrentIfaceProperties.count("UpstreamPortCount"))
+    {
+        upstreamPortCount = std::get<uint64_t>(
+            allCurrentIfaceProperties.at("UpstreamPortCount"));
+    }
+    const bool isMultiPciePort = upstreamPortCount > 0;
 
     auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
@@ -76,7 +86,9 @@ requester::Coroutine
     pcieSlotProvider.invoke(pdiMethod(slotType),
                             PCIeSlotIntf::convertSlotTypesFromString(slotType));
     device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
-                          pcieSlotProvider, deviceIndex, false),
+                          pcieSlotProvider,
+                          isMultiPciePort ? upstreamPortCount : deviceIndex,
+                          isMultiPciePort),
                       priority);
 
     std::vector<utils::Association> associations{};

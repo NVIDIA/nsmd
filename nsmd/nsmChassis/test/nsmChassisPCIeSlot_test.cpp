@@ -368,3 +368,64 @@ TEST_F(NsmChassisPCIeSlotTest, Factory_PriorityTrue_AddsToPrioritySensors)
     EXPECT_GT(baseboard->prioritySensors.size(), priorityBefore);
     EXPECT_EQ(roundRobinBefore, baseboard->roundRobinSensors.size());
 }
+
+// UpstreamPortCount absent → single-port query on DeviceIndex (FPGA configs)
+TEST_F(NsmChassisPCIeSlotTest, Factory_NoUpstreamPortCount_SinglePort)
+{
+    auto& map = utils::MockDbusAsync::serviceMap();
+    map = serviceMap;
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
+    propertyMap["DeviceIndex"] = uint64_t(2);
+    propertyMap["SlotType"] = basic["SlotType"];
+    propertyMap["Priority"] = basic["Priority"];
+
+    nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
+
+    std::shared_ptr<NsmPCIeLinkSpeed<PCIeSlotIntf>> linkSpeed;
+    for (auto& sensor : baseboard->deviceSensors)
+    {
+        if (auto ls = std::dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
+                sensor))
+        {
+            linkSpeed = ls;
+        }
+    }
+    ASSERT_NE(nullptr, linkSpeed);
+    EXPECT_FALSE(linkSpeed->isMultiPciePortEnabled);
+    EXPECT_EQ(linkSpeed->deviceIndex, 2u);
+}
+
+// UpstreamPortCount set → multi-port query (CX9 host uplink slots)
+TEST_F(NsmChassisPCIeSlotTest, Factory_UpstreamPortCount_MultiPort)
+{
+    auto& map = utils::MockDbusAsync::serviceMap();
+    map = serviceMap;
+    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          basicIntfName);
+    propertyMap["ChassisName"] = basic["ChassisName"];
+    propertyMap["Name"] = basic["Name"];
+    propertyMap["UUID"] = basic["UUID"];
+    propertyMap["DeviceIndex"] = basic["DeviceIndex"];
+    propertyMap["UpstreamPortCount"] = uint64_t(1);
+    propertyMap["SlotType"] = basic["SlotType"];
+    propertyMap["Priority"] = basic["Priority"];
+
+    nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
+
+    std::shared_ptr<NsmPCIeLinkSpeed<PCIeSlotIntf>> linkSpeed;
+    for (auto& sensor : baseboard->deviceSensors)
+    {
+        if (auto ls = std::dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
+                sensor))
+        {
+            linkSpeed = ls;
+        }
+    }
+    ASSERT_NE(nullptr, linkSpeed);
+    EXPECT_TRUE(linkSpeed->isMultiPciePortEnabled);
+    EXPECT_EQ(linkSpeed->upstreamPortCount, 1u);
+}
