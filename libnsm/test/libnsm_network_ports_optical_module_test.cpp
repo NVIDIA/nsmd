@@ -141,6 +141,73 @@ TEST(OpticalModuleCodec, EncodeQueryPortTelemetryV2Req_NullMsg)
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
+static_assert(sizeof(nsm_query_port_telemetry_v2_req) == 14,
+	      "Query Port Telemetry v2 request: 2-byte hdr + 12-byte payload");
+
+TEST(OpticalModuleCodec, EncodeQueryPortTelemetryV2Req_PayloadIs12Bytes)
+{
+	// Pre-fill with 0xFF so the test proves the reserved bytes are zeroed
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				     sizeof(nsm_query_port_telemetry_v2_req),
+				 0xFF);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	auto rc = encode_query_port_telemetry_v2_req(
+	    0, 0x0102, NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE, 0x11223344,
+	    msg);
+	ASSERT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto *req =
+	    reinterpret_cast<nsm_query_port_telemetry_v2_req *>(msg->payload);
+	EXPECT_EQ(req->hdr.data_size, 12);
+
+	// Golden payload: tok LE x4, port LE x2, 0, 0, group, 0, 0, 0
+	const std::vector<uint8_t> expected{
+	    0x44,
+	    0x33,
+	    0x22,
+	    0x11,
+	    0x02,
+	    0x01,
+	    0x00,
+	    0x00,
+	    static_cast<uint8_t>(NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE),
+	    0x00,
+	    0x00,
+	    0x00};
+	const uint8_t *payload = msg->payload + sizeof(nsm_common_req);
+	EXPECT_EQ(std::vector<uint8_t>(payload, payload + expected.size()),
+		  expected);
+}
+
+TEST(OpticalModuleCodec,
+     DecodeQueryPortTelemetryV2Req_LegacyNineBytePayload_Rejected)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_telemetry_v2_req), 0);
+	auto *msg = reinterpret_cast<nsm_msg *>(buf.data());
+	ASSERT_EQ(encode_query_port_telemetry_v2_req(
+		      0, 1, NSM_PORT_TELEMETRY_GROUP_OPTICAL_MODULE, 0, msg),
+		  NSM_SW_SUCCESS);
+
+	uint16_t port = 0;
+	uint8_t group = 0;
+	uint32_t token = 0;
+
+	// Frame carrying only the legacy 9-byte payload is too short
+	EXPECT_EQ(decode_query_port_telemetry_v2_req(
+		      msg, sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) + 9,
+		      &port, &group, &token),
+		  NSM_SW_ERROR_LENGTH);
+
+	// Full-size frame advertising a 9-byte data_size is rejected
+	auto *req =
+	    reinterpret_cast<nsm_query_port_telemetry_v2_req *>(msg->payload);
+	req->hdr.data_size = 9;
+	EXPECT_EQ(decode_query_port_telemetry_v2_req(msg, buf.size(), &port,
+						     &group, &token),
+		  NSM_SW_ERROR_DATA);
+}
+
 TEST(OpticalModuleCodec, EncodeQueryPortTelemetryV2Req_GroupBelowRange_Rejected)
 {
 	std::vector<uint8_t> buf(

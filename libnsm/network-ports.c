@@ -2588,12 +2588,11 @@ int encode_query_port_telemetry_v2_req(uint8_t instance_id, uint16_t port_index,
 
 	struct nsm_query_port_telemetry_v2_req *req =
 	    (struct nsm_query_port_telemetry_v2_req *)msg->payload;
+	memset(req, 0, sizeof(*req));
 	req->hdr.command = NSM_QUERY_PORT_TELEMETRY_COUNTER_V2;
 	req->hdr.data_size = sizeof(*req) - sizeof(req->hdr);
 	req->sequence_token = htole32(sequence_token);
 	req->port_index = htole16(port_index);
-	req->reserved[0] = 0;
-	req->reserved[1] = 0;
 	req->group_id = group_id;
 
 	return NSM_SW_SUCCESS;
