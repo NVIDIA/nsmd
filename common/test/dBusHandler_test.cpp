@@ -42,6 +42,18 @@ static void drainIoContext(int ms = 5000)
         std::chrono::milliseconds(ms));
 }
 
+// Drain in short slices and stop as soon as the coroutine finishes. The
+// connection always has a pending socket operation, so run_for() never
+// returns early; a single long drain would cost its full budget.
+static void drainUntilDone(const requester::Coroutine& co, int maxMs = 3000)
+{
+    auto& io = utils::DBusHandler::getAsioConnection()->get_io_context();
+    for (int elapsed = 0; elapsed < maxMs && !co.done(); elapsed += 50)
+    {
+        io.run_for(std::chrono::milliseconds(50));
+    }
+}
+
 // ============================================================================
 // coGetDbusPropertyBase (via coGetDbusProperty<std::string>)
 // ============================================================================
@@ -153,6 +165,38 @@ TEST(DBusHandlerTest, coGetAllDbusProperty_AwaitSuspend_ReturnsTrueQueuesCall)
     // On error, property map is not updated → still empty.
     drainIoContext();
     EXPECT_TRUE(gadp.await_resume().empty());
+    // An empty map alone cannot distinguish a failed read from an interface
+    // with no properties, so success must stay false on error.
+    EXPECT_FALSE(gadp.success);
+}
+
+// ============================================================================
+// coGetCachedBaseProperties
+// ============================================================================
+
+TEST(DBusHandlerTest, coGetCachedBaseProperties_FailedRead_IsNotCached)
+{
+    // entity-manager is absent here, so the GetAll fails.
+    const std::string objPath = "/xyz/openbmc_project/test/no/such/object";
+    const std::string baseIntf =
+        "xyz.openbmc_project.Configuration.NoSuchInterface";
+
+    dbus::PropertyMap first;
+    auto co1 = utils::coGetCachedBaseProperties(objPath, baseIntf, first);
+    drainUntilDone(co1);
+    ASSERT_TRUE(co1.done());
+    EXPECT_TRUE(first.empty());
+    EXPECT_EQ(co1.data(), NSM_SW_ERROR);
+
+    dbus::PropertyMap second;
+    auto co2 = utils::coGetCachedBaseProperties(objPath, baseIntf, second);
+    // A cache hit would have completed synchronously with NSM_SUCCESS.
+    EXPECT_FALSE(co2.done());
+
+    drainUntilDone(co2);
+    ASSERT_TRUE(co2.done());
+    EXPECT_TRUE(second.empty());
+    EXPECT_EQ(co2.data(), NSM_SW_ERROR);
 }
 
 // ============================================================================

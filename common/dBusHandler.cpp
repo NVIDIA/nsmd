@@ -259,9 +259,16 @@ requester::Coroutine
 
     try
     {
-        // Make the actual D-Bus call
-        dbus::PropertyMap properties = co_await utils::coGetAllDbusProperty(
+        // Named so the failure flag outlives the suspension.
+        auto getAll = utils::coGetAllDbusProperty(
             utils::entityManagerServiceStr, objPath, baseInterface);
+        dbus::PropertyMap properties = co_await getAll;
+
+        // The cache is never invalidated, so a failed read must not reach it.
+        if (!getAll.success)
+        {
+            throw std::runtime_error("GetAll failed for base interface");
+        }
 
         // Cache the result and clean up pending request
         basePropertiesCache[objPath][baseInterface] = properties;
@@ -383,6 +390,7 @@ bool coGetAllDbusProperty::await_suspend(
     asioConnection->async_method_call(
         [resumeHandle = handle, this](boost::system::error_code ec,
                                       const dbus::PropertyMap& value) {
+        success = !ec;
         if (ec)
         {
             lg2::error(
