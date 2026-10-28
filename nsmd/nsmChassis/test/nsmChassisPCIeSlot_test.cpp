@@ -369,7 +369,6 @@ TEST_F(NsmChassisPCIeSlotTest, Factory_PriorityTrue_AddsToPrioritySensors)
     EXPECT_EQ(roundRobinBefore, baseboard->roundRobinSensors.size());
 }
 
-// UpstreamPortCount absent → single-port query on DeviceIndex (FPGA configs)
 TEST_F(NsmChassisPCIeSlotTest, Factory_NoUpstreamPortCount_SinglePort)
 {
     auto& map = utils::MockDbusAsync::serviceMap();
@@ -399,7 +398,6 @@ TEST_F(NsmChassisPCIeSlotTest, Factory_NoUpstreamPortCount_SinglePort)
     EXPECT_EQ(linkSpeed->deviceIndex, 2u);
 }
 
-// UpstreamPortCount set → multi-port query (CX9 host uplink slots)
 TEST_F(NsmChassisPCIeSlotTest, Factory_UpstreamPortCount_MultiPort)
 {
     auto& map = utils::MockDbusAsync::serviceMap();

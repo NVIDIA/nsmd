@@ -69,9 +69,6 @@ requester::Coroutine
     {
         priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
     }
-    // Devices that report their PCIe link only through the multi-port query
-    // (e.g. CX9) set UpstreamPortCount. Without it the slot keeps the
-    // single-port query on DeviceIndex.
     uint64_t upstreamPortCount{};
     if (allCurrentIfaceProperties.count("UpstreamPortCount"))
     {
