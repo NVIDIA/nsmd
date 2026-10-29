@@ -239,6 +239,7 @@ bool coGetServiceMap::await_suspend(std::coroutine_handle<> /*handle*/) noexcept
 bool coGetAllDbusProperty::await_ready() noexcept
 {
     auto propertyMap = MockDbusAsync::findPropertyMap(objectPath, interface);
+    success = propertyMap != nullptr;
     if (propertyMap == nullptr)
     {
         lg2::error(

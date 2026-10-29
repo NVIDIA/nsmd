@@ -199,6 +199,11 @@ struct coGetAllDbusProperty : dbus::PropertyMap
     const std::string objectPath;
     const std::string interface;
 
+    /** @brief True once a GetAll reply arrives without an error. Read it off
+     * a named awaiter; an empty map alone does not mean the read failed.
+     */
+    bool success = false;
+
     /** @brief Returning false to make await_suspend() to be called.
      */
     bool await_ready() noexcept;
