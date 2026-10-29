@@ -161,7 +161,12 @@ requester::Coroutine CreateFPGATotalGPUPower(SensorManager& manager,
     std::string chassis_association;
     for (const auto& association : associations)
     {
-        if (association.forward == "chassis")
+        // Accept legacy "chassis" (bmcweb RelatedItem anchors on the chassis)
+        // and new "parent_chassis" (bmcweb RelatedItem falls through to
+        // System) so a platform can opt in to the System anchor by renaming
+        // its EM config without any nsmd change.
+        if (association.forward == "chassis" ||
+            association.forward == "parent_chassis")
         {
             chassis_association = association.absolutePath;
             break;
