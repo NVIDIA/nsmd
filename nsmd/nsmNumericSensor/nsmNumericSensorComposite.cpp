@@ -161,7 +161,8 @@ requester::Coroutine CreateFPGATotalGPUPower(SensorManager& manager,
     std::string chassis_association;
     for (const auto& association : associations)
     {
-        if (association.forward == "chassis")
+        if (association.forward == "chassis" ||
+            association.forward == "parent_chassis")
         {
             chassis_association = association.absolutePath;
             break;
