@@ -24,13 +24,9 @@ NsmMNNVLinkTopologyIntf::NsmMNNVLinkTopologyIntf(sdbusplus::bus_t& bus,
                                                  const char* path) :
     MNNVLinkTopologyIntf(bus, path)
 {
-    MNNVLinkTopologyIntf::chassisSerialNumber("NA");
-    MNNVLinkTopologyIntf::ibguid("NA");
-    MNNVLinkTopologyIntf::traySerialNumber("NA");
     MNNVLinkTopologyIntf::traySlotNumber(std::numeric_limits<uint32_t>::max());
     MNNVLinkTopologyIntf::traySlotIndex(std::numeric_limits<uint32_t>::max());
     MNNVLinkTopologyIntf::hostID(std::numeric_limits<uint32_t>::max());
-    MNNVLinkTopologyIntf::peerType("NA");
     MNNVLinkTopologyIntf::moduleID(std::numeric_limits<uint32_t>::max());
 };
 } // namespace nsm

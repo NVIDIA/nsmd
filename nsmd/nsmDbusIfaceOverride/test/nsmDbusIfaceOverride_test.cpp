@@ -32,13 +32,13 @@ TEST(NsmAssetIntf, Constructor)
     const char* path = "/xyz/openbmc_project/inventory/test/asset";
     NsmAssetIntf assetIntf(bus, path);
 
-    // Verify default values are set
-    EXPECT_EQ(assetIntf.name(), "NA");
-    EXPECT_EQ(assetIntf.partNumber(), "NA");
-    EXPECT_EQ(assetIntf.serialNumber(), "NA");
-    EXPECT_EQ(assetIntf.manufacturer(), "NA");
+    // Empty until the device or configuration supplies a value
+    EXPECT_EQ(assetIntf.name(), "");
+    EXPECT_EQ(assetIntf.partNumber(), "");
+    EXPECT_EQ(assetIntf.serialNumber(), "");
+    EXPECT_EQ(assetIntf.manufacturer(), "");
     EXPECT_EQ(assetIntf.buildDate(), "0000-00-00T00:00:00Z");
-    EXPECT_EQ(assetIntf.model(), "NA");
+    EXPECT_EQ(assetIntf.model(), "");
 }
 
 TEST(NsmAssetIntf, SetValues)
@@ -89,14 +89,15 @@ TEST(NsmMNNVLinkTopologyIntf, Constructor)
     const char* path = "/xyz/openbmc_project/inventory/test/topology";
     NsmMNNVLinkTopologyIntf topoIntf(bus, path);
 
-    // Verify default values
-    EXPECT_EQ(topoIntf.chassisSerialNumber(), "NA");
+    // Empty strings and type-max numbers until the device reports
+    EXPECT_EQ(topoIntf.chassisSerialNumber(), "");
+    EXPECT_EQ(topoIntf.traySerialNumber(), "");
     EXPECT_EQ(topoIntf.traySlotNumber(), UINT32_MAX);
     EXPECT_EQ(topoIntf.traySlotIndex(), UINT32_MAX);
     EXPECT_EQ(topoIntf.hostID(), UINT32_MAX);
     EXPECT_EQ(topoIntf.moduleID(), UINT32_MAX);
-    EXPECT_EQ(topoIntf.ibguid(), "NA");
-    EXPECT_EQ(topoIntf.peerType(), "NA");
+    EXPECT_EQ(topoIntf.ibguid(), "");
+    EXPECT_EQ(topoIntf.peerType(), "");
 }
 
 TEST(NsmMNNVLinkTopologyIntf, SetValues)

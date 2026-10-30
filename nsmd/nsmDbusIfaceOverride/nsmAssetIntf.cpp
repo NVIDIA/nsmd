@@ -25,11 +25,6 @@ using AssetIntf = sdbusplus::server::object_t<
 NsmAssetIntf::NsmAssetIntf(sdbusplus::bus_t& bus, const char* path) :
     AssetIntf(bus, path)
 {
-    AssetIntf::name("NA");
-    AssetIntf::partNumber("NA");
-    AssetIntf::serialNumber("NA");
-    AssetIntf::manufacturer("NA");
     AssetIntf::buildDate("0000-00-00T00:00:00Z");
-    AssetIntf::model("NA");
 };
 } // namespace nsm
