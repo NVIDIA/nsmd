@@ -296,6 +296,52 @@ TEST_F(NsmPortFactoryBranchTest, Factory_NvlinkPort_CreatesV2)
     }
 }
 
+TEST_F(NsmPortFactoryBranchTest, Factory_DataRateUnit_ReachesDecoder)
+{
+    const std::pair<std::optional<std::string>, nsm::DataRateUnit> cases[] = {
+        {std::nullopt, nsm::DataRateUnit::KiBps},
+        {"kbps", nsm::DataRateUnit::kbps},
+        {"KiBps", nsm::DataRateUnit::KiBps},
+        {"Gbps", nsm::DataRateUnit::KiBps},
+    };
+    int n = 0;
+    for (const auto& [unit, expectUnit] : cases)
+    {
+        const std::string id = std::to_string(n++);
+        const std::string objPath = "/xyz/openbmc_project/config/port_fb_rate" +
+                                    id;
+        auto& propMap = utils::MockDbusAsync::propertyMap(objPath,
+                                                          portInterface);
+        propMap["Name"] = "NVLink_Rate" + id;
+        propMap["UUID"] = gpuUuid;
+        propMap["ParentObjPath"] =
+            std::string("/xyz/openbmc_project/inventory/system/GPU_Rate");
+        propMap["Priority"] = false;
+        propMap["Count"] = uint64_t{1};
+        propMap["DeviceType"] = uint64_t{NSM_DEV_ID_GPU};
+        if (unit)
+        {
+            propMap["DataRateUnit"] = *unit;
+        }
+
+        gpu->roundRobinSensors.clear();
+        auto result = createNsmPortSensorGeneric(mockManager, portInterface,
+                                                 objPath);
+        runUntilDone(result);
+
+        ASSERT_EQ(countSensors<NsmPortCharacteristicsV2>(gpu), 1u);
+        for (const auto& sensor : gpu->roundRobinSensors)
+        {
+            if (auto v2 =
+                    std::dynamic_pointer_cast<NsmPortCharacteristicsV2>(sensor))
+            {
+                EXPECT_EQ(v2->phase1->dataRateUnit, expectUnit)
+                    << unit.value_or("(absent)");
+            }
+        }
+    }
+}
+
 TEST_F(NsmPortFactoryBranchTest, Factory_StaleLinkHealthKey_IsIgnored)
 {
     // A configuration that still carries the withdrawn

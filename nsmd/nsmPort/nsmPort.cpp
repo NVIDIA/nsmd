@@ -378,10 +378,11 @@ NsmPortCharacteristics::NsmPortCharacteristics(
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::shared_ptr<IBPortIntf> iBPortIntf,
     std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsInterface,
-    std::string& inventoryObjPath) :
+    std::string& inventoryObjPath, DataRateUnit dataRateUnit) :
     NsmSensor(portName, type), portName(portName), iBPortIntf(iBPortIntf),
     portHealthMetricsIntf(portHealthMetricsInterface), portNumber(portNum),
-    deviceType(deviceType), objPath(inventoryObjPath)
+    deviceType(deviceType), dataRateUnit(dataRateUnit),
+    objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortCharacteristics: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
@@ -495,17 +496,28 @@ void NsmPortCharacteristics::updateLineRate(uint32_t lineRateMbps)
     portInfoIntf->maxSpeed(speedGbps);
 }
 
-void NsmPortCharacteristics::updateDataRate(uint32_t dataRateKbps)
+static double dataRateInGbps(uint32_t dataRate, DataRateUnit unit)
+{
+    switch (unit)
+    {
+        case DataRateUnit::kbps:
+            return dataRate * 1e-6;
+        case DataRateUnit::KiBps:
+            return dataRate * 1024.0 * 8 / 1e9;
+    }
+    return 0;
+}
+
+void NsmPortCharacteristics::updateDataRate(uint32_t dataRate)
 {
     if (deviceType != NSM_DEV_ID_GPU)
     {
         return;
     }
-    auto currSpeedGbps = dataRateKbps * 1e-6;
-    portInfoIntf->currentSpeed(currSpeedGbps);
+    portInfoIntf->currentSpeed(dataRateInGbps(dataRate, dataRateUnit));
 
-    portMetricsOem3Intf->txNoProtocolBytes(dataRateKbps);
-    portMetricsOem3Intf->rxNoProtocolBytes(dataRateKbps);
+    portMetricsOem3Intf->txNoProtocolBytes(dataRate);
+    portMetricsOem3Intf->rxNoProtocolBytes(dataRate);
 }
 
 void NsmPortCharacteristics::updateLaneInfo(uint32_t laneInfo)
@@ -925,11 +937,13 @@ NsmPortCharacteristicsV2::NsmPortCharacteristicsV2(
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Intf,
     std::shared_ptr<IBPortIntf> iBPortIntf,
     std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsInterface,
-    std::string& inventoryObjPath, std::shared_ptr<NsmDevice> nsmDevice) :
+    std::string& inventoryObjPath, std::shared_ptr<NsmDevice> nsmDevice,
+    DataRateUnit dataRateUnit) :
     NsmSensorAggregator(portName, type), portName(portName),
     phase1(std::make_shared<NsmPortCharacteristics>(
         bus, portName, portNum, type, deviceType, portMetricsOem3Intf,
-        iBPortIntf, portHealthMetricsInterface, inventoryObjPath)),
+        iBPortIntf, portHealthMetricsInterface, inventoryObjPath,
+        dataRateUnit)),
     portHealthMetricsIntf(portHealthMetricsInterface), device(nsmDevice),
     portNumber(portNum), objPath(inventoryObjPath)
 {
@@ -2729,6 +2743,22 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
         supportFECHistogram =
             std::get<bool>(allCurrentIfaceProperties.at("SupportFECHistogram"));
     }
+    DataRateUnit dataRateUnit = DataRateUnit::KiBps;
+    if (allCurrentIfaceProperties.count("DataRateUnit"))
+    {
+        auto unit =
+            std::get<std::string>(allCurrentIfaceProperties.at("DataRateUnit"));
+        if (auto it = dataRateUnits.find(unit); it != dataRateUnits.end())
+        {
+            dataRateUnit = it->second;
+        }
+        else
+        {
+            lg2::warning(
+                "Unknown DataRateUnit '{UNIT}' for {NAME}, using KiBps", "UNIT",
+                unit, "NAME", name);
+        }
+    }
     std::vector<std::string> portNameMap{};
     if (allCurrentIfaceProperties.count("PortNameMap"))
     {
@@ -2939,7 +2969,7 @@ requester::Coroutine createNsmPortSensor(SensorManager& manager,
                 std::make_shared<NsmPortCharacteristicsV2>(
                     bus, portName, logicalPortNum, type, deviceType,
                     portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
-                    objPath, nsmDevice);
+                    objPath, nsmDevice, dataRateUnit);
             nsmDevice->addSensor(portCharacteristicsV2Sensor, priority);
         }
 

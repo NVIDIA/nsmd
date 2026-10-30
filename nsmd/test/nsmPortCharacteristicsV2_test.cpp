@@ -147,7 +147,7 @@ static constexpr uint32_t portStatusWord(uint32_t downReason)
 }
 
 constexpr uint32_t kLineRateMbps = 400000;
-constexpr uint32_t kDataRateKbps = 200000;
+constexpr uint32_t kDataRate = 200000;
 constexpr uint32_t kLaneInfo = 0x04;
 
 // Tags 0x00-0x03 with GPU characteristics plus the given Tag 0x04 record.
@@ -156,7 +156,7 @@ static std::vector<Record> fullRecordSet(const Record& health)
     return {u32Record(NSM_PORT_CHARACTERISTICS_V2_TAG_PORT_STATUS,
                       portStatusWord(NSM_PORT_DOWN_REASON_CODE_HI_SER_BER)),
             u32Record(NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE, kLineRateMbps),
-            u32Record(NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE, kDataRateKbps),
+            u32Record(NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE, kDataRate),
             u32Record(NSM_PORT_CHARACTERISTICS_V2_TAG_LANE_INFO, kLaneInfo),
             health};
 }
@@ -481,7 +481,7 @@ TEST_F(NsmPortCharacteristicsV2Test, DecodeRecords_TrailingBytes_Aborts)
     // Count says one record, the payload holds two.
     auto response = v2Response(
         {u32Record(NSM_PORT_CHARACTERISTICS_V2_TAG_LINE_RATE, kLineRateMbps),
-         u32Record(NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE, kDataRateKbps)},
+         u32Record(NSM_PORT_CHARACTERISTICS_V2_TAG_DATA_RATE, kDataRate)},
         1);
     bool unsupported = false;
     auto rc =
@@ -558,7 +558,7 @@ TEST_F(NsmPortCharacteristicsV2Test, DecodeRecords_GoodWalk_CollectsAndSkips)
     ASSERT_TRUE(sensor->records.lineRate.has_value());
     EXPECT_EQ(*sensor->records.lineRate, kLineRateMbps);
     ASSERT_TRUE(sensor->records.dataRate.has_value());
-    EXPECT_EQ(*sensor->records.dataRate, kDataRateKbps);
+    EXPECT_EQ(*sensor->records.dataRate, kDataRate);
     ASSERT_TRUE(sensor->records.laneInfo.has_value());
     EXPECT_EQ(*sensor->records.laneInfo, kLaneInfo);
     EXPECT_TRUE(sensor->records.linkHealthPresent);
@@ -858,9 +858,9 @@ TEST_F(NsmPortCharacteristicsV2Test, Publish_GpuCharacteristicsFromU32Records)
     ASSERT_NE(sensor->phase1->portInfoIntf, nullptr);
     EXPECT_EQ(sensor->phase1->portInfoIntf->maxSpeed(), kLineRateMbps / 1000);
     EXPECT_DOUBLE_EQ(sensor->phase1->portInfoIntf->currentSpeed(),
-                     kDataRateKbps * 1e-6);
-    EXPECT_EQ(portMetricsOem3Intf->txNoProtocolBytes(), kDataRateKbps);
-    EXPECT_EQ(portMetricsOem3Intf->rxNoProtocolBytes(), kDataRateKbps);
+                     kDataRate * 8192.0 / 1e9);
+    EXPECT_EQ(portMetricsOem3Intf->txNoProtocolBytes(), kDataRate);
+    EXPECT_EQ(portMetricsOem3Intf->rxNoProtocolBytes(), kDataRate);
     EXPECT_EQ(portMetricsOem3Intf->txWidth(), kLaneInfo);
     EXPECT_EQ(portMetricsOem3Intf->rxWidth(), kLaneInfo);
 }

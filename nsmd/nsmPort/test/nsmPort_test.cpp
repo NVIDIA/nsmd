@@ -459,6 +459,54 @@ TEST(NsmPortCharacteristics, GoodHandleResponseMsg)
     EXPECT_EQ(cc, NSM_SUCCESS);
 }
 
+TEST(NsmPortCharacteristics, DataRateUnitSelectsCurrentSpeedDecode)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string type = "CharType";
+
+    struct Case
+    {
+        nsm::DataRateUnit dataRateUnit;
+        uint32_t dataRate;
+        double expectedGbps;
+    };
+    const Case cases[] = {
+        {nsm::DataRateUnit::kbps, 400000000, 400.0},
+        {nsm::DataRateUnit::KiBps, 40039062, 40039062 * 8192.0 / 1e9},
+    };
+    uint8_t portNum = 20;
+    for (const auto& c : cases)
+    {
+        std::string portName = "rate_port" + std::to_string(portNum);
+        std::string objPath = "/xyz/openbmc_project/inventory/system/dummy/" +
+                              portName;
+        auto portMetricsOem3Intf =
+            std::make_shared<nsm::PortMetricsOem3Intf>(bus, objPath.c_str());
+        auto iBPortIntf = std::make_shared<nsm::IBPortIntf>(bus,
+                                                            objPath.c_str());
+        auto portHealthMetricsIntf =
+            std::make_shared<nsm::PortHealthMetricsIntf>(bus, objPath.c_str());
+        nsm::NsmPortCharacteristics sensor(
+            bus, portName, portNum++, type, NSM_DEV_ID_GPU, portMetricsOem3Intf,
+            iBPortIntf, portHealthMetricsIntf, objPath, c.dataRateUnit);
+
+        struct nsm_port_characteristics_data data = {};
+        data.nv_port_line_rate_mbps = 328000;
+        data.nv_port_data_rate_kbps = c.dataRate;
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_characteristics_resp));
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        ASSERT_EQ(encode_query_port_characteristics_resp(
+                      0, NSM_SUCCESS, ERR_NULL, &data, responseMsg),
+                  NSM_SW_SUCCESS);
+
+        EXPECT_EQ(sensor.handleResponseMsg(responseMsg, response.size()),
+                  NSM_SUCCESS);
+        EXPECT_DOUBLE_EQ(sensor.portInfoIntf->currentSpeed(), c.expectedGbps);
+        EXPECT_EQ(portMetricsOem3Intf->txNoProtocolBytes(), c.dataRate);
+    }
+}
+
 TEST(NsmPortCharacteristics, BadHandleResponseMsg)
 {
     auto& bus = utils::DBusHandler::getBus();
