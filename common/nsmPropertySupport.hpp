@@ -39,6 +39,7 @@ inline std::unordered_set<nsm_inventory_property_identifiers>
 {
     if (deviceType == NSM_DEV_ID_MCTP_BRIDGE &&
         (deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_SXM_SMA ||
+         deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_CX_SMA ||
          deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA ||
          deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_QM_SMA))
     {
