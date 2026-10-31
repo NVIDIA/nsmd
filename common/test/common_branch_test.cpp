@@ -523,12 +523,14 @@ TEST(NsmPropertySupportBranch, MctpBridgeHpmSma_ReturnsUnsupportedSet)
     EXPECT_TRUE(result.count(MARKETING_NAME));
 }
 
-TEST(NsmPropertySupportBranch, MctpBridgeCxSma_ReturnsEmptySet)
+TEST(NsmPropertySupportBranch, MctpBridgeCxSma_ReturnsUnsupportedSet)
 {
-    // CX SMA role is NOT in the special list
     auto result = nsm::getUnsupportedAssetProperties(
         NSM_DEV_ID_MCTP_BRIDGE, NSM_MCTP_BRIDGE_DEV_ROLE_CX_SMA);
-    EXPECT_TRUE(result.empty());
+    EXPECT_EQ(3, result.size());
+    EXPECT_TRUE(result.count(FRU_PART_NUMBER));
+    EXPECT_TRUE(result.count(SERIAL_NUMBER));
+    EXPECT_TRUE(result.count(MARKETING_NAME));
 }
 
 TEST(NsmPropertySupportBranch, MctpBridgeQmSmaRole_ReturnsUnsupportedSet)
