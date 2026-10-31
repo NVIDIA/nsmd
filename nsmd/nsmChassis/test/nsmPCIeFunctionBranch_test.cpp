@@ -301,3 +301,30 @@ TEST(NsmPCIeFunctionBranch, HandleResponseMsg_DecodeSuccessNonZeroCC_ErrorTrue)
     // error=true → hexFormat returned "" → function0VendorId=""
     EXPECT_EQ(intf->function0VendorId(), "");
 }
+
+// =============================================================================
+// handleResponseMsg: multi port (NIC / DPU) success → IDs from the reply are
+// published, but ClassCode, RevisionId and DeviceClass stay empty because
+// the group 0 reply does not carry them (no fixed GPU text on a NIC)
+// =============================================================================
+
+TEST(NsmPCIeFunctionBranch, HandleResponseMsg_MultiPort_NoFixedClassValues)
+{
+    std::shared_ptr<PCIeDeviceIntf> intf;
+    auto provider = makePcieProvider("/test/pcie_br/multi_no_class", intf);
+    NsmPCIeFunction sensor(provider, 0u, 0u, 0u, 0u);
+
+    auto buf = buildGroup0Response(NSM_SUCCESS);
+    auto rc = sensor.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+
+    EXPECT_EQ(rc, NSM_SUCCESS);
+    EXPECT_EQ(intf->function0VendorId(), "0x10DE");
+    EXPECT_EQ(intf->function0DeviceId(), "0x2330");
+    EXPECT_EQ(intf->function0SubsystemVendorId(), "0x10DE");
+    EXPECT_EQ(intf->function0SubsystemId(), "0x16C1");
+    EXPECT_EQ(intf->function0FunctionType(), "Physical");
+    EXPECT_EQ(intf->function0ClassCode(), "");
+    EXPECT_EQ(intf->function0RevisionId(), "");
+    EXPECT_EQ(intf->function0DeviceClass(), "");
+}

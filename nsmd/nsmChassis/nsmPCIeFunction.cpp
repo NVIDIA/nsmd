@@ -124,14 +124,16 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
         return hexStr;
     };
 
+    // The group 0 reply has no class code or revision ID. This sensor is
+    // created for NSM_MultiPortPCIeDevice (ConnectX NICs and BlueField DPUs),
+    // so the GPU defaults "0x000000" / "0x00" / "ProcessingAccelerators" are
+    // wrong here. Leave ClassCode, RevisionId and DeviceClass unset (empty
+    // means unknown, and bmcweb leaves an unknown value out).
 #define pcieFunction(X)                                                        \
     invoke([hexFormat, data](auto& pdi) {                                      \
         pdi.function##X##VendorId(hexFormat(data.pci_vendor_id));              \
         pdi.function##X##DeviceId(hexFormat(data.pci_device_id));              \
-        pdi.function##X##ClassCode("0x000000");                                \
-        pdi.function##X##RevisionId("0x00");                                   \
         pdi.function##X##FunctionType("Physical");                             \
-        pdi.function##X##DeviceClass("ProcessingAccelerators");                \
         pdi.function##X##SubsystemVendorId(                                    \
             hexFormat(data.pci_subsystem_vendor_id));                          \
         pdi.function##X##SubsystemId(hexFormat(data.pci_subsystem_device_id)); \
