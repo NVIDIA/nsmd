@@ -99,6 +99,27 @@ TEST_F(NsmNumericSensorDbusValueFixture, GoodTest)
     EXPECT_EQ(value.valueIntf.unit(), nsm::SensorUnit::DegreesC);
 }
 
+TEST_F(NsmNumericSensorDbusValueFixture, FunctionalFollowsReading)
+{
+    nsm::NsmNumericSensorDbusValue value{
+        bus,           sensorName,
+        sensorType,    nsm::SensorUnit::DegreesC,
+        associations,  physicalContexnt,
+        nullptr,       maxAllowableValue,
+        maxValue,      minValue,
+        &readingBasis, &description};
+    EXPECT_EQ(value.status->availabilityIntf.available(), true);
+    EXPECT_EQ(value.status->operationalStatusIntf.functional(), true);
+
+    value.updateReading(std::numeric_limits<double>::quiet_NaN());
+    EXPECT_EQ(value.status->availabilityIntf.available(), true);
+    EXPECT_EQ(value.status->operationalStatusIntf.functional(), false);
+
+    value.updateReading(val);
+    EXPECT_EQ(value.status->availabilityIntf.available(), true);
+    EXPECT_EQ(value.status->operationalStatusIntf.functional(), true);
+}
+
 TEST_F(NsmNumericSensorDbusValueTimestampFixture, GoodTest)
 {
     nsm::NsmNumericSensorDbusValueTimestamp value{

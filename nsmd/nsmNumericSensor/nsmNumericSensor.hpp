@@ -41,6 +41,7 @@ struct Association;
 namespace nsm
 {
 class NsmNumericSensorComposite;
+class NsmNumericSensorDbusStatus;
 class NsmThresholdEvaluator;
 using SensorUnit = sdbusplus::xyz::openbmc_project::Sensor::server::Value::Unit;
 using ValueIntf = sdbusplus::server::object_t<
@@ -153,6 +154,9 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
     // and/or readingBasis is non-null; stays nullptr otherwise.
     std::unique_ptr<NsmAsioSensorTypeInterface> sensorTypeAsioIntf{};
     std::unique_ptr<DescriptionIntf> descriptionIntf{};
+    // Functional is false while the reading is NaN, i.e. while the sensor
+    // cannot be read.
+    std::unique_ptr<NsmNumericSensorDbusStatus> status;
     // Threshold evaluator — null when no threshold interfaces are configured.
     // Attached by NsmThresholdFactory after the threshold D-Bus interfaces
     // are created. Evaluate() is called inline on every valid reading.
