@@ -376,20 +376,28 @@ TEST_F(NsmDeviceDI3Test, GetFRU_Erot_QueriesCorrectProps)
     EXPECT_TRUE(props.find(BOARD_PART_NUMBER) != props.end());
 }
 
-// getFRU — MCTP_BRIDGE (only SERIAL_NUMBER)
-TEST_F(NsmDeviceDI3Test, GetFRU_MctpBridge_OnlySerialNumber)
+// getFRU — EROT with every property query failing (props stay empty, no throw)
+TEST_F(NsmDeviceDI3Test, GetFRU_Erot_AllPropertiesFail_ContinuesNoThrow)
 {
-    const char* strValue = "SN-MCTP";
-    auto strResp = makeInvInfoResp3(NSM_SUCCESS, strlen(strValue),
-                                    reinterpret_cast<const uint8_t*>(strValue));
-
     EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _))
-        .WillOnce(mockSendRecv3(strResp)); // SERIAL_NUMBER only
+        .Times(5)
+        .WillRepeatedly(mockSendRecvFail3(NSM_SW_ERROR));
+
+    InventoryProperties props;
+    EXPECT_NO_THROW({ auto coro = device->getFRU(props, NSM_DEV_ID_EROT); });
+
+    EXPECT_TRUE(props.empty());
+}
+
+// getFRU — MCTP_BRIDGE (empty property list, no queries sent)
+TEST_F(NsmDeviceDI3Test, GetFRU_MctpBridge_NoQueries)
+{
+    EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _)).Times(0);
 
     InventoryProperties props;
     auto coro = device->getFRU(props, NSM_DEV_ID_MCTP_BRIDGE);
 
-    EXPECT_TRUE(props.find(SERIAL_NUMBER) != props.end());
+    EXPECT_TRUE(props.empty());
 }
 
 // getFRU — CPU (empty property list)
@@ -748,23 +756,6 @@ TEST_F(NsmDeviceDI3Test, RefreshCommandMatrix_MixedTypes)
     auto coro = device->refreshCommandMatrix();
 
     EXPECT_TRUE(device->commandCodesRetrieved[1]);
-}
-
-// ===========================================================================
-// getFRU — error in one of the properties logged but continues
-// ===========================================================================
-
-TEST_F(NsmDeviceDI3Test, GetFRU_MctpBridge_ErrorReturned_ContinuesNoThrow)
-{
-    // MCTP_BRIDGE only has SERIAL_NUMBER, and it fails
-    EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _))
-        .WillOnce(mockSendRecvFail3(NSM_SW_ERROR));
-
-    InventoryProperties props;
-    auto coro = device->getFRU(props, NSM_DEV_ID_MCTP_BRIDGE);
-
-    // Error logged but function continues — props should be empty
-    EXPECT_TRUE(props.empty());
 }
 
 // ===========================================================================

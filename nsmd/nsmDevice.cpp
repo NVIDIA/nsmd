@@ -893,7 +893,9 @@ requester::Coroutine NsmDevice::getFRU(nsm::InventoryProperties& properties,
             {NSM_DEV_ID_EROT,
              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
               BUILD_DATE}},
-            {NSM_DEV_ID_MCTP_BRIDGE, {SERIAL_NUMBER}},
+            // SMA MCU (all bridge roles): only SKU(3) and UUID(10) exist per
+            // the MCU usage spec; neither is needed on FruDevice
+            {NSM_DEV_ID_MCTP_BRIDGE, {}},
             {NSM_DEV_ID_CPU, {}},
             {NSM_DEV_ID_UNKNOWN, {}}};
 
