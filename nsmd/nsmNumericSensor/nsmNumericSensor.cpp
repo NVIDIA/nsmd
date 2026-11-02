@@ -57,7 +57,8 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
         ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str()),
     decoratorAreaIntf(
         bus,
-        ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str())
+        ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str()),
+    status(std::make_unique<NsmNumericSensorDbusStatus>(bus, name, sensor_type))
 {
     valueIntf.unit(unit);
     valueIntf.maxAllowableValue(maxAllowableValue);
@@ -126,6 +127,8 @@ void NsmNumericSensorDbusValue::updateReading(double value, uint64_t timestamp)
         valueIntf.value(value);
         previousValue = value;
     }
+
+    status->updateStatus(true, !std::isnan(value));
 
     if (std::isnan(value))
     {
