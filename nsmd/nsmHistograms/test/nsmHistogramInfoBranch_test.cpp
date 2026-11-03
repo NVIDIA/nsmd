@@ -21,7 +21,8 @@
  * Targets:
  * - NsmHistogramFormat::handleResponseMsg line 298:
  *   checkSizeOfBucketArrayIsValid returns false → NSM_SW_ERROR_COMMAND_FAIL
- *   (metadata says 10 NvU32 buckets = 40B but response has 39B of bucket data)
+ *   (metadata says 10 NvU32 buckets = 40B but response claims 44B of bucket
+ *   data; an undersized claim is now rejected earlier by the decoder)
  * - NsmHistogramData::genRequestMsg line 383:
  *   encode_get_histogram_data_req fails (invalid instanceId > NSM_INSTANCE_MAX)
  *   → function returns std::nullopt
@@ -32,6 +33,7 @@
 #include "test/mockDBusHandler.hpp"
 #include "test/mockSensorManager.hpp"
 
+#include <algorithm>
 #include <cstring>
 
 #include <gmock/gmock.h>
@@ -56,19 +58,18 @@ static std::string
     sBranchInvObjPath("/xyz/openbmc_project/inventory/histogram_branch");
 
 // ============================================================================
-// NsmHistogramFormat::handleResponseMsg: checkSizeOfBucketArrayIsValid fails
-// Line 298 TRUE branch: total_bucket_offset_size ≠ num_of_buckets*sizeof(type)
+// NsmHistogramFormat::handleResponseMsg: bucket data size does not match
+// num_of_buckets * sizeof(type)
 //
-// Strategy: encode with correct 40-byte bucket data (10 NvU32, no OOB), then
-// patch data_size field to claim only 36 bytes → total_bucket_offset_size=36,
-// calculated_size=40 → checkSizeOfBucketArrayIsValid returns false.
+// Strategy: encode with the correct 40-byte bucket data (10 NvU32, no OOB),
+// then patch the data_size field to claim a different number of bucket bytes.
 // Note: encode_get_histogram_format_resp calls htoleArrayData which reads
 // num_of_buckets*4 bytes; passing fewer bytes would trigger a valgrind
 // out-of-bounds read (production code bug). We avoid this by encoding the
 // full 40-byte buffer, then manually patching the data_size.
 // ============================================================================
 
-TEST(NsmHistogramInfoBranch, HandleFormat_InvalidBucketSize_ReturnsCommandFail)
+static uint8_t handleFormatWithClaimedBucketBytes(size_t claimedBucketBytes)
 {
     auto formatIntf = std::make_shared<FormatIntf>(busH,
                                                    sBranchInvObjPath.c_str());
@@ -89,13 +90,14 @@ TEST(NsmHistogramInfoBranch, HandleFormat_InvalidBucketSize_ReturnsCommandFail)
     metadata.bucket_unit_of_measure = NSM_BUCKET_UNIT_WATTS;
     metadata.bucket_data_type = NvU32; // expects 4*10 = 40 bytes
 
-    // Encode with the correct 40-byte buffer so htoleArrayData reads in-bounds
     const size_t correctDataSize = 40; // 10 NvU32 buckets
     std::vector<uint8_t> offsetData(correctDataSize, 0xAB);
-    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
-                                         sizeof(nsm_get_histogram_format_resp) +
-                                         correctDataSize,
-                                     0);
+    // The message buffer always covers the claimed size so that the decoder's
+    // msg_len check passes and only the bucket size mismatch is exercised.
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_histogram_format_resp) +
+            std::max(correctDataSize, claimedBucketBytes),
+        0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
 
     uint8_t encRc = encode_get_histogram_format_resp(
@@ -103,18 +105,29 @@ TEST(NsmHistogramInfoBranch, HandleFormat_InvalidBucketSize_ReturnsCommandFail)
         offsetData.size(), response);
     EXPECT_EQ(encRc, NSM_SW_SUCCESS);
 
-    // Patch data_size in the common response header to claim 36 bytes of
-    // bucket data (sizeof(metadata)+36) instead of the correct 40.
-    // decode_get_histogram_format_resp derives total_bucket_offset_size =
-    // data_size - sizeof(metadata); 36 ≠ 10*4=40 → checkSize returns false.
     auto* respPayload =
         reinterpret_cast<nsm_get_histogram_format_resp*>(response->payload);
-    const uint16_t patchedDataSize =
-        static_cast<uint16_t>(sizeof(nsm_histogram_format_metadata) + 36);
-    respPayload->hdr.data_size = htole16(patchedDataSize);
+    respPayload->hdr.data_size = htole16(static_cast<uint16_t>(
+        sizeof(nsm_histogram_format_metadata) + claimedBucketBytes));
 
-    uint8_t rc = sensor.handleResponseMsg(response, responseMsg.size());
-    EXPECT_EQ(rc, static_cast<uint8_t>(NSM_SW_ERROR_COMMAND_FAIL));
+    return sensor.handleResponseMsg(response, responseMsg.size());
+}
+
+// Claimed bucket bytes (44) > 10*4: decode_get_histogram_format_resp accepts
+// it (the buckets fit) and checkSizeOfBucketArrayIsValid (line 298) rejects it
+TEST(NsmHistogramInfoBranch, HandleFormat_InvalidBucketSize_ReturnsCommandFail)
+{
+    EXPECT_EQ(handleFormatWithClaimedBucketBytes(44),
+              static_cast<uint8_t>(NSM_SW_ERROR_COMMAND_FAIL));
+}
+
+// Claimed bucket bytes (36) < 10*4: decode_get_histogram_format_resp rejects
+// it before the handler's own size check, so the decoder's rc is returned
+TEST(NsmHistogramInfoBranch,
+     HandleFormat_UndersizedBucketData_ReturnsDecodeError)
+{
+    EXPECT_EQ(handleFormatWithClaimedBucketBytes(36),
+              static_cast<uint8_t>(NSM_SW_ERROR_DATA));
 }
 
 // ============================================================================
