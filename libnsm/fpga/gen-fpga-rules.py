@@ -622,8 +622,14 @@ class Parser:
             row.expect, i = self.compare(toks, i, env)
         elif head == "xfer":
             rows, i = self.xfer(row, toks, i, env)
+        # An expanded read replaces the row: refuse modifiers it would lose
+        expanded = row not in rows
         while i < len(toks):
             key = toks[i]
+            if expanded and key in ("poll", "remember", "expect", "else",
+                                    "period", "limit", "unless_clean",
+                                    "leaves_clean"):
+                self.fail(key + " is not supported on a read over four bytes")
             if key == "poll":
                 row.poll = toks[i + 1]
                 row.poll_mask = self.integer(toks[i + 2], env)

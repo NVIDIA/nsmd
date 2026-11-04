@@ -422,14 +422,26 @@ requester::Coroutine
     if (nsm_fpga_authority_activatable(&authority) &&
         nowUsec() >= recoverHoldUntilUsec)
     {
-        co_await activateBank(nsmDevice);
+        int activateRc = co_await activateBank(nsmDevice);
+        if (activateRc != NSM_SW_SUCCESS)
+        {
+            noteSession(nsm_fpga_session_classify(&authority));
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR;
+        }
     }
     // nsmd's own lapsed lease is recovered here, with no client on the bus;
     // a bank held by the host or faulted is never touched
     if (nsm_fpga_authority_recoverable(&authority) &&
         nowUsec() >= recoverHoldUntilUsec)
     {
-        co_await recoverOwnLease(nsmDevice);
+        int recoverRc = co_await recoverOwnLease(nsmDevice);
+        if (recoverRc != NSM_SW_SUCCESS)
+        {
+            noteSession(nsm_fpga_session_classify(&authority));
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR;
+        }
     }
     // The bank's own state, sampled before ACQUIRE makes nsmd the owner
     noteSession(nsm_fpga_session_classify(&authority));
