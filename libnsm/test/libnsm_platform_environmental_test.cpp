@@ -7059,10 +7059,10 @@ TEST(LibnsmOverreadGuard, GetInventoryInformationRespDestTooSmall)
 {
 	// Message is fully received (msg_len ok) but data_size exceeds the
 	// caller's destination buffer: must be rejected before the memcpy.
-	const uint16_t dataSize = 8;
+	const size_t dataSize = 8;
 	std::vector<uint8_t> buf(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + dataSize, 0);
-	putU16(buf, kRespDataSizeOff, dataSize);
+	putU16(buf, kRespDataSizeOff, static_cast<uint16_t>(dataSize));
 	uint8_t cc = 0xFF;
 	uint16_t rc = 0;
 	uint16_t ds = 0;

@@ -922,11 +922,18 @@ TEST(BaseBranch2, EncodeRawCmdReqV2_PackFail)
 
 // Device-controlled num_of_buckets / data_size must be bounded against the
 // destination buffer and the received message before dataCopy().
-static std::vector<uint8_t> histDataRespBuf(uint16_t dataSize,
-					    uint8_t bucketType,
-					    uint16_t numBuckets,
+// Bytes of a histogram data response that data_size counts besides the bucket
+// data: bucket_data_type and num_of_buckets.
+static constexpr size_t kHistDataFixedBytes =
+    sizeof(uint8_t) + sizeof(uint16_t);
+
+static std::vector<uint8_t> histDataRespBuf(size_t dataSize, uint8_t bucketType,
+					    size_t numBuckets,
 					    size_t payloadBytes)
 {
+	// data_size and num_of_buckets are 16-bit fields on the wire
+	EXPECT_LE(dataSize, UINT16_MAX);
+	EXPECT_LE(numBuckets, UINT16_MAX);
 	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
 				     sizeof(nsm_get_histogram_data_resp) - 1 +
 				     payloadBytes,
@@ -934,15 +941,15 @@ static std::vector<uint8_t> histDataRespBuf(uint16_t dataSize,
 	auto *resp = reinterpret_cast<nsm_get_histogram_data_resp *>(
 	    buf.data() + sizeof(nsm_msg_hdr));
 	resp->hdr.command = NSM_GET_HISTOGRAM_DATA;
-	resp->hdr.data_size = dataSize;
+	resp->hdr.data_size = htole16(static_cast<uint16_t>(dataSize));
 	resp->bucket_data_type = bucketType;
-	resp->num_of_buckets = numBuckets;
+	resp->num_of_buckets = htole16(static_cast<uint16_t>(numBuckets));
 	return buf;
 }
 
 TEST(BaseBranch2, DecodeGetHistogramDataResp_DestTooSmall)
 {
-	auto buf = histDataRespBuf(3 + 8, NvU8, 8, 8);
+	auto buf = histDataRespBuf(kHistDataFixedBytes + 8, NvU8, 8, 8);
 	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
 	uint8_t cc = 0;
 	uint16_t reason = 0, dsz = 0, nob = 0;
@@ -958,7 +965,7 @@ TEST(BaseBranch2, DecodeGetHistogramDataResp_DestTooSmall)
 TEST(BaseBranch2, DecodeGetHistogramDataResp_NumBucketsExceedsData)
 {
 	// 4 x NvU32 claimed (16 bytes) but only 4 bytes of bucket data sent.
-	auto buf = histDataRespBuf(3 + 4, NvU32, 4, 4);
+	auto buf = histDataRespBuf(kHistDataFixedBytes + 4, NvU32, 4, 4);
 	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
 	uint8_t cc = 0;
 	uint16_t reason = 0, dsz = 0, nob = 0;
@@ -988,7 +995,7 @@ TEST(BaseBranch2, DecodeGetHistogramDataResp_DataSizeExceedsMsgLen)
 
 TEST(BaseBranch2, DecodeGetHistogramDataResp_BoundsOk)
 {
-	auto buf = histDataRespBuf(3 + 8, NvU8, 8, 8);
+	auto buf = histDataRespBuf(kHistDataFixedBytes + 8, NvU8, 8, 8);
 	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
 	uint8_t cc = 0;
 	uint16_t reason = 0, dsz = 0, nob = 0;
@@ -1012,10 +1019,11 @@ TEST(BaseBranch2, DecodeGetHistogramFormatResp_DestTooSmall)
 	auto *resp = reinterpret_cast<nsm_get_histogram_format_resp *>(
 	    buf.data() + sizeof(nsm_msg_hdr));
 	resp->hdr.command = NSM_GET_HISTOGRAM_FORMAT;
-	resp->hdr.data_size =
-	    sizeof(nsm_histogram_format_metadata) + offsetsBytes;
+	resp->hdr.data_size = htole16(static_cast<uint16_t>(
+	    sizeof(nsm_histogram_format_metadata) + offsetsBytes));
 	resp->metadata.bucket_data_type = NvU8;
-	resp->metadata.num_of_buckets = offsetsBytes;
+	resp->metadata.num_of_buckets =
+	    htole16(static_cast<uint16_t>(offsetsBytes));
 	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
 
 	uint8_t cc = 0;
