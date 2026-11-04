@@ -152,8 +152,17 @@ requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
             errorCode,
             std::format("{}: {}", debug_token::Error(errorCode).to_string(),
                         errorCode));
-        lg2::error("DebugToken: eraseToken: eid={EID} cc={CC} rc={RC}", "EID",
-                   eid, "CC", cc, "RC", reasonCode);
+        if (errorCode == static_cast<uint16_t>(debug_token::NotInstalled))
+        {
+            lg2::info("DebugToken: eraseToken: token not installed "
+                      "eid={EID} cc={CC} rc={RC}",
+                      "EID", eid, "CC", cc, "RC", reasonCode);
+        }
+        else
+        {
+            lg2::error("DebugToken: eraseToken: eid={EID} cc={CC} rc={RC}",
+                       "EID", eid, "CC", cc, "RC", reasonCode);
+        }
         valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::InternalFailure);
     }
