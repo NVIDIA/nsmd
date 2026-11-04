@@ -353,8 +353,8 @@ bool nsm_fpga_rule_word(const struct nsm_fpga_rule *rule, const uint8_t *item,
 static bool read_word(const uint8_t *buffer, size_t length, size_t offset,
 		      size_t width, uint64_t *out)
 {
-	if (buffer == NULL || width == 0 || width > 8 ||
-	    offset + width > length) {
+	if (buffer == NULL || width == 0 || width > 8 || offset > length ||
+	    width > length - offset) {
 		return false;
 	}
 	uint64_t value = 0;

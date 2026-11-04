@@ -603,12 +603,17 @@ requester::Coroutine NsmFpgaGroup::update(std::shared_ptr<NsmDevice> nsmDevice)
     if (!controller)
     {
         // Unbound group: every item reads in its own episode
+        int unboundWorst = NSM_SW_SUCCESS;
         for (auto& item : items)
         {
-            co_await item->update(nsmDevice);
+            int itemRc = co_await item->update(nsmDevice);
+            if (itemRc != NSM_SW_SUCCESS)
+            {
+                unboundWorst = itemRc;
+            }
         }
         // coverity[missing_return]
-        co_return NSM_SW_SUCCESS;
+        co_return unboundWorst;
     }
     if (!controller->enabled())
     {
@@ -626,7 +631,9 @@ requester::Coroutine NsmFpgaGroup::update(std::shared_ptr<NsmDevice> nsmDevice)
     pending = false;
     nextItem = 0;
     const uint64_t now = NsmFpgaController::nowUsec();
-    auto body = [this, nsmDevice, &ran, start, now]() -> requester::Coroutine {
+    int worst = NSM_SW_SUCCESS;
+    auto body = [this, nsmDevice, &ran, &worst, start,
+                 now]() -> requester::Coroutine {
         ran = true;
         size_t started = 0;
         for (size_t step = 0; step < items.size(); ++step)
@@ -634,7 +641,7 @@ requester::Coroutine NsmFpgaGroup::update(std::shared_ptr<NsmDevice> nsmDevice)
             const size_t index = (start + step) % items.size();
             auto& item = items[index];
             if (item->getRule()->kind == NSM_FPGA_RULE_IDENTITY &&
-                item->hasReading())
+                item->hasReading() && !controller->roundEndedEarly())
             {
                 // Identity is read once; it re-runs after it was cleared
                 continue;
@@ -654,13 +661,21 @@ requester::Coroutine NsmFpgaGroup::update(std::shared_ptr<NsmDevice> nsmDevice)
                 break;
             }
             started++;
-            co_await item->updateInRound(nsmDevice, now);
+            int itemRc = co_await item->updateInRound(nsmDevice, now);
+            if (itemRc != NSM_SW_SUCCESS)
+            {
+                worst = itemRc;
+            }
         }
         // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     };
-    auto rc = co_await controller->runGroup(nsmDevice, definition,
-                                            getName().c_str(), body);
+    int rc = co_await controller->runGroup(nsmDevice, definition,
+                                           getName().c_str(), body);
+    if (rc == NSM_SW_SUCCESS)
+    {
+        rc = worst;
+    }
     if (!ran)
     {
         // The round never reached the items (bank unavailable, fenced, open

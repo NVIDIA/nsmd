@@ -220,7 +220,8 @@ TEST_F(NsmFpgaControllerTest, RefusedRecoverHoldsOffAndHostLeaseIsLeftAlone)
     EXPECT_EQ(fpga.recovers, 1u);
     EXPECT_EQ(fpga.acquires, 0u);
     EXPECT_FALSE(controller->sessionOpen());
-    EXPECT_THAT(controller->lastError(), HasSubstr("bank not acquirable"));
+    // The refused RECOVER is reported itself, not masked by the fence
+    EXPECT_THAT(controller->lastError(), HasSubstr("DENIED"));
     // Within the hold the status is re-read but no RECOVER is sent again
     controller->openFailedAtUsec = 0;
     controller->fencedUntilUsec = 0;
