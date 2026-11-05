@@ -916,3 +916,150 @@ TEST(BaseBranch2, EncodeRawCmdReqV2_PackFail)
 				  NSM_PING, payload, sizeof(payload), msg);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
+
+// ===========================================================================
+// decode_get_histogram_format_resp — data_size and length validation
+// ===========================================================================
+TEST(BaseBranch2, DecodeGetHistogramFormatResp_DataSizeTooSmall)
+{
+	std::vector<uint8_t> buf(sizeof(nsm_msg_hdr) +
+				     sizeof(nsm_get_histogram_format_resp) + 16,
+				 0);
+	auto *resp = reinterpret_cast<nsm_get_histogram_format_resp *>(
+	    buf.data() + sizeof(nsm_msg_hdr));
+	resp->hdr.command = NSM_GET_HISTOGRAM_FORMAT;
+	resp->hdr.completion_code = NSM_SUCCESS;
+	resp->hdr.data_size = htole16(1);
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0;
+	nsm_histogram_format_metadata meta{};
+	uint8_t offsets[16] = {0};
+	uint32_t offsets_sz = 0;
+
+	auto rc = decode_get_histogram_format_resp(
+	    msg, buf.size(), &cc, &reason, &dsz, &meta, offsets, &offsets_sz);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(BaseBranch2, DecodeGetHistogramFormatResp_MsgLenTooSmall)
+{
+	std::vector<uint8_t> buf(64, 0);
+	auto *resp = reinterpret_cast<nsm_get_histogram_format_resp *>(
+	    buf.data() + sizeof(nsm_msg_hdr));
+	resp->hdr.command = NSM_GET_HISTOGRAM_FORMAT;
+	resp->hdr.completion_code = NSM_SUCCESS;
+	resp->hdr.data_size =
+	    htole16(sizeof(nsm_histogram_format_metadata) + 100);
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0;
+	nsm_histogram_format_metadata meta{};
+	uint8_t offsets[16] = {0};
+	uint32_t offsets_sz = 0;
+
+	auto rc = decode_get_histogram_format_resp(
+	    msg, buf.size(), &cc, &reason, &dsz, &meta, offsets, &offsets_sz);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(BaseBranch2, DecodeGetHistogramFormatResp_ArraySizeMismatch)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *resp = reinterpret_cast<nsm_get_histogram_format_resp *>(
+	    buf.data() + sizeof(nsm_msg_hdr));
+	resp->hdr.command = NSM_GET_HISTOGRAM_FORMAT;
+	resp->hdr.completion_code = NSM_SUCCESS;
+	resp->hdr.data_size =
+	    htole16(sizeof(struct nsm_histogram_format_metadata) + 20);
+	resp->metadata.num_of_buckets = htole16(10);
+	resp->metadata.bucket_data_type = NvU32;
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0;
+	nsm_histogram_format_metadata meta{};
+	uint8_t offsets[256] = {0};
+	uint32_t offsets_sz = 0;
+
+	auto rc = decode_get_histogram_format_resp(
+	    msg, buf.size(), &cc, &reason, &dsz, &meta, offsets, &offsets_sz);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+// ===========================================================================
+// decode_get_histogram_data_resp — data_size and length validation
+// ===========================================================================
+TEST(BaseBranch2, DecodeGetHistogramDataResp_DataSizeTooSmall)
+{
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_histogram_data_resp) + 16, 0);
+	auto *resp = reinterpret_cast<nsm_get_histogram_data_resp *>(
+	    buf.data() + sizeof(nsm_msg_hdr));
+	resp->hdr.command = NSM_GET_HISTOGRAM_DATA;
+	resp->hdr.completion_code = NSM_SUCCESS;
+	resp->hdr.data_size = htole16(1);
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0;
+	uint8_t btype = 0;
+	uint16_t nbuckets = 0;
+	uint8_t data[16] = {0};
+	uint32_t bdata_sz = 0;
+
+	auto rc =
+	    decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason, &dsz,
+					   &btype, &nbuckets, data, &bdata_sz);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(BaseBranch2, DecodeGetHistogramDataResp_MsgLenTooSmall)
+{
+	std::vector<uint8_t> buf(64, 0);
+	auto *resp = reinterpret_cast<nsm_get_histogram_data_resp *>(
+	    buf.data() + sizeof(nsm_msg_hdr));
+	resp->hdr.command = NSM_GET_HISTOGRAM_DATA;
+	resp->hdr.completion_code = NSM_SUCCESS;
+	resp->hdr.data_size = htole16(100);
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0;
+	uint8_t btype = 0;
+	uint16_t nbuckets = 0;
+	uint8_t data[16] = {0};
+	uint32_t bdata_sz = 0;
+
+	auto rc =
+	    decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason, &dsz,
+					   &btype, &nbuckets, data, &bdata_sz);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(BaseBranch2, DecodeGetHistogramDataResp_ArraySizeMismatch)
+{
+	std::vector<uint8_t> buf(256, 0);
+	auto *resp = reinterpret_cast<nsm_get_histogram_data_resp *>(
+	    buf.data() + sizeof(nsm_msg_hdr));
+	resp->hdr.command = NSM_GET_HISTOGRAM_DATA;
+	resp->hdr.completion_code = NSM_SUCCESS;
+	resp->hdr.data_size = htole16(3 + 20);
+	resp->bucket_data_type = NvU32;
+	resp->num_of_buckets = htole16(10);
+	const auto *msg = reinterpret_cast<const nsm_msg *>(buf.data());
+
+	uint8_t cc = 0;
+	uint16_t reason = 0, dsz = 0;
+	uint8_t btype = 0;
+	uint16_t nbuckets = 0;
+	uint8_t data[256] = {0};
+	uint32_t bdata_sz = 0;
+
+	auto rc =
+	    decode_get_histogram_data_resp(msg, buf.size(), &cc, &reason, &dsz,
+					   &btype, &nbuckets, data, &bdata_sz);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
