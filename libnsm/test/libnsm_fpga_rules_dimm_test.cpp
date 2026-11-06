@@ -25,8 +25,7 @@ TEST(fpgaRulesDimm, calibrationAndTemperatureRules)
 	EXPECT_EQ(calib->commands[0].u.csr.address, 0x05000400u);
 	EXPECT_EQ(calib->kind, NSM_FPGA_RULE_STATE);
 	EXPECT_TRUE(nsm_fpga_rule_valid(p0, calib));
-	const auto *temp =
-	    nsm_fpga_find_rule(p0, "HGX_Chassis_0_FPGA_0_DIMM_0_Temp_0");
+	const auto *temp = nsm_fpga_find_rule(p0, "HGX_FPGA_0_Memory_0_Temp_0");
 	ASSERT_NE(temp, nullptr);
 	EXPECT_EQ(temp->command_count, 7u);
 	// A stale response is acknowledged before the transfer is staged

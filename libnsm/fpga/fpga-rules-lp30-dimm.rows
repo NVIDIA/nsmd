@@ -90,16 +90,16 @@ seq dimm_temp st
   use hub_ack $st
 end
 
-rule DIMM_0_Temp_0
+rule Memory_0_Temp_0
   use dimm_temp Ddr5Sideband_d0_ch0
 end
-rule DIMM_1_Temp_0
+rule Memory_1_Temp_0
   use dimm_temp Ddr5Sideband_d1_ch0
 end
-rule DIMM_2_Temp_0
+rule Memory_2_Temp_0
   use dimm_temp Ddr5Sideband_d2_ch0
 end
-rule DIMM_3_Temp_0
+rule Memory_3_Temp_0
   use dimm_temp Ddr5Sideband_d3_ch0
 end
 

@@ -46,7 +46,7 @@ static const struct nsm_fpga_command rows_DIMM_3_Channel_1_Calibration[] = {
     {.op = NSM_FPGA_OP_READ32, .station = 36, .u = {.csr = {0x5000400, 0}}},
 };
 
-static const struct nsm_fpga_command rows_DIMM_0_Temp_0[] = {
+static const struct nsm_fpga_command rows_Memory_0_Temp_0[] = {
     {.op = NSM_FPGA_OP_READ32, .station = 29, .remember = 1, .clean = NSM_FPGA_UNLESS_CLEAN, .u = {.csr = {0x500045c, 0}}},
     {.op = NSM_FPGA_OP_ACK_CLEAR, .station = 29, .clean = NSM_FPGA_UNLESS_CLEAN, .poll_mask = 1, .u = {.csr = {0x500045c, 0}}, .run_if = {.buffer = NSM_FPGA_BUF_WORD, .mask = 1, .value = 1}},
     {.op = NSM_FPGA_OP_WRITE32, .station = 29, .u = {.csr = {0x5000420, 0xa131a0}}},
@@ -56,11 +56,11 @@ static const struct nsm_fpga_command rows_DIMM_0_Temp_0[] = {
     {.op = NSM_FPGA_OP_READ32, .station = 29, .capture = NSM_FPGA_BUF_ITEM, .u = {.csr = {0x5000800, 0}}},
 };
 
-static const struct nsm_fpga_command end_DIMM_0_Temp_0[] = {
+static const struct nsm_fpga_command end_Memory_0_Temp_0[] = {
     {.op = NSM_FPGA_OP_ACK_CLEAR, .station = 29, .clean = NSM_FPGA_LEAVES_CLEAN, .poll_mask = 1, .u = {.csr = {0x500045c, 0}}},
 };
 
-static const struct nsm_fpga_command rows_DIMM_1_Temp_0[] = {
+static const struct nsm_fpga_command rows_Memory_1_Temp_0[] = {
     {.op = NSM_FPGA_OP_READ32, .station = 31, .remember = 1, .clean = NSM_FPGA_UNLESS_CLEAN, .u = {.csr = {0x500045c, 0}}},
     {.op = NSM_FPGA_OP_ACK_CLEAR, .station = 31, .clean = NSM_FPGA_UNLESS_CLEAN, .poll_mask = 1, .u = {.csr = {0x500045c, 0}}, .run_if = {.buffer = NSM_FPGA_BUF_WORD, .mask = 1, .value = 1}},
     {.op = NSM_FPGA_OP_WRITE32, .station = 31, .u = {.csr = {0x5000420, 0xa131a0}}},
@@ -70,11 +70,11 @@ static const struct nsm_fpga_command rows_DIMM_1_Temp_0[] = {
     {.op = NSM_FPGA_OP_READ32, .station = 31, .capture = NSM_FPGA_BUF_ITEM, .u = {.csr = {0x5000800, 0}}},
 };
 
-static const struct nsm_fpga_command end_DIMM_1_Temp_0[] = {
+static const struct nsm_fpga_command end_Memory_1_Temp_0[] = {
     {.op = NSM_FPGA_OP_ACK_CLEAR, .station = 31, .clean = NSM_FPGA_LEAVES_CLEAN, .poll_mask = 1, .u = {.csr = {0x500045c, 0}}},
 };
 
-static const struct nsm_fpga_command rows_DIMM_2_Temp_0[] = {
+static const struct nsm_fpga_command rows_Memory_2_Temp_0[] = {
     {.op = NSM_FPGA_OP_READ32, .station = 33, .remember = 1, .clean = NSM_FPGA_UNLESS_CLEAN, .u = {.csr = {0x500045c, 0}}},
     {.op = NSM_FPGA_OP_ACK_CLEAR, .station = 33, .clean = NSM_FPGA_UNLESS_CLEAN, .poll_mask = 1, .u = {.csr = {0x500045c, 0}}, .run_if = {.buffer = NSM_FPGA_BUF_WORD, .mask = 1, .value = 1}},
     {.op = NSM_FPGA_OP_WRITE32, .station = 33, .u = {.csr = {0x5000420, 0xa131a0}}},
@@ -84,11 +84,11 @@ static const struct nsm_fpga_command rows_DIMM_2_Temp_0[] = {
     {.op = NSM_FPGA_OP_READ32, .station = 33, .capture = NSM_FPGA_BUF_ITEM, .u = {.csr = {0x5000800, 0}}},
 };
 
-static const struct nsm_fpga_command end_DIMM_2_Temp_0[] = {
+static const struct nsm_fpga_command end_Memory_2_Temp_0[] = {
     {.op = NSM_FPGA_OP_ACK_CLEAR, .station = 33, .clean = NSM_FPGA_LEAVES_CLEAN, .poll_mask = 1, .u = {.csr = {0x500045c, 0}}},
 };
 
-static const struct nsm_fpga_command rows_DIMM_3_Temp_0[] = {
+static const struct nsm_fpga_command rows_Memory_3_Temp_0[] = {
     {.op = NSM_FPGA_OP_READ32, .station = 35, .remember = 1, .clean = NSM_FPGA_UNLESS_CLEAN, .u = {.csr = {0x500045c, 0}}},
     {.op = NSM_FPGA_OP_ACK_CLEAR, .station = 35, .clean = NSM_FPGA_UNLESS_CLEAN, .poll_mask = 1, .u = {.csr = {0x500045c, 0}}, .run_if = {.buffer = NSM_FPGA_BUF_WORD, .mask = 1, .value = 1}},
     {.op = NSM_FPGA_OP_WRITE32, .station = 35, .u = {.csr = {0x5000420, 0xa131a0}}},
@@ -98,7 +98,7 @@ static const struct nsm_fpga_command rows_DIMM_3_Temp_0[] = {
     {.op = NSM_FPGA_OP_READ32, .station = 35, .capture = NSM_FPGA_BUF_ITEM, .u = {.csr = {0x5000800, 0}}},
 };
 
-static const struct nsm_fpga_command end_DIMM_3_Temp_0[] = {
+static const struct nsm_fpga_command end_Memory_3_Temp_0[] = {
     {.op = NSM_FPGA_OP_ACK_CLEAR, .station = 35, .clean = NSM_FPGA_LEAVES_CLEAN, .poll_mask = 1, .u = {.csr = {0x500045c, 0}}},
 };
 
@@ -432,38 +432,38 @@ static const struct nsm_fpga_rule rules_dimm[] = {
      .group = "DIMM_Calibration",
      .states = states_DIMM_0_Channel_0_Calibration,
      .state_count = sizeof(states_DIMM_0_Channel_0_Calibration) / sizeof(states_DIMM_0_Channel_0_Calibration[0])},
-    {.name = "DIMM_0_Temp_0",
-     .commands = rows_DIMM_0_Temp_0,
-     .command_count = sizeof(rows_DIMM_0_Temp_0) / sizeof(rows_DIMM_0_Temp_0[0]),
-     .cleanup = end_DIMM_0_Temp_0,
-     .cleanup_count = sizeof(end_DIMM_0_Temp_0) / sizeof(end_DIMM_0_Temp_0[0]),
+    {.name = "Memory_0_Temp_0",
+     .commands = rows_Memory_0_Temp_0,
+     .command_count = sizeof(rows_Memory_0_Temp_0) / sizeof(rows_Memory_0_Temp_0[0]),
+     .cleanup = end_Memory_0_Temp_0,
+     .cleanup_count = sizeof(end_Memory_0_Temp_0) / sizeof(end_Memory_0_Temp_0[0]),
      .kind = NSM_FPGA_RULE_NUMERIC,
      .numeric = {.sensor_type = "temperature", .format = NSM_FPGA_FORMAT_FIXED, .buffer = NSM_FPGA_BUF_ITEM, .bit_shift = 2, .bit_width = 11, .is_signed = true, .scale = 0.25, .min_value = -40.0, .max_value = 125.0},
      .group = "DIMM_Temperature",
      .valid_if = {.buffer = NSM_FPGA_BUF_ITEM, .width = 2, .mask = 0xe003, .value = 0}},
-    {.name = "DIMM_1_Temp_0",
-     .commands = rows_DIMM_1_Temp_0,
-     .command_count = sizeof(rows_DIMM_1_Temp_0) / sizeof(rows_DIMM_1_Temp_0[0]),
-     .cleanup = end_DIMM_1_Temp_0,
-     .cleanup_count = sizeof(end_DIMM_1_Temp_0) / sizeof(end_DIMM_1_Temp_0[0]),
+    {.name = "Memory_1_Temp_0",
+     .commands = rows_Memory_1_Temp_0,
+     .command_count = sizeof(rows_Memory_1_Temp_0) / sizeof(rows_Memory_1_Temp_0[0]),
+     .cleanup = end_Memory_1_Temp_0,
+     .cleanup_count = sizeof(end_Memory_1_Temp_0) / sizeof(end_Memory_1_Temp_0[0]),
      .kind = NSM_FPGA_RULE_NUMERIC,
      .numeric = {.sensor_type = "temperature", .format = NSM_FPGA_FORMAT_FIXED, .buffer = NSM_FPGA_BUF_ITEM, .bit_shift = 2, .bit_width = 11, .is_signed = true, .scale = 0.25, .min_value = -40.0, .max_value = 125.0},
      .group = "DIMM_Temperature",
      .valid_if = {.buffer = NSM_FPGA_BUF_ITEM, .width = 2, .mask = 0xe003, .value = 0}},
-    {.name = "DIMM_2_Temp_0",
-     .commands = rows_DIMM_2_Temp_0,
-     .command_count = sizeof(rows_DIMM_2_Temp_0) / sizeof(rows_DIMM_2_Temp_0[0]),
-     .cleanup = end_DIMM_2_Temp_0,
-     .cleanup_count = sizeof(end_DIMM_2_Temp_0) / sizeof(end_DIMM_2_Temp_0[0]),
+    {.name = "Memory_2_Temp_0",
+     .commands = rows_Memory_2_Temp_0,
+     .command_count = sizeof(rows_Memory_2_Temp_0) / sizeof(rows_Memory_2_Temp_0[0]),
+     .cleanup = end_Memory_2_Temp_0,
+     .cleanup_count = sizeof(end_Memory_2_Temp_0) / sizeof(end_Memory_2_Temp_0[0]),
      .kind = NSM_FPGA_RULE_NUMERIC,
      .numeric = {.sensor_type = "temperature", .format = NSM_FPGA_FORMAT_FIXED, .buffer = NSM_FPGA_BUF_ITEM, .bit_shift = 2, .bit_width = 11, .is_signed = true, .scale = 0.25, .min_value = -40.0, .max_value = 125.0},
      .group = "DIMM_Temperature",
      .valid_if = {.buffer = NSM_FPGA_BUF_ITEM, .width = 2, .mask = 0xe003, .value = 0}},
-    {.name = "DIMM_3_Temp_0",
-     .commands = rows_DIMM_3_Temp_0,
-     .command_count = sizeof(rows_DIMM_3_Temp_0) / sizeof(rows_DIMM_3_Temp_0[0]),
-     .cleanup = end_DIMM_3_Temp_0,
-     .cleanup_count = sizeof(end_DIMM_3_Temp_0) / sizeof(end_DIMM_3_Temp_0[0]),
+    {.name = "Memory_3_Temp_0",
+     .commands = rows_Memory_3_Temp_0,
+     .command_count = sizeof(rows_Memory_3_Temp_0) / sizeof(rows_Memory_3_Temp_0[0]),
+     .cleanup = end_Memory_3_Temp_0,
+     .cleanup_count = sizeof(end_Memory_3_Temp_0) / sizeof(end_Memory_3_Temp_0[0]),
      .kind = NSM_FPGA_RULE_NUMERIC,
      .numeric = {.sensor_type = "temperature", .format = NSM_FPGA_FORMAT_FIXED, .buffer = NSM_FPGA_BUF_ITEM, .bit_shift = 2, .bit_width = 11, .is_signed = true, .scale = 0.25, .min_value = -40.0, .max_value = 125.0},
      .group = "DIMM_Temperature",
