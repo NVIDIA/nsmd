@@ -572,7 +572,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog(
             "NsmMinMemoryClockLimit decode_get_inventory_information_resp",
@@ -642,7 +642,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog(
             "NsmMaxMemoryClockLimit decode_get_inventory_information_resp",

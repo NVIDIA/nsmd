@@ -120,7 +120,7 @@ TEST(PlatformEnvErrorPaths, DecodeInventoryInfoResp_NonSuccessCompletionCode)
 
 	auto rc = decode_get_inventory_information_resp(
 	    response, responseMsg.size(), &decode_cc, &decode_reason,
-	    &decode_data_size, inventory_data);
+	    &decode_data_size, inventory_data, sizeof(inventory_data));
 
 	// decode_reason_code_and_cc returns rc for non-success cc
 	EXPECT_NE(rc, NSM_SW_SUCCESS);
@@ -1325,7 +1325,8 @@ TEST(PlatformEnvBranch2, DecodeGetInventoryInfoResp_NullDataSize)
 	uint8_t inv_data[4] = {};
 	// null data_size triggers NULL check
 	auto rc = decode_get_inventory_information_resp(
-	    msg, buf.size(), &cc, &reason_code, nullptr, inv_data);
+	    msg, buf.size(), &cc, &reason_code, nullptr, inv_data,
+	    sizeof(inv_data));
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 

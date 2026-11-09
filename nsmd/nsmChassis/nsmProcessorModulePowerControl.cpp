@@ -279,7 +279,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog("NsmModulePowerLimit decode_get_inventory_information_resp " +
                       propertyName,
@@ -355,7 +355,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog(
             "NsmDefaultModulePowerLimit decode_get_inventory_information_resp",

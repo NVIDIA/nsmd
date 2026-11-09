@@ -680,7 +680,7 @@ TEST(getInventoryInformation, testGoodDecodeResponse)
 
 	auto rc = decode_get_inventory_information_resp(
 	    response, msg_len, &cc, &reason_code, &data_size,
-	    inventory_information);
+	    inventory_information, sizeof(inventory_information));
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
@@ -7050,9 +7050,32 @@ TEST(LibnsmOverreadGuard, GetInventoryInformationResp)
 	uint16_t rc = 0;
 	uint16_t ds = 0;
 	uint8_t inv[8] = {0};
-	EXPECT_EQ(decode_get_inventory_information_resp(asMsg(buf), buf.size(),
-							&cc, &rc, &ds, inv),
+	EXPECT_EQ(decode_get_inventory_information_resp(
+		      asMsg(buf), buf.size(), &cc, &rc, &ds, inv, sizeof(inv)),
 		  NSM_SW_ERROR_LENGTH);
+}
+
+TEST(LibnsmOverreadGuard, GetInventoryInformationRespDestTooSmall)
+{
+	// Message is fully received (msg_len ok) but data_size exceeds the
+	// caller's destination buffer: must be rejected before the memcpy.
+	const size_t dataSize = 8;
+	std::vector<uint8_t> buf(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) + dataSize, 0);
+	putU16(buf, kRespDataSizeOff, static_cast<uint16_t>(dataSize));
+	uint8_t cc = 0xFF;
+	uint16_t rc = 0;
+	uint16_t ds = 0;
+	uint8_t inv[4] = {0};
+	EXPECT_EQ(decode_get_inventory_information_resp(
+		      asMsg(buf), buf.size(), &cc, &rc, &ds, inv, sizeof(inv)),
+		  NSM_SW_ERROR_LENGTH);
+
+	uint8_t invOk[8] = {0};
+	EXPECT_EQ(decode_get_inventory_information_resp(asMsg(buf), buf.size(),
+							&cc, &rc, &ds, invOk,
+							sizeof(invOk)),
+		  NSM_SW_SUCCESS);
 }
 
 TEST(LibnsmOverreadGuard, GetSupportedGpmMetricsResp)

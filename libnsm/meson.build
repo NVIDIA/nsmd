@@ -9,12 +9,29 @@ libnsm_sources = files(
     'device-configuration.c',
     'diagnostics.c',
     'firmware-utils.c',
+    'fpga/fpga-controller.c',
+    'fpga/fpga-maps.c',
+    'fpga/fpga-rules-lp30.c',
+    'fpga/fpga-run.c',
+    'fpga/fpga-tables.c',
     'network-ports.c',
     'pci-links.c',
     'platform-environmental.c',
     'powersmoothing-powerprofile-api-v2.c',
     'requester/mctp.c',
 )
+
+fs = import('fs')
+# Row part files compile only when the FPGA tables header is present
+if fs.exists('fpga/fpga-tables.h')
+    libnsm_sources += files(
+        'fpga/fpga-rules-lp30-dimm.c',
+        'fpga/fpga-rules-lp30-links.c',
+        'fpga/fpga-rules-lp30-optics.c',
+        'fpga/fpga-rules-lp30-pdb.c',
+        'fpga/fpga-rules-lp30-sdm.c',
+    )
+endif
 
 libnsm_headers = ['.', '..', '../common']
 

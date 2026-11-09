@@ -40,6 +40,7 @@ enum device_configuration_command {
 	NSM_ACTIVATE_ERROR_INJECTION = 0x0C,
 	NSM_SET_DEVICE_CONFIG_V2 = 0x10,
 	NSM_GET_DEVICE_CONFIG_V2 = 0x11,
+	NSM_GET_SUPPORTED_DEVICE_CONFIGS = 0x12,
 	NSM_SET_RECONFIGURATION_PERMISSIONS_V1 = 0x40,
 	NSM_GET_RECONFIGURATION_PERMISSIONS_V1 = 0x41,
 	NSM_ENABLE_DISABLE_GPU_IST_MODE = 0x62,
@@ -2243,6 +2244,152 @@ int decode_nsm_device_config_request_event_v1(const struct nsm_msg *msg,
 					      size_t msg_len,
 					      uint8_t *event_class,
 					      uint16_t *event_state);
+
+/* MMIO access configuration type: one operation moves
+ * N = 4 x length_dwords bytes at a DWORD-aligned 64-bit address through
+ * Set/Get Device Config v2. Experimental type value advertised by the LP30
+ * FPGA through Get Supported Device Configs.
+ */
+#define NSM_DEVICE_CONFIG_TYPE_MMIO_ACCESS 0x00000002
+#define NSM_MMIO_ACCESS_MIN_LENGTH_DWORDS 1
+#define NSM_MMIO_ACCESS_MAX_LENGTH_DWORDS 1023
+/* Bytes of one DWORD, the unit of an MMIO address and length */
+#define NSM_MMIO_DWORD_BYTES 4
+
+/** @struct nsm_mmio_access_query
+ *
+ *  Body after the configuration type in the MMIO read and write requests.
+ */
+struct nsm_mmio_access_query {
+	uint64_t address;
+	uint16_t length_dwords;
+	uint16_t reserved;
+} __attribute__((packed));
+
+/** @brief Encode an MMIO read: Get Device Config v2 with the MMIO query
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] device_config_type - MMIO access configuration type
+ *  @param[in] address - DWORD-aligned 64-bit register address
+ *  @param[in] length_dwords - DWORDs to read, 1..1023
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_config_mmio_req(uint8_t instance_id,
+				      uint32_t device_config_type,
+				      uint64_t address, uint16_t length_dwords,
+				      struct nsm_msg *msg);
+
+/** @brief Decode an MMIO read response: current length must equal
+ *  4 x length_dwords and pending length must be zero
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[in] length_dwords - DWORDs that were requested
+ *  @param[out] cc - completion code
+ *  @param[out] reason_code - NSM reason code
+ *  @param[out] data - buffer of at least 4 x length_dwords bytes
+ *  @return nsm_completion_codes
+ */
+int decode_get_device_config_mmio_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint16_t length_dwords,
+				       uint8_t *cc, uint16_t *reason_code,
+				       uint8_t *data);
+
+/** @brief Encode an MMIO write: Set Device Config v2 with the MMIO query
+ *  followed by 4 x length_dwords data bytes
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] device_config_type - MMIO access configuration type
+ *  @param[in] address - DWORD-aligned 64-bit register address
+ *  @param[in] length_dwords - DWORDs to write, 1..1023
+ *  @param[in] data - 4 x length_dwords bytes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_device_config_mmio_req(uint8_t instance_id,
+				      uint32_t device_config_type,
+				      uint64_t address, uint16_t length_dwords,
+				      const uint8_t *data, struct nsm_msg *msg);
+
+/** @struct nsm_get_supported_device_configs_req
+ *
+ *  Get Supported Device Configs request (Type 5, command 0x12). V2 header,
+ *  then the handle: 0 for the first request, the next handle of the
+ *  previous response to continue a long list.
+ */
+struct nsm_get_supported_device_configs_req {
+	struct nsm_common_req_v2 hdr;
+	uint32_t handle;
+} __attribute__((packed));
+
+/** @struct nsm_get_supported_device_configs_resp
+ *
+ *  Get Supported Device Configs response: next handle (0 = complete),
+ *  total count, then the configuration types of this chunk.
+ */
+struct nsm_get_supported_device_configs_resp {
+	struct nsm_common_resp hdr;
+	uint32_t next_handle;
+	uint32_t total_count;
+	uint32_t config_types[1];
+} __attribute__((packed));
+
+/** @brief Encode a Get Supported Device Configs request
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] handle - 0 for the first request, else the next handle
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_supported_device_configs_req(uint8_t instance_id,
+					    uint32_t handle,
+					    struct nsm_msg *msg);
+
+/** @brief Decode a Get Supported Device Configs request
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] handle - handle field
+ *  @return nsm_completion_codes
+ */
+int decode_get_supported_device_configs_req(const struct nsm_msg *msg,
+					    size_t msg_len, uint32_t *handle);
+
+/** @brief Encode a Get Supported Device Configs response
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - reason code
+ *  @param[in] next_handle - 0 when the list is complete
+ *  @param[in] total_count - number of configuration types overall
+ *  @param[in] config_types - configuration types in this chunk
+ *  @param[in] count - number of entries in config_types
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_supported_device_configs_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint32_t next_handle,
+    uint32_t total_count, const uint32_t *config_types, uint16_t count,
+    struct nsm_msg *msg);
+
+/** @brief Decode a Get Supported Device Configs response
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - completion code
+ *  @param[out] reason_code - NSM reason code
+ *  @param[out] next_handle - next handle, 0 when complete
+ *  @param[out] total_count - total number of configuration types
+ *  @param[out] config_types - buffer for this chunk
+ *  @param[in] capacity - entries available in config_types
+ *  @param[out] count - entries written; set even when capacity is too small
+ *  @return nsm_completion_codes
+ */
+int decode_get_supported_device_configs_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint32_t *next_handle, uint32_t *total_count,
+    uint32_t *config_types, uint16_t capacity, uint16_t *count);
 
 #ifdef __cplusplus
 }

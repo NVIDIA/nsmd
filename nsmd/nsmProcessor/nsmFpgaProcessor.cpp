@@ -3,6 +3,7 @@
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmInterface.hpp"
 
 #include <unordered_map>
 
@@ -42,8 +43,12 @@ NsmFpgaProcessor::NsmFpgaProcessor(
     fpgaTypeIntf = std::make_unique<FpgaTypeIntf>(bus,
                                                   inventoryObjPath.c_str());
     fpgaTypeIntf->fpgaType(FpgaTypeIntf::convertFPGATypeFromString(fpgaType));
-    healthIntf = std::make_unique<HealthIntf>(bus, inventoryObjPath.c_str());
-    healthIntf->health(HealthIntf::convertHealthTypeFromString(health));
+    if (!health.empty())
+    {
+        healthIntf = std::make_unique<HealthIntf>(bus,
+                                                  inventoryObjPath.c_str());
+        healthIntf->health(HealthIntf::convertHealthTypeFromString(health));
+    }
 }
 
 requester::Coroutine createNsmFpgaProcessorSensor(SensorManager& manager,
@@ -114,8 +119,16 @@ requester::Coroutine createNsmFpgaProcessorSensor(SensorManager& manager,
             std::vector<utils::Association> associations{};
             co_await utils::coGetAssociations(
                 objPath, interface + ".Associations", associations);
+            // NsmManagedStatus: the live NsmFpgaStatus from the
+            // NSM_FpgaDiscoveryCheck owns Health and OperationalStatus
+            bool nsmManagedStatus = false;
+            if (allCurrentIfaceProperties.count("NsmManagedStatus"))
+            {
+                nsmManagedStatus = std::get<bool>(
+                    allCurrentIfaceProperties.at("NsmManagedStatus"));
+            }
             std::string health{};
-            if (allCurrentIfaceProperties.count("Health"))
+            if (!nsmManagedStatus && allCurrentIfaceProperties.count("Health"))
             {
                 health = std::get<std::string>(
                     allCurrentIfaceProperties.at("Health"));
@@ -125,6 +138,44 @@ requester::Coroutine createNsmFpgaProcessorSensor(SensorManager& manager,
                 bus, name, type, inventoryObjPath, associations, fpgaType,
                 locationType, health);
             nsmDevice->addDeviceSensors(processorSensor);
+            if (nsmManagedStatus)
+            {
+                // Location decorators as standalone NsmInterfaceProvider
+                // objects, the same primitive nsmChassis uses for these
+                const dbus::Interfaces objectPaths{inventoryObjPath};
+                if (allCurrentIfaceProperties.count("LocationCode"))
+                {
+                    auto code = std::make_shared<
+                        NsmInterfaceProvider<FpgaLocationCodeIntf>>(
+                        name, type, objectPaths);
+                    code->invoke(
+                        pdiMethod(locationCode),
+                        std::get<std::string>(
+                            allCurrentIfaceProperties.at("LocationCode")));
+                    nsmDevice->addStaticSensor(code);
+                }
+                if (allCurrentIfaceProperties.count("LocationContext"))
+                {
+                    auto ctx = std::make_shared<
+                        NsmInterfaceProvider<FpgaLocationContextIntf>>(
+                        name, type, objectPaths);
+                    ctx->invoke(
+                        pdiMethod(locationContext),
+                        std::get<std::string>(
+                            allCurrentIfaceProperties.at("LocationContext")));
+                    nsmDevice->addStaticSensor(ctx);
+                }
+                if (allCurrentIfaceProperties.count("FieldReplaceable"))
+                {
+                    auto fru = std::make_shared<
+                        NsmInterfaceProvider<FpgaReplaceableIntf>>(name, type,
+                                                                   objectPaths);
+                    fru->invoke(pdiMethod(fieldReplaceable),
+                                std::get<bool>(allCurrentIfaceProperties.at(
+                                    "FieldReplaceable")));
+                    nsmDevice->addStaticSensor(fru);
+                }
+            }
         }
     }
 

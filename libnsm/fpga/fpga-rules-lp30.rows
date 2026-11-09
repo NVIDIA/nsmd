@@ -1,0 +1,55 @@
+# LP30 FPGA telemetry map (ibc1 schema 13): window, stations and the parts.
+# gen-fpga-rules.py turns this file into fpga-rules-lp30.c. Syntax in README.md.
+
+map p0
+  window 2 0x1000 0x1020 0x1040 0x1060 0x10a0 0x10e0
+  part pdb
+  part sdm
+  part dimm
+  part links
+  part optics
+end
+
+const ETH_WINDOW 0xffff
+const XCVR_WINDOW 0xfffff
+const DDR5_FIRST 0x05000200
+const DDR5_LAST 0x0500080f
+
+station i2c_master_eeprom 0 i2c 0 0
+station i2c_master_osfp 1 i2c 0 0
+station i2c_master_pdb 2 i2c 0 0
+station GroqNetV2_reconfig_eth0_mm_B13A_C2C_LOWER_QSFP_0 3 word 0 ETH_WINDOW
+station GroqNetV2_reconfig_xcvr0_mm_B13A_C2C_LOWER_QSFP_0 4 word 0 XCVR_WINDOW
+station GroqNetV2_reconfig_eth1_mm_B13A_C2C_LOWER_QSFP_1 5 word 0 ETH_WINDOW
+station GroqNetV2_reconfig_xcvr1_mm_B13A_C2C_LOWER_QSFP_1 6 word 0 XCVR_WINDOW
+station GroqNetV2_reconfig_eth2_mm_B13A_C2C_LOWER_QSFP_2 7 word 0 ETH_WINDOW
+station GroqNetV2_reconfig_xcvr2_mm_B13A_C2C_LOWER_QSFP_2 8 word 0 XCVR_WINDOW
+station GroqNetV2_reconfig_eth3_mm_B13A_C2C_LOWER_QSFP_3 9 word 0 ETH_WINDOW
+station GroqNetV2_reconfig_xcvr3_mm_B13A_C2C_LOWER_QSFP_3 10 word 0 XCVR_WINDOW
+station GroqNetV2_reconfig_eth0_mm_B13C_C2C_LOWER_QSFP_0 11 word 0 ETH_WINDOW
+station GroqNetV2_reconfig_xcvr0_mm_B13C_C2C_LOWER_QSFP_0 12 word 0 XCVR_WINDOW
+station GroqNetV2_reconfig_eth1_mm_B13C_C2C_LOWER_QSFP_1 13 word 0 ETH_WINDOW
+station GroqNetV2_reconfig_xcvr1_mm_B13C_C2C_LOWER_QSFP_1 14 word 0 XCVR_WINDOW
+station GroqNetV2_reconfig_eth2_mm_B13C_C2C_LOWER_QSFP_2 15 word 0 ETH_WINDOW
+station GroqNetV2_reconfig_xcvr2_mm_B13C_C2C_LOWER_QSFP_2 16 word 0 XCVR_WINDOW
+station GroqNetV2_reconfig_eth3_mm_B13C_C2C_LOWER_QSFP_3 17 word 0 ETH_WINDOW
+station GroqNetV2_reconfig_xcvr3_mm_B13C_C2C_LOWER_QSFP_3 18 word 0 XCVR_WINDOW
+station Network_reconfig_eth0_mm_B12A_Q2_LOWER_QSFP_200G_LOWER_QSFP 19 word 0 ETH_WINDOW
+station Network_reconfig_xcvr_p0_l0_mm_B12A_Q2_LOWER_QSFP_200G_LOWER_QSFP 20 word 0 XCVR_WINDOW
+station Network_reconfig_xcvr_p0_l1_mm_B12A_Q2_LOWER_QSFP_200G_LOWER_QSFP 21 word 0 XCVR_WINDOW
+station Network_reconfig_xcvr_p0_l2_mm_B12A_Q2_LOWER_QSFP_200G_LOWER_QSFP 22 word 0 XCVR_WINDOW
+station Network_reconfig_xcvr_p0_l3_mm_B12A_Q2_LOWER_QSFP_200G_LOWER_QSFP 23 word 0 XCVR_WINDOW
+station Network_reconfig_eth0_mm_B12A_Q3_LOWER_QSFP_200G_LOWER_QSFP 24 word 0 ETH_WINDOW
+station Network_reconfig_xcvr_p0_l0_mm_B12A_Q3_LOWER_QSFP_200G_LOWER_QSFP 25 word 0 XCVR_WINDOW
+station Network_reconfig_xcvr_p0_l1_mm_B12A_Q3_LOWER_QSFP_200G_LOWER_QSFP 26 word 0 XCVR_WINDOW
+station Network_reconfig_xcvr_p0_l2_mm_B12A_Q3_LOWER_QSFP_200G_LOWER_QSFP 27 word 0 XCVR_WINDOW
+station Network_reconfig_xcvr_p0_l3_mm_B12A_Q3_LOWER_QSFP_200G_LOWER_QSFP 28 word 0 XCVR_WINDOW
+station Ddr5Sideband_d0_ch0 29 word DDR5_FIRST DDR5_LAST
+station Ddr5Sideband_d0_ch1 30 word DDR5_FIRST DDR5_LAST
+station Ddr5Sideband_d1_ch0 31 word DDR5_FIRST DDR5_LAST
+station Ddr5Sideband_d1_ch1 32 word DDR5_FIRST DDR5_LAST
+station Ddr5Sideband_d2_ch0 33 word DDR5_FIRST DDR5_LAST
+station Ddr5Sideband_d2_ch1 34 word DDR5_FIRST DDR5_LAST
+station Ddr5Sideband_d3_ch0 35 word DDR5_FIRST DDR5_LAST
+station Ddr5Sideband_d3_ch1 36 word DDR5_FIRST DDR5_LAST
+station SDMMailBox_SecureDeviceManager 37 sdm 0 0x23

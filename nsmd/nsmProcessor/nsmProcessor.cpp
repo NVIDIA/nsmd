@@ -1677,7 +1677,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog("NsmMaxEDPpLimit decode_get_inventory_information_resp",
                   reasonCode, cc, rc, dataSize != sizeof(value)))
@@ -1739,7 +1739,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog("NsmMinEDPpLimit decode_get_inventory_information_resp",
                   reasonCode, cc, rc, dataSize != sizeof(value)))
@@ -2005,7 +2005,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog(
             "NsmDefaultBaseClockSpeed decode_get_inventory_information_resp",
@@ -2074,7 +2074,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
                   dataSize != sizeof(value)))
@@ -2444,7 +2444,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
                   dataSize != sizeof(value)))
@@ -2587,7 +2587,8 @@ uint8_t
     uint16_t reasonCode = ERR_NULL;
 
     auto rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &data_size, &reasonCode, data.data());
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, data.data(),
+        data.size());
 
     LG2_ERROR_FLT(
         "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
@@ -2820,7 +2821,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
                   dataSize != sizeof(value)))
@@ -2915,7 +2916,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
                   dataSize != sizeof(value)))
@@ -2997,7 +2998,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
                   dataSize != sizeof(value)))

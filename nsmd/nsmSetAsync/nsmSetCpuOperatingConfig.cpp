@@ -66,7 +66,7 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
     std::vector<uint8_t> data(4, 0);
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
@@ -122,7 +122,7 @@ requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
     std::vector<uint8_t> data(4, 0);
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {

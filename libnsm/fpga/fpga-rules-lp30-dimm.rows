@@ -1,0 +1,175 @@
+# LP30 DIMM telemetry: calibration status, temperature and SPD inventory of
+# the four DDR5 DIMMs through the IOSSM hub of each channel.
+# gen-fpga-rules.py turns this file into fpga-rules-lp30-dimm.c.
+
+part dimm
+include fpga-rules-lp30.rows
+
+# DDR5 IOSSM hub of a DIMM channel: calibration status CSR and the SPD-hub
+# mailbox (parameter6, parameter0, command, response status, data words)
+const IOSSM_CALIBRATION_STATUS 0x05000400
+const IOSSM_PARAMETER6 0x05000420
+const IOSSM_PARAMETER0 0x05000438
+const IOSSM_COMMAND 0x0500043c
+const IOSSM_RESPONSE_STATUS 0x0500045c
+const IOSSM_RESPONSE_READY 0x1
+const IOSSM_DATA 0x05000800
+const IOSSM_READ_COMMAND 0x20040f03
+const IOSSM_WRITE_COMMAND 0x20040f02
+
+# Low three bits of calibration_status: 0 no DIMM, 1 passed, 2 failed, 4 ongoing
+seq calibration st
+  kind state
+  group DIMM_Calibration
+  state 0x7 0 absent ok
+  state 0x7 1 enabled ok
+  state 0x7 2 fault critical
+  state 0x7 4 starting ok
+  state default unavailable warning
+  read32 $st IOSSM_CALIBRATION_STATUS
+end
+
+rule DIMM_0_Channel_0_Calibration
+  use calibration Ddr5Sideband_d0_ch0
+end
+rule DIMM_0_Channel_1_Calibration
+  use calibration Ddr5Sideband_d0_ch1
+end
+rule DIMM_1_Channel_0_Calibration
+  use calibration Ddr5Sideband_d1_ch0
+end
+rule DIMM_1_Channel_1_Calibration
+  use calibration Ddr5Sideband_d1_ch1
+end
+rule DIMM_2_Channel_0_Calibration
+  use calibration Ddr5Sideband_d2_ch0
+end
+rule DIMM_2_Channel_1_Calibration
+  use calibration Ddr5Sideband_d2_ch1
+end
+rule DIMM_3_Channel_0_Calibration
+  use calibration Ddr5Sideband_d3_ch0
+end
+rule DIMM_3_Channel_1_Calibration
+  use calibration Ddr5Sideband_d3_ch1
+end
+
+# A response nobody acknowledged is acknowledged first so an interrupted
+# read cannot wedge the hub; skipped while the last ack left the hub clean
+seq hub_idle st
+  read32 $st IOSSM_RESPONSE_STATUS remember unless_clean
+  ack_clear $st IOSSM_RESPONSE_STATUS IOSSM_RESPONSE_READY if word & IOSSM_RESPONSE_READY == IOSSM_RESPONSE_READY unless_clean
+end
+# Idle check of a transfer that follows another in the same item
+seq hub_still_idle st
+  read32 $st IOSSM_RESPONSE_STATUS expect & IOSSM_RESPONSE_READY == 0
+end
+# Wait for the response, then the data words
+seq hub_ready st
+  read32 $st IOSSM_RESPONSE_STATUS poll set IOSSM_RESPONSE_READY
+end
+# Acknowledge the response by clearing its ready bit, leaving the hub clean
+seq hub_ack st
+  ack_clear $st IOSSM_RESPONSE_STATUS IOSSM_RESPONSE_READY leaves_clean
+end
+
+# DIMM temperature: SPD register 0x31 through the hub, read address 0xa1, two
+# bytes; bits 12 to 2 of the word are a signed count of quarter degrees
+seq dimm_temp st
+  kind numeric temperature
+  group DIMM_Temperature
+  decode fixed item 0 shift 2 width 11 signed scale 0.25 range -40 125
+  valid_if item 0 w 2 & 0xe003 == 0
+  use hub_idle $st
+  write32 $st IOSSM_PARAMETER6 0x00a131a0
+  write32 $st IOSSM_PARAMETER0 0x00000202
+  write32 $st IOSSM_COMMAND IOSSM_READ_COMMAND
+  use hub_ready $st
+  read32 $st IOSSM_DATA capture item
+  cleanup
+  use hub_ack $st
+end
+
+rule Memory_0_Temp_0
+  use dimm_temp Ddr5Sideband_d0_ch0
+end
+rule Memory_1_Temp_0
+  use dimm_temp Ddr5Sideband_d1_ch0
+end
+rule Memory_2_Temp_0
+  use dimm_temp Ddr5Sideband_d2_ch0
+end
+rule Memory_3_Temp_0
+  use dimm_temp Ddr5Sideband_d3_ch0
+end
+
+const SPD_PAGE_REGISTER 0x0b
+const SPD_INVENTORY_PAGE 4
+# Stage and start a read of count SPD bytes from register reg
+seq hub_read st reg count
+  use hub_idle $st
+  write32 $st IOSSM_PARAMETER6 0xa0|($reg<<8)|(0xa1<<16)
+  write32 $st IOSSM_PARAMETER0 0x02|($count<<8)
+  write32 $st IOSSM_COMMAND IOSSM_READ_COMMAND
+  use hub_ready $st
+end
+# Write the SPD page selector MR11 and acknowledge
+seq hub_page st page
+  use hub_still_idle $st
+  write32 $st IOSSM_PARAMETER6 0xa0|(SPD_PAGE_REGISTER<<8)|($page<<16)
+  write32 $st IOSSM_PARAMETER0 0x03
+  write32 $st IOSSM_COMMAND IOSSM_WRITE_COMMAND
+  use hub_ready $st
+  use hub_ack $st
+end
+# DIMM inventory: SPD bytes 512 to 553 on page 4. The page selector is shared
+# with the host's SPD readers, so the rule stops without a write unless it is
+# 0 or already the inventory page, and its cleanup restores page 0 in those
+# two cases only. The item buffer holds the selector word, then the bytes;
+# serial 517 to 520, part 521 to 550.
+seq dimm_inventory st
+  kind identity
+  group DIMM_Inventory
+  field serial hex_be item 9 4
+  field part ascii item 13 30
+  use hub_read $st SPD_PAGE_REGISTER 1
+  read32 $st IOSSM_DATA capture item expect & (0xff&~SPD_INVENTORY_PAGE) == 0
+  use hub_ack $st
+  use hub_page $st SPD_INVENTORY_PAGE
+  use hub_read $st SPD_PAGE_REGISTER 1
+  read32 $st IOSSM_DATA expect & 0xff == SPD_INVENTORY_PAGE
+  use hub_ack $st
+  use hub_read $st 0x80 16
+  read32 $st IOSSM_DATA capture item
+  read32 $st IOSSM_DATA+4 capture item
+  read32 $st IOSSM_DATA+8 capture item
+  read32 $st IOSSM_DATA+12 capture item
+  use hub_ack $st
+  use hub_read $st 0x90 16
+  read32 $st IOSSM_DATA capture item
+  read32 $st IOSSM_DATA+4 capture item
+  read32 $st IOSSM_DATA+8 capture item
+  read32 $st IOSSM_DATA+12 capture item
+  use hub_ack $st
+  use hub_read $st 0xa0 10
+  read32 $st IOSSM_DATA capture item
+  read32 $st IOSSM_DATA+4 capture item
+  read32 $st IOSSM_DATA+8 capture item
+  use hub_ack $st
+  cleanup
+  use hub_ack $st
+  use hub_page $st 0 if item 0 & (0xff&~SPD_INVENTORY_PAGE) == 0
+end
+
+rule DIMM_0_Inventory
+  use dimm_inventory Ddr5Sideband_d0_ch0
+end
+rule DIMM_1_Inventory
+  use dimm_inventory Ddr5Sideband_d1_ch0
+end
+rule DIMM_2_Inventory
+  use dimm_inventory Ddr5Sideband_d2_ch0
+end
+rule DIMM_3_Inventory
+  use dimm_inventory Ddr5Sideband_d3_ch0
+end

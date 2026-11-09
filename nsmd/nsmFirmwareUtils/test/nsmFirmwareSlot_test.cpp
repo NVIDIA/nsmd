@@ -44,7 +44,7 @@ TEST(NsmFirmwareSlot, Constructor)
 
     EXPECT_EQ(slot.slotId(), slotNum);
     EXPECT_EQ(slot.type(), fwType);
-    EXPECT_STREQ(slot.extendedVersion().c_str(), "NA");
+    EXPECT_EQ(slot.extendedVersion(), "");
 }
 
 TEST(NsmFirmwareSlot, UpdateWithFirmwareInfo)
@@ -71,6 +71,7 @@ TEST(NsmFirmwareSlot, UpdateWithFirmwareInfo)
 
     // After update, slot should be marked as active
     EXPECT_TRUE(slot.isActive());
+    EXPECT_EQ(slot.extendedVersion(), "1.0.0.test");
 }
 
 TEST(NsmFirmwareSlot, UpdateActiveSlotAssociation)
@@ -307,11 +308,9 @@ TEST(NsmFirmwareSlot, UpdateKeyData_InactiveSlot_UsesPendingKeys)
     EXPECT_EQ(slot.revokedKeys(), pendingRevoked);
 }
 
-// =============================================================================
-// Branch coverage: WriteInProgress + inactive + empty version → "NA"
-// =============================================================================
-
-TEST(NsmFirmwareSlot, Update_WriteInProgress_Inactive_EmptyVersion_SetsNA)
+// An empty version is published as-is rather than as a placeholder, so
+// Redfish can report the slot's Version as null.
+TEST(NsmFirmwareSlot, Update_PublishesReportedVersionVerbatim)
 {
     std::string chassisPath =
         "/xyz/openbmc_project/inventory/system/chassis/wip";
@@ -321,15 +320,16 @@ TEST(NsmFirmwareSlot, Update_WriteInProgress_Inactive_EmptyVersion_SetsNA)
 
     struct nsm_firmware_slot_info info = {};
     info.slot_id = 0;
-    info.firmware_state = 4; // WriteInProgress (index 4 in stateTbl)
-    // firmware_version_string is all zeros → empty string
+    info.firmware_state = 4; // WriteInProgress
     struct nsm_firmware_erot_state_info_hdr_resp hdr = {};
-    hdr.active_slot = 1; // inactive (slot_id=0 != active_slot=1)
+    hdr.active_slot = 1;
     slot.update(info, hdr);
+    EXPECT_EQ(slot.extendedVersion(), "");
 
-    EXPECT_EQ(slot.state(), State::FirmwareState::WriteInProgress);
-    EXPECT_FALSE(slot.isActive());
-    EXPECT_EQ(slot.extendedVersion(), "NA");
+    std::strcpy(reinterpret_cast<char*>(info.firmware_version_string),
+                "1.2.3.4");
+    slot.update(info, hdr);
+    EXPECT_EQ(slot.extendedVersion(), "1.2.3.4");
 }
 
 // =============================================================================
@@ -397,69 +397,6 @@ TEST(NsmFirmwareSlot, UpdateActiveSlotAssociation_InactiveSlot_SetsInactiveSlot)
     // updateActiveSlotAssociation ran with isActive()=false → "InactiveSlot"
     // The associations list should have been updated
     EXPECT_GE(slot.associations().size(), 1u);
-}
-
-// =============================================================================
-// Branch coverage: WriteInProgress + ACTIVE slot → uses firmwareVersion not
-// "NA" (line 127 Branch 11→14: !isActive() is FALSE → short-circuit to
-// firmwareVersion)
-// =============================================================================
-
-TEST(NsmFirmwareSlot, Update_WriteInProgress_ActiveSlot_UsesFirmwareVersion)
-{
-    std::string chassisPath =
-        "/xyz/openbmc_project/inventory/system/chassis/wip_active";
-    std::string chassisName = "WipActiveChassis";
-    NsmFirmwareSlot slot(bus, chassisPath, {}, 0, SlotIntf::FirmwareType::AP,
-                         chassisName);
-
-    struct nsm_firmware_slot_info info = {};
-    info.slot_id = 0;
-    info.firmware_state = 4; // WriteInProgress (index 4 in stateTbl)
-    std::strcpy(reinterpret_cast<char*>(info.firmware_version_string),
-                "v2.5.0");
-    struct nsm_firmware_erot_state_info_hdr_resp hdr = {};
-    hdr.active_slot = 0; // same as slot_id → ACTIVE slot
-    slot.update(info, hdr);
-
-    EXPECT_EQ(slot.state(), State::FirmwareState::WriteInProgress);
-    EXPECT_TRUE(slot.isActive());
-    // fstate==WriteInProgress but isActive()==TRUE → !isActive() is FALSE
-    // → short-circuit, extendedVersion = firmwareVersion (not "NA")
-    EXPECT_EQ(slot.extendedVersion(), "v2.5.0");
-}
-
-// =============================================================================
-// Branch coverage: WriteInProgress + inactive + NON-EMPTY version →
-// firmwareVersion (line 128 Branch 12→14: firmwareVersion.empty() is FALSE →
-// use firmwareVersion)
-// =============================================================================
-
-TEST(NsmFirmwareSlot,
-     Update_WriteInProgress_Inactive_NonEmptyVersion_UsesVersion)
-{
-    std::string chassisPath =
-        "/xyz/openbmc_project/inventory/system/chassis/wip_nonempty";
-    std::string chassisName = "WipNonEmptyChassis";
-    NsmFirmwareSlot slot(bus, chassisPath, {}, 0, SlotIntf::FirmwareType::AP,
-                         chassisName);
-
-    struct nsm_firmware_slot_info info = {};
-    info.slot_id = 0;
-    info.firmware_state = 4; // WriteInProgress
-    // firmware_version_string is non-empty → firmwareVersion.empty() is FALSE
-    std::strcpy(reinterpret_cast<char*>(info.firmware_version_string),
-                "1.2.3.4");
-    struct nsm_firmware_erot_state_info_hdr_resp hdr = {};
-    hdr.active_slot = 1; // inactive (slot_id=0 != 1)
-    slot.update(info, hdr);
-
-    EXPECT_EQ(slot.state(), State::FirmwareState::WriteInProgress);
-    EXPECT_FALSE(slot.isActive());
-    // fstate==WriteInProgress && !isActive()==TRUE but firmwareVersion not
-    // empty → firmwareVersion.empty() is FALSE → extendedVersion =
-    // firmwareVersion
-    EXPECT_EQ(slot.extendedVersion(), "1.2.3.4");
 }
 
 // =============================================================================

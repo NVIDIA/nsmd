@@ -72,7 +72,8 @@ uint8_t NsmMemoryCapacity::handleResponseMsg(const struct nsm_msg* responseMsg,
     uint16_t reasonCode = ERR_NULL;
 
     auto rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &data_size, &reasonCode, data.data());
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, data.data(),
+        data.size());
 
     LG2_ERROR_FLT(
         "decode_get_inventory_information_resp for Maximum Memory Capacity failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
@@ -273,7 +274,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog(
             "NsmMinGraphicsClockLimit decode_get_inventory_information_resp",
@@ -361,7 +362,7 @@ requester::Coroutine
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
                                                &cc, &reasonCode, &dataSize,
-                                               data.data());
+                                               data.data(), data.size());
 
     if (shouldLog(
             "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp",
@@ -475,7 +476,7 @@ requester::Coroutine
 
         rc = decode_get_inventory_information_resp(
             responseMsg.get(), responseLen, &cc, &reason_code, &dataSize,
-            data.data());
+            data.data(), data.size());
 
         if (loggers[nsmDevice->getEid()].shouldLog(
                 "getDeviceUUID::decode_get_inventory_information_resp",

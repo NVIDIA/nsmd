@@ -729,7 +729,8 @@ TEST(PlatEnvBranch2, GetInventoryInformationResp_CcNonSuccess)
 	uint16_t reason = 0, data_size = 0;
 	uint8_t inv_data[64] = {};
 	auto rc = decode_get_inventory_information_resp(
-	    msg, buf.size(), &cc, &reason, &data_size, inv_data);
+	    msg, buf.size(), &cc, &reason, &data_size, inv_data,
+	    sizeof(inv_data));
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, 0xFF);
 }
