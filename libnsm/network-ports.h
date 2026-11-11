@@ -868,6 +868,10 @@ struct nsm_port_telemetry_v2_plr_counters {
 /** @struct nsm_query_port_telemetry_v2_req
  *
  * NSM Type-1 cmd 0x14 — Query Port Telemetry Counter v2 request.
+ * Fixed 12-byte request ("Query Port Telemetry v2", NSM Type 1 - Network
+ * ports spec, Bracha Hod): bytes 9-11 are reserved, 0 from the requester
+ * and ignored by the responder; any other length is rejected with
+ * NSM_ERR_INVALID_DATA_LENGTH (Base Spec 7.3.3).
  */
 struct nsm_query_port_telemetry_v2_req {
 	struct nsm_common_req hdr;
@@ -875,6 +879,7 @@ struct nsm_query_port_telemetry_v2_req {
 	uint16_t port_index;	 /* target port, 1-based */
 	uint8_t reserved[2];	 /* must be 0 */
 	uint8_t group_id;	 /* enum nsm_port_telemetry_v2_group_id value */
+	uint8_t reserved2[3];	 /* must be 0 */
 } __attribute__((packed));
 
 /** @struct nsm_query_port_telemetry_caps_req
