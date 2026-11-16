@@ -831,8 +831,8 @@ uint8_t NsmGPMPerInstanceV1::handleResponseMsg(const nsm_msg* responseMsg,
 
     while (telemetryCount--)
     {
-        uint8_t tag;
-        bool valid;
+        uint8_t tag = 0;
+        bool valid = false;
         const uint8_t* data;
         size_t dataLen;
 
@@ -841,9 +841,6 @@ uint8_t NsmGPMPerInstanceV1::handleResponseMsg(const nsm_msg* responseMsg,
 
         rc = decode_aggregate_resp_sample(sampleData, responseLen, &consumedLen,
                                           &tag, &valid, &data, &dataLen);
-
-        responseData += consumedLen;
-        responseLen -= consumedLen;
 
         if (rc != NSM_SW_SUCCESS)
         {
@@ -857,8 +854,19 @@ uint8_t NsmGPMPerInstanceV1::handleResponseMsg(const nsm_msg* responseMsg,
                     "TYPE", getType(), "TAG", tag, "NAME", getName(), "RC", rc,
                     "VALID", valid);
             }
-            continue;
+            // The next sample boundary is unknown after a failed decode.
+            returnValue = rc;
+            break;
         }
+
+        if (consumedLen == 0 || consumedLen > responseLen)
+        {
+            returnValue = NSM_SW_ERROR_LENGTH;
+            break;
+        }
+
+        responseData += consumedLen;
+        responseLen -= consumedLen;
 
         const bool sampleRejected =
             !valid || tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE;
