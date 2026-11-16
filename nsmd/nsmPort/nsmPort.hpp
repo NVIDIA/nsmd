@@ -154,6 +154,17 @@ class NsmPortStatus : public NsmObject
     std::string objPath;
 };
 
+enum class DataRateUnit
+{
+    kbps,
+    KiBps,
+};
+
+inline const std::map<std::string, DataRateUnit> dataRateUnits{
+    {"kbps", DataRateUnit::kbps},
+    {"KiBps", DataRateUnit::KiBps},
+};
+
 class NsmPortCharacteristics : public NsmSensor
 {
   public:
@@ -163,7 +174,8 @@ class NsmPortCharacteristics : public NsmSensor
         std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Intf,
         std::shared_ptr<IBPortIntf> iBPortIntf,
         std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsIntf,
-        std::string& inventoryObjPath);
+        std::string& inventoryObjPath,
+        DataRateUnit dataRateUnit = DataRateUnit::KiBps);
     NsmPortCharacteristics() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -179,7 +191,7 @@ class NsmPortCharacteristics : public NsmSensor
     // the 0x12 Tags 0x00-0x03 reuse.
     void updatePortStatus(uint32_t portStatus); // link-down reason (GPU only)
     void updateLineRate(uint32_t lineRateMbps); // GPU only
-    void updateDataRate(uint32_t dataRateKbps); // GPU only
+    void updateDataRate(uint32_t dataRate);     // GPU only
     void updateLaneInfo(uint32_t laneInfo);     // GPU only
     /** @brief Publish the health set and emit the transition event.
      *
@@ -224,6 +236,7 @@ class NsmPortCharacteristics : public NsmSensor
     // GPU exposes the full port-characteristics telemetry; a switch exposes
     // only the health counters. Gates non-health publishes.
     uint8_t deviceType;
+    DataRateUnit dataRateUnit = DataRateUnit::KiBps;
     std::string objPath;
     void updateLinkDownCode(const uint32_t linkDownCode);
     // Emits NVLinkPortHealthStateChanged on a health-state transition (the
@@ -268,7 +281,8 @@ class NsmPortCharacteristicsV2 : public NsmSensorAggregator
         std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Intf,
         std::shared_ptr<IBPortIntf> iBPortIntf,
         std::shared_ptr<PortHealthMetricsIntf> portHealthMetricsIntf,
-        std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device);
+        std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device,
+        DataRateUnit dataRateUnit = DataRateUnit::KiBps);
     ~NsmPortCharacteristicsV2() override;
 
     std::optional<std::vector<uint8_t>>
