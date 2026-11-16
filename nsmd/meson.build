@@ -157,6 +157,8 @@ foreach d : valid_nsmd_subdirs
     endif
 endforeach
 
+subdir('features')
+
 if get_option('tracing').enabled()
     deps += [liblttng, ldl]
     sources += ['../tracepoints/nsmd-tp.c']
@@ -245,6 +247,7 @@ if get_option('tests').enabled()
     subdir('nsmSetAsync/test')
     subdir('nsmCommon/test')
     subdir('nsmProgressCounters/test')
+    subdir('features/test')
 
     # Conditional test subdirs (same logic as subdir processing above)
     foreach d : valid_nsmd_subdirs

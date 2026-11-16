@@ -52,6 +52,20 @@ if get_option('system-guid').enabled()
     add_project_arguments('-DENABLE_SYSTEM_GUID', language: ['cpp', 'c'])
 endif
 
+if get_option('strict-overrides').enabled()
+    add_project_arguments('-DNSM_STRICT_OVERRIDES', language: ['cpp', 'c'])
+endif
+
+add_project_arguments(
+    '-DNSM_FEATURE_YIELD_BUDGET_US=' + get_option('feature-yield-budget-us').to_string(),
+    language: ['cpp', 'c'],
+)
+
+add_project_arguments(
+    '-DNSM_FEATURE_POLICY_WAIT_MS=' + get_option('feature-policy-wait-ms').to_string(),
+    language: ['cpp', 'c'],
+)
+
 if get_option('grace-spi-operations').enabled()
     add_project_arguments(
         '-DENABLE_GRACE_SPI_OPERATIONS',
@@ -162,7 +176,6 @@ endif
 if get_option('enable-debug-token').enabled() and not cx8_features
     add_project_arguments('-DENABLE_DEBUG_TOKEN', language: ['cpp', 'c'])
 endif
-
 if get_option('nvidia-manager-ready-csm').enabled()
     add_project_arguments(
         '-DNVIDIA_MANAGER_READY_CSM',

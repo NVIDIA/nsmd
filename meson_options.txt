@@ -577,3 +577,28 @@ option(
     description: 'Replace GPU_<n> labels with "GPU UUID <uuid>" in NSM Redfish event payloads (REDFISH_MESSAGE_ARGS and DEVICE_NAME for XID, ResetRequired, and Rediscovery events) so log messages identify the physical GPU instead of only its logical index. Disable on platforms that want to keep the original GPU_<n> labels.',
     value: 'disabled',
 )
+
+option(
+    'strict-overrides',
+    type: 'feature',
+    description: 'Treat a rejected NSM_Telemetry or NSM_Policy override as fatal (CI and lab images)',
+    value: 'disabled',
+)
+
+option(
+    'feature-policy-wait-ms',
+    type: 'integer',
+    min: 0,
+    max: 60000,
+    description: 'Wait after the first NSM_Telemetry record before reading NSM_Policy records, in milliseconds',
+    value: 5000,
+)
+
+option(
+    'feature-yield-budget-us',
+    type: 'integer',
+    min: 100,
+    max: 100000,
+    description: 'Longest uninterrupted feature-creation slice before yielding to the event loop, in microseconds',
+    value: 5000,
+)
