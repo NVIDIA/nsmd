@@ -20,11 +20,15 @@
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmChassisFeatures.hpp"
 #include "nsmCommon.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
+
+#include <xyz/openbmc_project/Inventory/Decorator/LocationContext/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Replaceable/server.hpp>
 
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)
 #include "nsmDbusIfaceOverride/nsmResetIface.hpp"
@@ -421,26 +425,141 @@ requester::Coroutine createNsmNVSwitchChassis(SensorManager& manager,
     co_return NSM_SUCCESS;
 }
 
-requester::Coroutine createNsmNVLinkMgmtNicChassis(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath)
-{
-    co_await createNsmChassis(manager, interface, objPath,
-                              "NSM_NVLinkMgmtNic_Chassis");
-    // coverity[missing_return]
-    co_return NSM_SUCCESS;
-}
-
 std::vector<std::string> nvSwitchChassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.ChassisAttributes"};
 
-std::vector<std::string> nvLinkMgmtNicChassisInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.ChassisAttributes"};
-
 REGISTER_NSM_CREATION_FUNCTION(createNsmNVSwitchChassis,
                                nvSwitchChassisInterfaces)
-REGISTER_NSM_CREATION_FUNCTION(createNsmNVLinkMgmtNicChassis,
-                               nvLinkMgmtNicChassisInterfaces)
 } // namespace nsm
+
+namespace nsm::features
+{
+
+namespace
+{
+
+using ChassisLocationContextIntf =
+    sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
+                                    inventory::decorator::LocationContext>;
+using ChassisReplaceableIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::inventory::decorator::Replaceable>;
+
+uint8_t createNVSwitchAndNicChassis(const DeviceContext& dev,
+                                    const dbus::PropertyMap& params,
+                                    const std::string& baseType)
+{
+    if (!dev.device)
+    {
+        lg2::error("{TYPE} feature of {NAME}: no NsmDevice", "TYPE", baseType,
+                   "NAME", dev.name);
+        return NSM_SW_ERROR;
+    }
+    auto device = dev.device;
+    auto name = param<std::string>(params, "Name").value_or("");
+
+    lg2::debug("createNsmChassis: {NAME}, {TYPE}", "NAME", name.c_str(), "TYPE",
+               baseType.c_str());
+    auto chassisUuid =
+        std::make_shared<NsmNVSwitchAndNicChassis<UuidIntf>>(name, baseType);
+    uuid_t uuid = dev.staticUuid;
+
+    // initial value update
+    chassisUuid->invoke(pdiMethod(uuid), uuid);
+
+    // add sensor
+    device->addStaticSensor(chassisUuid);
+
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+    if (param<bool>(params, "DeviceResetSupported").value_or(false))
+    {
+        createDeviceResetObjects(
+            utils::DBusHandler::getBus(), device,
+            std::string(chassisInventoryBasePath) + "/" + name, baseType);
+    }
+#endif
+    return NSM_SW_SUCCESS;
+}
+
+uint8_t createNVSwitchAndNicChassisAttributes(const DeviceContext& dev,
+                                              const dbus::PropertyMap& params,
+                                              const std::string& baseType)
+{
+    if (!dev.device)
+    {
+        lg2::error("{TYPE} attributes feature of {NAME}: no NsmDevice", "TYPE",
+                   baseType, "NAME", dev.name);
+        return NSM_SW_ERROR;
+    }
+    auto device = dev.device;
+    auto name = param<std::string>(params, "Name").value_or("");
+    auto allCurrentIfaceProperties = params;
+
+    createChassisAsset(device, name, baseType);
+    createChassisSKU(device, name, baseType);
+    createChassisHealth(device, name, baseType);
+    if (allCurrentIfaceProperties.count("ChassisType"))
+    {
+        createChassisType(device, name, baseType, allCurrentIfaceProperties);
+    }
+    if (allCurrentIfaceProperties.count("LocationType"))
+    {
+        createLocationType(device, name, baseType, allCurrentIfaceProperties);
+    }
+    if (allCurrentIfaceProperties.count("LocationCode"))
+    {
+        createLocationCode(device, name, baseType, allCurrentIfaceProperties);
+    }
+    if (allCurrentIfaceProperties.count("PrettyNameForChassis"))
+    {
+        createPrettyName(device, name, baseType, allCurrentIfaceProperties);
+    }
+    if (auto locationContext = param<std::string>(params, "LocationContext"))
+    {
+        auto chassisLocationContext = std::make_shared<
+            NsmNVSwitchAndNicChassis<ChassisLocationContextIntf>>(name,
+                                                                  baseType);
+        chassisLocationContext->invoke(pdiMethod(locationContext),
+                                       *locationContext);
+        device->addStaticSensor(chassisLocationContext);
+    }
+    if (auto fieldReplaceable = param<bool>(params, "FieldReplaceable"))
+    {
+        auto chassisReplaceable =
+            std::make_shared<NsmNVSwitchAndNicChassis<ChassisReplaceableIntf>>(
+                name, baseType);
+        chassisReplaceable->invoke(pdiMethod(fieldReplaceable),
+                                   *fieldReplaceable);
+        device->addStaticSensor(chassisReplaceable);
+    }
+    if (device->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
+        (device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8 ||
+         device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 ||
+         device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC))
+    {
+        createAssetTag(device, name, baseType);
+        createChassisVersion(device, name, baseType);
+    }
+    return NSM_SW_SUCCESS;
+}
+
+} // namespace
+
+requester::Coroutine
+    createNVLinkMgmtNicChassisFeature([[maybe_unused]] SensorManager& manager,
+                                      const DeviceContext& dev,
+                                      const dbus::PropertyMap& params)
+{
+    co_return createNVSwitchAndNicChassis(dev, params,
+                                          "NSM_NVLinkMgmtNic_Chassis");
+}
+
+requester::Coroutine createNVLinkMgmtNicChassisAttributesFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    co_return createNVSwitchAndNicChassisAttributes(
+        dev, params, "NSM_NVLinkMgmtNic_Chassis");
+}
+
+} // namespace nsm::features

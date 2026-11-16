@@ -24,17 +24,11 @@ using namespace ::testing;
 
 #include "base.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmGpuClockControl.hpp"
 
 using namespace nsm;
-
-namespace nsm
-{
-requester::Coroutine createControlGpuClock(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-
-}; // namespace nsm
 
 struct NsmChassisClockControlTest :
     public Test,
@@ -60,6 +54,51 @@ struct NsmChassisClockControlTest :
     ~NsmChassisClockControlTest()
     {
         cleanupDeviceSensors(devices);
+    }
+
+    /** @brief ClockLimit feature params with every param the list sets */
+    static dbus::PropertyMap clockLimitParams(const std::string& name)
+    {
+        return {{"Name", name},
+                {"PhysicalContext",
+                 std::string("xyz.openbmc_project.Inventory.Decorator.Area."
+                             "PhysicalContextType.GPU")},
+                {"ClockMode",
+                 std::string("com.nvidia.ClockMode.Mode.MaximumPerformance")},
+                {"Priority", false}};
+    }
+
+    /** @brief Run the ClockLimit feature of the device `deviceName`; the
+     *  control is created under the accelerator path of the device's base name
+     */
+    requester::Coroutine createClockLimit(const std::string& deviceName,
+                                          const dbus::PropertyMap& params,
+                                          bool withDevice = true)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = deviceName;
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return nsm::features::createClockLimitFeature(mockManager, dev, params);
+    }
+
+    std::shared_ptr<NsmChassisClockControl>
+        findClockControl(const std::string& sensorName)
+    {
+        for (const auto& sensor : gpu->deviceSensors)
+        {
+            auto s = std::dynamic_pointer_cast<NsmChassisClockControl>(sensor);
+            if (s && s->getName() == sensorName)
+            {
+                return s;
+            }
+        }
+        return nullptr;
     }
 };
 
@@ -109,101 +148,44 @@ TEST_F(NsmChassisClockControlTest, testDeviceAssociation)
     EXPECT_EQ(clockControl->device, gpu);
     EXPECT_EQ(clockControl->device->getEid(), gpu->getEid());
 }
-TEST_F(NsmChassisClockControlTest, createControlGpuClockSuccess)
+TEST_F(NsmChassisClockControlTest, createClockLimitFeatureSuccess)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl0";
     const std::string testName = "HGX_GPU 0 ClockLimit_0";
-    const std::string testType = "NSM_ControlClockLimit_0";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_0";
-    const std::string physicalContext =
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU";
-    const std::string clockMode =
-        "com.nvidia.ClockMode.Mode.MaximumPerformance";
-    const bool priority = false;
+    auto params = clockLimitParams(testName);
+    params["ParentChassisAssociationPaths"] =
+        std::vector<std::string>{"chassis/HGX_GPU_0"};
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = testName;
-    propertyMap["Type"] = testType;
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    propertyMap["PhysicalContext"] = physicalContext;
-    propertyMap["ClockMode"] = clockMode;
-    propertyMap["Priority"] = priority;
+    auto rc = createClockLimit("HGX_GPU_0", params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
 
-    dbus::PropertyMap association = {
-        {"Forward", "parent_chassis"},
-        {"Backward", "clock_controls"},
-        {"AbsolutePath",
-         "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU 0"}};
-    auto& propertyMapAssociation0 = utils::MockDbusAsync::propertyMap(
-        testObjPath, interface + ".Associations0");
-    propertyMapAssociation0 = association;
-
-    createControlGpuClock(mockManager, interface, testObjPath);
-
-    EXPECT_GE(gpu->deviceSensors.size(), 1);
-    // Check if sensor was created (could be at different index)
-    bool foundSensor = false;
-    for (const auto& sensor : gpu->deviceSensors)
-    {
-        if (std::dynamic_pointer_cast<NsmChassisClockControl>(sensor))
-        {
-            foundSensor = true;
-            EXPECT_EQ(testName, sensor->getName());
-            break;
-        }
-    }
-    EXPECT_TRUE(foundSensor);
+    auto sensor = findClockControl(testName);
+    ASSERT_NE(sensor, nullptr);
+    EXPECT_EQ(sensor->getType(), "NSM_ControlClockLimit_0");
+    // The control lives under the accelerator path of the base name
+    EXPECT_EQ(sensor->inventoryObjPath,
+              "/xyz/openbmc_project/inventory/system/accelerator/GPU_0/"
+              "Controls/ClockLimit_0");
+    auto associations = sensor->associationDefinitionsInft->associations();
+    ASSERT_EQ(associations.size(), 1u);
+    EXPECT_EQ(std::get<0>(associations[0]), "parent_chassis");
+    EXPECT_EQ(std::get<1>(associations[0]), "clock_controls");
+    EXPECT_EQ(std::get<2>(associations[0]),
+              "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_0");
 }
 
-// Helper: create a NsmChassisClockControl via factory and return a pointer
-// to the created sensor. Requires a valid GPU UUID in the fixture.
+// Helper: create a NsmChassisClockControl via the ClockLimit feature and
+// return the created sensor. Each suffix gives its own device (and so its
+// own D-Bus object path).
 static std::shared_ptr<NsmChassisClockControl>
     createClockControlSensor(NsmChassisClockControlTest& fixture,
                              const std::string& extraSuffix = "")
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/"
-        "ClockControl_genreq" +
-        extraSuffix;
     const std::string testName = "GPU0_ClockControl_genreq" + extraSuffix;
-    const std::string testType = "NSM_ControlClockLimit_0";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_genreq" +
-        extraSuffix;
-    const std::string physicalContext =
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU";
-    const std::string clockMode =
-        "com.nvidia.ClockMode.Mode.MaximumPerformance";
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = testName;
-    propertyMap["Type"] = testType;
-    propertyMap["UUID"] = fixture.gpuUuid;
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    propertyMap["PhysicalContext"] = physicalContext;
-    propertyMap["ClockMode"] = clockMode;
-    propertyMap["Priority"] = false;
-
-    createControlGpuClock(fixture.mockManager, interface, testObjPath);
-
-    for (const auto& sensor : fixture.gpu->deviceSensors)
-    {
-        auto s = std::dynamic_pointer_cast<NsmChassisClockControl>(sensor);
-        if (s && s->getName() == testName)
-        {
-            return s;
-        }
-    }
-    return nullptr;
+    auto rc = fixture.createClockLimit("HGX_GPU_genreq" + extraSuffix,
+                                       fixture.clockLimitParams(testName));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    return fixture.findClockControl(testName);
 }
 
 // Test genRequestMsg() returns a valid request
@@ -286,35 +268,17 @@ TEST_F(NsmChassisClockControlTest, HandleResponseMsg_DecodeFail_ReturnsError)
     EXPECT_NE(result, NSM_SUCCESS);
 }
 
-TEST_F(NsmChassisClockControlTest, CreateControlGpuClockInvalidUUID)
+TEST_F(NsmChassisClockControlTest, CreateClockLimitFeatureNoNsmDevice)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/invalid/ClockControl";
-    const std::string testName = "InvalidClockControl";
-    const std::string testType = "NSM_ClockControl";
-    const std::string testPath = "/test/clock/control";
-    const uint64_t clockControlSize = 1;
-    const uuid_t invalidUuid = "INVALID:UUID:DOES:NOT:EXIST";
+    const size_t before = gpu->deviceSensors.size();
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = testName;
-    propertyMap["Type"] = testType;
-    propertyMap["UUID"] = invalidUuid;
-    propertyMap["InventoryObjPaths"] = std::vector<std::string>{testPath};
-    propertyMap["ClockControlSize"] = clockControlSize;
+    auto rc = createClockLimit("HGX_GPU_nodevice",
+                               clockLimitParams("InvalidClockControl"), false);
 
-    EXPECT_THROW_COROUTINE(
-        createControlGpuClock(mockManager, interface, testObjPath),
-        std::runtime_error);
-
-    // Should have only the automatic first sensor
-    EXPECT_EQ(1, gpu->deviceSensors.size());
-    auto clockControl = std::dynamic_pointer_cast<NsmClearClockLimAsyncIntf>(
-        gpu->deviceSensors[0]);
-    EXPECT_EQ(nullptr, clockControl);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(before, gpu->deviceSensors.size());
+    EXPECT_EQ(nullptr, findClockControl("InvalidClockControl"));
 }
 
 // Success path: clearReqClockLimit coroutine – postPatchIO succeeds and
@@ -605,187 +569,59 @@ TEST_F(NsmChassisClockControlTest,
 }
 
 // =============================================================================
-// Branch coverage: FALSE branches for property count() checks in
-// createControlGpuClock (lines 318-362 of nsmGpuClockControl.cpp)
+// createClockLimitFeature: optional params left out of the feature list
 // =============================================================================
 
-// Name absent → FALSE branch for count("Name") → name="" →
-// NsmChassisClockControl accepts empty name in test env → sensor IS added.
-TEST_F(NsmChassisClockControlTest, Factory_MissingName_SensorCreated)
+// Name absent → name="" → NsmChassisClockControl accepts an empty name in the
+// test env → sensor IS added.
+TEST_F(NsmChassisClockControlTest, Feature_MissingName_SensorCreated)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl_miss_name";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_miss_name";
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    // Intentionally omit "Name" → FALSE branch for count("Name") → name=""
-    propertyMap["Type"] = std::string("NSM_ControlClockLimit_0");
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    propertyMap["PhysicalContext"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU");
-    propertyMap["ClockMode"] =
-        std::string("com.nvidia.ClockMode.Mode.MaximumPerformance");
-    propertyMap["Priority"] = false;
+    auto params = clockLimitParams("");
+    params.erase("Name");
 
     const size_t before = gpu->deviceSensors.size();
-    createControlGpuClock(mockManager, interface, testObjPath);
+    auto rc = createClockLimit("HGX_GPU_miss_name", params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->deviceSensors.size(), before);
 }
 
-// UUID absent → FALSE branch for count("UUID") → uuid="" →
-// getNsmDeviceFromStaticUUID("") → parseStaticUuid throws std::runtime_error
-TEST_F(NsmChassisClockControlTest, Factory_MissingUUID_Throws)
+// Priority absent → priority=false → addSensor(sensor, false) → roundRobin
+// sensor.
+TEST_F(NsmChassisClockControlTest, Feature_MissingPriority_RoundRobinSensor)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl_miss_uuid";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_miss_uuid";
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = std::string("ClockControl_miss_uuid");
-    propertyMap["Type"] = std::string("NSM_ControlClockLimit_0");
-    // Intentionally omit "UUID" → FALSE branch for count("UUID") → uuid="" →
-    // parseStaticUuid("") returns -1 → throws std::runtime_error
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    propertyMap["PhysicalContext"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU");
-    propertyMap["ClockMode"] =
-        std::string("com.nvidia.ClockMode.Mode.MaximumPerformance");
-    propertyMap["Priority"] = false;
-
-    EXPECT_THROW_COROUTINE(
-        createControlGpuClock(mockManager, interface, testObjPath),
-        std::runtime_error);
-}
-
-// Type absent → FALSE branch for count("Type") → type="" →
-// NsmChassisClockControl accepts empty type → sensor IS added.
-TEST_F(NsmChassisClockControlTest, Factory_MissingType_SensorCreated)
-{
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl_miss_type";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_miss_type";
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = std::string("ClockControl_miss_type");
-    // Intentionally omit "Type" → FALSE branch for count("Type") → type=""
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    propertyMap["PhysicalContext"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU");
-    propertyMap["ClockMode"] =
-        std::string("com.nvidia.ClockMode.Mode.MaximumPerformance");
-    propertyMap["Priority"] = false;
-
-    const size_t before = gpu->deviceSensors.size();
-    createControlGpuClock(mockManager, interface, testObjPath);
-    EXPECT_GT(gpu->deviceSensors.size(), before);
-}
-
-// Priority absent → FALSE branch for count("Priority") → priority=false
-// (default bool{}) → addSensor(sensor, false) → roundRobin sensor. //
-
-TEST_F(NsmChassisClockControlTest, Factory_MissingPriority_RoundRobinSensor)
-{
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl_miss_prio";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_miss_prio";
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = std::string("ClockControl_miss_prio");
-    propertyMap["Type"] = std::string("NSM_ControlClockLimit_0");
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    propertyMap["PhysicalContext"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU");
-    propertyMap["ClockMode"] =
-        std::string("com.nvidia.ClockMode.Mode.MaximumPerformance");
-    // Intentionally omit "Priority" → FALSE branch → priority=false →
-    // roundRobin
+    auto params = clockLimitParams("ClockControl_miss_prio");
+    params.erase("Priority");
 
     const size_t rrBefore = gpu->roundRobinSensors.size();
-    createControlGpuClock(mockManager, interface, testObjPath);
+    auto rc = createClockLimit("HGX_GPU_miss_prio", params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->roundRobinSensors.size(), rrBefore);
 }
 
-// InventoryObjPath absent → FALSE branch for count("InventoryObjPath") →
-// inventoryObjPath="" → path becomes "/Controls/ClockLimit_0" →
-// valid D-Bus path → sensor IS added.
-TEST_F(NsmChassisClockControlTest,
-       Factory_MissingInventoryObjPath_SensorCreated)
+// No ParentChassisAssociationPaths → the control has no associations
+TEST_F(NsmChassisClockControlTest, Feature_NoParentChassis_NoAssociations)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl_miss_invpath";
+    const std::string testName = "ClockControl_no_parent";
+    auto rc = createClockLimit("HGX_GPU_no_parent", clockLimitParams(testName));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = std::string("ClockControl_miss_invpath");
-    propertyMap["Type"] = std::string("NSM_ControlClockLimit_0");
-    propertyMap["UUID"] = gpuUuid;
-    // Intentionally omit "InventoryObjPath" → FALSE branch →
-    // inventoryObjPath="" → path becomes "/Controls/ClockLimit_0" (unique
-    // across tests)
-    propertyMap["PhysicalContext"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU");
-    propertyMap["ClockMode"] =
-        std::string("com.nvidia.ClockMode.Mode.MaximumPerformance");
-    propertyMap["Priority"] = false;
-
-    const size_t before = gpu->deviceSensors.size();
-    createControlGpuClock(mockManager, interface, testObjPath);
-    EXPECT_GT(gpu->deviceSensors.size(), before);
+    auto sensor = findClockControl(testName);
+    ASSERT_NE(sensor, nullptr);
+    EXPECT_TRUE(sensor->associationDefinitionsInft->associations().empty());
 }
 
-// PhysicalContext absent → FALSE branch for count("PhysicalContext") →
-// physicalContext="" → NsmChassisClockControl enum conversion throws
-// InvalidEnumString (extends std::exception) → propagates out.
-TEST_F(NsmChassisClockControlTest, Factory_MissingPhysicalContext_Throws)
+// PhysicalContext absent → physicalContext="" → NsmChassisClockControl enum
+// conversion throws InvalidEnumString (extends std::exception) → propagates
+// out.
+TEST_F(NsmChassisClockControlTest, Feature_MissingPhysicalContext_Throws)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl_miss_phys";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_miss_phys";
+    auto params = clockLimitParams("ClockControl_miss_phys");
+    params.erase("PhysicalContext");
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = std::string("ClockControl_miss_phys");
-    propertyMap["Type"] = std::string("NSM_ControlClockLimit_0");
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    // Intentionally omit "PhysicalContext" → FALSE branch → physicalContext=""
-    // → enum conversion in NsmChassisClockControl throws InvalidEnumString
-    propertyMap["ClockMode"] =
-        std::string("com.nvidia.ClockMode.Mode.MaximumPerformance");
-    propertyMap["Priority"] = false;
-
-    EXPECT_THROW_COROUTINE(
-        createControlGpuClock(mockManager, interface, testObjPath),
-        std::exception);
+    EXPECT_THROW_COROUTINE(createClockLimit("HGX_GPU_miss_phys", params),
+                           std::exception);
 }
 
-// ClockMode absent → FALSE branch for count("ClockMode") →
-// clockMode="" → NsmChassisClockControl enum conversion throws
-// InvalidEnumString (extends std::exception) → propagates out.
 // clearClockLimit() public method – calls doClearClockLimitOnDevice().detach()
 // and returns the allocated object path (lines 110-125 in
 // nsmGpuClockControl.cpp).
@@ -839,30 +675,15 @@ TEST_F(NsmChassisClockControlTest,
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
 }
 
-TEST_F(NsmChassisClockControlTest, Factory_MissingClockMode_Throws)
+// ClockMode param absent → clockMode="" → NsmChassisClockControl enum
+// conversion throws InvalidEnumString (extends std::exception).
+TEST_F(NsmChassisClockControlTest, Feature_MissingClockMode_Throws)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl_miss_clkmode";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_miss_clkmode";
+    auto params = clockLimitParams("ClockControl_miss_clkmode");
+    params.erase("ClockMode");
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = std::string("ClockControl_miss_clkmode");
-    propertyMap["Type"] = std::string("NSM_ControlClockLimit_0");
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    propertyMap["PhysicalContext"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU");
-    // Intentionally omit "ClockMode" → FALSE branch → clockMode="" →
-    // enum conversion in NsmChassisClockControl throws InvalidEnumString
-    propertyMap["Priority"] = false;
-
-    EXPECT_THROW_COROUTINE(
-        createControlGpuClock(mockManager, interface, testObjPath),
-        std::exception);
+    EXPECT_THROW_COROUTINE(createClockLimit("HGX_GPU_miss_clkmode", params),
+                           std::exception);
 }
 
 // handleResponseMsg: rc==NSM_SW_SUCCESS, cc==NSM_ERROR →

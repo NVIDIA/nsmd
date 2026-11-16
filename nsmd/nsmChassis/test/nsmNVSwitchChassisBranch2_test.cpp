@@ -30,7 +30,7 @@
  * - createChassisSKU: exercises helper directly
  * - NsmNVSwitchAndNicChassis<UuidIntf>::update() error path
  * - createNsmChassis factory: missing Name/UUID/Type branches
- * - createNsmNVSwitchChassis / createNsmNVLinkMgmtNicChassis wrappers
+ * - createNsmNVSwitchChassis wrapper, createNVLinkMgmtNicChassisFeature
  */
 
 #include "test/mockDBusHandler.hpp"
@@ -42,6 +42,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmNVSwitchAndNVMgmtNICChassis.hpp"
 
@@ -80,9 +82,6 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
 requester::Coroutine createNsmNVSwitchChassis(SensorManager& manager,
                                               const std::string& interface,
                                               const std::string& objPath);
-requester::Coroutine createNsmNVLinkMgmtNicChassis(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath);
 } // namespace nsm
 
 using namespace nsm;
@@ -511,21 +510,30 @@ TEST_F(NsmNVSwitchChassisBranch2Test, CreateNsmNVSwitchChassis_Wrapper)
 }
 
 // ============================================================================
-// createNsmNVLinkMgmtNicChassis wrapper
+// createNVLinkMgmtNicChassisFeature: chassis UUID from the static UUID
 // ============================================================================
-TEST_F(NsmNVSwitchChassisBranch2Test, CreateNsmNVLinkMgmtNicChassis_Wrapper)
+TEST_F(NsmNVSwitchChassisBranch2Test, CreateNVLinkMgmtNicChassisFeature)
 {
-    static const std::string nicBaseIntf =
-        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis";
-    const std::string objPath = "/xyz/test/nvswitch_b2/wrapper_nic";
-    auto& props = utils::MockDbusAsync::propertyMap(objPath, nicBaseIntf);
-    props["Name"] = std::string("WrapperNic");
-    props["UUID"] = kDevUuid;
-    props["Type"] = std::string("NSM_NVLinkMgmtNic_Chassis");
+    nsm::features::DeviceContext ctx;
+    ctx.name = "WrapperNic";
+    ctx.kind = "cx_nic";
+    ctx.staticUuid = kDevUuid;
+    ctx.platformPrefix = "HGX_";
+    ctx.device = dev;
 
     const size_t before = dev->staticSensors.size();
-    createNsmNVLinkMgmtNicChassis(mockManager, nicBaseIntf, objPath);
-    EXPECT_GT(dev->staticSensors.size(), before);
+    auto rc = nsm::features::createNVLinkMgmtNicChassisFeature(
+        mockManager, ctx, {{"Name", std::string("WrapperNic")}});
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    ASSERT_GT(dev->staticSensors.size(), before);
+
+    auto chassisUuid =
+        std::dynamic_pointer_cast<NsmNVSwitchAndNicChassis<UuidIntf>>(
+            dev->staticSensors[before]);
+    ASSERT_NE(chassisUuid, nullptr);
+    EXPECT_EQ(chassisUuid->getName(), "WrapperNic");
+    EXPECT_EQ(chassisUuid->getType(), "NSM_NVLinkMgmtNic_Chassis");
+    EXPECT_EQ(chassisUuid->invoke(pdiMethod(uuid)), kDevUuid);
 }
 
 // ============================================================================

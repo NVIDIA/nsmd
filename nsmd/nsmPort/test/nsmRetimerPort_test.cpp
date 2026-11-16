@@ -28,6 +28,9 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
+#include "globals.hpp"
 #include "nsmRetimerPort.hpp"
 
 using namespace nsm;
@@ -3434,7 +3437,7 @@ TEST(NsmPCIeVectorGroup1, BadGenReq_InvalidInstanceId_ReturnsNullopt)
 }
 
 // =============================================================================
-// createNsmPCIeRetimerPorts and createNsmMultiPCIeRetimerPorts factory tests
+// createNsmPCIeRetimerPorts factory and createMultiPCIeLinkFeature tests
 // (static removed from nsmRetimerPort.cpp to allow forward declaration)
 // =============================================================================
 
@@ -3443,10 +3446,6 @@ namespace nsm
 requester::Coroutine createNsmPCIeRetimerPorts(SensorManager& manager,
                                                const std::string& interface,
                                                const std::string& objPath);
-requester::Coroutine
-    createNsmMultiPCIeRetimerPorts(SensorManager& manager,
-                                   const std::string& interface,
-                                   const std::string& objPath);
 } // namespace nsm
 
 struct NsmPCIeRetimerPortsFactoryFixture :
@@ -3463,8 +3462,6 @@ struct NsmPCIeRetimerPortsFactoryFixture :
 
     const std::string retimerIntf =
         "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_PCIeLink";
-    const std::string multiPortIntf =
-        "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_MultiPCIeLink";
 
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> retimer;
@@ -3513,19 +3510,40 @@ struct NsmPCIeRetimerPortsFactoryFixture :
                      "PortType.UpstreamPort")},
     };
 
-    // Full property map for createNsmMultiPCIeRetimerPorts (all required)
-    const dbus::PropertyMap multiPortProps = {
-        {"Name", std::string("MultiPort")},
-        {"Priority", false},
-        {"Counts", std::vector<uint64_t>{1}},
-        {"InventoryObjPath",
-         std::string("/xyz/openbmc_project/inventory/multiport/")},
-        {"UUID", retimerUuid},
-        {"PortType",
-         std::string("xyz.openbmc_project.Inventory.Decorator.PortInfo."
-                     "PortType.UpstreamPort")},
-        {"UpstreamPortNumbers", std::vector<uint64_t>{0}},
-    };
+    // MultiPCIeLink feature params, as the CX device list sets them
+    static dbus::PropertyMap multiPortParams(const std::string& switchName)
+    {
+        return {{"Name", std::string("PCIePorts")},
+                {"FabricName", std::string("HGX_PCIeTopology_CX_0")},
+                {"SwitchName", switchName},
+                {"UpstreamPortName", std::string("UP")},
+                {"DownstreamPortName", std::string("DOWN")},
+                {"Priority", false}};
+    }
+
+    /** @brief Ports/ path the discovery sensor joins its port names on */
+    static std::string multiPortInventoryPath(const std::string& switchName)
+    {
+        return (fabricsInventoryBasePath / "HGX_PCIeTopology_CX_0" /
+                fabricSwitchesSubPath / switchName)
+                   .string() +
+               "/Ports/";
+    }
+
+    /** @brief Run the MultiPCIeLink feature on `device` (none if null) */
+    requester::Coroutine
+        createMultiPCIeLink(const dbus::PropertyMap& params,
+                            const std::shared_ptr<MockNsmDevice>& device)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_CX_0";
+        dev.kind = "cx_io";
+        dev.staticUuid = retimerUuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = device;
+        return nsm::features::createMultiPCIeLinkFeature(mockManager, dev,
+                                                         params);
+    }
 };
 
 // All 8 count() TRUE branches taken → sensors created (3 per port)
@@ -3640,85 +3658,53 @@ TEST_F(NsmPCIeRetimerPortsFactoryFixture,
 }
 
 // =============================================================================
-// createNsmMultiPCIeRetimerPorts factory tests
+// createMultiPCIeLinkFeature tests
 // =============================================================================
 
-// UpstreamPort → portTypeVal=NSM_PORT_TYPE_UPSTREAM → sensors + config info
-TEST_F(NsmPCIeRetimerPortsFactoryFixture,
-       MultiFactory_UpstreamPort_SensorsAndConfigCreated)
+// A NsmPCIePortDiscovery static sensor is registered on the device
+TEST_F(NsmPCIeRetimerPortsFactoryFixture, MultiFeature_CreatesDiscoverySensor)
 {
-    const std::string testPath = "/xyz/test/multiport/upstream";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = multiPortProps;
-
     const size_t before = retimer->deviceSensors.size();
-    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
+    auto rc = createMultiPCIeLink(multiPortParams("Switch_Create"), retimer);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
     EXPECT_GT(retimer->deviceSensors.size(), before);
 }
 
-// DownstreamPort → portTypeVal=NSM_PORT_TYPE_DOWNSTREAM → sensors created
-// but createNsmPCIePortConfigurationInfo NOT called (portTypeVal != UPSTREAM)
-TEST_F(NsmPCIeRetimerPortsFactoryFixture,
-       MultiFactory_DownstreamPort_SensorsCreatedNoConfigInfo)
+// No NsmDevice in the context: error, nothing created
+TEST_F(NsmPCIeRetimerPortsFactoryFixture, MultiFeature_NoNsmDevice_Error)
 {
-    const std::string testPath = "/xyz/test/multiport/downstream";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = multiPortProps;
-    pm["Name"] = std::string("DownPort");
-    pm["PortType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.PortInfo."
-        "PortType.DownstreamPort");
+    const size_t before = retimer->deviceSensors.size();
+    auto rc = createMultiPCIeLink(multiPortParams("Switch_NoDevice"), nullptr);
 
-    const size_t beforeRetimer = retimer->deviceSensors.size();
-    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
-    EXPECT_GT(retimer->deviceSensors.size(), beforeRetimer);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(retimer->deviceSensors.size(), before);
 }
 
-// PortType is no longer read from EM config (dynamic discovery via
-// ListPCIePorts determines port types at runtime). Factory always succeeds
-// if UUID is valid — a NsmPCIePortDiscovery sensor is created regardless
-// of any PortType property in the config.
+// UpstreamPortIndex outside 0-255 rejects the feature
 TEST_F(NsmPCIeRetimerPortsFactoryFixture,
-       MultiFactory_NoPortType_StillCreatesDiscoverySensor)
+       MultiFeature_UpstreamPortIndexOutOfRange_Error)
 {
-    const std::string testPath = "/xyz/test/multiport/no_port_type";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = multiPortProps;
-    pm["Name"] = std::string("NoPortTypePort");
+    auto params = multiPortParams("Switch_BadIndex");
+    params["UpstreamPortIndex"] = uint64_t(256);
 
     const size_t before = retimer->deviceSensors.size();
-    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
-    EXPECT_GT(retimer->deviceSensors.size(), before);
-}
+    auto rc = createMultiPCIeLink(params, retimer);
 
-// UUID="" → parseStaticUuid("") throws in mock (invalid format)
-TEST_F(NsmPCIeRetimerPortsFactoryFixture,
-       MultiFactory_EmptyUUID_ThrowsInvalidUUID)
-{
-    const std::string testPath = "/xyz/test/multiport/empty_uuid";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = multiPortProps;
-    pm["Name"] = std::string("MultiPort_EmptyUUID");
-    pm["UUID"] = std::string(""); // blank uuid → mock throws on getNsmDevice
-
-    EXPECT_THROW_COROUTINE(
-        createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath),
-        std::runtime_error);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(retimer->deviceSensors.size(), before);
 }
 
 // CX9 device → getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 →
 // includeInboundCounters=true → NsmPCIeECCGroup10 created with inbound counters
 TEST_F(NsmPCIeRetimerPortsFactoryFixture,
-       MultiFactory_CX9Device_IncludeInboundCounters)
+       MultiFeature_CX9Device_IncludeInboundCounters)
 {
-    const std::string testPath = "/xyz/test/multiport/cx9";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = multiPortProps;
-    pm["Name"] = std::string("CX9Port");
-    pm["UUID"] = cx9Uuid; // CX9 device
-
     const size_t before = cx9Device->deviceSensors.size();
-    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
+    auto rc = createMultiPCIeLink(multiPortParams("Switch_CX9"), cx9Device);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(cx9Device->deviceSensors.size(), before);
 }
 
@@ -3785,19 +3771,15 @@ static std::shared_ptr<NsmPCIePortDiscovery>
 // UpstreamPortIndex places only that device port, named from 0 on D-Bus, while
 // telemetry still addresses the device's own port number.
 TEST_F(NsmPCIeRetimerPortsFactoryFixture,
-       MultiFactory_UpstreamPortIndex_PlacesThatPortFromZero)
+       MultiFeature_UpstreamPortIndex_PlacesThatPortFromZero)
 {
-    const std::string testPath = "/xyz/test/multiport/selective";
-    const std::string inv = "/xyz/openbmc_project/inventory/multiport/";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = {{"Name", std::string("PCIePorts")},
-          {"InventoryObjPath", inv},
-          {"UUID", retimerUuid},
-          {"UpstreamPortName", std::string("UP")},
-          {"DownstreamPortName", std::string("DOWN")},
-          {"UpstreamPortIndex", uint64_t(1)}};
+    const std::string switchName = "Switch_Selective";
+    const std::string inv = multiPortInventoryPath(switchName);
+    auto params = multiPortParams(switchName);
+    params["UpstreamPortIndex"] = uint64_t(1);
 
-    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
+    auto rc = createMultiPCIeLink(params, retimer);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     auto discovery = findPortDiscovery(retimer);
     ASSERT_NE(discovery, nullptr);
@@ -3816,18 +3798,13 @@ TEST_F(NsmPCIeRetimerPortsFactoryFixture,
 // named by device port number and one downstream counter running across all of
 // them.
 TEST_F(NsmPCIeRetimerPortsFactoryFixture,
-       MultiFactory_NoUpstreamPortIndex_PlacesEveryPortWithFlatNumbering)
+       MultiFeature_NoUpstreamPortIndex_PlacesEveryPortWithFlatNumbering)
 {
-    const std::string testPath = "/xyz/test/multiport/all";
-    const std::string inv = "/xyz/openbmc_project/inventory/multiport_all/";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = {{"Name", std::string("AllPCIePorts")},
-          {"InventoryObjPath", inv},
-          {"UUID", retimerUuid},
-          {"UpstreamPortName", std::string("UP")},
-          {"DownstreamPortName", std::string("DOWN")}};
+    const std::string switchName = "Switch_All";
+    const std::string inv = multiPortInventoryPath(switchName);
 
-    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
+    auto rc = createMultiPCIeLink(multiPortParams(switchName), retimer);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     auto discovery = findPortDiscovery(retimer);
     ASSERT_NE(discovery, nullptr);
@@ -3855,19 +3832,13 @@ TEST_F(NsmPCIeRetimerPortsFactoryFixture,
 // An UpstreamPortIndex the device does not report is placed nowhere, rather
 // than falling back to a port it does report.
 TEST_F(NsmPCIeRetimerPortsFactoryFixture,
-       MultiFactory_UpstreamPortIndexBeyondTopology_PlacesNothing)
+       MultiFeature_UpstreamPortIndexBeyondTopology_PlacesNothing)
 {
-    const std::string testPath = "/xyz/test/multiport/beyond";
-    const std::string inv = "/xyz/openbmc_project/inventory/multiport_beyond/";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = {{"Name", std::string("BeyondPCIePorts")},
-          {"InventoryObjPath", inv},
-          {"UUID", retimerUuid},
-          {"UpstreamPortName", std::string("UP")},
-          {"DownstreamPortName", std::string("DOWN")},
-          {"UpstreamPortIndex", uint64_t(2)}};
+    auto params = multiPortParams("Switch_Beyond");
+    params["UpstreamPortIndex"] = uint64_t(2);
 
-    createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath);
+    auto rc = createMultiPCIeLink(params, retimer);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     auto discovery = findPortDiscovery(retimer);
     ASSERT_NE(discovery, nullptr);

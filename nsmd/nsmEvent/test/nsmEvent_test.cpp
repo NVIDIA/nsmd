@@ -24,17 +24,12 @@ using namespace ::testing;
 
 #include "network-ports.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmLongRunningEventHandler.hpp"
 #include "nsmThresholdEvent.hpp"
 #include "test/mockDBusHandler.hpp"
 #include "test/mockSensorManager.hpp"
-
-namespace nsm
-{
-requester::Coroutine createNsmThresholdEvent(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath);
-}; // namespace nsm
 
 using namespace nsm;
 
@@ -45,10 +40,7 @@ struct NsmThresholdEventTest :
 {
     eid_t eid = 0;
     uint8_t instanceId = 0;
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_Event_Threshold";
     const std::string name = "ThresholdEventSetting";
-    const std::string objPath = chassisInventoryBasePath / name;
 
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
 
@@ -64,14 +56,8 @@ struct NsmThresholdEventTest :
         EXPECT_EQ(NSM_DEV_ID_GPU, gpu->getDeviceType());
     }
 
-    dbus::PropertyMap error = {
-        {"UUID", "992b3ec1-e468-f145-8686-badbadbadbad"},
-        {"MessageArgs", std::vector<std::string>{}},
-    };
     dbus::PropertyMap basic = {
-        {"UUID", gpuUuid},
         {"Name", name},
-        {"OriginOfCondition", "/redfish/v1/Chassis/HGX_GPU_SXM_1"},
         {"MessageId", "ResourceEvent.1.0.ResourceErrorsDetected"},
         {"LoggingNamespace", "GPU_SXM 1 Threshold"},
         {"Resolution",
@@ -83,55 +69,52 @@ struct NsmThresholdEventTest :
          }},
         {"Severity", "Critical"},
     };
+
+    requester::Coroutine createEvent(const dbus::PropertyMap& params,
+                                     bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "HGX_GPU_SXM_1";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return features::createThresholdEventFeature(mockManager, dev, params);
+    }
 };
 
-TEST_F(NsmThresholdEventTest, badTestUuidNotFound)
+TEST_F(NsmThresholdEventTest, badTestNoDevice)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = createEvent(basic, false);
 
-    // Set up base properties with INVALID UUID that doesn't match any device
-    propertyMap["UUID"] = error["UUID"]; // Invalid UUID as uuid_t type
-
-    EXPECT_THROW_COROUTINE(
-        createNsmThresholdEvent(mockManager, basicIntfName, objPath),
-        std::runtime_error);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceEvents.size(), before);
 }
 
 TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
+    auto params = basic;
+    params["MessageArgs"] = std::vector<std::string>{};
 
-    propertyMap = basic;
-    propertyMap["MessageArgs"] = error["MessageArgs"];
-
-    EXPECT_THROW_COROUTINE(
-        createNsmThresholdEvent(mockManager, basicIntfName, objPath),
-        std::invalid_argument);
+    EXPECT_THROW_COROUTINE(createEvent(params), std::invalid_argument);
 }
 
 TEST_F(NsmThresholdEventTest, badTestInvalidMessageId)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
+    auto params = basic;
+    params["MessageId"] = std::string("InvalidMessageId");
 
-    propertyMap = basic;
-    propertyMap["MessageId"] = std::string("InvalidMessageId");
-
-    EXPECT_THROW_COROUTINE(
-        createNsmThresholdEvent(mockManager, basicIntfName, objPath),
-        std::invalid_argument);
+    EXPECT_THROW_COROUTINE(createEvent(params), std::invalid_argument);
 }
 
 TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    propertyMap = basic;
-
-    createNsmThresholdEvent(mockManager, basicIntfName, objPath);
+    auto cr = createEvent(basic);
+    EXPECT_EQ(cr.data(), NSM_SUCCESS);
 
     EXPECT_EQ(2, gpu->deviceEvents.size());
     EXPECT_EQ(2, gpu->eventDispatcher.eventsMap.size());
@@ -163,17 +146,13 @@ TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
 
 TEST_F(NsmThresholdEventTest, goodTestCreateEventWithDeviceToPortMap)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    propertyMap = basic;
-
     // Setup deviceToPortMap with port mapping
     uint8_t portNumber = 5;
     std::string portName = "Port_5";
     mockManager.deviceToPortMap[gpu][portNumber] = portName;
 
-    createNsmThresholdEvent(mockManager, basicIntfName, objPath);
+    auto cr = createEvent(basic);
+    EXPECT_EQ(cr.data(), NSM_SUCCESS);
 
     EXPECT_EQ(2, gpu->deviceEvents.size());
     EXPECT_EQ(2, gpu->eventDispatcher.eventsMap.size());

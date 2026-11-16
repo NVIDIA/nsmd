@@ -16,13 +16,13 @@
  */
 
 /*
- * Branch coverage for nsmPCIeRetimerFabricsDI.cpp factory function:
+ * Branch coverage for nsmPCIeRetimerFabricsDI.cpp feature creator:
  *
- * Targets uncovered code paths:
- * - createNSMPCIeRetimerFabrics: all properties present (direct call)
- * - createNSMPCIeRetimerFabrics: !nsmDevice (UUID matches no device)
- * - createNSMPCIeRetimerFabrics: missing Name, UUID, FabricType
- *   (FALSE count() branches)
+ * Targets code paths:
+ * - createPCIeRetimerFabricsFeature: all params present
+ * - createPCIeRetimerFabricsFeature: no NsmDevice
+ * - createPCIeRetimerFabricsFeature: missing Name, FabricType
+ * - createPCIeRetimerFabricsFeature: ChassisAssociationPaths
  * - NsmPCIeRetimerFabricDI constructor: verify interface initialization
  */
 
@@ -37,17 +37,11 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
 #include "nsmPCIeRetimerFabricsDI.hpp"
 
 #undef private
 #undef protected
-
-namespace nsm
-{
-requester::Coroutine createNSMPCIeRetimerFabrics(SensorManager& manager,
-                                                 const std::string& interface,
-                                                 const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -63,8 +57,6 @@ struct NsmPCIeRetimerFabricsDIBranchTest :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Fabrics";
     const uuid_t deviceUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
@@ -81,59 +73,72 @@ struct NsmPCIeRetimerFabricsDIBranchTest :
     {
         cleanupDeviceSensors(devices);
     }
+
+    features::DeviceContext makeDev(bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "HGX_PCIeRetimer_0";
+        dev.kind = "pcie_retimer";
+        dev.staticUuid = deviceUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return dev;
+    }
+
+    static dbus::PropertyMap params(const std::string& name)
+    {
+        return {{"Name", name}, {"FabricType", std::string(fabricTypePCIe)}};
+    }
 };
 
 // ============================================================================
-// Factory: all properties present -> sensor created (direct call)
-// Exercises lines 43-86: all count() TRUE branches, nsmDevice valid
+// Feature: all params present -> sensor created
 // ============================================================================
 
-TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Factory_AllProperties_SensorCreated)
+TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Feature_AllParams_SensorCreated)
 {
-    const std::string testPath = "/xyz/test/fabrics_br/all_props";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabBr_0");
-    pm["UUID"] = deviceUuid;
-    pm["FabricType"] = std::string(fabricTypePCIe);
-
     const size_t before = gpu->deviceSensors.size();
-    createNSMPCIeRetimerFabrics(mockManager, intf, testPath);
-    EXPECT_GT(gpu->deviceSensors.size(), before);
+    auto rc = features::createPCIeRetimerFabricsFeature(mockManager, makeDev(),
+                                                        params("FabBr_0"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(gpu->deviceSensors.size(), before + 1);
+    auto fabric = std::dynamic_pointer_cast<NsmPCIeRetimerFabricDI>(
+        gpu->deviceSensors.back());
+    ASSERT_NE(fabric, nullptr);
+    EXPECT_EQ(fabric->getName(), "FabBr_0");
+    EXPECT_EQ(fabric->getType(), "NSM_PCIeRetimer_Fabrics");
+    EXPECT_TRUE(fabric->associationDefIntf->associations().empty());
 }
 
 // ============================================================================
-// Factory: invalid UUID -> nsmDevice is nullptr -> error path (lines 71-79)
+// Feature: no NsmDevice -> error path
 // ============================================================================
 
-TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Factory_InvalidUUID_ReturnsError)
+TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Feature_NullDevice_ReturnsError)
 {
-    const std::string testPath = "/xyz/test/fabrics_br/bad_uuid";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabBr_BadUUID");
-    pm["UUID"] = std::string("STATIC:99:99:NSM_DEVICE_INSTANCE_NUMBER:999");
-    pm["FabricType"] = std::string(fabricTypePCIe);
-
     const size_t before = gpu->deviceSensors.size();
-    createNSMPCIeRetimerFabrics(mockManager, intf, testPath);
+    auto rc = features::createPCIeRetimerFabricsFeature(
+        mockManager, makeDev(false), params("FabBr_NullDevice"));
+    EXPECT_EQ(rc.data(), NSM_ERROR);
     EXPECT_EQ(before, gpu->deviceSensors.size());
 }
 
 // ============================================================================
-// Factory: missing Name -> FALSE count("Name") branch -> name=""
+// Feature: missing Name -> name="" -> D-Bus path ends with "/"
 // ============================================================================
 
-TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Factory_MissingName_EmptyName)
+TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Feature_MissingName_EmptyName)
 {
-    const std::string testPath = "/xyz/test/fabrics_br/no_name";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    // Name intentionally omitted -> name=""
-    pm["UUID"] = deviceUuid;
-    pm["FabricType"] = std::string(fabricTypePCIe);
+    auto p = params("");
+    p.erase("Name");
 
     // Empty name creates a path ending with "/" which sdbusplus may reject
     try
     {
-        createNSMPCIeRetimerFabrics(mockManager, intf, testPath);
+        features::createPCIeRetimerFabricsFeature(mockManager, makeDev(), p);
     }
     catch (...)
     {
@@ -143,46 +148,19 @@ TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Factory_MissingName_EmptyName)
 }
 
 // ============================================================================
-// Factory: missing UUID -> FALSE count("UUID") branch -> uuid=""
+// Feature: missing FabricType -> fabricType="" ->
+// convertFabricTypeFromString("") throws
 // ============================================================================
 
-TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Factory_MissingUUID_NoDevice)
+TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Feature_MissingFabricType_NoSensor)
 {
-    const std::string testPath = "/xyz/test/fabrics_br/no_uuid";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabBr_NoUUID");
-    // UUID intentionally omitted -> uuid=""
-    pm["FabricType"] = std::string(fabricTypePCIe);
+    auto p = params("FabBr_NoFabType");
+    p.erase("FabricType");
 
     const size_t before = gpu->deviceSensors.size();
     try
     {
-        createNSMPCIeRetimerFabrics(mockManager, intf, testPath);
-    }
-    catch (...)
-    {
-        // uuid="" -> parseStaticUuid may throw
-    }
-    EXPECT_EQ(before, gpu->deviceSensors.size());
-}
-
-// ============================================================================
-// Factory: missing FabricType -> FALSE count("FabricType") branch
-// fabricType="" -> convertFabricTypeFromString("") may throw
-// ============================================================================
-
-TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Factory_MissingFabricType_EmptyType)
-{
-    const std::string testPath = "/xyz/test/fabrics_br/no_fabtype";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabBr_NoFabType");
-    pm["UUID"] = deviceUuid;
-    // FabricType intentionally omitted -> fabricType=""
-
-    const size_t before = gpu->deviceSensors.size();
-    try
-    {
-        createNSMPCIeRetimerFabrics(mockManager, intf, testPath);
+        features::createPCIeRetimerFabricsFeature(mockManager, makeDev(), p);
     }
     catch (...)
     {
@@ -193,40 +171,30 @@ TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Factory_MissingFabricType_EmptyType)
 }
 
 // ============================================================================
-// Factory: with associations from D-Bus
+// Feature: ChassisAssociationPaths -> chassis/fabrics association
 // ============================================================================
 
-TEST_F(NsmPCIeRetimerFabricsDIBranchTest,
-       Factory_WithAssociations_SensorCreated)
+TEST_F(NsmPCIeRetimerFabricsDIBranchTest, Feature_WithAssociations_Created)
 {
-    const std::string testPath = "/xyz/test/fabrics_br/with_assoc";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabBr_Assoc");
-    pm["UUID"] = deviceUuid;
-    pm["FabricType"] = std::string(fabricTypePCIe);
-
-    // Set up association service map
-    auto& serviceMap = utils::MockDbusAsync::serviceMap();
-    MapperServiceMap assocServiceMap = {
-        {{
-            "xyz.openbmc_project.NSM",
-            {intf + ".Associations"},
-        }},
-    };
-    serviceMap = assocServiceMap;
-
-    dbus::PropertyMap assocProperties = {
-        {"Forward", "parent_chassis"},
-        {"Backward", "pcie_retimer"},
-        {"AbsolutePath", "/xyz/openbmc_project/inventory/system"},
-    };
-    auto& assocPm = utils::MockDbusAsync::propertyMap(testPath,
-                                                      intf + ".Associations");
-    assocPm = assocProperties;
+    auto p = params("FabBr_Assoc");
+    p["ChassisAssociationPaths"] =
+        std::vector<std::string>{"chassis/HGX_PCIeRetimer_0"};
 
     const size_t before = gpu->deviceSensors.size();
-    createNSMPCIeRetimerFabrics(mockManager, intf, testPath);
-    EXPECT_GT(gpu->deviceSensors.size(), before);
+    auto rc = features::createPCIeRetimerFabricsFeature(mockManager, makeDev(),
+                                                        p);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(gpu->deviceSensors.size(), before + 1);
+    auto fabric = std::dynamic_pointer_cast<NsmPCIeRetimerFabricDI>(
+        gpu->deviceSensors.back());
+    ASSERT_NE(fabric, nullptr);
+    const auto& assocs = fabric->associationDefIntf->associations();
+    ASSERT_EQ(assocs.size(), 1u);
+    EXPECT_EQ(std::get<0>(assocs[0]), "chassis");
+    EXPECT_EQ(std::get<1>(assocs[0]), "fabrics");
+    EXPECT_EQ(std::get<2>(assocs[0]),
+              "/xyz/openbmc_project/inventory/system/chassis/"
+              "HGX_PCIeRetimer_0");
 }
 
 // ============================================================================

@@ -5,6 +5,8 @@
 #ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
 #endif
+#include "features/associations.hpp"
+#include "nsmFwSwInventoryFeatures.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -140,59 +142,42 @@ requester::Coroutine NsmGPUSWInventoryDriverVersionAndStatus::update(
     co_return cc ? cc : rc;
 }
 
-requester::Coroutine createGPUDriverSensor(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    auto& bus = utils::DBusHandler::getBus();
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
+requester::Coroutine
+    createGPUSWInventoryFeature([[maybe_unused]] SensorManager& manager,
+                                const DeviceContext& dev,
+                                const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    uuid_t uuid{};
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-    std::string manufacturer{};
-    if (allCurrentIfaceProperties.count("Manufacturer"))
-    {
-        manufacturer =
-            std::get<std::string>(allCurrentIfaceProperties.at("Manufacturer"));
-    }
-
-    std::vector<utils::Association> associations{};
-    co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                      associations);
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-    if (!nsmDevice)
-    {
-        // cannot found a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of NSM_GPUSWInventory PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
+        lg2::error("GPUSWInventory feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
         co_return NSM_ERROR;
     }
 
+    auto name = param<std::string>(params, "Name").value_or("");
+
+    std::vector<utils::Association> associations{};
+    addAssociations(associations, params, "ProcessorAssociationPaths",
+                    "inventory", "software");
+    if (param<bool>(params, "SoftwareVersionAssociationsEnabled")
+            .value_or(false))
+    {
+        associations.push_back({"software_version", "updateable",
+                                firmwareInventoryBasePath.string()});
+    }
+
     auto sensor = std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
-        bus, name, associations, type, manufacturer);
-    nsmDevice->addGpuDriverSensor(sensor);
-    // update sensor
-    nsmDevice->addSensor(sensor, false);
-    sensor->nsmDeviceFound = nsmDevice;
-    // coverity[missing_return]
+        utils::DBusHandler::getBus(), name, associations, "NSM_GPU_SWInventory",
+        param<std::string>(params, "Manufacturer").value_or(""));
+    dev.device->addGpuDriverSensor(sensor);
+    dev.device->addSensor(sensor, false);
+    sensor->nsmDeviceFound = dev.device;
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createGPUDriverSensor,
-    "xyz.openbmc_project.Configuration.NSM_GPU_SWInventory")
-
-} // namespace nsm
+} // namespace nsm::features

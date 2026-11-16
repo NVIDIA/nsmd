@@ -36,16 +36,11 @@ using namespace ::testing;
 
 #include "network-ports.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmEvent/nsmThresholdEvent.hpp"
 
 using namespace nsm;
-
-namespace nsm
-{
-requester::Coroutine createNsmThresholdEvent(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath);
-} // namespace nsm
 
 static const std::string kValidMessageId =
     "ResourceEvent.1.0.ResourceErrorsDetected";
@@ -316,154 +311,178 @@ TEST_F(NsmThresholdEventTest, Handle_PortMapMiss_NoAppend)
 }
 
 // =============================================================================
-// FALSE-branch coverage: count() checks in createNsmThresholdEvent
+// createThresholdEventFeature: param defaults and error paths
 // =============================================================================
 
-static const std::string kThresholdInterface =
-    "xyz.openbmc_project.Configuration.NSM_Event_Threshold";
 static const uuid_t kThresholdUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
 static const std::string kThresholdMsgId =
     "ResourceEvent.1.0.ResourceErrorsDetected";
 
-// Helper: set minimum valid props for a successful factory run
-static void setBaseThresholdProps(dbus::PropertyMap& pm)
+struct NsmThresholdEventFeatureTest : public NsmThresholdEventTest
 {
-    pm["UUID"] = kThresholdUuid;
-    pm["MessageId"] = kThresholdMsgId;
-    pm["MessageArgs"] = std::vector<std::string>{"PortThreshold"};
-}
+    std::shared_ptr<NsmDevice> gpu;
 
-// UUID absent → info.uuid="" → parseStaticUuid("") throws before device lookup
-TEST_F(NsmThresholdEventTest, Factory_MissingUUID_Throws)
+    NsmThresholdEventFeatureTest()
+    {
+        gpu = mockManager.getNsmDeviceFromStaticUUID(kThresholdUuid);
+        EXPECT_NE(gpu, nullptr);
+    }
+
+    // Minimum valid params for a successful creator run
+    static dbus::PropertyMap baseParams()
+    {
+        return {
+            {"MessageId", kThresholdMsgId},
+            {"MessageArgs", std::vector<std::string>{"PortThreshold"}},
+        };
+    }
+
+    requester::Coroutine create(const dbus::PropertyMap& params,
+                                bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "GPU_1";
+        dev.kind = "gpu";
+        dev.staticUuid = kThresholdUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return features::createThresholdEventFeature(mockManager, dev, params);
+    }
+
+    std::shared_ptr<NsmThresholdEvent> lastEvent()
+    {
+        if (!gpu || gpu->deviceEvents.empty())
+        {
+            return nullptr;
+        }
+        return std::dynamic_pointer_cast<NsmThresholdEvent>(
+            gpu->deviceEvents.back());
+    }
+};
+
+// No NsmDevice in the context → NSM_ERROR, nothing added
+TEST_F(NsmThresholdEventFeatureTest, Factory_NoDevice_ReturnsError)
 {
-    const std::string objPath = "/xyz/test/threshold/no_uuid";
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
-    pm["MessageId"] = kThresholdMsgId;
-    pm["MessageArgs"] = std::vector<std::string>{"PortThreshold"};
-    // "UUID" intentionally omitted → info.uuid="" → parseStaticUuid throws
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = create(baseParams(), false);
 
-    EXPECT_THROW_COROUTINE(
-        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath),
-        std::exception);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceEvents.size(), before);
 }
 
 // MessageId absent → info.messageId="" → NsmThresholdEvent ctor throws
 // (invalid messageId string)
-TEST_F(NsmThresholdEventTest, Factory_MissingMessageId_Throws)
+TEST_F(NsmThresholdEventFeatureTest, Factory_MissingMessageId_Throws)
 {
-    const std::string objPath = "/xyz/test/threshold/no_msgid";
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
-    pm["UUID"] = kThresholdUuid;
-    pm["MessageArgs"] = std::vector<std::string>{"PortThreshold"};
-    // "MessageId" intentionally omitted → info.messageId="" →
-    // NsmThresholdEvent constructor throws std::invalid_argument
+    auto params = baseParams();
+    params.erase("MessageId");
 
-    EXPECT_THROW_COROUTINE(
-        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath),
-        std::exception);
+    EXPECT_THROW_COROUTINE(create(params), std::exception);
 }
 
 // MessageArgs absent → info.messageArgs={} → NsmThresholdEvent ctor throws
 // (empty messageArgs vector)
-TEST_F(NsmThresholdEventTest, Factory_MissingMessageArgs_Throws)
+TEST_F(NsmThresholdEventFeatureTest, Factory_MissingMessageArgs_Throws)
 {
-    const std::string objPath = "/xyz/test/threshold/no_msgargs";
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
-    pm["UUID"] = kThresholdUuid;
-    pm["MessageId"] = kThresholdMsgId;
-    // "MessageArgs" intentionally omitted → info.messageArgs={} →
-    // NsmThresholdEvent constructor throws std::invalid_argument
+    auto params = baseParams();
+    params.erase("MessageArgs");
 
-    EXPECT_THROW_COROUTINE(
-        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath),
-        std::exception);
+    EXPECT_THROW_COROUTINE(create(params), std::exception);
 }
 
-// Severity absent → severityStr="" → convertStringToLevel("...Level.") →
-// empty optional → value_or(Level::Critical) → sensor IS created
-TEST_F(NsmThresholdEventTest, Factory_MissingSeverity_UsesDefault)
+// Severity absent → convertStringToLevel("...Level.") → nullopt →
+// value_or(Level::Critical) → event IS created
+TEST_F(NsmThresholdEventFeatureTest, Factory_MissingSeverity_UsesDefault)
 {
-    const std::string objPath = "/xyz/test/threshold/no_severity";
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
-    setBaseThresholdProps(pm);
-    // "Severity" intentionally omitted → uses Level::Critical default
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = create(baseParams());
 
-    EXPECT_NO_THROW(
-        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceEvents.size(), before + 1);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.severity, Level::Critical);
 }
 
-// Name absent → name="" → makeDBusNameValid("") → sensor IS created with
-// sanitized name
-TEST_F(NsmThresholdEventTest, Factory_MissingName_SensorCreated)
+TEST_F(NsmThresholdEventFeatureTest, Factory_SeverityWarning_Applied)
 {
-    const std::string objPath = "/xyz/test/threshold/no_name";
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
-    setBaseThresholdProps(pm);
-    pm["Severity"] = std::string("Critical");
-    // "Name" intentionally omitted → name="" → makeDBusNameValid → sensor added
+    auto params = baseParams();
+    params["Severity"] = std::string("Warning");
+    auto rc = create(params);
 
-    EXPECT_NO_THROW(
-        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.severity, Level::Warning);
 }
 
-// OriginOfCondition absent → info.originOfCondition="" → sensor IS created
-TEST_F(NsmThresholdEventTest, Factory_MissingOriginOfCondition_SensorCreated)
+// Name absent → name="" → makeDBusNameValid("") → event IS created
+TEST_F(NsmThresholdEventFeatureTest, Factory_MissingName_SensorCreated)
 {
-    const std::string objPath = "/xyz/test/threshold/no_origin";
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
-    setBaseThresholdProps(pm);
-    pm["Name"] = std::string("TestThreshold");
-    pm["Severity"] = std::string("Critical");
-    // "OriginOfCondition" intentionally omitted → info.originOfCondition=""
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = create(baseParams());
 
-    EXPECT_NO_THROW(
-        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceEvents.size(), before + 1);
 }
 
-// LoggingNamespace absent → info.loggingNamespace="" →
-// makeDBusNameValid("") → sensor IS created
-TEST_F(NsmThresholdEventTest, Factory_MissingLoggingNamespace_SensorCreated)
+// OriginOfCondition is not a param any more: it is derived from the device
+TEST_F(NsmThresholdEventFeatureTest, Factory_OriginOfConditionFromDeviceName)
 {
-    const std::string objPath = "/xyz/test/threshold/no_namespace";
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
-    setBaseThresholdProps(pm);
-    pm["Name"] = std::string("TestThreshold");
-    pm["Severity"] = std::string("Critical");
-    pm["OriginOfCondition"] = std::string("/xyz/test/origin");
-    // "LoggingNamespace" intentionally omitted → info.loggingNamespace=""
+    auto rc = create(baseParams());
 
-    EXPECT_NO_THROW(
-        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.originOfCondition, "/redfish/v1/Chassis/GPU_1");
+    EXPECT_EQ(event->info.uuid, kThresholdUuid);
 }
 
-// Resolution absent → info.resolution="" → sensor IS created
-TEST_F(NsmThresholdEventTest, Factory_MissingResolution_SensorCreated)
+// LoggingNamespace / Resolution absent → empty strings, event IS created
+TEST_F(NsmThresholdEventFeatureTest, Factory_MissingNamespaceAndResolution)
 {
-    const std::string objPath = "/xyz/test/threshold/no_resolution";
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
-    setBaseThresholdProps(pm);
-    pm["Name"] = std::string("TestThreshold");
-    pm["Severity"] = std::string("Critical");
-    pm["OriginOfCondition"] = std::string("/xyz/test/origin");
-    pm["LoggingNamespace"] = std::string("TestNamespace");
-    // "Resolution" intentionally omitted → info.resolution=""
+    auto params = baseParams();
+    params["Name"] = std::string("TestThreshold");
+    auto rc = create(params);
 
-    EXPECT_NO_THROW(
-        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->getName(), "TestThreshold");
+    EXPECT_TRUE(event->info.loggingNamespace.empty());
+    EXPECT_TRUE(event->info.resolution.empty());
 }
 
-// EventIds present → covers the new EventIds D-Bus read branch in
-// createNsmThresholdEvent.
-TEST_F(NsmThresholdEventTest, Factory_WithEventIds_SensorCreated)
+// LoggingNamespace / Resolution present → copied into the event info
+TEST_F(NsmThresholdEventFeatureTest, Factory_WithNamespaceAndResolution)
 {
-    const std::string objPath = "/xyz/test/threshold/with_eventids";
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, kThresholdInterface);
-    setBaseThresholdProps(pm);
-    pm["Name"] = std::string("TestThreshold");
-    pm["Severity"] = std::string("Critical");
-    pm["EventIds"] = std::vector<std::string>{"Threshold",
-                                              "GPU-THRESHOLD-EVENT"};
+    auto params = baseParams();
+    params["LoggingNamespace"] = std::string("TestNamespace");
+    params["Resolution"] = std::string("Check threshold logs");
+    auto rc = create(params);
 
-    EXPECT_NO_THROW(
-        createNsmThresholdEvent(mockManager, kThresholdInterface, objPath));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.loggingNamespace, "TestNamespace");
+    EXPECT_EQ(event->info.resolution, "Check threshold logs");
+}
+
+// EventIds present → stored in info.errorId
+TEST_F(NsmThresholdEventFeatureTest, Factory_WithEventIds_SensorCreated)
+{
+    auto params = baseParams();
+    params["Name"] = std::string("TestThreshold");
+    params["Severity"] = std::string("Critical");
+    params["EventIds"] = std::vector<std::string>{"Threshold",
+                                                  "GPU-THRESHOLD-EVENT"};
+    auto rc = create(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.errorId.size(), 2u);
 }

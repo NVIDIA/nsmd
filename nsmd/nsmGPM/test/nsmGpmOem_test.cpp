@@ -28,14 +28,9 @@
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmGpmOem.hpp"
-
-namespace nsm
-{
-requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
-                                         const std::string& interface,
-                                         const std::string& objPath);
-} // namespace nsm
 
 class MockMetricPerInstanceUpdator : public nsm::MetricPerInstanceUpdator
 {
@@ -377,10 +372,6 @@ struct NsmGPMMetricsTestFixture :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_GPMMetrics";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/gpm_test";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:10";
 
     boost::asio::io_context io;
@@ -401,6 +392,21 @@ struct NsmGPMMetricsTestFixture :
     {
         cleanupDeviceSensors(devices);
     }
+
+    requester::Coroutine createGPMMetrics(const dbus::PropertyMap& params,
+                                          bool withDevice = true)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_GPU_SXM_10";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return nsm::features::createGPMMetricsFeature(mockManager, dev, params);
+    }
 };
 
 TEST_F(NsmGPMMetricsTestFixture, goodTestCreateGPMMetrics)
@@ -409,46 +415,40 @@ TEST_F(NsmGPMMetricsTestFixture, goodTestCreateGPMMetrics)
 
     dbus::PropertyMap properties = {
         {"Name", std::string("GPM_Metrics")},
-        {"UUID", gpuUuid},
-        {"RetrievalSource", uint64_t(2)},
-        {"GpuInstance", uint64_t(0)},
-        {"ComputeInstance", uint64_t(0)},
-        {"MetricsBitfield", std::vector<uint64_t>{0x89, 0x04, 0x15}},
-        {"InventoryObjPath", std::string("/xyz/openbmc_project/inventory/gpm")},
+        {"AggregatedRetrievalSource", uint64_t(2)},
+        {"AggregatedGpuInstance", uint64_t(0)},
+        {"AggregatedComputeInstance", uint64_t(0)},
+        {"AggregatedMetricsBitfield", std::vector<uint64_t>{0x89, 0x04, 0x15}},
     };
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
 
     EXPECT_CALL(mockManager, getObjServer())
         .WillOnce(testing::ReturnRef(*objServer));
 
-    createNsmGPMMetrics(mockManager, basicIntfName, objPath);
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = createGPMMetrics(properties);
 
-    EXPECT_GE(gpu->deviceSensors.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(gpu->deviceSensors.size(), before + 1);
+    EXPECT_NE(std::dynamic_pointer_cast<NsmGetSupportedGPMMetrics>(
+                  gpu->deviceSensors.back()),
+              nullptr);
 }
 
-TEST_F(NsmGPMMetricsTestFixture, badTestMissingUUID)
+TEST_F(NsmGPMMetricsTestFixture, badTestNoDevice)
 {
     using namespace nsm;
 
     dbus::PropertyMap properties = {
         {"Name", std::string("GPM_Metrics")},
-        {"RetrievalSource", uint64_t(2)},
-        {"GpuInstance", uint64_t(0)},
-        {"ComputeInstance", uint64_t(0)},
-        {"MetricsBitfield", std::vector<uint64_t>{0x89}},
-        {"InventoryObjPath", std::string("/xyz/openbmc_project/inventory/gpm")},
+        {"AggregatedMetricsBitfield", std::vector<uint64_t>{0x89}},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = createGPMMetrics(properties, false);
 
-    EXPECT_THROW_COROUTINE(
-        createNsmGPMMetrics(mockManager, basicIntfName, objPath),
-        std::bad_optional_access);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
 TEST_F(NsmGPMMetricsTestFixture, testGPMMetricsWithMemoryBandwidth)
@@ -457,26 +457,20 @@ TEST_F(NsmGPMMetricsTestFixture, testGPMMetricsWithMemoryBandwidth)
 
     dbus::PropertyMap properties = {
         {"Name", std::string("GPM_Metrics_Memory")},
-        {"UUID", gpuUuid},
-        {"RetrievalSource", uint64_t(2)},
-        {"GpuInstance", uint64_t(0)},
-        {"ComputeInstance", uint64_t(0)},
-        {"MetricsBitfield", std::vector<uint64_t>{0x10}}, // DRAMUsage bit
-        {"InventoryObjPath", std::string("/xyz/openbmc_project/inventory/gpm")},
-        {"MemoryBandwidth", true},
-        {"MemoryInventoryObjPath",
-         std::string("/xyz/openbmc_project/inventory/memory")},
+        {"AggregatedRetrievalSource", uint64_t(2)},
+        {"AggregatedGpuInstance", uint64_t(0)},
+        {"AggregatedComputeInstance", uint64_t(0)},
+        {"AggregatedMetricsBitfield",
+         std::vector<uint64_t>{0x10}}, // DRAMUsage bit
+        {"AggregatedMemoryBandwidth", true},
     };
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath + "_memory",
-                                                          basicIntfName);
-    propertyMap = properties;
 
     EXPECT_CALL(mockManager, getObjServer())
         .WillOnce(testing::ReturnRef(*objServer));
 
-    createNsmGPMMetrics(mockManager, basicIntfName, objPath + "_memory");
+    auto rc = createGPMMetrics(properties);
 
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GE(gpu->deviceSensors.size(), 1);
 }
 
@@ -620,23 +614,21 @@ TEST_F(NsmGPMMetricsTestFixture, testGPMPerInstanceRequest)
                   sizeof(nsm_query_per_instance_gpm_metrics_req));
 }
 
-TEST_F(NsmGPMMetricsTestFixture, badTestCreateGPMMetricsMissingFields)
+// Only Name set → every aggregated param defaults; creator still succeeds
+TEST_F(NsmGPMMetricsTestFixture, goodTestCreateGPMMetricsDefaults)
 {
     using namespace nsm;
 
     dbus::PropertyMap properties = {
-        {"Name", std::string("GPM_Incomplete")},
-        {"UUID", gpuUuid},
-        // Missing required fields
+        {"Name", std::string("GPM_Defaults")},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath + "_incomplete", basicIntfName);
-    propertyMap = properties;
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = createGPMMetrics(properties);
 
-    EXPECT_THROW_COROUTINE(createNsmGPMMetrics(mockManager, basicIntfName,
-                                               objPath + "_incomplete"),
-                           std::bad_optional_access);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(gpu->deviceSensors.size(), before + 1);
 }
 
 // ========== New Branch Coverage Tests ==========

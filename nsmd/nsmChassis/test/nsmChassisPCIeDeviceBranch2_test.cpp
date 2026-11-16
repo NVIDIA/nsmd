@@ -21,7 +21,7 @@
  * Covers:
  * - NsmChassisPCIeDevice<UuidIntf>::update: rc != 0 from getDeviceUUID
  * - NsmChassisPCIeDevice<UuidIntf>::update: empty uuid check
- * - nsmChassisPCIeDeviceCreateSensors: missing properties branches
+ * - ChassisPCIeDevice feature creators: missing params branches
  * - createChassisPCIeDeviceMultiPortPCIeDevice: various property combinations
  * - NsmChassisPCIeDevice<non-UuidIntf>::update: co_return NSM_SUCCESS //
  *
@@ -36,6 +36,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmChassisPCIeDevice.hpp"
 
 #undef private
@@ -43,11 +45,6 @@ using namespace ::testing;
 
 namespace nsm
 {
-requester::Coroutine
-    nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
-                                      const std::string& interface,
-                                      const std::string& objPath);
-
 void createChassisPCIeDeviceMultiPortPCIeDevice(
     std::shared_ptr<NsmDevice> device, std::string& name,
     const std::string& chassisName,
@@ -96,6 +93,19 @@ struct NsmChassisPCIeDeviceBranch2Test :
     {
         cleanupDeviceSensors(devices);
     }
+
+    /** @brief Run a ChassisPCIeDevice feature of the chassis device on gpu */
+    requester::Coroutine run(nsm::features::CreatorFn create,
+                             const dbus::PropertyMap& params)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = chassisName;
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = gpu;
+        return create(mockManager, dev, params);
+    }
 };
 
 // ============================================================================
@@ -137,147 +147,48 @@ TEST_F(NsmChassisPCIeDeviceBranch2Test, UpdateAssociationIntf_CoReturnSuccess)
 }
 
 // ============================================================================
-// Factory: NSM_Chassis_Attributes type → L344-348 branch
-// Exercises createChassisPCIeDeviceAsset + createChassisPCIeDeviceHealth
+// ChassisAttributes features: createChassisPCIeDeviceAsset +
+// createChassisPCIeDeviceHealth
 // ============================================================================
 
 TEST_F(NsmChassisPCIeDeviceBranch2Test,
-       Factory_ChassisAttributes_CreatesAssetAndHealth)
+       Feature_ChassisAttributes_CreatesAssetAndHealth)
 {
-    const std::string uniquePath = objPath + "_b2_attrs";
-
-    auto& basePm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    basePm["ChassisName"] = chassisName;
-    basePm["Name"] = name;
-    basePm["UUID"] = gpuUuid;
-
-    auto& curPm = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".ChassisAttributes");
-    curPm["Type"] = std::string("NSM_Chassis_Attributes");
-    curPm["Name"] = std::string("GPU_SXM_B2");
-
     const size_t before = gpu->staticSensors.size();
-    nsmChassisPCIeDeviceCreateSensors(
-        mockManager, basicIntfName + ".ChassisAttributes", uniquePath);
+    auto assetRc = run(nsm::features::createChassisPCIeDeviceAssetFeature,
+                       {{"Name", name + "_b2_attrs"}});
+    auto healthRc = run(nsm::features::createChassisPCIeDeviceHealthFeature,
+                        {{"Name", name + "_b2_attrs"}});
 
+    EXPECT_EQ(assetRc.data(), NSM_SUCCESS);
+    EXPECT_EQ(healthRc.data(), NSM_SUCCESS);
     // Asset creates partNumber + serialNumber + model = 3 static sensors
     // Health creates 1 static sensor = 4 total
     EXPECT_GE(gpu->staticSensors.size(), before + 3u);
 }
 
 // ============================================================================
-// Factory: missing ChassisName → L296 FALSE → chassisName stays ""
+// Name param absent → params.at("Name") throws
 // ============================================================================
 
-TEST_F(NsmChassisPCIeDeviceBranch2Test, Factory_MissingChassisName_FalseBranch)
+TEST_F(NsmChassisPCIeDeviceBranch2Test, Feature_MissingName_Throws)
 {
-    const std::string uniquePath = objPath + "_b2_noChassis";
-
-    auto& basePm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    // ChassisName absent → L296 FALSE
-    basePm["Name"] = name;
-    basePm["UUID"] = gpuUuid;
-
-    auto& curPm = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".noChassis");
-    curPm["Type"] = std::string("NSM_ChassisPCIeDevice");
-    curPm["DEVICE_UUID"] = gpuUuid;
-
-    EXPECT_NO_THROW(nsmChassisPCIeDeviceCreateSensors(
-        mockManager, basicIntfName + ".noChassis", uniquePath));
-}
-
-// ============================================================================
-// Factory: missing Name → L302 FALSE → name stays ""
-// ============================================================================
-
-TEST_F(NsmChassisPCIeDeviceBranch2Test, Factory_MissingName_FalseBranch)
-{
-    const std::string uniquePath = objPath + "_b2_noName";
-
-    auto& basePm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    basePm["ChassisName"] = chassisName;
-    // Name absent → L302 FALSE
-    basePm["UUID"] = gpuUuid;
-
-    auto& curPm = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                    basicIntfName + ".noName");
-    curPm["Type"] = std::string("NSM_ChassisPCIeDevice");
-    curPm["DEVICE_UUID"] = gpuUuid;
-
-    // name="" → D-Bus path may throw on empty name
     EXPECT_THROW_COROUTINE(
-        nsmChassisPCIeDeviceCreateSensors(
-            mockManager, basicIntfName + ".noName", uniquePath),
+        run(nsm::features::createChassisPCIeDeviceAssetFeature, {}),
         std::exception);
 }
 
 // ============================================================================
-// Factory: missing Type → L307 FALSE → type="" → no type branch taken
+// UUID feature: no device UUID in the params, sensor created empty
 // ============================================================================
 
-TEST_F(NsmChassisPCIeDeviceBranch2Test, Factory_MissingType_NoBranchTaken)
+TEST_F(NsmChassisPCIeDeviceBranch2Test, Feature_UUID_CreatesSensor)
 {
-    const std::string uniquePath = objPath + "_b2_noType";
-
-    auto& basePm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    basePm["ChassisName"] = chassisName;
-    basePm["Name"] = name;
-    basePm["UUID"] = gpuUuid;
-
-    (void)utils::MockDbusAsync::propertyMap(uniquePath,
-                                            basicIntfName + ".noType");
-    // Type absent → L307 FALSE
-
-    const size_t before = gpu->deviceSensors.size();
-    nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".noType",
-                                      uniquePath);
-    EXPECT_EQ(gpu->deviceSensors.size(), before);
-}
-
-// ============================================================================
-// Factory: missing UUID → L312 FALSE → uuid="" → throws
-// ============================================================================
-
-TEST_F(NsmChassisPCIeDeviceBranch2Test, Factory_MissingUUID_Throws)
-{
-    const std::string uniquePath = objPath + "_b2_noUUID";
-
-    auto& basePm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    basePm["ChassisName"] = chassisName;
-    basePm["Name"] = name;
-    // UUID absent → L312 FALSE
-
-    auto& curPm = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                    basicIntfName + ".noUUID");
-    curPm["Type"] = std::string("NSM_Chassis_Attributes");
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisPCIeDeviceCreateSensors(
-            mockManager, basicIntfName + ".noUUID", uniquePath),
-        std::runtime_error);
-}
-
-// ============================================================================
-// Factory: missing DEVICE_UUID → L322 FALSE → deviceUuid stays ""
-// ============================================================================
-
-TEST_F(NsmChassisPCIeDeviceBranch2Test, Factory_MissingDEVICE_UUID_FalseBranch)
-{
-    const std::string uniquePath = objPath + "_b2_noDevUUID";
-
-    auto& basePm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    basePm["ChassisName"] = chassisName;
-    basePm["Name"] = name;
-    basePm["UUID"] = gpuUuid;
-
-    auto& curPm = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".noDevUUID");
-    curPm["Type"] = std::string("NSM_ChassisPCIeDevice");
-    // DEVICE_UUID absent → L322 FALSE
-
-    EXPECT_NO_THROW(nsmChassisPCIeDeviceCreateSensors(
-        mockManager, basicIntfName + ".noDevUUID", uniquePath));
+    const size_t before = gpu->staticSensors.size();
+    auto rc = run(nsm::features::createChassisPCIeDeviceUUIDFeature,
+                  {{"Name", name + "_b2_noDevUUID"}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(gpu->staticSensors.size(), before);
 }
 
 // ============================================================================
@@ -383,55 +294,44 @@ TEST_F(NsmChassisPCIeDeviceBranch2Test,
 }
 
 // ============================================================================
-// Factory: NSM_MultiPortPCIeDevice via factory with all props
-// Exercises full factory path through L354-358
+// MultiPortPCIeDevice + RetimerAERErrorStatus features with all params
 // ============================================================================
 
-TEST_F(NsmChassisPCIeDeviceBranch2Test, Factory_MultiPort_AllProps_FullPath)
+TEST_F(NsmChassisPCIeDeviceBranch2Test, Feature_MultiPort_AllParams_FullPath)
 {
-    const std::string uniquePath = objPath + "_b2_multiAll";
+    const size_t before = gpu->deviceSensors.size();
+    auto rc =
+        run(nsm::features::createChassisPCIeDeviceMultiPortPCIeDeviceFeature,
+            {{"Name", name},
+             {"DeviceType",
+              std::string("xyz.openbmc_project.Inventory.Item.PCIeDevice."
+                          "DeviceTypes.SingleFunction")},
+             {"Functions", std::vector<uint64_t>{0, 1}},
+             {"UpstreamPortCount", uint64_t(2)}});
+    auto aerRc =
+        run(nsm::features::createChassisPCIeDeviceRetimerAERErrorStatusFeature,
+            {{"Name", name}});
 
-    auto& basePm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    basePm["ChassisName"] = chassisName;
-    basePm["Name"] = name;
-    basePm["UUID"] = gpuUuid;
-
-    auto& curPm = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".MultiPortPCIeDevice");
-    curPm["Type"] = std::string("NSM_MultiPortPCIeDevice");
-    curPm["DeviceType"] = std::string(
-        "xyz.openbmc_project.Inventory.Item.PCIeDevice."
-        "DeviceTypes.SingleFunction");
-    curPm["Functions"] = std::vector<uint64_t>{0, 1};
-    curPm["UpstreamPortCount"] = uint64_t(2);
-
-    EXPECT_NO_THROW(nsmChassisPCIeDeviceCreateSensors(
-        mockManager, basicIntfName + ".MultiPortPCIeDevice", uniquePath));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(aerRc.data(), NSM_SUCCESS);
+    EXPECT_GT(gpu->deviceSensors.size(), before);
 }
 
 // ============================================================================
-// Factory: NSM_PCIeDevice with DeviceType and Functions present
-// → TRUE branches at L109, L115
+// PCIeDevice feature with DeviceType and Functions present
 // ============================================================================
 
-TEST_F(NsmChassisPCIeDeviceBranch2Test,
-       Factory_PCIeDevice_AllProps_TrueBranches)
+TEST_F(NsmChassisPCIeDeviceBranch2Test, Feature_PCIeDevice_AllParams)
 {
-    const std::string uniquePath = objPath + "_b2_pcieAll";
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = run(
+        nsm::features::createChassisPCIeDevicePCIeDeviceFeature,
+        {{"Name", name + "_b2_pcieAll"},
+         {"DeviceType", std::string("xyz.openbmc_project.Inventory.Item."
+                                    "PCIeDevice.DeviceTypes.MultiFunction")},
+         {"Functions", std::vector<uint64_t>{0, 1, 2}}});
 
-    auto& basePm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    basePm["ChassisName"] = chassisName;
-    basePm["Name"] = name;
-    basePm["UUID"] = gpuUuid;
-
-    auto& curPm = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".PCIeDevice");
-    curPm["Type"] = std::string("NSM_PCIeDevice");
-    curPm["DeviceType"] = std::string(
-        "xyz.openbmc_project.Inventory.Item.PCIeDevice."
-        "DeviceTypes.MultiFunction");
-    curPm["Functions"] = std::vector<uint64_t>{0, 1, 2};
-
-    EXPECT_NO_THROW(nsmChassisPCIeDeviceCreateSensors(
-        mockManager, basicIntfName + ".PCIeDevice", uniquePath));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_GT(gpu->deviceSensors.size(), before);
 }

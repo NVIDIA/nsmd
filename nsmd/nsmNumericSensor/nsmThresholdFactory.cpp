@@ -44,24 +44,21 @@ class NsmThresholdAggregatorBuilder : public NumericSensorAggregatorBuilder
 };
 
 NsmThresholdFactory::NsmThresholdFactory(
-    SensorManager& manager, const std::string& interface,
-    const std::string& objPath, std::shared_ptr<NsmNumericSensor> numericSensor,
-    const NumericSensorInfo& info, const uuid_t& uuid) :
-    manager(manager), interface(interface), objPath(objPath),
-    numericSensor(numericSensor), info(info), uuid(uuid),
-    nsmDevice(manager.getNsmDeviceFromStaticUUID(uuid))
+    SensorManager& manager, std::shared_ptr<NsmNumericSensor> numericSensor,
+    const NumericSensorInfo& info, const uuid_t& uuid,
+    std::shared_ptr<NsmDevice> nsmDevice,
+    std::unordered_map<std::string, FeatureThreshold> featureThresholds) :
+    manager(manager), numericSensor(numericSensor), info(info), uuid(uuid),
+    nsmDevice(std::move(nsmDevice)),
+    featureThresholds(std::move(featureThresholds))
 {}
 
 requester::Coroutine NsmThresholdFactory::make()
 {
     std::unordered_map<std::string, std::string> thresholdInterfaces;
-    auto result = co_await getThresholdInterfacesAsync(thresholdInterfaces);
-
-    if (result != NSM_SW_SUCCESS)
+    for (const auto& [name, threshold] : featureThresholds)
     {
-        lg2::error("Failed to get threshold interfaces for {OBJPATH}",
-                   "OBJPATH", objPath);
-        co_return result;
+        thresholdInterfaces[name] = {};
     }
 
     // Capture interface objects for evaluator creation, one per tier.
@@ -117,10 +114,10 @@ requester::Coroutine NsmThresholdFactory::make()
     }
 
     // SoftShutdown and PerformanceLoss (STH-REQ-09, threshold-tier
-    // extensibility): infra-only today — no entity-manager config assigns
-    // either tier to any sensor on any platform. Wired unconditionally so a
-    // future ThermalParameters entry activates evaluation with no further
-    // code change; processThresholdsPair() is a no-op until then.
+    // extensibility): infra-only today — no feature list assigns either tier
+    // to any sensor. Wired unconditionally so a tier passed in
+    // featureThresholds activates evaluation; processThresholdsPair() is a
+    // no-op until then.
     std::shared_ptr<ThresholdSoftShutdownIntf> softShutdownIntf;
     std::shared_ptr<ThresholdPerformanceLossIntf> perfLossIntf;
 
@@ -189,67 +186,6 @@ requester::Coroutine NsmThresholdFactory::make()
     co_return NSM_SUCCESS;
 }
 
-requester::Coroutine NsmThresholdFactory::getThresholdInterfacesAsync(
-    std::unordered_map<std::string, std::string>& thresholdInterfaces)
-{
-    const std::string thresholdInterfaceName = interface + ".ThermalParameters";
-    thresholdInterfaces.clear();
-
-    // Use existing async utility instead of blocking call
-    auto mapperResponse = co_await utils::coGetServiceMap(objPath,
-                                                          dbus::Interfaces{});
-
-    for (const auto& [service, interfaces] : mapperResponse)
-    {
-        for (const auto& intf : interfaces)
-        {
-            if (intf.find(thresholdInterfaceName) != std::string::npos)
-            {
-                // Use async property read instead of blocking call
-                auto name = co_await utils::coGetDbusProperty<std::string>(
-                    objPath, "Name", intf, service);
-
-                thresholdInterfaces[name] = intf;
-            }
-        }
-    }
-
-    co_return NSM_SW_SUCCESS;
-}
-
-// Keep original function for backward compatibility (deprecated)
-std::unordered_map<std::string, std::string>
-    NsmThresholdFactory::getThresholdInterfaces()
-{
-    const std::string thresholdInterfaceName = interface + ".ThermalParameters";
-    std::unordered_map<std::string, std::string> thresholdInterfaces;
-    std::map<std::string, std::vector<std::string>> mapperResponse;
-    auto& bus = utils::DBusHandler::getBus();
-
-    auto mapper = bus.new_method_call(utils::mapperService, utils::mapperPath,
-                                      utils::mapperInterface, "GetObject");
-    mapper.append(objPath, std::vector<std::string>{});
-
-    auto mapperResponseMsg = bus.call(mapper);
-    mapperResponseMsg.read(mapperResponse);
-
-    for (const auto& [service, interfaces] : mapperResponse)
-    {
-        for (const auto& intf : interfaces)
-        {
-            if (intf.find(thresholdInterfaceName) != std::string::npos)
-            {
-                auto name = utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "Name", intf.c_str());
-
-                thresholdInterfaces[name] = intf;
-            }
-        }
-    }
-
-    return thresholdInterfaces;
-}
-
 template <typename DBusIntf,
           std::derived_from<NsmThresholdValue> ThresholdValueLow,
           std::derived_from<NsmThresholdValue> ThresholdValueHigh>
@@ -307,74 +243,28 @@ requester::Coroutine NsmThresholdFactory::processThresholdsPair(
 }
 
 requester::Coroutine NsmThresholdFactory::createNsmThreshold(
-    const std::string& intfName, const std::string& thresholdType,
+    [[maybe_unused]] const std::string& intfName,
+    const std::string& thresholdType,
     std::unique_ptr<NsmThresholdValue> thresholdValue)
 {
     NumericSensorInfo thresholdInfo;
 
     thresholdInfo.name = info.name + "_" + thresholdType;
 
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), intfName.c_str());
-
-    bool dynamic{};
-    if (allCurrentIfaceProperties.count("Dynamic"))
+    const auto& threshold = featureThresholds.at(thresholdType);
+    if (!threshold.parameterId)
     {
-        dynamic = std::get<bool>(allCurrentIfaceProperties.at("Dynamic"));
-    }
-
-    if (!dynamic)
-    {
-        double threshold{};
-        if (allCurrentIfaceProperties.count("Value"))
-        {
-            threshold = std::get<double>(allCurrentIfaceProperties.at("Value"));
-        }
-
-        thresholdValue->updateReading(threshold);
+        thresholdValue->updateReading(threshold.value);
 
         nsmDevice->addDeviceSensors(std::move(thresholdValue));
 
         lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type=Static",
                   "UUID", uuid, "NAME", thresholdInfo.name);
-        // coverity[missing_return]
         co_return NSM_SUCCESS;
     }
 
-    std::string type{};
-    if (allCurrentIfaceProperties.count("Type"))
-    {
-        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
-    }
-    thresholdInfo.type = type;
-
-    if (thresholdInfo.type != "NSM_ThermalParameter")
-    {
-        lg2::error(
-            "Unsupported Threshold Type {TYPE} : UUID={UUID}, Name={NAME}",
-            "UUID", uuid, "NAME", thresholdInfo.name, "TYPE",
-            thresholdInfo.type);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
-    }
-
-    uint64_t sensorId{};
-    if (allCurrentIfaceProperties.count("ParameterId"))
-    {
-        sensorId =
-            std::get<uint64_t>(allCurrentIfaceProperties.at("ParameterId"));
-    }
-    thresholdInfo.sensorId = sensorId;
-
-    bool periodicUpdate{false};
-
-    try
-    {
-        periodicUpdate = utils::DBusHandler().getDbusProperty<bool>(
-            objPath.c_str(), "PeriodicUpdate", intfName.c_str());
-    }
-    catch (const std::exception& e)
-    {}
+    thresholdInfo.type = "NSM_ThermalParameter";
+    thresholdInfo.sensorId = *threshold.parameterId;
 
     auto sensor = std::make_shared<NsmThreshold>(
         thresholdInfo.name, thresholdInfo.type, thresholdInfo.sensorId,
@@ -385,32 +275,19 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
               "UUID", uuid, "NAME", thresholdInfo.name, "TYPE",
               thresholdInfo.type);
 
-    if (!periodicUpdate)
+    if (!threshold.periodicUpdate)
     {
         nsmDevice->addStaticSensor(sensor);
         nsmDevice->addCapabilityRefreshSensor(sensor);
-        // coverity[missing_return]
         co_return NSM_SUCCESS;
     }
 
-    bool priority{};
-    if (allCurrentIfaceProperties.count("Priority"))
-    {
-        priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
-    }
-    thresholdInfo.priority = priority;
-
-    bool aggregated{};
-    if (allCurrentIfaceProperties.count("Aggregated"))
-    {
-        aggregated = std::get<bool>(allCurrentIfaceProperties.at("Aggregated"));
-    }
-    thresholdInfo.aggregated = aggregated;
+    thresholdInfo.priority = threshold.priority;
+    thresholdInfo.aggregated = threshold.aggregated;
 
     NumericSensorFactory::makeAggregatorAndAddSensor(
         std::make_unique<NsmThresholdAggregatorBuilder>().get(), thresholdInfo,
         sensor, uuid, nsmDevice.get());
-    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

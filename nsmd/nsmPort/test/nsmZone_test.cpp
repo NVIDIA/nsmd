@@ -19,6 +19,8 @@
 #include "test/mockSensorManager.hpp"
 using namespace ::testing;
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmZone.hpp"
 
 #include <sdbusplus/bus.hpp>
@@ -26,14 +28,6 @@ using namespace ::testing;
 #include <gtest/gtest.h>
 
 using namespace nsm;
-
-namespace nsm
-{
-requester::Coroutine createNsmZones(SensorManager& manager,
-                                    const std::string& interface,
-                                    const std::string& objPath);
-
-}; // namespace nsm
 
 auto bus = sdbusplus::bus::new_default();
 
@@ -126,6 +120,8 @@ struct NsmZoneFactoryTest :
     public SensorManagerTest
 {
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+    const std::string zoneOfZones =
+        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfZones";
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
 
@@ -140,179 +136,100 @@ struct NsmZoneFactoryTest :
     {
         cleanupDeviceSensors(devices);
     }
+
+    /** @brief Run the FabricsZone feature of a CX device on the mock device */
+    requester::Coroutine createZone(const dbus::PropertyMap& params,
+                                    bool withDevice = true)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_CX_0";
+        dev.kind = "cx_io";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return nsm::features::createFabricsZoneFeature(mockManager, dev,
+                                                       params);
+    }
 };
 
-TEST_F(NsmZoneFactoryTest, CreateNsmZonesSuccess)
+TEST_F(NsmZoneFactoryTest, CreateFabricsZoneSuccess)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/zone0";
     const std::string name = "Zone0";
-    const std::string zoneType =
-        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfZones";
-    const std::string fabricsObjPath =
-        "/xyz/openbmc_project/inventory/system/fabric";
+    dbus::PropertyMap params{
+        {"Name", name},
+        {"ZoneType", zoneOfZones},
+        {"FabricName", std::string("HGX_PCIeTopology_CX_0")}};
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
-    propertyMap["Name"] = name;
-    propertyMap["ZoneType"] = zoneType;
-    propertyMap["FabricsObjPath"] = fabricsObjPath;
-    propertyMap["UUID"] = gpuUuid;
+    auto rc = createZone(params);
 
-    createNsmZones(mockManager, interface, objPath);
-
-    EXPECT_EQ(2, gpu->deviceSensors.size());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(2, gpu->deviceSensors.size());
     auto zone = std::dynamic_pointer_cast<NsmZone>(gpu->deviceSensors[1]);
-    EXPECT_NE(nullptr, zone);
+    ASSERT_NE(nullptr, zone);
     EXPECT_EQ(name, zone->getName());
+    EXPECT_EQ("NSM_FabricsZone", zone->getType());
 }
 
-TEST_F(NsmZoneFactoryTest, CreateNsmZonesWithZoneOfEndpoints)
+TEST_F(NsmZoneFactoryTest, CreateFabricsZoneWithZoneOfEndpoints)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/zone1";
     const std::string name = "Zone1";
-    const std::string zoneType =
-        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfEndpoints";
-    const std::string fabricsObjPath =
-        "/xyz/openbmc_project/inventory/system/fabric";
+    dbus::PropertyMap params{
+        {"Name", name},
+        {"ZoneType",
+         std::string(
+             "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfEndpoints")},
+        {"FabricName", std::string("HGX_PCIeTopology_CX_1")}};
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
-    propertyMap["Name"] = name;
-    propertyMap["ZoneType"] = zoneType;
-    propertyMap["FabricsObjPath"] = fabricsObjPath;
-    propertyMap["UUID"] = gpuUuid;
+    auto rc = createZone(params);
 
-    createNsmZones(mockManager, interface, objPath);
-
-    EXPECT_EQ(2, gpu->deviceSensors.size());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(2, gpu->deviceSensors.size());
     auto zone = std::dynamic_pointer_cast<NsmZone>(gpu->deviceSensors[1]);
-    EXPECT_NE(nullptr, zone);
+    ASSERT_NE(nullptr, zone);
     EXPECT_EQ(name, zone->getName());
 }
 
-TEST_F(NsmZoneFactoryTest, CreateNsmZonesInvalidUUID)
+TEST_F(NsmZoneFactoryTest, CreateFabricsZoneNoNsmDevice)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/zone_invalid";
-    const std::string name = "ZoneInvalid";
-    const std::string zoneType =
-        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfZones";
-    const std::string fabricsObjPath =
-        "/xyz/openbmc_project/inventory/system/fabric";
-    const uuid_t invalidUuid = "INVALID:UUID:DOES:NOT:EXIST";
+    dbus::PropertyMap params{
+        {"Name", std::string("ZoneNoDevice")},
+        {"ZoneType", zoneOfZones},
+        {"FabricName", std::string("HGX_PCIeTopology_CX_2")}};
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
-    propertyMap["Name"] = name;
-    propertyMap["ZoneType"] = zoneType;
-    propertyMap["FabricsObjPath"] = fabricsObjPath;
-    propertyMap["UUID"] = invalidUuid;
+    auto rc = createZone(params, false);
 
-    EXPECT_THROW_COROUTINE(createNsmZones(mockManager, interface, objPath),
-                           std::runtime_error);
-
-    // Should have only the automatic first sensor, not the zone
-    EXPECT_EQ(1, gpu->deviceSensors.size());
-    auto zone = std::dynamic_pointer_cast<NsmZone>(gpu->deviceSensors[0]);
-    EXPECT_EQ(nullptr, zone);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    // Only the automatic first sensor of the mock device, not the zone
+    ASSERT_EQ(1, gpu->deviceSensors.size());
+    EXPECT_EQ(nullptr,
+              std::dynamic_pointer_cast<NsmZone>(gpu->deviceSensors[0]));
 }
 
-// =============================================================================
-// FALSE-branch coverage: count() checks in createNsmZones
-// =============================================================================
-
-// Name absent → name="" → NsmZone created with empty name → sensor IS added
-TEST_F(NsmZoneFactoryTest, CreateZones_MissingName_SensorCreated)
+// Name absent: the zone is created with an empty name
+TEST_F(NsmZoneFactoryTest, CreateFabricsZone_MissingName_SensorCreated)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/zone_no_name";
-    const std::string fabricsObjPath =
-        "/xyz/openbmc_project/inventory/test/zone/fabric_no_name";
-    const std::string zoneType =
-        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfZones";
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
-    propertyMap["ZoneType"] = zoneType;
-    propertyMap["FabricsObjPath"] = fabricsObjPath;
-    propertyMap["UUID"] = gpuUuid;
-    // "Name" intentionally omitted → FALSE branch → name="" → sensor added
+    dbus::PropertyMap params{
+        {"ZoneType", zoneOfZones},
+        {"FabricName", std::string("HGX_PCIeTopology_CX_3")}};
 
     const size_t before = gpu->deviceSensors.size();
-    createNsmZones(mockManager, interface, objPath);
-    // NsmZone constructed with empty name → no throw in test env → sensor added
-    //
-    EXPECT_GT(gpu->deviceSensors.size(), before);
+    auto rc = createZone(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), before + 1);
 }
 
-// ZoneType absent → zoneType="" → convertZoneTypeFromString("") throws in
-// NsmZone constructor → propagates (no try/catch in factory)
-TEST_F(NsmZoneFactoryTest, CreateZones_MissingZoneType_Throws)
+// ZoneType absent: convertZoneTypeFromString("") throws in the NsmZone
+// constructor and the creator does not catch it
+TEST_F(NsmZoneFactoryTest, CreateFabricsZone_MissingZoneType_Throws)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/zone_no_zonetype";
-    const std::string fabricsObjPath =
-        "/xyz/openbmc_project/inventory/test/zone/fabric_no_zonetype";
+    dbus::PropertyMap params{
+        {"Name", std::string("Zone_NoType")},
+        {"FabricName", std::string("HGX_PCIeTopology_CX_4")}};
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
-    propertyMap["Name"] = std::string("Zone_NoType");
-    propertyMap["FabricsObjPath"] = fabricsObjPath;
-    propertyMap["UUID"] = gpuUuid;
-    // "ZoneType" intentionally omitted → zoneType="" →
-    // convertZoneTypeFromString("") throws
-
-    EXPECT_THROW_COROUTINE(createNsmZones(mockManager, interface, objPath),
-                           std::exception);
-}
-
-// FabricsObjPath absent → fabricsObjPath="" → inventoryObjPath="/zones/0"
-// (valid D-Bus path starting with "/") → sensor IS created
-TEST_F(NsmZoneFactoryTest, CreateZones_MissingFabricsObjPath_SensorCreated)
-{
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/zone_no_fabrics";
-    const std::string zoneType =
-        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfZones";
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
-    propertyMap["Name"] = std::string("Zone_NoFabrics");
-    propertyMap["ZoneType"] = zoneType;
-    propertyMap["UUID"] = gpuUuid;
-    // "FabricsObjPath" intentionally omitted → fabricsObjPath="" →
-    // inventoryObjPath="/zones/0" → valid path → sensor IS created
-
-    const size_t before = gpu->deviceSensors.size();
-    createNsmZones(mockManager, interface, objPath);
-    EXPECT_GT(gpu->deviceSensors.size(), before);
-}
-
-// UUID absent → uuid="" → parseStaticUuid("") throws std::runtime_error
-// before NsmZone is created
-TEST_F(NsmZoneFactoryTest, CreateZones_MissingUUID_Throws)
-{
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/zone_no_uuid";
-    const std::string fabricsObjPath =
-        "/xyz/openbmc_project/inventory/test/zone/fabric_no_uuid";
-    const std::string zoneType =
-        "xyz.openbmc_project.Inventory.Item.Zone.ZoneType.ZoneOfZones";
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, interface);
-    propertyMap["Name"] = std::string("Zone_NoUUID");
-    propertyMap["ZoneType"] = zoneType;
-    propertyMap["FabricsObjPath"] = fabricsObjPath;
-    // "UUID" intentionally omitted → uuid="" → parseStaticUuid("") throws
-
-    EXPECT_THROW_COROUTINE(createNsmZones(mockManager, interface, objPath),
-                           std::exception);
+    EXPECT_THROW_COROUTINE(createZone(params), std::exception);
 }

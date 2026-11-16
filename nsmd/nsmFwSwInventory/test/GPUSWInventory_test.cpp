@@ -25,13 +25,8 @@ using namespace ::testing;
 #define protected public
 
 #include "GPUSWInventory.hpp"
-
-namespace nsm
-{
-requester::Coroutine createGPUDriverSensor(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 
 using namespace nsm;
 
@@ -149,10 +144,6 @@ struct NsmGPUSWInventoryTestFixture :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_GPU_SWInventory";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/gpu_driver";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:2";
 
     NsmDeviceTable devices;
@@ -169,69 +160,83 @@ struct NsmGPUSWInventoryTestFixture :
     {
         cleanupDeviceSensors(devices);
     }
+
+    requester::Coroutine createDriverSensor(const dbus::PropertyMap& params,
+                                            bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "GPU_SXM_2";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return features::createGPUSWInventoryFeature(mockManager, dev, params);
+    }
+
+    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> lastDriverSensor()
+    {
+        if (gpu->deviceSensors.empty())
+        {
+            return nullptr;
+        }
+        return std::dynamic_pointer_cast<
+            NsmGPUSWInventoryDriverVersionAndStatus>(gpu->deviceSensors.back());
+    }
 };
 
 TEST_F(NsmGPUSWInventoryTestFixture, goodTestCreateGPUDriverSensor)
 {
     dbus::PropertyMap properties = {
         {"Name", std::string("GPU_Driver")},
-        {"UUID", gpuUuid},
         {"Manufacturer", std::string("NVIDIA")},
+        {"ProcessorAssociationPaths",
+         std::vector<std::string>{"HGX_GPU_SXM_2"}},
+        {"SoftwareVersionAssociationsEnabled", true},
     };
 
-    // Setup associations
-    auto& serviceMap = utils::MockDbusAsync::serviceMap();
-    MapperServiceMap assocServiceMap = {
-        {
-            {
-                "xyz.openbmc_project.NSM",
-                {
-                    basicIntfName + ".Associations",
-                },
-            },
-        },
-    };
-    serviceMap = assocServiceMap;
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = createDriverSensor(properties);
 
-    dbus::PropertyMap assocProperties = {
-        {"Forward", "parent_gpu"},
-        {"Backward", "driver"},
-        {"AbsolutePath", "/xyz/openbmc_project/inventory/system/gpu0"},
-    };
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(gpu->deviceSensors.size(), before + 1);
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
+    auto driverSensor = lastDriverSensor();
+    ASSERT_NE(driverSensor, nullptr);
+    EXPECT_EQ(driverSensor->getName(), "GPU_Driver");
+    EXPECT_EQ(driverSensor->getType(), "NSM_GPU_SWInventory");
+    EXPECT_EQ(driverSensor->nsmDeviceFound, gpu);
+    EXPECT_EQ(gpu->gpuDriverSensor, driverSensor);
+    EXPECT_EQ(driverSensor->asset->manufacturer(), "NVIDIA");
 
-    auto& assocPropertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".Associations");
-    assocPropertyMap = assocProperties;
-
-    createGPUDriverSensor(mockManager, basicIntfName, objPath);
-
-    EXPECT_EQ(2, gpu->deviceSensors.size());
-
-    // Skip msgTypes sensor at index 0
-    auto driverSensor =
-        std::dynamic_pointer_cast<NsmGPUSWInventoryDriverVersionAndStatus>(
-            gpu->deviceSensors[1]);
-    EXPECT_NE(driverSensor, nullptr);
+    auto assocs = driverSensor->associationDef->associations();
+    ASSERT_EQ(assocs.size(), 2u);
+    EXPECT_EQ(std::get<0>(assocs[0]), "inventory");
+    EXPECT_EQ(std::get<1>(assocs[0]), "software");
+    EXPECT_EQ(std::get<2>(assocs[0]),
+              "/xyz/openbmc_project/inventory/system/HGX_GPU_SXM_2");
+    EXPECT_EQ(std::get<0>(assocs[1]), "software_version");
+    EXPECT_EQ(std::get<1>(assocs[1]), "updateable");
+    EXPECT_EQ(std::get<2>(assocs[1]), "/xyz/openbmc_project/software");
 }
 
-TEST_F(NsmGPUSWInventoryTestFixture, badTestMissingUUID)
+// No association params → no association links
+TEST_F(NsmGPUSWInventoryTestFixture, goodTestCreateGPUDriverSensorNoAssocs)
 {
     dbus::PropertyMap properties = {
-        {"Name", std::string("GPU_Driver")},
+        {"Name", std::string("GPU_Driver_NoAssoc")},
         {"Manufacturer", std::string("NVIDIA")},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
+    auto rc = createDriverSensor(properties);
 
-    EXPECT_THROW_COROUTINE(
-        createGPUDriverSensor(mockManager, basicIntfName, objPath),
-        std::runtime_error);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto driverSensor = lastDriverSensor();
+    ASSERT_NE(driverSensor, nullptr);
+    EXPECT_TRUE(driverSensor->associationDef->associations().empty());
 }
 
 TEST_F(NsmGPUSWInventoryTestFixture, testDriverSensorUpdate)
@@ -404,18 +409,12 @@ TEST_F(NsmGPUSWInventoryTestFixture, testDriverSensorUpdateMultipleVersions)
 TEST_F(NsmGPUSWInventoryTestFixture, badTestCreateGPUDriverSensorMissingName)
 {
     dbus::PropertyMap properties = {
-        {"UUID", gpuUuid},
         {"Manufacturer", std::string("NVIDIA")},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath + "_noname",
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    // Should still work, name might be empty
-    EXPECT_THROW_COROUTINE(
-        createGPUDriverSensor(mockManager, basicIntfName, objPath + "_noname"),
-        sdbusplus::exception::SdBusError);
+    // Empty name → invalid object path → sdbusplus throws in the constructor
+    EXPECT_THROW_COROUTINE(createDriverSensor(properties),
+                           sdbusplus::exception::SdBusError);
 }
 
 TEST_F(NsmGPUSWInventoryTestFixture, testDriverSensorUpdateResponseSizeError)
@@ -470,63 +469,25 @@ TEST_F(NsmGPUSWInventoryTestFixture, testDriverSensorUpdateResponseSizeError)
 TEST_F(NsmGPUSWInventoryTestFixture,
        testCreateGPUDriverSensorWithMultipleAssociations)
 {
+    // Empty entries give no link
     dbus::PropertyMap properties = {
         {"Name", std::string("GPU_Driver_MultiAssoc")},
-        {"UUID", gpuUuid},
         {"Manufacturer", std::string("NVIDIA")},
+        {"ProcessorAssociationPaths",
+         std::vector<std::string>{"HGX_GPU_SXM_1", "", "HGX_GPU_SXM_3"}},
     };
 
-    // Setup multiple associations
-    auto& serviceMap = utils::MockDbusAsync::serviceMap();
-    MapperServiceMap assocServiceMap = {
-        {
-            {
-                "xyz.openbmc_project.NSM",
-                {
-                    basicIntfName + ".Associations",
-                    basicIntfName + ".Associations1",
-                    basicIntfName + ".Associations2",
-                },
-            },
-        },
-    };
-    serviceMap = assocServiceMap;
+    auto rc = createDriverSensor(properties);
 
-    dbus::PropertyMap assocProperties0 = {
-        {"Forward", "parent_gpu"},
-        {"Backward", "driver"},
-        {"AbsolutePath", "/xyz/openbmc_project/inventory/system/gpu0"},
-    };
-    dbus::PropertyMap assocProperties1 = {
-        {"Forward", "parent_chassis"},
-        {"Backward", "software"},
-        {"AbsolutePath", "/xyz/openbmc_project/inventory/system/chassis"},
-    };
-    dbus::PropertyMap assocProperties2 = {
-        {"Forward", "parent_system"},
-        {"Backward", "driver_software"},
-        {"AbsolutePath", "/xyz/openbmc_project/inventory/system"},
-    };
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath + "_multiassoc", basicIntfName);
-    propertyMap = properties;
-
-    auto& assocPropertyMap0 = utils::MockDbusAsync::propertyMap(
-        objPath + "_multiassoc", basicIntfName + ".Associations");
-    assocPropertyMap0 = assocProperties0;
-
-    auto& assocPropertyMap1 = utils::MockDbusAsync::propertyMap(
-        objPath + "_multiassoc", basicIntfName + ".Associations1");
-    assocPropertyMap1 = assocProperties1;
-
-    auto& assocPropertyMap2 = utils::MockDbusAsync::propertyMap(
-        objPath + "_multiassoc", basicIntfName + ".Associations2");
-    assocPropertyMap2 = assocProperties2;
-
-    createGPUDriverSensor(mockManager, basicIntfName, objPath + "_multiassoc");
-
-    EXPECT_GE(gpu->deviceSensors.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto driverSensor = lastDriverSensor();
+    ASSERT_NE(driverSensor, nullptr);
+    auto assocs = driverSensor->associationDef->associations();
+    ASSERT_EQ(assocs.size(), 2u);
+    EXPECT_EQ(std::get<2>(assocs[0]),
+              "/xyz/openbmc_project/inventory/system/HGX_GPU_SXM_1");
+    EXPECT_EQ(std::get<2>(assocs[1]),
+              "/xyz/openbmc_project/inventory/system/HGX_GPU_SXM_3");
 }
 
 // update(): sensorIO returns NSM_ERROR (transport failure) →
@@ -545,52 +506,40 @@ TEST_F(NsmGPUSWInventoryTestFixture, testDriverSensorUpdate_SensorIOError)
     driverSensor->update(std::static_pointer_cast<NsmDevice>(gpu));
 }
 
-// createGPUDriverSensor: "Manufacturer" key absent in property map →
-// manufacturer="" → sensor still created (covers false branch of
-// if (count("Manufacturer")) at line ~162 in GPUSWInventory.cpp).
+// createGPUSWInventoryFeature: "Manufacturer" param absent →
+// manufacturer="" → sensor still created
 TEST_F(NsmGPUSWInventoryTestFixture,
        testCreateGPUDriverSensorMissingManufacturer)
 {
     dbus::PropertyMap properties = {
         {"Name", std::string("GPU_Driver_NoMfr")},
-        {"UUID", gpuUuid},
         // "Manufacturer" intentionally absent → manufacturer=""
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath + "_nomfr",
-                                                          basicIntfName);
-    propertyMap = properties;
-
     const size_t before = gpu->deviceSensors.size();
-    createGPUDriverSensor(mockManager, basicIntfName, objPath + "_nomfr");
+    auto rc = createDriverSensor(properties);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     // Sensor is still created with empty manufacturer
     EXPECT_GT(gpu->deviceSensors.size(), before);
+    auto driverSensor = lastDriverSensor();
+    ASSERT_NE(driverSensor, nullptr);
+    EXPECT_TRUE(driverSensor->asset->manufacturer().empty());
 }
 
-// createGPUDriverSensor: UUID present and valid format but matches no
-// NsmDevice → nsmDevice==nullptr → logs error and co_returns NSM_ERROR //
-// (covers the !nsmDevice error path in GPUSWInventory.cpp
-// factory)
+// createGPUSWInventoryFeature: no NsmDevice in the context → logs error and
+// co_returns NSM_ERROR
 TEST_F(NsmGPUSWInventoryTestFixture, badTestCreateGPUDriverSensorNoDevice)
 {
-    // UUID is valid format but doesn't match any registered NsmDevice
-    const uuid_t unknownUuid = "STATIC:99:99:NSM_DEVICE_INSTANCE_NUMBER:99";
-    const std::string testPath = objPath + "_nodev";
-
     dbus::PropertyMap properties = {
         {"Name", std::string("GPU_Driver_NoDevice")},
-        {"UUID", unknownUuid},
         {"Manufacturer", std::string("NVIDIA")},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
     const size_t before = gpu->deviceSensors.size();
-    // Should not throw – logs error and returns NSM_ERROR
-    createGPUDriverSensor(mockManager, basicIntfName, testPath);
-    // No sensor added since device was not found
+    auto rc = createDriverSensor(properties, false);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_FALSE(rc.exception());
+    // No sensor added since there is no device
     EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 

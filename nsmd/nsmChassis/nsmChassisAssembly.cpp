@@ -20,6 +20,7 @@
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmChassisFeatures.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
@@ -27,6 +28,8 @@
 #include <phosphor-logging/lg2.hpp>
 
 #include <cstdint>
+#include <format>
+#include <tuple>
 #include <unordered_map>
 
 namespace nsm
@@ -136,81 +139,63 @@ void createChassisAssemblyLocation(std::shared_ptr<NsmDevice> device,
     device->addStaticSensor(locationObject);
 }
 
-requester::Coroutine
-    nsmChassisAssemblyCreateSensors(SensorManager& manager,
-                                    const std::string& interface,
-                                    const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    std::string baseInterface =
-        "xyz.openbmc_project.Configuration.NSM_ChassisAssembly";
-    dbus::PropertyMap allBaseIfaceProperties;
-    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
-                                                        allBaseIfaceProperties);
-    if (rc != NSM_SUCCESS)
-    {
-        co_return rc;
-    }
-    dbus::PropertyMap allCurrentIfaceProperties =
-        co_await utils::coGetAllDbusProperty(utils::entityManagerServiceStr,
-                                             objPath, interface);
 
-    std::string chassisName{};
-    std::string name{};
-    std::string type{};
-    uuid_t uuid{};
+requester::Coroutine
+    createChassisAssemblyFeature([[maybe_unused]] SensorManager& manager,
+                                 const DeviceContext& dev,
+                                 const dbus::PropertyMap& params)
+{
+    // Holds both the base (AssemblyType) and attribute (Name, ...) keys the
+    // helpers read; a copy because they take non-const maps.
+    auto attributes = params;
 
-    if (allBaseIfaceProperties.count("ChassisName"))
+    // Everything that can fail is checked before the index is taken, so a
+    // failed assembly does not leave a gap or a partial object.
+    for (const char* key :
+         {"AssemblyType", "Name", "PhysicalContext", "LocationType"})
     {
-        chassisName =
-            std::get<std::string>(allBaseIfaceProperties.at("ChassisName"));
-    }
-    if (allBaseIfaceProperties.count("Name"))
-    {
-        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
-    }
-    if (allCurrentIfaceProperties.count("Type"))
-    {
-        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
-    }
-    if (allBaseIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
-    }
-
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-
-    if (type == "NSM_ChassisAssembly")
-    {
-        auto assemblyObject =
-            std::make_shared<NsmChassisAssembly<AssemblyIntf>>(chassisName,
-                                                               name);
-        device->addStaticSensor(assemblyObject);
-    }
-    else if (type == "NSM_Chassis_Attributes")
-    {
-        createChassisAssemblyAsset(device, chassisName, name,
-                                   allCurrentIfaceProperties,
-                                   allBaseIfaceProperties);
-        createChassisAssemblyHealth(device, chassisName, name);
-        if (allCurrentIfaceProperties.count("PhysicalContext"))
+        auto it = attributes.find(key);
+        if (it != attributes.end() &&
+            !std::holds_alternative<std::string>(it->second))
         {
-            createChassisAssemblyArea(device, chassisName, name,
-                                      allCurrentIfaceProperties);
-        }
-        if (allCurrentIfaceProperties.count("LocationType"))
-        {
-            createChassisAssemblyLocation(device, chassisName, name,
-                                          allCurrentIfaceProperties);
+            lg2::error("Chassis assembly of {NAME}: {KEY} must be a string",
+                       "NAME", dev.name, "KEY", key);
+            co_return NSM_SW_ERROR_DATA;
         }
     }
-    // coverity[missing_return]
+    const bool hasArea = attributes.contains("PhysicalContext");
+    if (hasArea)
+    {
+        std::ignore = AreaIntf::convertPhysicalContextTypeFromString(
+            std::get<std::string>(attributes.at("PhysicalContext")));
+    }
+    const bool hasLocation = attributes.contains("LocationType");
+    if (hasLocation)
+    {
+        std::ignore = LocationIntf::convertLocationTypesFromString(
+            std::get<std::string>(attributes.at("LocationType")));
+    }
+
+    const auto name = std::format("Assembly{}", dev.nextIndex("Assembly"));
+
+    dev.device->addStaticSensor(
+        std::make_shared<NsmChassisAssembly<AssemblyIntf>>(dev.name, name));
+    createChassisAssemblyAsset(dev.device, dev.name, name, attributes,
+                               attributes);
+    createChassisAssemblyHealth(dev.device, dev.name, name);
+    if (hasArea)
+    {
+        createChassisAssemblyArea(dev.device, dev.name, name, attributes);
+    }
+    if (hasLocation)
+    {
+        createChassisAssemblyLocation(dev.device, dev.name, name, attributes);
+    }
     co_return NSM_SUCCESS;
 }
 
-std::vector<std::string> chassisAssemblyInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_ChassisAssembly",
-    "xyz.openbmc_project.Configuration.NSM_ChassisAssembly.ChassisAttributes"};
-REGISTER_NSM_CREATION_FUNCTION(nsmChassisAssemblyCreateSensors,
-                               chassisAssemblyInterfaces)
-
-} // namespace nsm
+} // namespace nsm::features

@@ -39,6 +39,10 @@
 #if defined(ENABLE_LLDP)
 #include "nsmLLDPLib/nsmLldpPort.hpp"
 #endif
+#include "features/associations.hpp"
+#include "globals.hpp"
+#include "nsmDeviceInventoryFeatures.hpp"
+#include "sensorManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -1245,47 +1249,57 @@ static void createDeviceModeSensors(
     }
 }
 
-requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath)
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+NsmNetworkAdapterDIReset::NsmNetworkAdapterDIReset(
+    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
+    std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
+    NsmObject(name, type)
 {
-    auto& bus = utils::DBusHandler::getBus();
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+    lg2::info("NsmNetworkAdapterDIReset: create sensor:{NAME}", "NAME",
+              name.c_str());
 
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
+    objPath = inventoryObjPath + name;
+    resetIntf = std::make_shared<NsmResetDeviceIntf>(bus, objPath.c_str());
+    resetIntf->resetType(sdbusplus::common::xyz::openbmc_project::control::
+                             Reset::ResetTypes::ForceRestart);
+    resetAsyncIntf = std::make_shared<NsmNetworkDeviceResetAsyncIntf>(
+        bus, objPath.c_str(), device);
+}
+#endif
+
+} // namespace nsm
+
+namespace nsm::features
+{
+
+requester::Coroutine
+    createNetworkAdapterFeature([[maybe_unused]] SensorManager& manager,
+                                const DeviceContext& dev,
+                                const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        lg2::error("NetworkAdapter feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
     }
-    uuid_t uuid{};
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-    std::string type{};
-    if (allCurrentIfaceProperties.count("Type"))
-    {
-        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
-    }
-    std::string inventoryObjPath{};
-    if (allCurrentIfaceProperties.count("InventoryObjPath"))
-    {
-        inventoryObjPath = std::get<std::string>(
-            allCurrentIfaceProperties.at("InventoryObjPath"));
-    }
+    auto& bus = utils::DBusHandler::getBus();
+    const std::string type = "NSM_NetworkAdapter";
+    auto name = param<std::string>(params, "Name").value_or("");
+    [[maybe_unused]] auto uuid = dev.staticUuid;
+    // Legacy InventoryObjPath, with the trailing '/' it is joined on
+    std::string inventoryObjPath =
+        (path(dev.chassisPath) / networkAdaptersSubPath).string() + "/";
 
     std::vector<utils::Association> associations{};
-    co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                      associations);
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
+    addAssociations(associations, params, "ParentChassisAssociationPaths",
+                    "parent_chassis", "network_adapters");
+    auto nsmDevice = dev.device;
 
     auto networkAdapterDI = std::make_shared<NsmNetworkAdapterDI>(
         bus, name, associations, type, inventoryObjPath);
     nsmDevice->addDeviceSensors(networkAdapterDI);
 
-// Network adapters (CX/BlueField NICs) expose DebugInfo + LogInfo; Erase is
-// omitted because their trace storage is volatile (erase would be a no-op).
 #if defined(ENABLE_DEBUG_INFO)
     auto networkAdapterDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
         bus, name, inventoryObjPath, type, uuid, DebugDumpType::Network);
@@ -1318,12 +1332,12 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
     createDeviceProtectionOptions(nsmDevice, type, inventoryObjPath, name);
 #endif
 
-    if (allCurrentIfaceProperties.count("DeviceModesSupported"))
+    if (params.count("DeviceModesSupported"))
     {
         // DeviceModesSupported: DEVICE_MODE_NOT_SUPPORTED (-1) = mode not
         // supported;  >= 0 = patchability bitmap.
-        auto deviceModesSupported = std::get<std::vector<int64_t>>(
-            allCurrentIfaceProperties.at("DeviceModesSupported"));
+        auto deviceModesSupported =
+            std::get<std::vector<int64_t>>(params.at("DeviceModesSupported"));
 
         auto isModeSupported = [&](size_t modeIndex) -> bool {
             return modeIndex < deviceModesSupported.size() &&
@@ -1371,30 +1385,7 @@ requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
         }
     }
 
-    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
-#if defined(ENABLE_NETWORK_ADAPTER_RESET)
-NsmNetworkAdapterDIReset::NsmNetworkAdapterDIReset(
-    sdbusplus::bus_t& bus, const std::string& name, const std::string& type,
-    std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
-    NsmObject(name, type)
-{
-    lg2::info("NsmNetworkAdapterDIReset: create sensor:{NAME}", "NAME",
-              name.c_str());
-
-    objPath = inventoryObjPath + name;
-    resetIntf = std::make_shared<NsmResetDeviceIntf>(bus, objPath.c_str());
-    resetIntf->resetType(sdbusplus::common::xyz::openbmc_project::control::
-                             Reset::ResetTypes::ForceRestart);
-    resetAsyncIntf = std::make_shared<NsmNetworkDeviceResetAsyncIntf>(
-        bus, objPath.c_str(), device);
-}
-#endif
-
-REGISTER_NSM_CREATION_FUNCTION(
-    createNSMNetworkAdapter,
-    "xyz.openbmc_project.Configuration.NSM_NetworkAdapter")
-
-} // namespace nsm
+} // namespace nsm::features

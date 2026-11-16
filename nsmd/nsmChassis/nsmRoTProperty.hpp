@@ -234,6 +234,15 @@ struct ComponentInfo
     uint8_t index;
 };
 
+/** @brief Record the active slot's component of a firmware object, so image
+ *  copy does not have to look it up in the EM NSM_RoT_Slot records */
+void registerActiveSlotComponent(const std::string& firmwareObjPath,
+                                 const ComponentInfo& componentInfo);
+
+/** @brief Component registered for a firmware object, if any */
+std::optional<ComponentInfo>
+    findActiveSlotComponent(const std::string& firmwareObjPath);
+
 /**
  * @brief Class for initiating image copy for a chassis
  */

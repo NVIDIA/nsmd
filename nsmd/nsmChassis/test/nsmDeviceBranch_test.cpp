@@ -32,6 +32,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmDevice.hpp"
 #include "nsmEvent/nsmLongRunningEvent.hpp"
 #include "nsmFwSwInventory/GPUSWInventory.hpp"
@@ -42,14 +44,6 @@ using namespace ::testing;
 #undef protected
 
 using namespace nsm;
-
-// Forward declarations for factory functions
-namespace nsm
-{
-requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
-                                              const std::string& interface,
-                                              const std::string& objPath);
-} // namespace nsm
 
 static auto bus = sdbusplus::bus::new_default();
 
@@ -438,10 +432,6 @@ struct NsmProcessorBatch9Test :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_Processor";
-    const std::string name = "GPU_SXM_2";
-    const std::string objPath = std::string(processorsInventoryBasePath) + name;
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:5";
 
     NsmDeviceTable devices;
@@ -462,170 +452,104 @@ struct NsmProcessorBatch9Test :
         cleanupDeviceSensors(devices);
     }
 
-    dbus::PropertyMap basic = {
-        {"Name", name},
-        {"Type", std::string("NSM_Processor")},
-        {"UUID", gpuUuid},
-        {"DEVICE_UUID", gpuUuid},
-        {"InventoryObjPath", objPath},
-        {"Priority", false},
-    };
+    /** @brief Run the processor attributes feature of the GPU `devName` */
+    requester::Coroutine attributes(const std::string& devName,
+                                    dbus::PropertyMap params)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = devName;
+        dev.kind = "gpu";
+        dev.deviceType = NSM_DEV_ID_GPU;
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = gpu;
+        params["Name"] = devName;
+        return nsm::features::createProcessorAttributesFeature(mockManager, dev,
+                                                               params);
+    }
 };
 
 TEST_F(NsmProcessorBatch9Test,
        CreateProcessorAttributes_MemCapacityUtilEnabled_Standalone)
 {
-    // Arrange - only MemCapacityUtil enabled
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-    basePropertyMap["InventoryObjPath"] = basic["InventoryObjPath"];
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ProcessorAttributes");
-    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
-    propertyMap["MIGModeSupported"] = false;
-    propertyMap["PortDisableFutureSupported"] = false;
-    propertyMap["ECCModeSupported"] = false;
-    propertyMap["EDPpScalingFactorSupported"] = false;
-    propertyMap["PowerSmoothingSupported"] = false;
-    propertyMap["CpuOperatingConfigSupported"] = false;
-    propertyMap["MemCapacityUtilSupported"] = true;
-    propertyMap["TotalNvLinksCountSupported"] = false;
-    propertyMap["EGMModeSupported"] = false;
-    propertyMap["MNNVLTopologySupported"] = false;
-
-    // Act
-    createNsmProcessorSensor(mockManager,
-                             basicIntfName + ".ProcessorAttributes", objPath);
-
-    // Assert - 3 Asset (static) + MemCapacityUtil (LR) + 1 msgTypes
-    EXPECT_GE(gpu->deviceSensors.size(), 1u);
-    EXPECT_GE(gpu->longRunningSensors.size(), 0u);
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = attributes("HGX_GPU_SXM_2",
+                         {{"MIGModeSupported", false},
+                          {"PortDisableFutureSupported", false},
+                          {"ECCModeSupported", false},
+                          {"EDPpScalingFactorSupported", false},
+                          {"PowerSmoothingSupported", false},
+                          {"CpuOperatingConfigSupported", false},
+                          {"MemCapacityUtilSupported", true},
+                          {"TotalNvLinksCountSupported", false},
+                          {"EGMModeSupported", false},
+                          {"MNNVLTopologySupported", false}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // 3 asset properties + MemCapacityUtil
+    EXPECT_GT(gpu->deviceSensors.size(), before + 3);
 }
 
 TEST_F(NsmProcessorBatch9Test, CreateProcessorAttributes_AllFeaturesEnabled)
 {
-    // Arrange - ALL features enabled simultaneously
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-    basePropertyMap["InventoryObjPath"] = basic["InventoryObjPath"];
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ProcessorAttributes");
-    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
-    propertyMap["LocationType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Location."
-        "LocationTypes.Embedded");
-    propertyMap["LocationCode"] = std::string("GPU_SXM_2");
-    propertyMap["MIGModeSupported"] = true;
-    propertyMap["PortDisableFutureSupported"] = true;
-    propertyMap["ECCModeSupported"] = true;
-    propertyMap["EDPpScalingFactorSupported"] = true;
-    propertyMap["PowerSmoothingSupported"] = true;
-    propertyMap["CpuOperatingConfigSupported"] = true;
-    propertyMap["MemCapacityUtilSupported"] = true;
-    propertyMap["TotalNvLinksCountSupported"] = true;
-    propertyMap["EGMModeSupported"] = true;
-    propertyMap["MNNVLTopologySupported"] = true;
-
-    // Act
-    createNsmProcessorSensor(mockManager,
-                             basicIntfName + ".ProcessorAttributes", objPath);
-
-    // Assert - very large number of sensors created
-    EXPECT_GE(gpu->deviceSensors.size(), 10u);
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = attributes(
+        "HGX_GPU_SXM_3",
+        {{"LocationType",
+          std::string("xyz.openbmc_project.Inventory.Decorator.Location."
+                      "LocationTypes.Embedded")},
+         {"LocationCode", std::string("GPU_SXM_3")},
+         {"MIGModeSupported", true},
+         {"PortDisableFutureSupported", true},
+         {"ECCModeSupported", true},
+         {"EDPpScalingFactorSupported", true},
+         {"PowerSmoothingSupported", true},
+         {"CpuOperatingConfigSupported", true},
+         {"MemCapacityUtilSupported", true},
+         {"TotalNvLinksCountSupported", true},
+         {"EGMModeSupported", true},
+         {"MNNVLTopologySupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // Very large number of sensors created
+    EXPECT_GE(gpu->deviceSensors.size(), before + 10);
 }
 
-// NSM_Processor_Attributes with NO "Supported" flags at all → all 11
-// count() FALSE branches: MIGModeSupported, PortDisableFutureSupported,
-// ECCModeSupported, EDPpScalingFactorSupported, PowerSmoothingSupported,
-// CpuOperatingConfigSupported, MemCapacityUtilSupported,
-// TotalNvLinksCountSupported, EGMModeSupported, MNNVLTopologySupported,
-// MctpNsmOperationalStatusSupported all absent → skipped.
-// Also LocationType and LocationCode absent → those count() FALSE branches.
+// No "Supported" flags and no location params → only the asset properties
 TEST_F(NsmProcessorBatch9Test,
        CreateProcessorAttributes_NoSupportedFlags_AllFALSEBranches)
 {
-    const std::string uniquePath =
-        std::string(processorsInventoryBasePath / "GPU_SXM_NoFlags");
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = std::string("GPU_SXM_NoFlags");
-    basePropertyMap["UUID"] = gpuUuid;
-    basePropertyMap["InventoryObjPath"] = uniquePath;
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".ProcessorAttributes");
-    // Type only — all optional properties absent (no Supported flags,
-    // no LocationType, no LocationCode) → all count() checks return 0
-    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
-
-    createNsmProcessorSensor(
-        mockManager, basicIntfName + ".ProcessorAttributes", uniquePath);
-
-    // Asset sensors still created even with no optional features
-    EXPECT_GE(gpu->staticSensors.size(), 1u);
-}
-
-TEST_F(NsmProcessorBatch9Test, DISABLED_CreateNSMProcessor_BaseType)
-{
-    const std::string uniquePath =
-        std::string(processorsInventoryBasePath / "GPU_SXM_BaseType");
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = std::string("GPU_SXM_BaseType");
-    basePropertyMap["UUID"] = gpuUuid;
-    basePropertyMap["InventoryObjPath"] = uniquePath;
-    basePropertyMap["DEVICE_UUID"] =
-        std::string("12345678-abcd-abcd-abcd-123456789abc");
-    basePropertyMap["Type"] = std::string("NSM_Processor");
-
-    // Act
-    createNsmProcessorSensor(mockManager, basicIntfName, uniquePath);
-
-    // Assert - many sensors should be created for NSM_Processor type:
-    // associationSensor, uuidSensor, debugInfoObject, eraseTraceObject,
-    // logInfoObject, diagnosticsObject, gpuRevisionSensor,
-    // totalMemorySizeSensor, healthSensor, errorInjectionSensors,
-    // confidentialComputeSensor
-    EXPECT_GE(gpu->deviceSensors.size(), 5u);
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = attributes("HGX_GPU_SXM_NoFlags", {});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), before + 3);
 }
 
 TEST_F(NsmProcessorBatch9Test,
        CreateProcessorAttributes_LocationCodeOnly_NoLocationType)
 {
-    // Arrange - only LocationCode, no LocationType
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-    basePropertyMap["InventoryObjPath"] = basic["InventoryObjPath"];
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = attributes("HGX_GPU_SXM_4",
+                         {{"LocationCode", std::string("GPU_SXM_4")},
+                          {"MIGModeSupported", false},
+                          {"MemCapacityUtilSupported", false}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // 3 asset properties + LocationCode
+    EXPECT_EQ(gpu->deviceSensors.size(), before + 4);
+}
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ProcessorAttributes");
-    propertyMap["Type"] = std::string("NSM_Processor_Attributes");
-    propertyMap["LocationCode"] = std::string("GPU_SXM_2");
-    propertyMap["MIGModeSupported"] = false;
-    propertyMap["PortDisableFutureSupported"] = false;
-    propertyMap["ECCModeSupported"] = false;
-    propertyMap["EDPpScalingFactorSupported"] = false;
-    propertyMap["PowerSmoothingSupported"] = false;
-    propertyMap["CpuOperatingConfigSupported"] = false;
-    propertyMap["MemCapacityUtilSupported"] = false;
-    propertyMap["TotalNvLinksCountSupported"] = false;
-    propertyMap["EGMModeSupported"] = false;
-    propertyMap["MNNVLTopologySupported"] = false;
-
-    // Act
-    createNsmProcessorSensor(mockManager,
-                             basicIntfName + ".ProcessorAttributes", objPath);
-
-    // Assert - 3 Asset (static) + LocationCode (device) + 1 msgTypes
-    EXPECT_GE(gpu->deviceSensors.size(), 1u);
+TEST_F(NsmProcessorBatch9Test, CreateProcessorAttributes_NoDevice_ReturnsError)
+{
+    nsm::features::DeviceContext dev;
+    dev.name = "HGX_GPU_SXM_NoDev";
+    dev.staticUuid = gpuUuid;
+    const dbus::PropertyMap params{{"Name", std::string("HGX_GPU_SXM_NoDev")}};
+    auto rc = nsm::features::createProcessorAttributesFeature(mockManager, dev,
+                                                              params);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_ERROR);
 }
 
 // ============================================================================

@@ -19,7 +19,9 @@
 
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "globals.hpp"
 #include "nsmApSkuId.hpp"
+#include "nsmChassisFeatures.hpp"
 #include "nsmKeyMgmt.hpp"
 #include "nsmRoTProperty.hpp"
 #include "nsmSecurityRBP.hpp"
@@ -117,416 +119,103 @@ int extractNumber(const std::string& str)
     return number;
 }
 
-requester::Coroutine parseSlots(const std::string& path, uint64_t slotCount,
-                                const std::string& rotSlotInterface,
-                                std::vector<SlotInfo>& slots)
+void createRoTSensors(std::shared_ptr<NsmDevice> device,
+                      const std::string& name, const std::string& type,
+                      const uuid_t& uuid, const std::string& path,
+                      const std::vector<SlotInfo>& allSlots,
+                      bool imageCopyEnabled, bool imageCopyStateEnabled,
+                      bool inbandUpdatePolicyEnabled,
+                      bool imageCopyPolicyEnabled, bool enableFailoverPolicy)
 {
-    for (size_t slotIndex = 1; slotIndex <= slotCount; slotIndex++)
+    auto& bus = utils::DBusHandler::getBus();
+
+    std::shared_ptr<ProgressIntf> rotProgressIntf = nullptr;
+
+    std::map<std::string, std::shared_ptr<NsmBuildTypeObject>>
+        apFirmwareTypeMap;
+    std::map<std::string, std::shared_ptr<ProgressIntf>> apProgressIntfMap;
+    std::map<std::string, std::shared_ptr<NsmKeyMgmt>> apKeyMgmtMap;
+    std::map<std::string, std::shared_ptr<NsmMinSecVersionObject>>
+        apMinSecVersionMap;
+
+    std::map<std::string, std::shared_ptr<NsmApSkuIdObject>> apSkuIdSensorMap;
+    std::map<std::string, std::shared_ptr<NsmUpdateApSkuIdIntf>>
+        apUpdateSkuIntfMap;
+
+    std::shared_ptr<NsmBuildTypeObject> ecFirmwareType = nullptr;
+    std::shared_ptr<ProgressIntf> ecProgressIntf = nullptr;
+    std::shared_ptr<NsmKeyMgmt> ecKeyMgmt = nullptr;
+    std::shared_ptr<NsmMinSecVersionObject> ecMinSecVersion = nullptr;
+    std::shared_ptr<NsmInbandUpdatePolicyObject> inbandUpdatePolicy = nullptr;
+    std::shared_ptr<NsmImageCopyPolicyObject> imageCopyPolicySensor = nullptr;
+    std::shared_ptr<NsmFailoverPolicyObject> failoverPolicy = nullptr;
+    std::shared_ptr<NsmImageCopyObject> imageCopyObject = nullptr;
+    std::shared_ptr<NsmImageCopyStateObject> imageCopyStateSensor = nullptr;
+
+    for (const auto& slot : allSlots)
     {
-        auto slotPath = path + "/Slot" + std::to_string(slotIndex);
-        auto allSlotIfaceProperties = co_await utils::coGetAllDbusProperty(
-            utils::entityManagerServiceStr, slotPath.c_str(),
-            rotSlotInterface.c_str());
+        if (slot.fwType == "AP")
+        {
+            auto slotObject = std::make_shared<NsmFirmwareSlot>(
+                bus, path, slot.associations, extractNumber(slot.slotName),
+                SlotIntf::FirmwareType::AP, slot.chassisName,
+                device->getDeviceType());
 
-        SlotInfo slot{};
-        if (allSlotIfaceProperties.count("Name"))
-        {
-            slot.slotName =
-                std::get<std::string>(allSlotIfaceProperties.at("Name"));
-        }
-        if (allSlotIfaceProperties.count("ComponentClassification"))
-        {
-            slot.classification = std::get<uint64_t>(
-                allSlotIfaceProperties.at("ComponentClassification"));
-        }
-        if (allSlotIfaceProperties.count("ComponentIdentifier"))
-        {
-            slot.identifier = std::get<uint64_t>(
-                allSlotIfaceProperties.at("ComponentIdentifier"));
-        }
-        if (allSlotIfaceProperties.count("ComponentIndex"))
-        {
-            slot.index =
-                std::get<uint64_t>(allSlotIfaceProperties.at("ComponentIndex"));
-        }
-        if (allSlotIfaceProperties.count("FirmwareType"))
-        {
-            slot.fwType = std::get<std::string>(
-                allSlotIfaceProperties.at("FirmwareType"));
-        }
-        slot.associations = utils::getAssociations(
-            slotPath, std::string(rotSlotInterface) + ".Associations");
-        if (allSlotIfaceProperties.count("ChassisName"))
-        {
-            slot.chassisName =
-                std::get<std::string>(allSlotIfaceProperties.at("ChassisName"));
-        }
+            const std::string& slotKey = slot.isRoT ? name : slot.chassisName;
 
-        slot.isRoT = false;
-        if (allSlotIfaceProperties.count("IsRoT"))
-        {
-            slot.isRoT = std::get<bool>(allSlotIfaceProperties.at("IsRoT"));
-        }
-        slot.reportSkuWithNsm = false;
-        if (allSlotIfaceProperties.count("ReportSkuWithNsm"))
-        {
-            slot.reportSkuWithNsm =
-                std::get<bool>(allSlotIfaceProperties.at("ReportSkuWithNsm"));
-        }
-
-        slot.enableUpdateSKU = false;
-        if (allSlotIfaceProperties.count("SetRotPropertyList"))
-        {
-            try
+            if (apFirmwareTypeMap.find(slotKey) == apFirmwareTypeMap.end())
             {
-                auto propertyList = std::get<std::vector<std::string>>(
-                    allSlotIfaceProperties.at("SetRotPropertyList"));
-
-                if (std::find(propertyList.begin(), propertyList.end(),
-                              "AP_SKU_ID") != propertyList.end())
-                {
-                    slot.enableUpdateSKU = true;
-                }
-            }
-            catch (const std::exception& e)
-            {
-                lg2::error(
-                    "Failed to parse SetRotPropertyList for slot:{SLOT}: {ERROR}",
-                    "SLOT", slot.slotName, "ERROR", e.what());
-            }
-        }
-
-        if (slot.fwType == "EC")
-        {
-            slot.isRoT = true;
-        }
-
-        slots.push_back(slot);
-    }
-
-    co_return NSM_SW_SUCCESS;
-}
-
-requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
-                                          const std::string& interface,
-                                          const std::string& objPath)
-{
-    auto rotSlotInterface = "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
-
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
-
-    std::string type{};
-    if (allCurrentIfaceProperties.count("Type"))
-    {
-        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
-    }
-
-    if (type == "NSM_Chassis" || type == "NSM_ChassisRoT")
-    {
-        std::string name{};
-        if (allCurrentIfaceProperties.count("Name"))
-        {
-            name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-        }
-        uuid_t uuid{};
-        if (allCurrentIfaceProperties.count("UUID"))
-        {
-            uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-        }
-
-        auto path = std::string(chassisInventoryBasePath) + "/" + name;
-        uint64_t slotCount{};
-        if (allCurrentIfaceProperties.count("SlotCount"))
-        {
-            slotCount =
-                std::get<uint64_t>(allCurrentIfaceProperties.at("SlotCount"));
-        }
-        else
-        {
-            // coverity[missing_return]
-            co_return NSM_SUCCESS; // not a RoT chassis
-        }
-
-        bool imageCopyEnabled = false;
-        if (allCurrentIfaceProperties.count("ImageCopyEnabled"))
-        {
-            imageCopyEnabled = std::get<bool>(
-                allCurrentIfaceProperties.at("ImageCopyEnabled"));
-        }
-
-        bool imageCopyStateEnabled = false;
-        if (allCurrentIfaceProperties.count("ImageCopyStateEnabled"))
-        {
-            imageCopyStateEnabled = std::get<bool>(
-                allCurrentIfaceProperties.at("ImageCopyStateEnabled"));
-        }
-
-        bool inbandUpdatePolicyEnabled = false;
-        if (allCurrentIfaceProperties.count("InbandUpdatePolicyEnabled"))
-        {
-            inbandUpdatePolicyEnabled = std::get<bool>(
-                allCurrentIfaceProperties.at("InbandUpdatePolicyEnabled"));
-        }
-
-        bool imageCopyPolicyEnabled = false;
-        if (allCurrentIfaceProperties.count("ImageCopyPolicyEnabled"))
-        {
-            imageCopyPolicyEnabled = std::get<bool>(
-                allCurrentIfaceProperties.at("ImageCopyPolicyEnabled"));
-        }
-
-        bool enableFailoverPolicy = false;
-        if (allCurrentIfaceProperties.count("SetRotPropertyList"))
-        {
-            try
-            {
-                auto propertyList = std::get<std::vector<std::string>>(
-                    allCurrentIfaceProperties.at("SetRotPropertyList"));
-
-                if (std::find(propertyList.begin(), propertyList.end(),
-                              "FAILOVER_POLICY") != propertyList.end())
-                {
-                    enableFailoverPolicy = true;
-                }
-            }
-            catch (const std::exception& e)
-            {
-                lg2::error(
-                    "Failed to parse SetRotPropertyList for chassis:{CHASSIS}: {ERROR}",
-                    "CHASSIS", name, "ERROR", e.what());
-            }
-        }
-
-        auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-
-        if (!device)
-        {
-            lg2::error("Failed to get NsmDevice for UUID:{UUID}", "UUID", uuid);
-            co_return NSM_SW_ERROR;
-        }
-
-        auto& bus = utils::DBusHandler::getBus();
-
-        std::shared_ptr<ProgressIntf> rotProgressIntf = nullptr;
-
-        std::map<std::string, std::shared_ptr<NsmBuildTypeObject>>
-            apFirmwareTypeMap;
-        std::map<std::string, std::shared_ptr<ProgressIntf>> apProgressIntfMap;
-        std::map<std::string, std::shared_ptr<NsmKeyMgmt>> apKeyMgmtMap;
-        std::map<std::string, std::shared_ptr<NsmMinSecVersionObject>>
-            apMinSecVersionMap;
-
-        std::map<std::string, std::shared_ptr<NsmApSkuIdObject>>
-            apSkuIdSensorMap;
-        std::map<std::string, std::shared_ptr<NsmUpdateApSkuIdIntf>>
-            apUpdateSkuIntfMap;
-
-        std::shared_ptr<NsmBuildTypeObject> ecFirmwareType = nullptr;
-        std::shared_ptr<ProgressIntf> ecProgressIntf = nullptr;
-        std::shared_ptr<NsmKeyMgmt> ecKeyMgmt = nullptr;
-        std::shared_ptr<NsmMinSecVersionObject> ecMinSecVersion = nullptr;
-        std::shared_ptr<NsmInbandUpdatePolicyObject> inbandUpdatePolicy =
-            nullptr;
-        std::shared_ptr<NsmImageCopyPolicyObject> imageCopyPolicySensor =
-            nullptr;
-        std::shared_ptr<NsmFailoverPolicyObject> failoverPolicy = nullptr;
-        std::shared_ptr<NsmImageCopyObject> imageCopyObject = nullptr;
-        std::shared_ptr<NsmImageCopyStateObject> imageCopyStateSensor = nullptr;
-
-        std::vector<SlotInfo> allSlots;
-        uint8_t parseRc = co_await parseSlots(path, slotCount, rotSlotInterface,
-                                              allSlots);
-        if (parseRc != NSM_SW_SUCCESS)
-        {
-            lg2::error("Failed to parse slots for {PATH}", "PATH", path);
-            co_return parseRc;
-        }
-
-        for (const auto& slot : allSlots)
-        {
-            if (slot.fwType == "AP")
-            {
-                auto slotObject = std::make_shared<NsmFirmwareSlot>(
-                    bus, path, slot.associations, extractNumber(slot.slotName),
-                    SlotIntf::FirmwareType::AP, slot.chassisName,
-                    device->getDeviceType());
-
-                const std::string& slotKey = slot.isRoT ? name
-                                                        : slot.chassisName;
-
-                if (apFirmwareTypeMap.find(slotKey) == apFirmwareTypeMap.end())
-                {
-                    apFirmwareTypeMap[slotKey] =
-                        std::make_shared<NsmBuildTypeObject>(
-                            name, type, uuid, slot.classification,
-                            slot.identifier);
-                }
-                apFirmwareTypeMap[slotKey]->addSlotObject(slotObject);
-
-                if (apProgressIntfMap.find(slot.chassisName) ==
-                    apProgressIntfMap.end())
-                {
-                    auto progressPath = std::string(chassisInventoryBasePath) +
-                                        "/" + slot.chassisName;
-                    apProgressIntfMap[slot.chassisName] =
-                        std::make_shared<ProgressIntf>(bus,
-                                                       progressPath.c_str());
-                }
-
-                if (apKeyMgmtMap.find(slot.chassisName) == apKeyMgmtMap.end())
-                {
-                    apKeyMgmtMap[slot.chassisName] =
-                        std::make_shared<NsmKeyMgmt>(
-                            bus, slot.chassisName, type, uuid,
-                            apProgressIntfMap[slot.chassisName],
-                            slot.classification, slot.identifier,
-                            static_cast<uint8_t>(slot.index));
-                }
-                apKeyMgmtMap[slot.chassisName]->addSlotObject(slotObject);
-
-                if (apMinSecVersionMap.find(slot.chassisName) ==
-                    apMinSecVersionMap.end())
-                {
-                    apMinSecVersionMap[slot.chassisName] =
-                        std::make_shared<NsmMinSecVersionObject>(
-                            bus, slot.chassisName, type, uuid,
-                            slot.classification, slot.identifier,
-                            static_cast<uint8_t>(slot.index),
-                            apProgressIntfMap[slot.chassisName]);
-                    device->addSensor(apMinSecVersionMap[slot.chassisName],
-                                      PollingType::RoundRobin);
-                }
-
-                if (imageCopyPolicySensor == nullptr && imageCopyPolicyEnabled)
-                {
-                    auto inventoryPath = std::string(chassisInventoryBasePath) +
-                                         "/" + name;
-
-                    imageCopyPolicySensor =
-                        std::make_shared<NsmImageCopyPolicyObject>(
-                            bus, name, type, slot.classification,
-                            slot.identifier, static_cast<uint8_t>(slot.index));
-                    device->addSensor(imageCopyPolicySensor,
-                                      PollingType::RoundRobin);
-
-                    // Register async set handler for ImageCopyPolicy property
-                    nsm::AsyncSetOperationHandler imageCopyPolicyHandler =
-                        std::bind(&nsm::updateImageCopyPolicyHandler,
-                                  std::placeholders::_1, std::placeholders::_2,
-                                  std::placeholders::_3, slot.classification,
-                                  slot.identifier,
-                                  static_cast<uint8_t>(slot.index));
-                    AsyncOperationManager::getInstance()
-                        ->getDispatcher(inventoryPath)
-                        ->addAsyncSetOperation(
-                            "com.nvidia.ImageCopyPolicy", "ImageCopyPolicy",
-                            AsyncSetOperationInfo{imageCopyPolicyHandler,
-                                                  imageCopyPolicySensor,
-                                                  device});
-                    lg2::info(
-                        "ImageCopyPolicy interface created successfully for chassis:{CHASSIS}",
-                        "CHASSIS", name);
-                }
-                if (slot.reportSkuWithNsm &&
-                    apSkuIdSensorMap.find(slot.chassisName) ==
-                        apSkuIdSensorMap.end())
-                {
-                    apSkuIdSensorMap[slot.chassisName] =
-                        std::make_shared<NsmApSkuIdObject>(
-                            bus, slot.chassisName, type, uuid,
-                            apProgressIntfMap[slot.chassisName],
-                            slot.classification, slot.identifier,
-                            static_cast<uint8_t>(slot.index),
-                            slot.associations);
-                    device->addSensor(apSkuIdSensorMap[slot.chassisName],
-                                      PollingType::RoundRobin);
-                }
-
-                if (slot.enableUpdateSKU &&
-                    apUpdateSkuIntfMap.find(slot.chassisName) ==
-                        apUpdateSkuIntfMap.end())
-                {
-                    auto inventoryPath = std::string(chassisInventoryBasePath) +
-                                         "/" + slot.chassisName;
-                    lg2::info(
-                        "Creating UpdateSKU interface for chassis:{CHASSIS} path:{PATH} with AP component (class={CLASS}, id={ID}, idx={IDX})",
-                        "CHASSIS", slot.chassisName, "PATH", inventoryPath,
-                        "CLASS", slot.classification, "ID", slot.identifier,
-                        "IDX", static_cast<uint8_t>(slot.index));
-                    apUpdateSkuIntfMap[slot.chassisName] =
-                        std::make_shared<NsmUpdateApSkuIdIntf>(
-                            bus, slot.chassisName, type, inventoryPath);
-                    device->addDeviceSensors(
-                        apUpdateSkuIntfMap[slot.chassisName]);
-                    nsm::AsyncSetOperationHandler updateSkuHandler =
-                        std::bind(&updateApSkuIdHandler, std::placeholders::_1,
-                                  std::placeholders::_2, std::placeholders::_3,
-                                  slot.classification, slot.identifier,
-                                  static_cast<uint8_t>(slot.index));
-                    AsyncOperationManager::getInstance()
-                        ->getDispatcher(inventoryPath)
-                        ->addAsyncSetOperation(
-                            "xyz.openbmc_project.Inventory.Decorator.SKU",
-                            "SKU",
-                            AsyncSetOperationInfo{
-                                updateSkuHandler,
-                                apSkuIdSensorMap[slot.chassisName], device});
-                }
-            }
-            else // EC
-            {
-                auto slotObject = std::make_shared<NsmFirmwareSlot>(
-                    bus, path, slot.associations, extractNumber(slot.slotName),
-                    SlotIntf::FirmwareType::EC, slot.chassisName,
-                    device->getDeviceType());
-
-                if (ecFirmwareType == nullptr)
-                {
-                    ecFirmwareType = std::make_shared<NsmBuildTypeObject>(
+                apFirmwareTypeMap[slotKey] =
+                    std::make_shared<NsmBuildTypeObject>(
                         name, type, uuid, slot.classification, slot.identifier);
-                }
-                ecFirmwareType->addSlotObject(slotObject);
-                if (ecProgressIntf == nullptr)
-                {
-                    auto progressPath = std::string(chassisInventoryBasePath) +
-                                        "/" + name;
-                    ecProgressIntf = std::make_shared<ProgressIntf>(
-                        bus, progressPath.c_str());
-                }
-                if (ecKeyMgmt == nullptr)
-                {
-                    ecKeyMgmt = std::make_shared<NsmKeyMgmt>(
-                        bus, name, type, uuid, ecProgressIntf,
-                        slot.classification, slot.identifier,
-                        static_cast<uint8_t>(slot.index));
-                }
-                ecKeyMgmt->addSlotObject(slotObject);
-                if (ecMinSecVersion == nullptr)
-                {
-                    ecMinSecVersion = std::make_shared<NsmMinSecVersionObject>(
-                        bus, name, type, uuid, slot.classification,
-                        slot.identifier, static_cast<uint8_t>(slot.index),
-                        ecProgressIntf);
-                    device->addSensor(ecMinSecVersion, PollingType::RoundRobin);
-                }
+            }
+            apFirmwareTypeMap[slotKey]->addSlotObject(slotObject);
+
+            if (apProgressIntfMap.find(slot.chassisName) ==
+                apProgressIntfMap.end())
+            {
+                auto progressPath = std::string(chassisInventoryBasePath) +
+                                    "/" + slot.chassisName;
+                apProgressIntfMap[slot.chassisName] =
+                    std::make_shared<ProgressIntf>(bus, progressPath.c_str());
             }
 
-            if (inbandUpdatePolicy == nullptr && inbandUpdatePolicyEnabled)
+            if (apKeyMgmtMap.find(slot.chassisName) == apKeyMgmtMap.end())
+            {
+                apKeyMgmtMap[slot.chassisName] = std::make_shared<NsmKeyMgmt>(
+                    bus, slot.chassisName, type, uuid,
+                    apProgressIntfMap[slot.chassisName], slot.classification,
+                    slot.identifier, static_cast<uint8_t>(slot.index));
+            }
+            apKeyMgmtMap[slot.chassisName]->addSlotObject(slotObject);
+
+            if (apMinSecVersionMap.find(slot.chassisName) ==
+                apMinSecVersionMap.end())
+            {
+                apMinSecVersionMap[slot.chassisName] =
+                    std::make_shared<NsmMinSecVersionObject>(
+                        bus, slot.chassisName, type, uuid, slot.classification,
+                        slot.identifier, static_cast<uint8_t>(slot.index),
+                        apProgressIntfMap[slot.chassisName]);
+                device->addSensor(apMinSecVersionMap[slot.chassisName],
+                                  PollingType::RoundRobin);
+            }
+
+            if (imageCopyPolicySensor == nullptr && imageCopyPolicyEnabled)
             {
                 auto inventoryPath = std::string(chassisInventoryBasePath) +
                                      "/" + name;
 
-                inbandUpdatePolicy =
-                    std::make_shared<NsmInbandUpdatePolicyObject>(
-                        bus, name, slot.classification, slot.identifier,
+                imageCopyPolicySensor =
+                    std::make_shared<NsmImageCopyPolicyObject>(
+                        bus, name, type, slot.classification, slot.identifier,
                         static_cast<uint8_t>(slot.index));
-                device->addSensor(inbandUpdatePolicy, PollingType::RoundRobin);
+                device->addSensor(imageCopyPolicySensor,
+                                  PollingType::RoundRobin);
 
-                // Register async set handler for InbandUpdatePolicy property
-                // with Async.Set support
-                nsm::AsyncSetOperationHandler inbandUpdatePolicyHandler =
-                    std::bind(&nsm::updateInbandUpdatePolicyHandler,
+                // Register async set handler for ImageCopyPolicy property
+                nsm::AsyncSetOperationHandler imageCopyPolicyHandler =
+                    std::bind(&nsm::updateImageCopyPolicyHandler,
                               std::placeholders::_1, std::placeholders::_2,
                               std::placeholders::_3, slot.classification,
                               slot.identifier,
@@ -534,101 +223,380 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 AsyncOperationManager::getInstance()
                     ->getDispatcher(inventoryPath)
                     ->addAsyncSetOperation(
-                        "com.nvidia.InbandUpdatePolicy", "InbandUpdatePolicy",
-                        AsyncSetOperationInfo{inbandUpdatePolicyHandler,
-                                              inbandUpdatePolicy, device});
+                        "com.nvidia.ImageCopyPolicy", "ImageCopyPolicy",
+                        AsyncSetOperationInfo{imageCopyPolicyHandler,
+                                              imageCopyPolicySensor, device});
+                lg2::info(
+                    "ImageCopyPolicy interface created successfully for chassis:{CHASSIS}",
+                    "CHASSIS", name);
+            }
+            if (slot.reportSkuWithNsm &&
+                apSkuIdSensorMap.find(slot.chassisName) ==
+                    apSkuIdSensorMap.end())
+            {
+                apSkuIdSensorMap[slot.chassisName] =
+                    std::make_shared<NsmApSkuIdObject>(
+                        bus, slot.chassisName, type, uuid,
+                        apProgressIntfMap[slot.chassisName],
+                        slot.classification, slot.identifier,
+                        static_cast<uint8_t>(slot.index), slot.associations);
+                device->addSensor(apSkuIdSensorMap[slot.chassisName],
+                                  PollingType::RoundRobin);
             }
 
-            if (failoverPolicy == nullptr && enableFailoverPolicy)
+            if (slot.enableUpdateSKU &&
+                apUpdateSkuIntfMap.find(slot.chassisName) ==
+                    apUpdateSkuIntfMap.end())
             {
-                failoverPolicy = std::make_shared<NsmFailoverPolicyObject>(
-                    bus, name, uuid, slot.classification, slot.identifier,
-                    static_cast<uint8_t>(slot.index));
-                device->addSensor(failoverPolicy, PollingType::RoundRobin);
-
-                // Register Async.Set handler for FailoverPolicy property
                 auto inventoryPath = std::string(chassisInventoryBasePath) +
-                                     "/" + name;
-
-                nsm::AsyncSetOperationHandler failoverPolicyHandler = std::bind(
-                    &updateFailoverPolicyHandler, std::placeholders::_1,
-                    std::placeholders::_2, std::placeholders::_3,
-                    slot.classification, slot.identifier,
+                                     "/" + slot.chassisName;
+                lg2::info(
+                    "Creating UpdateSKU interface for chassis:{CHASSIS} path:{PATH} with AP component (class={CLASS}, id={ID}, idx={IDX})",
+                    "CHASSIS", slot.chassisName, "PATH", inventoryPath, "CLASS",
+                    slot.classification, "ID", slot.identifier, "IDX",
                     static_cast<uint8_t>(slot.index));
+                apUpdateSkuIntfMap[slot.chassisName] =
+                    std::make_shared<NsmUpdateApSkuIdIntf>(
+                        bus, slot.chassisName, type, inventoryPath);
+                device->addDeviceSensors(apUpdateSkuIntfMap[slot.chassisName]);
+                nsm::AsyncSetOperationHandler updateSkuHandler =
+                    std::bind(&updateApSkuIdHandler, std::placeholders::_1,
+                              std::placeholders::_2, std::placeholders::_3,
+                              slot.classification, slot.identifier,
+                              static_cast<uint8_t>(slot.index));
                 AsyncOperationManager::getInstance()
                     ->getDispatcher(inventoryPath)
                     ->addAsyncSetOperation(
-                        "com.nvidia.FailoverPolicy", "FailoverPolicy",
-                        AsyncSetOperationInfo{failoverPolicyHandler,
-                                              failoverPolicy, device});
+                        "xyz.openbmc_project.Inventory.Decorator.SKU", "SKU",
+                        AsyncSetOperationInfo{
+                            updateSkuHandler,
+                            apSkuIdSensorMap[slot.chassisName], device});
             }
+        }
+        else // EC
+        {
+            auto slotObject = std::make_shared<NsmFirmwareSlot>(
+                bus, path, slot.associations, extractNumber(slot.slotName),
+                SlotIntf::FirmwareType::EC, slot.chassisName,
+                device->getDeviceType());
 
-            if (imageCopyObject == nullptr and imageCopyEnabled)
+            if (ecFirmwareType == nullptr)
             {
-                imageCopyObject =
-                    std::make_shared<NsmImageCopyObject>(bus, name, uuid);
-                device->addSensor(imageCopyObject, PollingType::RoundRobin);
+                ecFirmwareType = std::make_shared<NsmBuildTypeObject>(
+                    name, type, uuid, slot.classification, slot.identifier);
             }
-
-            if (imageCopyStateSensor == nullptr and imageCopyStateEnabled)
-            {
-                imageCopyStateSensor =
-                    std::make_shared<NsmImageCopyStateObject>(bus, name);
-                device->addSensor(imageCopyStateSensor,
-                                  PollingType::RoundRobin);
-                device->imageCopyStateSensor = imageCopyStateSensor;
-            }
-        }
-
-        for (const auto& [_, apFwType] : apFirmwareTypeMap)
-        {
-            if (apFwType)
-            {
-                device->addSensor(apFwType, PollingType::RoundRobin);
-            }
-        }
-        for (const auto& [_, apKeyMgmtObj] : apKeyMgmtMap)
-        {
-            if (apKeyMgmtObj)
-            {
-                device->addSensor(apKeyMgmtObj, PollingType::RoundRobin);
-            }
-        }
-
-        if (ecFirmwareType)
-        {
-            device->addSensor(ecFirmwareType, PollingType::RoundRobin);
-        }
-        if (ecKeyMgmt)
-        {
-            device->addSensor(ecKeyMgmt, PollingType::RoundRobin);
-        }
-        if (rotProgressIntf == nullptr)
-        {
-            if (ecProgressIntf != nullptr)
-            {
-                rotProgressIntf = ecProgressIntf;
-            }
-            else
+            ecFirmwareType->addSlotObject(slotObject);
+            if (ecProgressIntf == nullptr)
             {
                 auto progressPath = std::string(chassisInventoryBasePath) +
                                     "/" + name;
-                rotProgressIntf =
+                ecProgressIntf =
                     std::make_shared<ProgressIntf>(bus, progressPath.c_str());
             }
+            if (ecKeyMgmt == nullptr)
+            {
+                ecKeyMgmt = std::make_shared<NsmKeyMgmt>(
+                    bus, name, type, uuid, ecProgressIntf, slot.classification,
+                    slot.identifier, static_cast<uint8_t>(slot.index));
+            }
+            ecKeyMgmt->addSlotObject(slotObject);
+            if (ecMinSecVersion == nullptr)
+            {
+                ecMinSecVersion = std::make_shared<NsmMinSecVersionObject>(
+                    bus, name, type, uuid, slot.classification, slot.identifier,
+                    static_cast<uint8_t>(slot.index), ecProgressIntf);
+                device->addSensor(ecMinSecVersion, PollingType::RoundRobin);
+            }
         }
-        auto securityCfg = std::make_shared<NsmSecurityCfgObject>(
-            bus, name, type, uuid, rotProgressIntf);
-        device->addSensor(securityCfg, PollingType::RoundRobin);
+
+        if (inbandUpdatePolicy == nullptr && inbandUpdatePolicyEnabled)
+        {
+            auto inventoryPath = std::string(chassisInventoryBasePath) + "/" +
+                                 name;
+
+            inbandUpdatePolicy = std::make_shared<NsmInbandUpdatePolicyObject>(
+                bus, name, slot.classification, slot.identifier,
+                static_cast<uint8_t>(slot.index));
+            device->addSensor(inbandUpdatePolicy, PollingType::RoundRobin);
+
+            // Register async set handler for InbandUpdatePolicy property
+            // with Async.Set support
+            nsm::AsyncSetOperationHandler inbandUpdatePolicyHandler =
+                std::bind(&nsm::updateInbandUpdatePolicyHandler,
+                          std::placeholders::_1, std::placeholders::_2,
+                          std::placeholders::_3, slot.classification,
+                          slot.identifier, static_cast<uint8_t>(slot.index));
+            AsyncOperationManager::getInstance()
+                ->getDispatcher(inventoryPath)
+                ->addAsyncSetOperation(
+                    "com.nvidia.InbandUpdatePolicy", "InbandUpdatePolicy",
+                    AsyncSetOperationInfo{inbandUpdatePolicyHandler,
+                                          inbandUpdatePolicy, device});
+        }
+
+        if (failoverPolicy == nullptr && enableFailoverPolicy)
+        {
+            failoverPolicy = std::make_shared<NsmFailoverPolicyObject>(
+                bus, name, uuid, slot.classification, slot.identifier,
+                static_cast<uint8_t>(slot.index));
+            device->addSensor(failoverPolicy, PollingType::RoundRobin);
+
+            // Register Async.Set handler for FailoverPolicy property
+            auto inventoryPath = std::string(chassisInventoryBasePath) + "/" +
+                                 name;
+
+            nsm::AsyncSetOperationHandler failoverPolicyHandler =
+                std::bind(&updateFailoverPolicyHandler, std::placeholders::_1,
+                          std::placeholders::_2, std::placeholders::_3,
+                          slot.classification, slot.identifier,
+                          static_cast<uint8_t>(slot.index));
+            AsyncOperationManager::getInstance()
+                ->getDispatcher(inventoryPath)
+                ->addAsyncSetOperation(
+                    "com.nvidia.FailoverPolicy", "FailoverPolicy",
+                    AsyncSetOperationInfo{failoverPolicyHandler, failoverPolicy,
+                                          device});
+        }
+
+        if (imageCopyObject == nullptr and imageCopyEnabled)
+        {
+            imageCopyObject = std::make_shared<NsmImageCopyObject>(bus, name,
+                                                                   uuid);
+            device->addSensor(imageCopyObject, PollingType::RoundRobin);
+        }
+
+        if (imageCopyStateSensor == nullptr and imageCopyStateEnabled)
+        {
+            imageCopyStateSensor =
+                std::make_shared<NsmImageCopyStateObject>(bus, name);
+            device->addSensor(imageCopyStateSensor, PollingType::RoundRobin);
+            device->imageCopyStateSensor = imageCopyStateSensor;
+        }
     }
-    // coverity[missing_return]
+
+    for (const auto& [_, apFwType] : apFirmwareTypeMap)
+    {
+        if (apFwType)
+        {
+            device->addSensor(apFwType, PollingType::RoundRobin);
+        }
+    }
+    for (const auto& [_, apKeyMgmtObj] : apKeyMgmtMap)
+    {
+        if (apKeyMgmtObj)
+        {
+            device->addSensor(apKeyMgmtObj, PollingType::RoundRobin);
+        }
+    }
+
+    if (ecFirmwareType)
+    {
+        device->addSensor(ecFirmwareType, PollingType::RoundRobin);
+    }
+    if (ecKeyMgmt)
+    {
+        device->addSensor(ecKeyMgmt, PollingType::RoundRobin);
+    }
+    if (rotProgressIntf == nullptr)
+    {
+        if (ecProgressIntf != nullptr)
+        {
+            rotProgressIntf = ecProgressIntf;
+        }
+        else
+        {
+            auto progressPath = std::string(chassisInventoryBasePath) + "/" +
+                                name;
+            rotProgressIntf =
+                std::make_shared<ProgressIntf>(bus, progressPath.c_str());
+        }
+    }
+    auto securityCfg = std::make_shared<NsmSecurityCfgObject>(
+        bus, name, type, uuid, rotProgressIntf);
+    device->addSensor(securityCfg, PollingType::RoundRobin);
+}
+
+} // namespace nsm
+
+namespace nsm::features
+{
+
+requester::Coroutine createRoTFeature([[maybe_unused]] SensorManager& manager,
+                                      const DeviceContext& dev,
+                                      const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("RoT feature of {NAME}: no NsmDevice", "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+
+    std::string name = param<std::string>(params, "Name").value_or("");
+    const std::string type = "NSM_ChassisRoT";
+    const uuid_t& uuid = dev.staticUuid;
+    auto path = std::string(chassisInventoryBasePath) + "/" + name;
+
+    bool imageCopyEnabled =
+        param<bool>(params, "ImageCopyEnabled").value_or(false);
+    bool imageCopyStateEnabled =
+        param<bool>(params, "ImageCopyStateEnabled").value_or(false);
+    bool inbandUpdatePolicyEnabled =
+        param<bool>(params, "InbandUpdatePolicyEnabled").value_or(false);
+    bool imageCopyPolicyEnabled =
+        param<bool>(params, "ImageCopyPolicyEnabled").value_or(false);
+    bool enableFailoverPolicy =
+        param<bool>(params, "FailoverPolicyEnabled").value_or(false);
+
+    auto chassisNames = arrayParam<std::string>(params, "SlotChassisName");
+    auto firmwareTypes = arrayParam<std::string>(params, "SlotFirmwareType");
+    auto slotTypes = arrayParam<std::string>(params, "SlotType");
+    auto classifications = arrayParam<uint64_t>(params,
+                                                "SlotComponentClassification");
+    auto identifiers = arrayParam<uint64_t>(params, "SlotComponentIdentifier");
+    auto indexes = arrayParam<uint64_t>(params, "SlotComponentIndex");
+    // Software target leaf per slot; an empty entry means no association.
+    // Without it, SlotSoftwareNameFromChassis gives
+    // <PlatformPrefix>FW_<ChassisName without PlatformPrefix> for every slot;
+    // otherwise the target is HGX_FW_<ChassisName> where
+    // SlotSoftwareAssociationsEnabled is set.
+    auto softwareNames = arrayParam<std::string>(params, "SlotSoftwareName");
+    const bool namedSoftwareTargets = !softwareNames.empty();
+    const bool softwareFromChassis =
+        !namedSoftwareTargets &&
+        param<bool>(params, "SlotSoftwareNameFromChassis").value_or(false);
+    const std::string platformPrefix = param<std::string>(params,
+                                                          "PlatformPrefix")
+                                           .value_or(dev.platformPrefix);
+    auto softwareNameFromChassis =
+        [&platformPrefix](const std::string& chassisName) {
+        std::string_view base = chassisName;
+        if (!platformPrefix.empty() && base.starts_with(platformPrefix))
+        {
+            base.remove_prefix(platformPrefix.size());
+        }
+        return platformPrefix + "FW_" + std::string(base);
+    };
+    // inventory_SKU target per slot, relative to inventorySystemBasePath; an
+    // empty entry, or no param, means no association.
+    auto skuInventoryPaths = arrayParam<std::string>(params,
+                                                     "SlotSkuInventoryPath");
+
+    const size_t slotCount = firmwareTypes.size();
+    auto optionalFlags = [&params, slotCount](const char* key) {
+        auto values = arrayParam<uint64_t>(params, key);
+        return values.empty() ? std::vector<uint64_t>(slotCount, 0) : values;
+    };
+    auto softwareAssociations =
+        namedSoftwareTargets || softwareFromChassis
+            ? optionalFlags("SlotSoftwareAssociationsEnabled")
+            : arrayParam<uint64_t>(params, "SlotSoftwareAssociationsEnabled");
+    auto isRoT = optionalFlags("SlotIsRoT");
+    auto reportSkuWithNsm = optionalFlags("SlotReportSkuWithNsm");
+    auto updateSkuEnabled = optionalFlags("SlotUpdateSkuEnabled");
+
+    for (size_t size :
+         {chassisNames.size(), slotTypes.size(), classifications.size(),
+          identifiers.size(), indexes.size(), softwareAssociations.size(),
+          namedSoftwareTargets ? softwareNames.size() : slotCount, isRoT.size(),
+          reportSkuWithNsm.size(), updateSkuEnabled.size(),
+          skuInventoryPaths.empty() ? slotCount : skuInventoryPaths.size()})
+    {
+        if (size != slotCount)
+        {
+            lg2::error(
+                "RoT feature of {NAME}: slot arrays differ in length ({SIZE} vs {COUNT})",
+                "NAME", dev.name, "SIZE", size, "COUNT", slotCount);
+            co_return NSM_ERROR;
+        }
+    }
+
+    std::vector<SlotInfo> allSlots;
+    for (size_t i = 0; i < slotCount; ++i)
+    {
+        SlotInfo slot{};
+        slot.slotName = "Slot" + std::to_string(i + 1);
+        slot.classification = classifications[i];
+        slot.identifier = identifiers[i];
+        slot.index = indexes[i];
+        slot.fwType = firmwareTypes[i];
+        slot.chassisName = chassisNames[i];
+        slot.isRoT = isRoT[i] != 0;
+        slot.reportSkuWithNsm = reportSkuWithNsm[i] != 0;
+        slot.enableUpdateSKU = updateSkuEnabled[i] != 0;
+
+        const bool active = slotTypes[i] == "Active";
+        const std::string softwareName =
+            namedSoftwareTargets  ? softwareNames[i]
+            : softwareFromChassis ? softwareNameFromChassis(slot.chassisName)
+                                  : "HGX_FW_" + slot.chassisName;
+        const bool softwareAssociation = namedSoftwareTargets
+                                             ? !softwareName.empty()
+                                         : softwareFromChassis
+                                             ? true
+                                             : softwareAssociations[i] != 0;
+        const std::string firmwareObjPath =
+            (firmwareInventoryBasePath / softwareName).string();
+        if (softwareAssociation)
+        {
+            slot.associations.push_back({"software",
+                                         active ? "ActiveSlot" : "InactiveSlot",
+                                         firmwareObjPath});
+
+            if (active)
+            {
+                if (slot.classification > UINT16_MAX ||
+                    slot.identifier > UINT16_MAX || slot.index > UINT8_MAX)
+                {
+                    lg2::error(
+                        "Component property value out of range: "
+                        "classification={CLASSIFICATION}, identifier={IDENTIFIER}, index={INDEX}",
+                        "CLASSIFICATION", slot.classification, "IDENTIFIER",
+                        slot.identifier, "INDEX", slot.index);
+                }
+                else
+                {
+                    registerActiveSlotComponent(
+                        firmwareObjPath,
+                        {.classification =
+                             static_cast<uint16_t>(slot.classification),
+                         .identifier = static_cast<uint16_t>(slot.identifier),
+                         .index = static_cast<uint8_t>(slot.index)});
+                }
+            }
+        }
+        if (!skuInventoryPaths.empty() && !skuInventoryPaths[i].empty())
+        {
+            slot.associations.push_back(
+                {"inventory_SKU", "associated_SKU",
+                 (inventorySystemBasePath / skuInventoryPaths[i]).string()});
+        }
+
+        if (slot.fwType == "EC")
+        {
+            slot.isRoT = true;
+        }
+
+        allSlots.push_back(slot);
+    }
+
+    createRoTSensors(dev.device, name, type, uuid, path, allSlots,
+                     imageCopyEnabled, imageCopyStateEnabled,
+                     inbandUpdatePolicyEnabled, imageCopyPolicyEnabled,
+                     enableFailoverPolicy);
+
     co_return NSM_SUCCESS;
 }
 
-std::vector<std::string> erotInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_Chassis",
-    "xyz.openbmc_project.Configuration.NSM_ChassisRoT"};
+requester::Coroutine
+    createFWComponentTypeFeature([[maybe_unused]] SensorManager& manager,
+                                 const DeviceContext& dev,
+                                 const dbus::PropertyMap& params)
+{
+    lg2::debug(
+        "FWComponentType feature of {NAME}: ComponentType={TYPE}, nothing created",
+        "NAME", dev.name, "TYPE",
+        param<std::string>(params, "ComponentType").value_or(""));
+    co_return NSM_SUCCESS;
+}
 
-REGISTER_NSM_CREATION_FUNCTION(nsmErotCreateSensors, erotInterfaces)
-
-} // namespace nsm
+} // namespace nsm::features

@@ -63,10 +63,6 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
 requester::Coroutine createNsmNVSwitchChassis(SensorManager& manager,
                                               const std::string& interface,
                                               const std::string& objPath);
-
-requester::Coroutine createNsmNVLinkMgmtNicChassis(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath);
 } // namespace nsm
 
 using namespace nsm;
@@ -804,7 +800,7 @@ TEST_F(NsmNVSwitchChassisFactoryTest,
     EXPECT_EQ(chassis->getName(), "NVSwitch0");
 }
 
-// Test: createNsmNVLinkMgmtNicChassis with base type
+// Test: createNsmChassis with NSM_NVLinkMgmtNic_Chassis base type
 struct NsmNVLinkMgmtNicChassisExtraTest :
     public Test,
     public utils::DBusTest,

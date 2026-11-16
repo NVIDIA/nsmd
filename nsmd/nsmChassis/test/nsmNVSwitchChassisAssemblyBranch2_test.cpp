@@ -37,6 +37,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmChassis/nsmNVSwitchAndNVMgmtNICChassisAssembly.hpp"
 #include "nsmInventoryProperty.hpp"
 
@@ -48,8 +50,6 @@ namespace nsm
 requester::Coroutine createNsmNVSwitchChassisAssembly(SensorManager& manager,
                                                       const std::string& intf,
                                                       const std::string& path);
-requester::Coroutine createNsmNVLinkMgmtNicChassisAssembly(
-    SensorManager& manager, const std::string& intf, const std::string& path);
 void createAssemblyAsset(std::shared_ptr<NsmDevice> device,
                          const std::string& chassisName,
                          const std::string& name, const std::string& baseType,
@@ -400,26 +400,23 @@ TEST_F(NsmNVSwitchAssemblyBranch2Test,
 }
 
 // ============================================================================
-// NVLinkMgmtNic variant: createNsmNVLinkMgmtNicChassisAssembly with
-// type==baseType (exercises the sibling factory path)
+// NVLinkMgmtNic variant: createNVLinkMgmtNicChassisAssemblyFeature (exercises
+// the sibling creator path)
 // ============================================================================
 
-TEST_F(NsmNVSwitchAssemblyBranch2Test,
-       NVLinkMgmtNic_TypeMatchesBase_AddsSensors)
+TEST_F(NsmNVSwitchAssemblyBranch2Test, NVLinkMgmtNic_Feature_AddsSensors)
 {
-    const std::string nicBaseIface =
-        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly";
-    const std::string uniquePath = "/xyz/test/nvswasm/nic_base";
-
-    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath, nicBaseIface);
-    baseMap["UUID"] = deviceUuid;
-    baseMap["Name"] = std::string("NVMgmtNIC0_Asm");
-    baseMap["ChassisName"] = std::string("HGX_Chassis_NIC");
-    baseMap["Type"] = std::string("NSM_NVLinkMgmtNic_ChassisAssembly");
+    nsm::features::DeviceContext dev;
+    dev.name = "HGX_Chassis_NIC";
+    dev.kind = "cx_nic";
+    dev.staticUuid = deviceUuid;
+    dev.platformPrefix = "HGX_";
+    dev.device = gpu;
 
     const size_t before = gpu->staticSensors.size();
-    nsm::createNsmNVLinkMgmtNicChassisAssembly(mockManager, nicBaseIface,
-                                               uniquePath);
-    // type==baseType → assemblyObject + versionSensor
-    EXPECT_GE(gpu->staticSensors.size(), before + 2);
+    auto rc = nsm::features::createNVLinkMgmtNicChassisAssemblyFeature(
+        mockManager, dev, {{"Name", std::string("NVMgmtNIC0_Asm")}});
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    // assemblyObject + versionSensor + health + 4 asset
+    EXPECT_EQ(gpu->staticSensors.size(), before + 7);
 }

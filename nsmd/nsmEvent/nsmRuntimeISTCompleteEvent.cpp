@@ -20,6 +20,8 @@
 #include "diagnostics.h"
 
 #include "dBusAsyncUtils.hpp"
+#include "globals.hpp"
+#include "nsmEventFeatures.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
 
@@ -211,95 +213,47 @@ int NsmRuntimeISTCompleteEvent::handle(eid_t eid, NsmType /*type*/,
     return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine
-    createNsmRuntimeISTCompleteEvent(SensorManager& manager,
-                                     const std::string& interface,
-                                     const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    NsmEventInfo info{};
 
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
-
-    // info.uuid is the MCTP UUID used for NsmDevice lookup -- distinct from
-    // the wire payload's gpu_identifier (Device UUID).
-    if (allCurrentIfaceProperties.count("UUID"))
+requester::Coroutine createRuntimeISTCompleteEventFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        info.uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
-    {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    name = utils::makeDBusNameValid(name);
-
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-
-    if (allCurrentIfaceProperties.count("OriginOfCondition"))
-    {
-        info.originOfCondition = std::get<std::string>(
-            allCurrentIfaceProperties.at("OriginOfCondition"));
-    }
-    if (allCurrentIfaceProperties.count("MessageId"))
-    {
-        info.messageId =
-            std::get<std::string>(allCurrentIfaceProperties.at("MessageId"));
-    }
-    if (allCurrentIfaceProperties.count("LoggingNamespace"))
-    {
-        info.loggingNamespace = std::get<std::string>(
-            allCurrentIfaceProperties.at("LoggingNamespace"));
-    }
-    info.loggingNamespace = utils::makeDBusNameValid(info.loggingNamespace);
-
-    // The EM JSON "Resolution" property carries the actionable text used
-    // for the failure rows of the RIST spec table (Warning / Critical).
-    // The Pass row's resolution is the spec literal "None" hardcoded in
-    // deriveRistSeverity() and does not consult info.resolution.
-    if (allCurrentIfaceProperties.count("Resolution"))
-    {
-        info.resolution =
-            std::get<std::string>(allCurrentIfaceProperties.at("Resolution"));
-    }
-    if (allCurrentIfaceProperties.count("MessageArgs"))
-    {
-        info.messageArgs = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("MessageArgs"));
-    }
-
-    // NOTE: The EM JSON "Severity" property is intentionally not read here.
-    // For NSM_Event_Runtime_IST_Complete the per-log Severity is derived
-    // from the wire payload (see deriveRistSeverity in handle()), and
-    // info.severity is left default-initialised since no code path consults
-    // it for this event.
-    if (allCurrentIfaceProperties.count("EventIds"))
-    {
-        info.errorId = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("EventIds"));
-    }
-    if (allCurrentIfaceProperties.count("ImpactedComponent"))
-    {
-        info.impactedComponent = std::get<std::string>(
-            allCurrentIfaceProperties.at("ImpactedComponent"));
-    }
-
-    // Master on/off switch for phosphor logging. Defaults to true if the
-    // property is absent so existing exemplars without a Logging key keep
-    // logging by default. Pass and Fail are gated identically by this flag.
-    info.logging = utils::DBusHandler().tryGetDbusProperty<bool>(
-        objPath.c_str(), "Logging", interface.c_str(), true);
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(info.uuid);
-    if (!nsmDevice)
-    {
-        lg2::error(
-            "The UUID of Runtime IST Complete Event PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", info.uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
+        lg2::error("Runtime IST Complete Event feature of {NAME}: no NsmDevice",
+                   "NAME", dev.name);
         co_return NSM_ERROR;
     }
+
+    NsmEventInfo info{};
+    info.uuid = dev.staticUuid;
+
+    auto name = utils::makeDBusNameValid(
+        param<std::string>(params, "Name").value_or(""));
+    const std::string type = "NSM_Event_Runtime_IST_Complete";
+
+    info.originOfCondition = (redfishChassisBasePath / dev.name).string();
+    info.messageId = param<std::string>(params, "MessageId").value_or("");
+    info.loggingNamespace = utils::makeDBusNameValid(
+        param<std::string>(params, "LoggingNamespace").value_or(""));
+    // Failure rows only; the Pass row's resolution is the spec literal "None"
+    info.resolution = param<std::string>(params, "Resolution").value_or("");
+    // MessageArgs fmt fields are filled per event
+    info.messageArgs = param<std::vector<std::string>>(params, "MessageArgs")
+                           .value_or(std::vector<std::string>{});
+    info.errorId = param<std::vector<std::string>>(params, "EventIds")
+                       .value_or(std::vector<std::string>{});
+    if (auto impactedComponent = param<std::string>(params,
+                                                    "ImpactedComponent"))
+    {
+        info.impactedComponent = *impactedComponent;
+    }
+    // Severity is derived from the event payload, not configured
+    info.logging = param<bool>(params, "Logging").value_or(true);
 
     auto event = std::make_shared<NsmRuntimeISTCompleteEvent>(name, type, info);
 
@@ -307,14 +261,9 @@ requester::Coroutine
         "Created NSM Runtime IST Complete Event : UUID={UUID}, Name={NAME}, Type={TYPE}",
         "UUID", info.uuid, "NAME", name, "TYPE", type);
 
-    nsmDevice->addDeviceEvent(event, NSM_TYPE_DIAGNOSTIC,
-                              NSM_RUNTIME_IST_COMPLETE_EVENT);
-    // coverity[missing_return]
+    dev.device->addDeviceEvent(event, NSM_TYPE_DIAGNOSTIC,
+                               NSM_RUNTIME_IST_COMPLETE_EVENT);
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmRuntimeISTCompleteEvent,
-    "xyz.openbmc_project.Configuration.NSM_Event_Runtime_IST_Complete");
-
-} // namespace nsm
+} // namespace nsm::features

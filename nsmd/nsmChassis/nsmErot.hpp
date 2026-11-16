@@ -66,17 +66,6 @@ class NsmBuildTypeObject : public NsmSensor
 
     uuid_t uuid;
     nsm_firmware_erot_state_info_req nsmRequest;
-    /**
-     * @brief Parse the slots from the D-Bus interface
-     * @param path The path of the D-Bus interface
-     * @param slotCount The number of slots
-     * @param rotSlotInterface The interface of the RoT slots
-     * @param result The result of the parsing
-     * @return The result of the parsing
-     */
-    requester::Coroutine parseSlots(const std::string& path, uint64_t slotCount,
-                                    const std::string& rotSlotInterface,
-                                    std::vector<SlotInfo>& slots);
 };
 
 } // namespace nsm

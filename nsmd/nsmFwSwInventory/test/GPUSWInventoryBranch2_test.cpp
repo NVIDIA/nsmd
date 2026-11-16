@@ -24,8 +24,8 @@
  *   but verify the success path encoding)
  * - update(): decode success, cc != NSM_SUCCESS -> keeps previous version,
  *   state change triggers updateNsmDevice
- * - createGPUDriverSensor factory: all properties present (success path)
- * - createGPUDriverSensor factory: missing Manufacturer (FALSE branch)
+ *
+ * createGPUSWInventoryFeature is covered in GPUSWInventory_test.cpp
  */
 
 #include "test/mockDBusHandler.hpp"
@@ -42,13 +42,6 @@ using namespace ::testing;
 #undef private
 #undef protected
 
-namespace nsm
-{
-requester::Coroutine createGPUDriverSensor(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
-
 using namespace nsm;
 
 // ============================================================================
@@ -60,8 +53,6 @@ struct GPUSWInventoryBranch2Test :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_GPU_SWInventory";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
@@ -202,55 +193,6 @@ TEST_F(GPUSWInventoryBranch2Test,
 
     EXPECT_EQ(sensor->driverState, DriverNotLoaded);
     EXPECT_FALSE(sensor->operationalStatus->functional());
-}
-
-// ============================================================================
-// Factory: all properties present including Manufacturer -> success
-// ============================================================================
-
-TEST_F(GPUSWInventoryBranch2Test, Factory_AllProperties_SensorCreated)
-{
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/gpu_br2_all";
-
-    dbus::PropertyMap properties = {
-        {"Name", std::string("GPU_Driver_Br2_All")},
-        {"UUID", gpuUuid},
-        {"Manufacturer", std::string("NVIDIA")},
-    };
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    const size_t before = gpu->deviceSensors.size();
-    createGPUDriverSensor(mockManager, basicIntfName, testPath);
-    EXPECT_GT(gpu->deviceSensors.size(), before);
-}
-
-// ============================================================================
-// Factory: missing Manufacturer -> manufacturer="" -> sensor created
-// (FALSE count("Manufacturer") branch)
-// ============================================================================
-
-TEST_F(GPUSWInventoryBranch2Test, Factory_MissingManufacturer_Created)
-{
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/gpu_br2_nomfr";
-
-    dbus::PropertyMap properties = {
-        {"Name", std::string("GPU_Driver_Br2_NoMfr")},
-        {"UUID", gpuUuid},
-        // Manufacturer intentionally omitted
-    };
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    const size_t before = gpu->deviceSensors.size();
-    createGPUDriverSensor(mockManager, basicIntfName, testPath);
-    EXPECT_GT(gpu->deviceSensors.size(), before);
 }
 
 // ============================================================================

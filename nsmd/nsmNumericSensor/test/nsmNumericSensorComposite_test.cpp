@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include <cmath>
 #include <limits>
 
 #include <gmock/gmock.h>
@@ -25,8 +26,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
 #include "nsmNumericSensor/nsmNumericSensorComposite.hpp"
-#include "nsmObjectFactory.hpp"
 #include "test/mockDBusHandler.hpp"
 #include "test/mockSensorManager.hpp"
 
@@ -197,7 +198,7 @@ TEST_F(NsmNumericSensorCompositeTest,
 #endif
 
 // =============================================================================
-// CreateFPGATotalGPUPower factory tests (via NsmObjectFactory dispatch)
+// createNumericCompositeSensorFeature tests
 // =============================================================================
 
 struct NsmNumericSensorCompositeFactoryDevicesStorage
@@ -211,10 +212,6 @@ struct NsmNumericSensorCompositeFactoryTest :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string interfaceName =
-        "xyz.openbmc_project.Configuration.NSM_NumericCompositeSensor";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/composite0";
     const std::string name = "TotalGPUPower";
     const uuid_t gpuUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
@@ -232,187 +229,73 @@ struct NsmNumericSensorCompositeFactoryTest :
         cleanupDeviceSensors(devices);
     }
 
-    dbus::PropertyMap basicProperties = {
+    nsm::features::DeviceContext makeDev(bool withDevice = true)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_FPGA_0";
+        dev.kind = "fpga";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = fpga;
+        }
+        return dev;
+    }
+
+    dbus::PropertyMap basicParams = {
         {"Name", name},
-        {"UUID", gpuUuid},
         {"SensorType", std::string("power")},
+        {"ChassisName", std::string("HGX_Chassis_0")},
         {"PhysicalContext", std::string("GPU")},
         {"Implementation", std::string("PhysicalSensor")},
     };
 };
 
-// Full property map + chassis association → sensor created and registered
-// (NVIDIA_SHMEM block requires chassis association → must set up serviceMap)
-TEST_F(NsmNumericSensorCompositeFactoryTest, Factory_FullProperties_Success)
+// Full params → composite sensor created, added to the device and registered
+// by its sensor path with a chassis association
+TEST_F(NsmNumericSensorCompositeFactoryTest, Feature_FullParams_Success)
 {
-    // Set up chassis association so NVIDIA_SHMEM block proceeds past empty
-    // check
-    const std::string assocIntf = interfaceName + ".Associations0";
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {assocIntf}}};
-    auto& assocPm = utils::MockDbusAsync::propertyMap(objPath, assocIntf);
-    assocPm["Forward"] = std::string("chassis");
-    assocPm["Backward"] = std::string("all_sensors");
-    assocPm["AbsolutePath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis");
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          interfaceName);
-    propertyMap = basicProperties;
-
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               objPath);
-
-    EXPECT_GE(fpga->deviceSensors.size(), 1u);
-}
-
-// Missing UUID → parseStaticUuid throws → caught by createObjects → no sensor
-TEST_F(NsmNumericSensorCompositeFactoryTest, Factory_MissingUUID_NoSensor)
-{
-    const std::string uniquePath =
-        "/xyz/openbmc_project/inventory/system/composite_no_uuid";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                          interfaceName);
-    dbus::PropertyMap props = basicProperties;
-    props.erase("UUID");
-    propertyMap = props;
-
     const size_t before = fpga->deviceSensors.size();
+    auto rc = nsm::features::createNumericCompositeSensorFeature(
+        mockManager, makeDev(), basicParams);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(fpga->deviceSensors.size(), before + 1);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               uniquePath);
-
-    EXPECT_EQ(before, fpga->deviceSensors.size());
+    const std::string path = "/xyz/openbmc_project/sensors/power/" + name;
+    auto it = mockManager.objectPathToSensorMap.find(path);
+    ASSERT_NE(it, mockManager.objectPathToSensorMap.end());
+    auto composite =
+        std::dynamic_pointer_cast<NsmNumericSensorComposite>(it->second);
+    ASSERT_NE(composite, nullptr);
+    EXPECT_EQ(composite->getType(), "NSM_NumericCompositeSensor");
+    const auto& assocs = composite->associationDefinitionsInft->associations();
+    ASSERT_EQ(assocs.size(), 1u);
+    EXPECT_EQ(std::get<0>(assocs[0]), "chassis");
+    EXPECT_EQ(std::get<1>(assocs[0]), "all_sensors");
+    EXPECT_EQ(std::get<2>(assocs[0]),
+              "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0");
+    EXPECT_TRUE(std::isnan(composite->valueIntf->value()));
 }
 
-// Only UUID and Name → FALSE branches for
-// SensorType/PhysicalContext/Implementation Under NVIDIA_SHMEM, no chassis
-// association → chassis_association.empty() TRUE → co_return NSM_ERROR → no //
-// sensor added
-TEST_F(NsmNumericSensorCompositeFactoryTest, Factory_MinimalProperties_NoSensor)
+// No NsmDevice → NSM_ERROR, nothing created
+TEST_F(NsmNumericSensorCompositeFactoryTest, Feature_NullDevice_ReturnsError)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/composite_minimal";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
-    propertyMap = {
-        {"Name", name},
-        {"UUID", gpuUuid},
-    };
-
     const size_t before = fpga->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_EQ(before, fpga->deviceSensors.size());
+    auto rc = nsm::features::createNumericCompositeSensorFeature(
+        mockManager, makeDev(false), basicParams);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(fpga->deviceSensors.size(), before);
 }
 
-// With SensorType + PhysicalContext + Implementation + chassis assoc →
-// TRUE branches for all property checks → sensor created
-TEST_F(NsmNumericSensorCompositeFactoryTest,
-       Factory_WithSensorTypeAndImplementation_Success)
+// Required param missing → params.at() throws, no sensor added
+TEST_F(NsmNumericSensorCompositeFactoryTest, Feature_MissingChassisName_Throws)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/composite_full";
-    // Set up chassis association (required by NVIDIA_SHMEM block)
-    const std::string assocIntf = interfaceName + ".Associations0";
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {assocIntf}}};
-    auto& assocPm = utils::MockDbusAsync::propertyMap(testPath, assocIntf);
-    assocPm["Forward"] = std::string("chassis");
-    assocPm["Backward"] = std::string("all_sensors");
-    assocPm["AbsolutePath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis");
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
-    dbus::PropertyMap props = basicProperties;
-    props["SensorType"] = std::string("power");
-    props["PhysicalContext"] = std::string("GPU");
-    props["Implementation"] = std::string("PhysicalSensor");
-    propertyMap = props;
-
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_GE(fpga->deviceSensors.size(), 1u);
-}
-
-// Only Name missing → FALSE branch for count("Name") → name="" →
-// Under NVIDIA_SHMEM, no chassis association → chassis_association.empty() TRUE
-// → co_return NSM_ERROR → no sensor added
-TEST_F(NsmNumericSensorCompositeFactoryTest, Factory_MissingName_NoSensor)
-{
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/composite_noname";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
-    dbus::PropertyMap props = basicProperties;
-    props.erase("Name");
-    propertyMap = props;
-
+    auto params = basicParams;
+    params.erase("ChassisName");
     const size_t before = fpga->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_EQ(before, fpga->deviceSensors.size());
-}
-
-// Association forward != "chassis" → L165 FALSE branch → loop exhausted →
-// chassis_association stays empty → co_return NSM_ERROR → no sensor //
-
-TEST_F(NsmNumericSensorCompositeFactoryTest,
-       Factory_AssocForwardNotChassis_NoSensor)
-{
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/composite_badassoc";
-    const std::string assocIntf = interfaceName + ".Associations0";
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {assocIntf}}};
-    auto& assocPm = utils::MockDbusAsync::propertyMap(testPath, assocIntf);
-    assocPm["Forward"] =
-        std::string("containing"); // NOT "chassis" → L165 FALSE
-    assocPm["Backward"] = std::string("all_sensors");
-    assocPm["AbsolutePath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis");
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
-    propertyMap = basicProperties;
-
-    const size_t before = fpga->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_EQ(before, fpga->deviceSensors.size());
-}
-
-// Chassis association present + UUID missing → L172 FALSE branch taken
-// → getNsmDeviceFromStaticUUID("") → parseStaticUuid throws → caught → no
-// sensor
-TEST_F(NsmNumericSensorCompositeFactoryTest,
-       Factory_WithChassisAssoc_MissingUUID_NoSensor)
-{
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/composite_chassisnouuid";
-    const std::string assocIntf = interfaceName + ".Associations0";
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {assocIntf}}};
-    auto& assocPm = utils::MockDbusAsync::propertyMap(testPath, assocIntf);
-    assocPm["Forward"] = std::string("chassis");
-    assocPm["Backward"] = std::string("all_sensors");
-    assocPm["AbsolutePath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis");
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
-    dbus::PropertyMap props = basicProperties;
-    props.erase("UUID"); // uuid="" → parseStaticUuid throws
-    propertyMap = props;
-
-    const size_t before = fpga->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_EQ(before, fpga->deviceSensors.size());
+    EXPECT_THROW_COROUTINE(nsm::features::createNumericCompositeSensorFeature(
+                               mockManager, makeDev(), params),
+                           std::out_of_range);
+    EXPECT_EQ(fpga->deviceSensors.size(), before);
 }

@@ -21,6 +21,7 @@
 #include "device-capability-discovery.h"
 
 #include "dBusAsyncUtils.hpp"
+#include "nsmEventConfigFeatures.hpp"
 #include "nsmObjectFactory.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
@@ -210,66 +211,45 @@ requester::Coroutine
     co_return cc ? cc : rc;
 }
 
-requester::Coroutine createNsmEventSetting(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(),
-        "xyz.openbmc_project.Configuration.NSM_EventSetting");
 
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
+requester::Coroutine
+    createEventSettingFeature([[maybe_unused]] SensorManager& manager,
+                              const DeviceContext& dev,
+                              const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-    uuid_t uuid{};
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-    uint64_t eventGenerationSetting{};
-    if (allCurrentIfaceProperties.count("EventGenerationSetting"))
-    {
-        eventGenerationSetting = std::get<uint64_t>(
-            allCurrentIfaceProperties.at("EventGenerationSetting"));
-    }
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-    if (!nsmDevice)
-    {
-        lg2::error(
-            "found NSM_EventSetting [{NAME}] but not applied since no NsmDevice UUID={UUID}",
-            "NAME", name, "UUID", uuid);
-        // coverity[missing_return]
+        lg2::error("EventSetting feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
         co_return NSM_ERROR;
     }
 
+    auto name = std::get<std::string>(params.at("Name"));
+    auto eventGenerationSetting =
+        param<uint64_t>(params, "EventGenerationSetting").value_or(0);
     if (eventGenerationSetting > GLOBAL_EVENT_GENERATION_ENABLE_PUSH)
     {
         lg2::error(
             "NSM_EventSetting: Found an invalid setting={SETTING} for eventGenerationSetting",
             "SETTING", eventGenerationSetting);
-        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
+    const std::string type = "NSM_EventSetting";
     auto sensor = std::make_shared<NsmEventSetting>(
-        name, type, eventGenerationSetting, nsmDevice);
+        name, type, eventGenerationSetting, dev.device);
     auto getEventSensor = std::make_shared<NsmGetEventSetting>(name, type,
                                                                sensor);
-    nsmDevice->setHasNsmEventSettingConfig(true);
-    nsmDevice->addCapabilityRefreshSensor(sensor);
+    dev.device->setHasNsmEventSettingConfig(true);
+    dev.device->addCapabilityRefreshSensor(sensor);
 
-    // update sensor
-    nsmDevice->addStaticSensor(sensor);
-    nsmDevice->addSensor(getEventSensor, false);
-    // coverity[missing_return]
+    dev.device->addStaticSensor(sensor);
+    dev.device->addSensor(getEventSensor, false);
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmEventSetting, "xyz.openbmc_project.Configuration.NSM_EventSetting")
-
-} // namespace nsm
+} // namespace nsm::features

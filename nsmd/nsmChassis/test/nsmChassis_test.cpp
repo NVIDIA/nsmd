@@ -25,6 +25,9 @@ using namespace ::testing;
 #include "base.h"
 #include "device-configuration.h"
 
+#include "../../common/nsmPropertySupport.hpp"
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmChassis.hpp"
 #include "nsmDebugInfo.hpp"
@@ -36,14 +39,8 @@ using namespace ::testing;
 #include "nsmProcessor/nsmOemResetStatistics.hpp"
 #include "nsmWriteProtectedJumper.hpp"
 
-namespace nsm
-{
-requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath);
-}; // namespace nsm
-
 using namespace nsm;
+using namespace std::string_literals;
 
 struct NsmChassisTest :
     public Test,
@@ -52,13 +49,11 @@ struct NsmChassisTest :
 {
     eid_t eid = 0;
     uint8_t instanceId = 0;
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_Chassis";
     const std::string name = "HGX_GPU_SXM_1";
-    const std::string objPath = chassisInventoryBasePath / name;
 
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
     const uuid_t gpuDeviceUuid = "000b3ec1-0068-0045-0086-000009062aa8";
+    const uuid_t gpuMctpUuid = "00000000-0000-0000-0000-0000000000a4";
     const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
@@ -85,293 +80,315 @@ struct NsmChassisTest :
         fpga.reset();
     }
 
-    dbus::PropertyMap error = {
-        {"Type", "NSM_GPU_cassis"},
-    };
-    dbus::PropertyMap basic = {
-        {"Name", name},
-        {"Type", "NSM_Chassis"},
-        {"UUID", gpuUuid},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
-        {"DEVICE_UUID", gpuDeviceUuid},
-    };
-    dbus::PropertyMap fpgaProperties = {
-        {"Name", name},
-        {"Type", "NSM_Chassis"},
-        {"UUID", fpgaUuid},
-        {"DeviceType", uint64_t(NSM_DEV_ID_BASEBOARD)},
-        {"DEVICE_UUID", fpgaUuid},
-        {"INSTANCE_NUMBER", uint64_t(0)},
-    };
-    dbus::PropertyMap fpgaAsset = {
-        {"Type", "NSM_FPGA_Attributes"},
-    };
-    dbus::PropertyMap asset = {
-        {"Type", "NSM_Chassis_Attributes"},
+    /** @brief Chassis ChassisAttributes params of a GPU device list */
+    const dbus::PropertyMap asset = {
         {"AssetInformationAvailable", true},
-        {"WriteProtectSupported", true},
         {"ChassisType",
-         "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"},
-        {"DimensionSupported", true},
-        {"PowerLimitSupported", true},
+         "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"s},
         {"LocationType",
-         "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"},
-        {"LocationCode", "SXM2"},
+         "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"s},
+        {"LocationCode", "SXM2"s},
     };
-    dbus::PropertyMap powerState = {
-        {"Type", "NSM_PowerState"},
-        {"InstanceNumber", uint64_t(2)},
-        {"InventoryObjPaths",
-         std::vector<std::string>{
-             objPath,
-             objPath + "/PCIeDevices/Device1",
-         }},
-    };
-    dbus::PropertyMap association = {
-        {"Forward", "pciedevice"},
-        {"Backward", "chassis"},
-        {"AbsolutePath",
-         "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_1/PCIeDevices/GPU_SXM_1"},
-    };
-    const MapperServiceMap gpuServiceMap = {
+
+    /** @brief Run a chassis creator for `device` as its device list would;
+     *  the params get the chassis Name unless they set one
+     */
+    requester::Coroutine run(nsm::features::CreatorFn create,
+                             const std::shared_ptr<MockNsmDevice>& device,
+                             dbus::PropertyMap params,
+                             std::optional<uint8_t> deviceType = std::nullopt)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = name;
+        dev.kind = "chassis";
+        dev.platformPrefix = "HGX_";
+        dev.device = device;
+        if (device)
         {
+            dev.deviceType = device->getDeviceType();
+            dev.deviceRole = device->getDeviceRole();
+        }
+        if (deviceType)
+        {
+            dev.deviceType = *deviceType;
+        }
+        params.try_emplace("Name", name);
+        return create(mockManager, dev, params);
+    }
+
+    requester::Coroutine
+        createChassis(const std::shared_ptr<MockNsmDevice>& device,
+                      dbus::PropertyMap params = {})
+    {
+        return run(nsm::features::createChassisFeature, device,
+                   std::move(params));
+    }
+
+    requester::Coroutine
+        createAttributes(const std::shared_ptr<MockNsmDevice>& device,
+                         dbus::PropertyMap params,
+                         std::optional<uint8_t> deviceType = std::nullopt)
+    {
+        return run(nsm::features::createChassisAttributesFeature, device,
+                   std::move(params), deviceType);
+    }
+
+    requester::Coroutine
+        createAssociations(const std::shared_ptr<MockNsmDevice>& device,
+                           dbus::PropertyMap params)
+    {
+        return run(nsm::features::createChassisAssociationsFeature, device,
+                   std::move(params));
+    }
+
+    /** @brief Sensors of type T among `sensors` */
+    template <typename T, typename Sensors>
+    static std::vector<std::shared_ptr<T>> find(const Sensors& sensors)
+    {
+        std::vector<std::shared_ptr<T>> found;
+        for (const auto& sensor : sensors)
+        {
+            if (auto typed = std::dynamic_pointer_cast<T>(sensor))
             {
-                "xyz.openbmc_project.NSM",
-                {
-                    "xyz.openbmc_project.Configuration.NSM_Chassis.Associations0",
-                },
-            },
-        },
-    };
-    const MapperServiceMap fpgaServiceMap;
+                found.push_back(typed);
+            }
+        }
+        return found;
+    }
 };
 
-TEST_F(NsmChassisTest, badTestCreateDeviceSensors)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
+// ============================================================================
+// createChassisFeature / createChassisAssociationsFeature /
+// createChassisAttributesFeature: chassis sensors from the feature params
+// ============================================================================
 
-    // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["Name"] = basic["Name"];
-    propertyMap["UUID"] = basic["UUID"];
-
-    // Set up interface-specific properties with invalid type
-    propertyMap["Type"] = error["Type"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(1, devices.back()->deviceSensors.size());
-}
 TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
 {
-    utils::MockDbusAsync::serviceMap() = gpuServiceMap;
+    gpu->deviceUuid = gpuDeviceUuid;
+    gpu->uuid = gpuMctpUuid;
+    const size_t before = gpu->deviceSensors.size();
+    const size_t staticBefore = gpu->staticSensors.size();
+    const size_t roundRobinBefore = gpu->roundRobinSensors.size();
 
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
+    auto rc = createChassis(gpu);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    rc = createAssociations(
+        gpu, {{"ParentChassisAssociationPaths",
+               std::vector<std::string>{"chassis/HGX_Baseboard_0"}}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    rc = createAttributes(gpu, asset);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
 
-    // Set up base properties that coGetCachedBaseProperties needs
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
+    // UUID, MCTP UUID, associations; asset part number, serial number, model,
+    // SKU, location, location code, chassis type, health
+    EXPECT_EQ(staticBefore + 11, gpu->staticSensors.size());
+    EXPECT_EQ(roundRobinBefore, gpu->roundRobinSensors.size());
+    EXPECT_EQ(before + 11, gpu->deviceSensors.size());
 
-    // First call: NSM_Chassis
-    auto& propertyMap =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMap["Type"] = basic["Type"];
-    propertyMap["DeviceType"] = basic["DeviceType"];
-    propertyMap["DEVICE_UUID"] = basic["DEVICE_UUID"];
+    auto sensors = before;
+    auto chassisUuid = dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
+        gpu->deviceSensors[sensors++]);
+    ASSERT_NE(nullptr, chassisUuid);
+    EXPECT_EQ(gpuDeviceUuid, chassisUuid->invoke(pdiMethod(uuid)));
 
-    auto& propertyMapAssociation0 = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".Associations0");
-    propertyMapAssociation0 = association;
+    auto mctpUuid = dynamic_pointer_cast<NsmInterfaceProvider<MctpUuidIntf>>(
+        gpu->deviceSensors[sensors++]);
+    ASSERT_NE(nullptr, mctpUuid);
+    EXPECT_EQ(gpuMctpUuid, mctpUuid->invoke(pdiMethod(uuid)));
 
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-
-    // Second call: NSM_Chassis_Attributes
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = asset["Type"];
-    propertyMapAttributes["AssetInformationAvailable"] =
-        asset["AssetInformationAvailable"];
-    propertyMapAttributes["ChassisType"] = asset["ChassisType"];
-    propertyMapAttributes["LocationType"] = asset["LocationType"];
-    propertyMapAttributes["LocationCode"] = asset["LocationCode"];
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-    EXPECT_EQ(11, gpu->staticSensors.size());
-    EXPECT_EQ(1, gpu->roundRobinSensors.size());
-    EXPECT_EQ(12, gpu->deviceSensors.size());
-
-    auto sensors = 1; // Skip the first sensor (new sensor added)
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                           gpu->deviceSensors[sensors]));
-    EXPECT_EQ(gpuDeviceUuid,
-              dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                  gpu->deviceSensors[sensors++])
-                  ->invoke(pdiMethod(uuid)));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<MctpUuidIntf>>(
-                           gpu->deviceSensors[sensors++]));
-    EXPECT_NE(
-        nullptr,
+    auto associations =
         dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
-            gpu->deviceSensors[sensors++]));
-    // Skip asset inventory property sensors (partNumber, serialNumber, model)
-    // and SKU
-    sensors += 4;
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
-                           gpu->deviceSensors[sensors++]));
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
-                  gpu->deviceSensors[sensors++]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
-                           gpu->deviceSensors[sensors++]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                           gpu->deviceSensors[sensors++]));
+            gpu->deviceSensors[sensors++]);
+    ASSERT_NE(nullptr, associations);
+    EXPECT_EQ(1, associations->invoke(pdiMethod(associations)).size());
 
-    sensors = 1; // Skip the first sensor (new sensor added)
-    EXPECT_EQ(gpuDeviceUuid,
-              dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                  gpu->deviceSensors[sensors++])
-                  ->invoke(pdiMethod(uuid)));
-    EXPECT_EQ(gpuUuid, dynamic_pointer_cast<NsmInterfaceProvider<MctpUuidIntf>>(
-                           gpu->deviceSensors[sensors++])
-                           ->invoke(pdiMethod(uuid)));
-    EXPECT_EQ(
-        1,
-        dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
-            gpu->deviceSensors[sensors++])
-            ->invoke(pdiMethod(associations))
-            .size());
+    // Asset inventory property sensors (part number, serial number, model)
+    for (auto property : {FRU_PART_NUMBER, SERIAL_NUMBER, MARKETING_NAME})
+    {
+        auto assetProperty =
+            dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
+                gpu->deviceSensors[sensors++]);
+        ASSERT_NE(nullptr, assetProperty);
+        EXPECT_EQ(property, assetProperty->property);
+        EXPECT_EQ(MANUFACTURER_NVIDIA,
+                  assetProperty->invoke(pdiMethod(manufacturer)));
+    }
 
-    // Skip asset inventory property sensors (partNumber, serialNumber, model)
-    // and SKU
-    sensors += 4;
+    auto sku = dynamic_pointer_cast<NsmInterfaceProvider<NsmApSkuIdIntf>>(
+        gpu->deviceSensors[sensors++]);
+    ASSERT_NE(nullptr, sku);
+    // A GPU has a SKU of its own: not tombstoned
+    EXPECT_NE(std::string(propertyNotSupported), sku->invoke(pdiMethod(sku)));
 
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
-                           gpu->deviceSensors[sensors]));
+    auto location = dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
+        gpu->deviceSensors[sensors++]);
+    ASSERT_NE(nullptr, location);
     EXPECT_EQ(LocationIntf::LocationTypes::Embedded,
-              dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
-                  gpu->deviceSensors[sensors++])
-                  ->invoke(pdiMethod(locationType)));
+              location->invoke(pdiMethod(locationType)));
 
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
-                  gpu->deviceSensors[sensors]));
-    EXPECT_EQ(std::get<std::string>(asset["LocationCode"]),
-              dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
-                  gpu->deviceSensors[sensors++])
-                  ->invoke(pdiMethod(locationCode)));
+    auto locationCode =
+        dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
+            gpu->deviceSensors[sensors++]);
+    ASSERT_NE(nullptr, locationCode);
+    EXPECT_EQ("SXM2", locationCode->invoke(pdiMethod(locationCode)));
 
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
-                           gpu->deviceSensors[sensors]));
+    auto chassis = dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
+        gpu->deviceSensors[sensors++]);
+    ASSERT_NE(nullptr, chassis);
     EXPECT_EQ(ChassisIntf::ChassisType::Module,
-              dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
-                  gpu->deviceSensors[sensors++])
-                  ->invoke(pdiMethod(type)));
+              chassis->invoke(pdiMethod(type)));
 
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                           gpu->deviceSensors[sensors]));
-    EXPECT_EQ(HealthIntf::HealthType::OK,
-              dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                  gpu->deviceSensors[sensors++])
-                  ->invoke(pdiMethod(health)));
-
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
+    auto health = dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
+        gpu->deviceSensors[sensors++]);
+    ASSERT_NE(nullptr, health);
+    EXPECT_EQ(HealthIntf::HealthType::OK, health->invoke(pdiMethod(health)));
 }
 
 TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
 {
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
+    fpga->deviceUuid = "fpga-device-uuid";
+    const size_t staticBefore = fpga->staticSensors.size();
 
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
+    auto rc = createChassis(fpga, {{"PCIeRefClockEnabled", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
 
-    // Set up base properties that coGetCachedBaseProperties needs
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
+    auto chassisUuid =
+        find<NsmInterfaceProvider<UuidIntf>>(fpga->staticSensors);
+    ASSERT_EQ(1, chassisUuid.size());
+    EXPECT_EQ("fpga-device-uuid", chassisUuid[0]->invoke(pdiMethod(uuid)));
+    EXPECT_EQ(
+        1,
+        find<NsmInterfaceProvider<MctpUuidIntf>>(fpga->staticSensors).size());
+#ifdef NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT
+    EXPECT_EQ(staticBefore + 3, fpga->staticSensors.size());
+    EXPECT_EQ(1,
+              find<NsmInterfaceProvider<PCIeRefClockIntf>>(fpga->staticSensors)
+                  .size());
+#else
+    EXPECT_EQ(staticBefore + 2, fpga->staticSensors.size());
+#endif
+}
 
-    // First call: NSM_Chassis
-    auto& propertyMap =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMap["Type"] = fpgaProperties["Type"];
-    propertyMap["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(3, fpga->staticSensors.size());
-    EXPECT_EQ(1, fpga->roundRobinSensors.size());
-    EXPECT_EQ(4, fpga->deviceSensors.size());
-    // Second call: NSM_Chassis_Attributes
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = fpgaAsset["Type"];
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-    EXPECT_EQ(5, fpga->staticSensors.size());
-    EXPECT_EQ(1, fpga->roundRobinSensors.size());
-    EXPECT_EQ(7, fpga->deviceSensors.size());
+TEST_F(NsmChassisTest, goodTestCreateChassisWithoutPCIeRefClock)
+{
+    const size_t staticBefore = fpga->staticSensors.size();
 
-    auto sensors = 1; // Skip msgTypes sensor added by initMsgTypesSensor()
+    auto rc = createChassis(fpga);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    auto chassisUuid = dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-        fpga->deviceSensors[sensors++]);
-    auto mctpUuid = dynamic_pointer_cast<NsmInterfaceProvider<MctpUuidIntf>>(
-        fpga->deviceSensors[sensors++]);
-    auto pcieRefClock =
-        dynamic_pointer_cast<NsmInterfaceProvider<PCIeRefClockIntf>>(
-            fpga->deviceSensors[sensors++]);
-    auto chassisAsset = dynamic_pointer_cast<NsmChassis<NsmAssetIntf>>(
-        fpga->deviceSensors[sensors++]);
-    auto chassisSKU = dynamic_pointer_cast<NsmChassis<NsmApSkuIdIntf>>(
-        fpga->deviceSensors[sensors++]);
-    EXPECT_NE(nullptr, chassisUuid);
-    EXPECT_NE(nullptr, mctpUuid);
-    EXPECT_NE(nullptr, pcieRefClock);
-    EXPECT_NE(nullptr, chassisAsset);
-    EXPECT_NE(nullptr, chassisSKU);
-    EXPECT_EQ(MANUFACTURER_NVIDIA,
-              chassisAsset->invoke(pdiMethod(manufacturer)));
+    // Only the UUID and MCTP UUID: the list does not enable PCIeRefClock
+    EXPECT_EQ(staticBefore + 2, fpga->staticSensors.size());
+    EXPECT_TRUE(
+        find<NsmInterfaceProvider<PCIeRefClockIntf>>(fpga->staticSensors)
+            .empty());
+}
 
-    EXPECT_EQ(fpgaUuid, chassisUuid->invoke(pdiMethod(uuid)));
+TEST_F(NsmChassisTest, goodTestCreateChassisEmptyDeviceUuid)
+{
+    // The device UUID is read over NSM later; before that it is empty
+    auto rc = createChassis(gpu);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    auto chassisUuid = find<NsmInterfaceProvider<UuidIntf>>(gpu->staticSensors);
+    ASSERT_EQ(1, chassisUuid.size());
+    EXPECT_EQ("", chassisUuid[0]->invoke(pdiMethod(uuid)));
+}
+
+TEST_F(NsmChassisTest, badTestCreateChassisNoNsmDevice)
+{
+    auto rc = createChassis(nullptr);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_FALSE(rc.exception());
+}
+
+TEST_F(NsmChassisTest, badTestCreateChassisNoName)
+{
+    nsm::features::DeviceContext dev;
+    dev.name = name;
+    dev.device = gpu;
+    EXPECT_THROW_COROUTINE(
+        nsm::features::createChassisFeature(mockManager, dev, {}),
+        std::out_of_range);
+}
+
+TEST_F(NsmChassisTest, goodTestChassisParentAndBridgingAssociations)
+{
+    const size_t before = gpu->staticSensors.size();
+
+    auto rc = createAssociations(
+        gpu, {{"ParentChassisAssociationPaths",
+               std::vector<std::string>{"board/HGX_ProcessorModule_0", "",
+                                        "chassis/HGX_Baseboard_0"}},
+              {"BridgingChassisAssociationPath", "chassis/HGX_Bridge_0"s}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(before + 1, gpu->staticSensors.size());
+
+    auto associations = find<NsmInterfaceProvider<AssociationDefinitionsInft>>(
+        gpu->staticSensors);
+    ASSERT_EQ(1, associations.size());
+    const auto links = associations[0]->invoke(pdiMethod(associations));
+    // The empty parent entry gives no link
+    ASSERT_EQ(3, links.size());
+    const std::string system = inventorySystemBasePath.string();
+    EXPECT_EQ(std::make_tuple("parent_chassis"s, "all_chassis"s,
+                              system + "/board/HGX_ProcessorModule_0"),
+              links[0]);
+    EXPECT_EQ(std::make_tuple("parent_chassis"s, "all_chassis"s,
+                              system + "/chassis/HGX_Baseboard_0"),
+              links[1]);
+    EXPECT_EQ(std::make_tuple("bridged_chassis"s, "bridging_chassis"s,
+                              system + "/chassis/HGX_Bridge_0"),
+              links[2]);
+}
+
+TEST_F(NsmChassisTest, goodTestChassisAssociationsNoTargets)
+{
+    const size_t before = gpu->staticSensors.size();
+
+    auto rc = createAssociations(
+        gpu, {{"ParentChassisAssociationPaths", std::vector<std::string>{""}},
+              {"BridgingChassisAssociationPath", ""s}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // No link: no association sensor
+    EXPECT_EQ(before, gpu->staticSensors.size());
+
+    rc = createAssociations(gpu, {});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(before, gpu->staticSensors.size());
+}
+
+TEST_F(NsmChassisTest, badTestChassisAssociationsNoNsmDevice)
+{
+    auto rc = createAssociations(
+        nullptr, {{"ParentChassisAssociationPaths",
+                   std::vector<std::string>{"chassis/HGX_Baseboard_0"}}});
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_FALSE(rc.exception());
 }
 
 TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
 {
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
+    const size_t before = fpga->deviceSensors.size();
+    const size_t staticBefore = fpga->staticSensors.size();
+    const size_t roundRobinBefore = fpga->roundRobinSensors.size();
 
-    // Set up base properties that coGetCachedBaseProperties needs
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
+    auto rc = createAttributes(fpga, {{"AssetInformationAvailable", true},
+                                      {"DimensionSupported", true},
+                                      {"WriteProtectSupported", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
 
-    // First call: NSM_Chassis (create FPGA device)
-    auto& propertyMap =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMap["Type"] = fpgaProperties["Type"];
-    propertyMap["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-    propertyMap["INSTANCE_NUMBER"] = fpgaProperties["INSTANCE_NUMBER"];
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
+    // part number, serial number, model, SKU, health, depth, width, height
+    EXPECT_EQ(staticBefore + 8, fpga->staticSensors.size());
+    // write protect jumper
+    EXPECT_EQ(roundRobinBefore + 1, fpga->roundRobinSensors.size());
+    EXPECT_EQ(before + 9, fpga->deviceSensors.size());
 
-    // Second call: NSM_Chassis_Attributes (for FPGA)
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = asset["Type"];
-    propertyMapAttributes["AssetInformationAvailable"] =
-        asset["AssetInformationAvailable"];
-    propertyMapAttributes["DimensionSupported"] = asset["DimensionSupported"];
-    propertyMapAttributes["WriteProtectSupported"] =
-        asset["WriteProtectSupported"];
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_EQ(11, fpga->staticSensors.size());
-    EXPECT_EQ(2, fpga->roundRobinSensors.size()); // +1 for msgTypes sensor
-    EXPECT_EQ(13, fpga->deviceSensors.size());    // +1 for msgTypes sensor
-
-    auto sensors = 0;
-    sensors += 4; // Skip msgTypes sensor at index 0 + 3 more
+    auto sensors = before;
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         fpga->deviceSensors[sensors++]);
     auto serialNumber =
@@ -379,19 +396,22 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
             fpga->deviceSensors[sensors++]);
     auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         fpga->deviceSensors[sensors++]);
-    sensors += 2; // Skip SKU sensor and one more
+    auto sku = dynamic_pointer_cast<NsmInterfaceProvider<NsmApSkuIdIntf>>(
+        fpga->deviceSensors[sensors++]);
+    sensors++; // health
     auto depth = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
         fpga->deviceSensors[sensors++]);
     auto width = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
         fpga->deviceSensors[sensors++]);
     auto height = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
         fpga->deviceSensors[sensors++]);
-    EXPECT_NE(nullptr, partNumber);
-    EXPECT_NE(nullptr, serialNumber);
-    EXPECT_NE(nullptr, model);
-    EXPECT_NE(nullptr, depth);
-    EXPECT_NE(nullptr, width);
-    EXPECT_NE(nullptr, height);
+    ASSERT_NE(nullptr, partNumber);
+    ASSERT_NE(nullptr, serialNumber);
+    ASSERT_NE(nullptr, model);
+    ASSERT_NE(nullptr, sku);
+    ASSERT_NE(nullptr, depth);
+    ASSERT_NE(nullptr, width);
+    ASSERT_NE(nullptr, height);
 
     EXPECT_EQ(FRU_PART_NUMBER, partNumber->property);
     EXPECT_EQ(SERIAL_NUMBER, serialNumber->property);
@@ -400,93 +420,299 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
     EXPECT_EQ(PRODUCT_WIDTH, width->property);
     EXPECT_EQ(PRODUCT_HEIGHT, height->property);
     EXPECT_EQ(MANUFACTURER_NVIDIA, model->invoke(pdiMethod(manufacturer)));
+    // A baseboard-class chassis has no SKU of its own
+    EXPECT_EQ(std::string(propertyNotSupported), sku->invoke(pdiMethod(sku)));
 
     EXPECT_EQ(0, fpga->prioritySensors.size());
-    auto writeProtectedJumper = dynamic_pointer_cast<NsmWriteProtectedJumper>(
-        fpga->deviceSensors.back());
-    EXPECT_NE(nullptr, writeProtectedJumper);
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmWriteProtectedJumper>(
+                           fpga->deviceSensors.back()));
 }
 
 TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
 {
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
+    const size_t before = gpu->deviceSensors.size();
+    const size_t staticBefore = gpu->staticSensors.size();
+    const size_t roundRobinBefore = gpu->roundRobinSensors.size();
 
-    // Set up base properties that coGetCachedBaseProperties needs
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
+    auto rc = createAttributes(gpu, {{"PowerLimitSupported", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    // First call: NSM_Chassis_Attributes
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMap["Type"] = asset["Type"];
-    propertyMap["PowerLimitSupported"] = asset["PowerLimitSupported"];
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Second call: NSM_PowerState (for FPGA)
-    // Update base properties to FPGA for the PowerState call
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-    basePropertyMap["InstanceNumber"] = powerState["InstanceNumber"];
-
-    auto& propertyMapPowerState = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".PowerState");
-    propertyMapPowerState["Type"] = powerState["Type"];
-    propertyMapPowerState["InventoryObjPaths"] =
-        powerState["InventoryObjPaths"];
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                            objPath);
-
-    EXPECT_EQ(2, fpga->roundRobinSensors.size());
-    EXPECT_EQ(2, fpga->deviceSensors.size());
-    EXPECT_EQ(3, gpu->roundRobinSensors.size());
-    EXPECT_EQ(5, gpu->deviceSensors.size()); // +1 for msgTypes sensor
+    // SKU and health are static, min and max power limit are polled
+    EXPECT_EQ(staticBefore + 2, gpu->staticSensors.size());
+    EXPECT_EQ(roundRobinBefore + 2, gpu->roundRobinSensors.size());
+    EXPECT_EQ(before + 4, gpu->deviceSensors.size());
+    auto powerLimits =
+        find<NsmInventoryProperty<PowerLimitIntf>>(gpu->deviceSensors);
+    ASSERT_EQ(2, powerLimits.size());
+    EXPECT_EQ(MINIMUM_DEVICE_POWER_LIMIT, powerLimits[0]->property);
+    EXPECT_EQ(MAXIMUM_DEVICE_POWER_LIMIT, powerLimits[1]->property);
 }
 
-TEST_F(NsmChassisTest, badTestCreateStaticSensors)
+TEST_F(NsmChassisTest, goodTestPowerLimitWithPriority)
 {
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
+    const size_t priorityBefore = gpu->prioritySensors.size();
 
-    // Set up base properties that coGetCachedBaseProperties needs
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    // Use GPU device type (NSM_DEV_ID_GPU) instead of BASEBOARD to trigger
-    // error
-    basePropertyMap["DeviceType"] = basic["DeviceType"];
+    auto rc = createAttributes(
+        gpu, {{"PowerLimitSupported", true}, {"Priority", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    // Set up interface-specific properties with WriteProtectSupported
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMap["Type"] = asset["Type"];
-    propertyMap["WriteProtectSupported"] = asset["WriteProtectSupported"];
+    EXPECT_EQ(priorityBefore + 2, gpu->prioritySensors.size());
+}
 
+TEST_F(NsmChassisTest, goodTestChassisAttributesWithoutOptionalFlags)
+{
+    const size_t before = gpu->deviceSensors.size();
+    const size_t staticBefore = gpu->staticSensors.size();
+
+    auto rc = createAttributes(gpu, {{"AssetInformationAvailable", false},
+                                     {"DimensionSupported", false},
+                                     {"PowerLimitSupported", false},
+                                     {"WriteProtectSupported", false},
+                                     {"ResetMetricsSupported", false},
+                                     {"GPIOStateSupported", false},
+                                     {"ErrorInjectionSupported", false},
+                                     {"DeviceDiagnosticsSupported", false},
+                                     {"SoCPowerSmoothingSupported", false}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+
+    // Only the SKU and health that are always created
+    EXPECT_EQ(staticBefore + 2, gpu->staticSensors.size());
+    EXPECT_EQ(before + 2, gpu->deviceSensors.size());
+    EXPECT_EQ(
+        1,
+        find<NsmInterfaceProvider<NsmApSkuIdIntf>>(gpu->staticSensors).size());
+    EXPECT_EQ(
+        1, find<NsmInterfaceProvider<HealthIntf>>(gpu->staticSensors).size());
+}
+
+TEST_F(NsmChassisTest, badTestWriteProtectOnNonBaseboard)
+{
     EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(mockManager,
-                                basicIntfName + ".ChassisAttributes", objPath),
+        createAttributes(gpu, {{"WriteProtectSupported", true}}),
         std::runtime_error);
 }
 
-TEST_F(NsmChassisTest, badTestCreateDynamicSensors)
+TEST_F(NsmChassisTest, badTestWriteProtectDeviceTypeFromDeviceList)
 {
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
+    // The write protect check uses the device list's device type, not the
+    // NsmDevice's
+    EXPECT_THROW_COROUTINE(createAttributes(fpga,
+                                            {{"WriteProtectSupported", true}},
+                                            NSM_DEV_ID_GPU),
+                           std::runtime_error);
+}
 
-    // Set up base properties that coGetCachedBaseProperties needs
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-
-    // Set up interface-specific properties with mismatched device type
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".PowerState");
-    propertyMap["Type"] = powerState["Type"];
-    propertyMap["DeviceType"] = basic["DeviceType"];
+TEST_F(NsmChassisTest, badTestCreateAttributesNoName)
+{
+    nsm::features::DeviceContext dev;
+    dev.name = name;
+    dev.device = gpu;
     EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                                objPath),
-        std::runtime_error);
+        nsm::features::createChassisAttributesFeature(mockManager, dev, {}),
+        std::out_of_range);
+}
+
+TEST_F(NsmChassisTest, goodTestCreatePrettyNameWithValue)
+{
+    auto rc = createAttributes(gpu,
+                               {{"PrettyNameForChassis", "GPU Module 1"s}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    auto items = find<NsmInterfaceProvider<ItemIntf>>(gpu->staticSensors);
+    ASSERT_EQ(1, items.size());
+    EXPECT_EQ("GPU Module 1", items[0]->invoke(pdiMethod(prettyName)));
+}
+
+TEST_F(NsmChassisTest, goodTestCreatePrettyNameEmpty)
+{
+    auto rc = createAttributes(gpu, {{"PrettyNameForChassis", ""s}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    auto items = find<NsmInterfaceProvider<ItemIntf>>(gpu->staticSensors);
+    ASSERT_EQ(1, items.size());
+    EXPECT_EQ("", items[0]->invoke(pdiMethod(prettyName)));
+}
+
+TEST_F(NsmChassisTest, goodTestCreateLocationContextWithValue)
+{
+    auto rc = createAttributes(gpu,
+                               {{"LocationContext", "Rear Panel Slot 3"s}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    auto contexts =
+        find<NsmInterfaceProvider<LocationContextIntf>>(gpu->staticSensors);
+    ASSERT_EQ(1, contexts.size());
+    EXPECT_EQ("Rear Panel Slot 3",
+              contexts[0]->invoke(pdiMethod(locationContext)));
+}
+
+TEST_F(NsmChassisTest, goodTestCreateFieldReplaceableTrue)
+{
+    auto rc = createAttributes(gpu, {{"FieldReplaceable", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    auto replaceable =
+        find<NsmInterfaceProvider<ReplaceableIntf>>(gpu->staticSensors);
+    ASSERT_EQ(1, replaceable.size());
+    EXPECT_TRUE(replaceable[0]->invoke(pdiMethod(fieldReplaceable)));
+}
+
+TEST_F(NsmChassisTest, goodTestCreateFieldReplaceableFalse)
+{
+    auto rc = createAttributes(gpu, {{"FieldReplaceable", false}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    auto replaceable =
+        find<NsmInterfaceProvider<ReplaceableIntf>>(gpu->staticSensors);
+    ASSERT_EQ(1, replaceable.size());
+    EXPECT_FALSE(replaceable[0]->invoke(pdiMethod(fieldReplaceable)));
+}
+
+TEST_F(NsmChassisTest, goodTestEmptyLocationCodeLeftOut)
+{
+    // EM publishes "" for a LocationCode variable the topology does not set
+    auto rc = createAttributes(gpu, {{"LocationCode", ""s}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+
+    EXPECT_TRUE(find<NsmInterfaceProvider<LocationCodeIntf>>(gpu->staticSensors)
+                    .empty());
+}
+
+TEST_F(NsmChassisTest, badTestChassisTypeWithEmptyString)
+{
+    EXPECT_THROW_COROUTINE(createAttributes(gpu, {{"ChassisType", ""s}}),
+                           sdbusplus::exception::InvalidEnumString);
+}
+
+TEST_F(NsmChassisTest, badTestLocationWithEmptyString)
+{
+    EXPECT_THROW_COROUTINE(createAttributes(gpu, {{"LocationType", ""s}}),
+                           sdbusplus::exception::InvalidEnumString);
+}
+
+TEST_F(NsmChassisTest, goodTestAssetWithCustomManufacturer)
+{
+    auto rc = createAttributes(gpu, {{"AssetInformationAvailable", true},
+                                     {"Manufacturer", "CustomManufacturer"s}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    auto assetProperties =
+        find<NsmInventoryProperty<NsmAssetIntf>>(gpu->staticSensors);
+    ASSERT_EQ(3, assetProperties.size());
+    for (const auto& assetProperty : assetProperties)
+    {
+        EXPECT_EQ("CustomManufacturer",
+                  assetProperty->invoke(pdiMethod(manufacturer)));
+    }
+}
+
+TEST_F(NsmChassisTest, goodTestAssetNotSupportedOnHpmSma)
+{
+    // combined = (NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA=3 << 8) |
+    // NSM_DEV_ID_MCTP_BRIDGE=5 = 773
+    const uuid_t hpmSmaUuid = "STATIC:773:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto hpmSma = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(hpmSmaUuid));
+    ASSERT_NE(nullptr, hpmSma);
+    ASSERT_EQ(NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA, hpmSma->getDeviceRole());
+
+    auto rc = createAttributes(hpmSma, {{"AssetInformationAvailable", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    // No asset property is read over NSM: the asset object itself is added,
+    // with the properties tombstoned
+    EXPECT_TRUE(find<NsmInventoryProperty<NsmAssetIntf>>(hpmSma->staticSensors)
+                    .empty());
+    auto assets = find<NsmChassis<NsmAssetIntf>>(hpmSma->staticSensors);
+    ASSERT_EQ(1, assets.size());
+    EXPECT_EQ(std::string(propertyNotSupported),
+              assets[0]->invoke(pdiMethod(partNumber)));
+    EXPECT_EQ(std::string(propertyNotSupported),
+              assets[0]->invoke(pdiMethod(serialNumber)));
+    EXPECT_EQ(MANUFACTURER_NVIDIA, assets[0]->invoke(pdiMethod(manufacturer)));
+}
+
+TEST_F(NsmChassisTest, goodTestCreateResetMetricsSupported)
+{
+    const size_t before = fpga->deviceSensors.size();
+
+    auto rc = createAttributes(fpga, {{"ResetMetricsSupported", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    EXPECT_GT(fpga->deviceSensors.size(), before);
+    EXPECT_EQ(1, find<ResetStatisticsAggregator>(fpga->deviceSensors).size());
+}
+
+TEST_F(NsmChassisTest, goodTestCreateGPIOStateSupported)
+{
+    const size_t before = fpga->deviceSensors.size();
+
+    auto rc = createAttributes(fpga, {{"GPIOStateSupported", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    EXPECT_GT(fpga->deviceSensors.size(), before);
+    EXPECT_FALSE(find<NsmGPIOState>(fpga->deviceSensors).empty());
+}
+
+#if defined(ENABLE_DEBUG_INFO)
+TEST_F(NsmChassisTest, goodTestCreateDeviceDiagnosticsSupported)
+{
+    auto rc = createAttributes(fpga, {{"DeviceDiagnosticsSupported", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    auto debugInfo = find<NsmDebugInfoObject>(fpga->staticSensors);
+    ASSERT_EQ(1, debugInfo.size());
+    EXPECT_EQ("NSM_DeviceDiagnostics", debugInfo[0]->getType());
+}
+#endif
+
+TEST_F(NsmChassisTest, goodTestCreateMCUErrorInjectionForMctpBridge)
+{
+    const uuid_t mctpBridgeUuid = "STATIC:5:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto mctpBridge = dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(mctpBridgeUuid));
+    ASSERT_NE(nullptr, mctpBridge);
+    mctpBridge->deviceType = NSM_DEV_ID_MCTP_BRIDGE;
+    const size_t before = mctpBridge->deviceSensors.size();
+
+    auto rc = createAttributes(mctpBridge, {{"ErrorInjectionSupported", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    // More than the SKU and health: the MCU error injection sensors
+    EXPECT_GT(mctpBridge->deviceSensors.size(), before + 2);
+}
+
+TEST_F(NsmChassisTest,
+       MCUErrorInjection_HPMSMARole_CoversLeakAndUSBBridgeBranches)
+{
+    const uuid_t hpmSmaUuid = "STATIC:773:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    auto hpmSma = std::dynamic_pointer_cast<MockNsmDevice>(
+        mockManager.getNsmDeviceFromStaticUUID(hpmSmaUuid));
+    ASSERT_NE(nullptr, hpmSma);
+    EXPECT_EQ(NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA, hpmSma->getDeviceRole());
+    const size_t before = hpmSma->deviceSensors.size();
+
+    auto rc = createAttributes(hpmSma, {{"ErrorInjectionSupported", true}},
+                               NSM_DEV_ID_MCTP_BRIDGE);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    // Sensors for LeakDetectionErrors + USBBridgeEmulationErrors are added
+    EXPECT_GT(hpmSma->deviceSensors.size(), before + 2);
+}
+
+TEST_F(NsmChassisTest, badTestErrorInjectionNotCreatedForGpuDevice)
+{
+    const size_t staticBefore = gpu->staticSensors.size();
+    const size_t before = gpu->deviceSensors.size();
+
+    auto rc = createAttributes(gpu, {{"ErrorInjectionSupported", true}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    // Only the SKU and health: a GPU has no MCU error injection
+    EXPECT_EQ(staticBefore + 2, gpu->staticSensors.size());
+    EXPECT_EQ(before + 2, gpu->deviceSensors.size());
 }
 
 struct NsmInventoryPropertyTest : public NsmChassisTest
@@ -814,78 +1040,43 @@ TEST_F(NsmPowerSupplyStatusTest, badTestCompletionErrorResponse)
 
 struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
 {
-    dbus::PropertyMap operationalStatus = {
-        {"Name", "HGX_GPU_SXM_1"},
-        {"Type", "NSM_OperationalStatus"},
-        {"UUID", fpgaUuid},
-        {"DeviceType", uint64_t(NSM_DEV_ID_BASEBOARD)},
-        {"InstanceNumber", uint64_t(0)},
-        {"InventoryObjPaths",
-         std::vector<std::string>{objPath,
-                                  processorsInventoryBasePath / "GPU_SXM_1"}},
-    };
     std::shared_ptr<NsmGpuPresenceAndPowerStatus> sensor,
         chassisOperationalStatus;
+
+    /** @brief Add the operational status sensor of GPU `gpuInstance` to the
+     *  baseboard as the chassis code does: one priority sensor per name and
+     *  type, the other GPUs merged into it as sub sensors
+     */
+    void addOperationalStatus(uint8_t gpuInstance)
+    {
+        const std::string gpuName = "HGX_GPU_SXM_" +
+                                    std::to_string(gpuInstance + 1);
+        dbus::Interfaces inventoryObjPaths{
+            chassisInventoryBasePath / gpuName,
+            processorsInventoryBasePath /
+                ("GPU_SXM_" + std::to_string(gpuInstance + 1))};
+        auto operationalStatus = NsmInterfaceProvider<OperationalStatusIntf>(
+            gpuName, "NSM_OperationalStatus", inventoryObjPaths);
+        fpga->addSensor(std::make_shared<NsmGpuPresenceAndPowerStatus>(
+                            operationalStatus, gpuInstance),
+                        true);
+    }
+
     void SetUp() override
     {
-        auto& basePropertyMap =
-            utils::MockDbusAsync::propertyMap(objPath, basicIntfName);
-
-        // Set up base properties that coGetCachedBaseProperties needs
-        basePropertyMap["Name"] = operationalStatus["Name"];
-        basePropertyMap["UUID"] = operationalStatus["UUID"];
-        basePropertyMap["DeviceType"] = operationalStatus["DeviceType"];
-        basePropertyMap["InstanceNumber"] = operationalStatus["InstanceNumber"];
-
-        // Set up interface-specific properties for OperationalStatus
-        auto& propertyMap = utils::MockDbusAsync::propertyMap(
-            objPath, basicIntfName + ".OperationalStatus");
-        propertyMap["Type"] = operationalStatus["Type"];
-        propertyMap["InventoryObjPaths"] =
-            operationalStatus["InventoryObjPaths"];
-        propertyMap["Priority"] = true;
-        nsmChassisCreateSensors(mockManager,
-                                basicIntfName + ".OperationalStatus", objPath);
+        addOperationalStatus(0);
 
         EXPECT_EQ(2, fpga->deviceSensors.size()); // +1 for msgTypes sensor
         EXPECT_EQ(1, fpga->prioritySensors.size());
         chassisOperationalStatus =
             std::dynamic_pointer_cast<NsmGpuPresenceAndPowerStatus>(
                 fpga->deviceSensors[1]); // Skip msgTypes sensor at index 0
-        EXPECT_NE(chassisOperationalStatus, nullptr);
+        ASSERT_NE(chassisOperationalStatus, nullptr);
         EXPECT_EQ(0, chassisOperationalStatus->sensors.size());
 
-        for (size_t i = 1; i < 8; i++)
+        for (uint8_t i = 1; i < 8; i++)
         {
-            auto gpuName = ("HGX_GPU_SXM_" + std::to_string(i + 1));
-            auto gpuPath = chassisInventoryBasePath / gpuName;
-            auto gpuOperationalStatus = operationalStatus;
-            gpuOperationalStatus["Name"] = gpuName;
-            gpuOperationalStatus["InstanceNumber"] = uint64_t(i);
-            gpuOperationalStatus["InventoryObjPaths"] =
-                std::vector<std::string>{
-                    gpuPath, processorsInventoryBasePath /
-                                 ("GPU_SXM_" + std::to_string(i + 1))};
-
-            // Update base propertyMap for each GPU sensor
-            auto& gpuBasePropertyMap =
-                utils::MockDbusAsync::propertyMap(gpuPath, basicIntfName);
-            gpuBasePropertyMap["Name"] = gpuOperationalStatus["Name"];
-            gpuBasePropertyMap["UUID"] = gpuOperationalStatus["UUID"];
-            gpuBasePropertyMap["DeviceType"] =
-                gpuOperationalStatus["DeviceType"];
-            gpuBasePropertyMap["InstanceNumber"] =
-                gpuOperationalStatus["InstanceNumber"];
-
-            // Update interface-specific propertyMap for each GPU sensor
-            auto& gpuPropertyMap = utils::MockDbusAsync::propertyMap(
-                gpuPath, basicIntfName + ".OperationalStatus");
-            gpuPropertyMap["Type"] = gpuOperationalStatus["Type"];
-            gpuPropertyMap["InventoryObjPaths"] =
-                gpuOperationalStatus["InventoryObjPaths"];
-            gpuPropertyMap["Priority"] = true;
-            nsmChassisCreateSensors(
-                mockManager, basicIntfName + ".OperationalStatus", gpuPath);
+            addOperationalStatus(i);
         }
         // Sensors shall be added as sub sensor
         EXPECT_EQ(2, fpga->deviceSensors.size());
@@ -930,6 +1121,7 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
         sensor->update(fpga);
     }
 };
+
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestRequest)
 {
     init(0);
@@ -1125,534 +1317,14 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest,
     EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Fault);
 }
 
-// ============================================================================
-// Tests for createPrettyName (lines 186-200 in nsmChassis.cpp)
-// ============================================================================
-
-TEST_F(NsmChassisTest, goodTestCreatePrettyNameWithValue)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = gpuServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = basic["Type"];
-    propertyMapChassis["DeviceType"] = basic["DeviceType"];
-    propertyMapChassis["DEVICE_UUID"] = basic["DEVICE_UUID"];
-
-    auto& propertyMapAssociation0 = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".Associations0");
-    propertyMapAssociation0 = association;
-
-    // Create the device first
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    // Get the device by UUID (more reliable than checking devices.size())
-    gpu = dynamic_pointer_cast<MockNsmDevice>(
-        mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
-    ASSERT_NE(nullptr, gpu);
-
-    // Set up NSM_Chassis_Attributes with PrettyNameForChassis
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = asset["Type"];
-    propertyMapAttributes["PrettyNameForChassis"] = std::string("GPU Module 1");
-
-    size_t sensorsBefore = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify a sensor was added to staticSensors
-    EXPECT_GT(gpu->staticSensors.size(), sensorsBefore);
-
-    // Find the ItemIntf sensor (created by createPrettyName) in staticSensors
-    bool foundPrettyName = false;
-    for (const auto& sensor : gpu->staticSensors)
-    {
-        auto prettyNameSensor =
-            dynamic_pointer_cast<NsmInterfaceProvider<ItemIntf>>(sensor);
-        if (prettyNameSensor)
-        {
-            EXPECT_EQ("GPU Module 1",
-                      prettyNameSensor->invoke(pdiMethod(prettyName)));
-            foundPrettyName = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundPrettyName);
-
-    // Cleanup to avoid D-Bus object conflicts with subsequent tests
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-TEST_F(NsmChassisTest, goodTestCreatePrettyNameEmpty)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = gpuServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = basic["Type"];
-    propertyMapChassis["DeviceType"] = basic["DeviceType"];
-    propertyMapChassis["DEVICE_UUID"] = basic["DEVICE_UUID"];
-
-    auto& propertyMapAssociation0 = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".Associations0");
-    propertyMapAssociation0 = association;
-
-    // Create the device first
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    gpu = dynamic_pointer_cast<MockNsmDevice>(
-        mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
-    ASSERT_NE(nullptr, gpu);
-
-    // Set up NSM_Chassis_Attributes with empty PrettyNameForChassis
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = asset["Type"];
-    propertyMapAttributes["PrettyNameForChassis"] = std::string("");
-
-    size_t sensorsBefore = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify a sensor was added to staticSensors (even with empty name)
-    EXPECT_GT(gpu->staticSensors.size(), sensorsBefore);
-
-    // Find the ItemIntf sensor and verify empty pretty name
-    bool foundPrettyName = false;
-    for (const auto& sensor : gpu->staticSensors)
-    {
-        auto prettyNameSensor =
-            dynamic_pointer_cast<NsmInterfaceProvider<ItemIntf>>(sensor);
-        if (prettyNameSensor)
-        {
-            EXPECT_EQ("", prettyNameSensor->invoke(pdiMethod(prettyName)));
-            foundPrettyName = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundPrettyName);
-
-    // Cleanup to avoid D-Bus object conflicts with subsequent tests
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// ============================================================================
-// Tests for createResetMetrics (lines 230-265 in nsmChassis.cpp)
-// ============================================================================
-
-TEST_F(NsmChassisTest, goodTestCreateResetMetricsSupported)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["UUID"];
-
-    // Create the device first
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    ASSERT_GE(devices.size(), 1);
-    fpga = dynamic_pointer_cast<MockNsmDevice>(devices.back());
-    ASSERT_NE(nullptr, fpga);
-    fpga->deviceType = NSM_DEV_ID_BASEBOARD;
-
-    // Set up NSM_Chassis_Attributes with ResetMetricsSupported
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = asset["Type"];
-    propertyMapAttributes["ResetMetricsSupported"] = true;
-
-    size_t deviceSensorsBefore = fpga->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify ResetStatisticsAggregator was added to deviceSensors
-    EXPECT_GT(fpga->deviceSensors.size(), deviceSensorsBefore);
-
-    // Find the ResetStatisticsAggregator sensor
-    bool foundResetMetrics = false;
-    for (const auto& sensor : fpga->deviceSensors)
-    {
-        auto resetSensor =
-            dynamic_pointer_cast<ResetStatisticsAggregator>(sensor);
-        if (resetSensor)
-        {
-            foundResetMetrics = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundResetMetrics);
-
-    // Cleanup to avoid D-Bus object conflicts with subsequent tests
-    fpga->deviceSensors.clear();
-    fpga->prioritySensors.clear();
-    fpga->roundRobinSensors.clear();
-    fpga->staticSensors.clear();
-}
-
-// ============================================================================
-// Tests for createNsmGPIOStateSensors (lines 353-356 in nsmChassis.cpp)
-// ============================================================================
-
-TEST_F(NsmChassisTest, goodTestCreateGPIOStateSupported)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["UUID"];
-
-    // Create the device first
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    ASSERT_GE(devices.size(), 1);
-    fpga = dynamic_pointer_cast<MockNsmDevice>(devices.back());
-    ASSERT_NE(nullptr, fpga);
-    fpga->deviceType = NSM_DEV_ID_BASEBOARD;
-
-    // Set up NSM_Chassis_Attributes with GPIOStateSupported
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = asset["Type"];
-    propertyMapAttributes["GPIOStateSupported"] = true;
-
-    size_t deviceSensorsBefore = fpga->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify NsmGPIOState was added to deviceSensors
-    EXPECT_GT(fpga->deviceSensors.size(), deviceSensorsBefore);
-
-    // Find the NsmGPIOState sensor
-    bool foundGPIOState = false;
-    for (const auto& sensor : fpga->deviceSensors)
-    {
-        auto gpioSensor = dynamic_pointer_cast<NsmGPIOState>(sensor);
-        if (gpioSensor)
-        {
-            foundGPIOState = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundGPIOState);
-
-    // Cleanup to avoid D-Bus object conflicts with subsequent tests
-    fpga->deviceSensors.clear();
-    fpga->prioritySensors.clear();
-    fpga->roundRobinSensors.clear();
-    fpga->staticSensors.clear();
-}
-
-// ============================================================================
-// Tests for createDeviceDiagnostics (lines 285-292 in nsmChassis.cpp)
-// ============================================================================
-
-TEST_F(NsmChassisTest, goodTestCreateDeviceDiagnosticsSupported)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["UUID"];
-
-    // Create the device first
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    ASSERT_GE(devices.size(), 1);
-    fpga = dynamic_pointer_cast<MockNsmDevice>(devices.back());
-    ASSERT_NE(nullptr, fpga);
-    fpga->deviceType = NSM_DEV_ID_BASEBOARD;
-
-    // Set up NSM_Chassis_Attributes with DeviceDiagnosticsSupported
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = asset["Type"];
-    propertyMapAttributes["DeviceDiagnosticsSupported"] = true;
-
-    size_t staticBefore = fpga->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify NsmDebugInfoObject was added to staticSensors
-    EXPECT_GT(fpga->staticSensors.size(), staticBefore);
-
-    // Find the NsmDebugInfoObject sensor
-    bool foundDebugInfo = false;
-    for (const auto& sensor : fpga->staticSensors)
-    {
-        auto debugInfoSensor = dynamic_pointer_cast<NsmDebugInfoObject>(sensor);
-        if (debugInfoSensor)
-        {
-            EXPECT_EQ("NSM_DeviceDiagnostics", debugInfoSensor->getType());
-            foundDebugInfo = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundDebugInfo);
-
-    // Cleanup to avoid D-Bus object conflicts with subsequent tests
-    fpga->deviceSensors.clear();
-    fpga->prioritySensors.clear();
-    fpga->roundRobinSensors.clear();
-    fpga->staticSensors.clear();
-}
-
-// ============================================================================
-// Tests for createErrorInjectionPayload for MCTP Bridge (lines 267-283)
-// ============================================================================
-
-TEST_F(NsmChassisTest, goodTestCreateMCUErrorInjectionForMctpBridge)
-{
-    // Define MCTP bridge UUID - use 5 which is NSM_DEV_ID_MCTP_BRIDGE
-    const uuid_t mctpBridgeUuid = "STATIC:5:0:NSM_DEVICE_INSTANCE_NUMBER:0";
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = name;
-    basePropertyMap["UUID"] = mctpBridgeUuid;
-    basePropertyMap["DeviceType"] = uint64_t(NSM_DEV_ID_MCTP_BRIDGE);
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = basic["Type"];
-    propertyMapChassis["DEVICE_UUID"] = mctpBridgeUuid;
-
-    // Create the device first
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-
-    // Find the MCTP bridge device
-    auto mctpBridgeDevice = dynamic_pointer_cast<MockNsmDevice>(
-        mockManager.getNsmDeviceFromStaticUUID(mctpBridgeUuid));
-    ASSERT_NE(nullptr, mctpBridgeDevice);
-    mctpBridgeDevice->deviceType = NSM_DEV_ID_MCTP_BRIDGE;
-
-    // Set up NSM_Chassis_Attributes with ErrorInjectionSupported
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = asset["Type"];
-    propertyMapAttributes["ErrorInjectionSupported"] = true;
-
-    size_t sensorsBefore = mctpBridgeDevice->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify error injection sensors were added
-    EXPECT_GT(mctpBridgeDevice->staticSensors.size(), sensorsBefore);
-
-    // Cleanup to avoid D-Bus object conflicts with subsequent tests
-    mctpBridgeDevice->deviceSensors.clear();
-    mctpBridgeDevice->prioritySensors.clear();
-    mctpBridgeDevice->roundRobinSensors.clear();
-    mctpBridgeDevice->staticSensors.clear();
-}
-
-TEST_F(NsmChassisTest, badTestErrorInjectionNotCreatedForGpuDevice)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = gpuServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = basic["Type"];
-    propertyMapChassis["DeviceType"] = basic["DeviceType"];
-    propertyMapChassis["DEVICE_UUID"] = basic["DEVICE_UUID"];
-
-    auto& propertyMapAssociation0 = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".Associations0");
-    propertyMapAssociation0 = association;
-
-    // Create the device first
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    gpu = dynamic_pointer_cast<MockNsmDevice>(
-        mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
-    ASSERT_NE(nullptr, gpu);
-
-    // Set up NSM_Chassis_Attributes with ErrorInjectionSupported
-    // Note: Error injection should NOT be created for GPU devices
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = asset["Type"];
-    propertyMapAttributes["ErrorInjectionSupported"] = true;
-
-    size_t staticBefore = gpu->staticSensors.size();
-    size_t deviceBefore = gpu->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // For GPU devices, error injection sensors should NOT be created
-    // The createErrorInjectionPayload function checks device type
-    // and only creates sensors for MCTP bridge devices
-    // Verify no additional sensors were added for error injection
-    // (only Health sensor should be added)
-    EXPECT_GE(gpu->staticSensors.size(), staticBefore);
-    EXPECT_GE(gpu->deviceSensors.size(), deviceBefore);
-
-    // Cleanup to avoid D-Bus object conflicts with subsequent tests
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// ============================================================================
-// Combined test for all ChassisAttributes features
-// ============================================================================
-
-TEST_F(NsmChassisTest, DISABLED_goodTestCreateChassisAttributesWithAllFeatures)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    // Set up base properties for baseboard device
-    propertyMap["Name"] = fpgaProperties["Name"];
-    propertyMap["UUID"] = fpgaProperties["UUID"];
-    propertyMap["Type"] = basic["Type"];
-    propertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-    propertyMap["DEVICE_UUID"] = fpgaProperties["UUID"];
-
-    // Create the device first
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    ASSERT_GE(devices.size(), 1);
-    fpga = dynamic_pointer_cast<MockNsmDevice>(devices.back());
-    ASSERT_NE(nullptr, fpga);
-    fpga->deviceType = NSM_DEV_ID_BASEBOARD;
-
-    // Set up NSM_Chassis_Attributes with all supported features
-    propertyMap["Type"] = asset["Type"];
-    propertyMap["AssetInformationAvailable"] = true;
-    propertyMap["DimensionSupported"] = true;
-    propertyMap["WriteProtectSupported"] = true;
-    propertyMap["ResetMetricsSupported"] = true;
-    propertyMap["GPIOStateSupported"] = true;
-    propertyMap["DeviceDiagnosticsSupported"] = true;
-    propertyMap["PrettyNameForChassis"] = std::string("Baseboard FPGA");
-
-    // Record sizes before adding sensors
-    size_t deviceSensorsBefore = fpga->deviceSensors.size();
-    size_t staticSensorsBefore = fpga->staticSensors.size();
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify sensors were added to the device
-    EXPECT_GT(fpga->deviceSensors.size(), deviceSensorsBefore);
-    EXPECT_GT(fpga->staticSensors.size(), staticSensorsBefore);
-
-    // Search for specific sensors - different sensor types go to different
-    // queues
-    bool foundResetMetrics = false;
-    bool foundGPIOState = false;
-    bool foundDebugInfo = false;
-    bool foundPrettyName = false;
-
-    // Search deviceSensors for ResetMetrics and GPIOState
-    for (const auto& sensor : fpga->deviceSensors)
-    {
-        if (dynamic_pointer_cast<ResetStatisticsAggregator>(sensor))
-        {
-            foundResetMetrics = true;
-        }
-        if (dynamic_pointer_cast<NsmGPIOState>(sensor))
-        {
-            foundGPIOState = true;
-        }
-    }
-
-    // Search staticSensors for DebugInfo and PrettyName
-    for (const auto& sensor : fpga->staticSensors)
-    {
-        if (dynamic_pointer_cast<NsmDebugInfoObject>(sensor))
-        {
-            foundDebugInfo = true;
-        }
-        auto prettyNameSensor =
-            dynamic_pointer_cast<NsmInterfaceProvider<ItemIntf>>(sensor);
-        if (prettyNameSensor)
-        {
-            foundPrettyName = true;
-        }
-    }
-
-    EXPECT_TRUE(foundResetMetrics);
-    EXPECT_TRUE(foundGPIOState);
-    EXPECT_TRUE(foundDebugInfo);
-    EXPECT_TRUE(foundPrettyName);
-
-    // Cleanup to avoid D-Bus object conflicts with subsequent tests
-    fpga->deviceSensors.clear();
-    fpga->prioritySensors.clear();
-    fpga->roundRobinSensors.clear();
-    fpga->staticSensors.clear();
-}
-
 struct NsmWriteProtectedJumperTest : public NsmChassisTest
 {
     std::shared_ptr<NsmWriteProtectedJumper> sensor;
 
     void SetUp() override
     {
-        auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-        // Set up base properties that coGetCachedBaseProperties needs
-        propertyMap["Name"] = fpgaProperties["Name"];
-        propertyMap["UUID"] = fpgaProperties["UUID"];
-        propertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-        // Set up interface-specific properties
-        auto& assetPropertyMap = utils::MockDbusAsync::propertyMap(
-            objPath, basicIntfName + ".ChassisAttributes");
-        assetPropertyMap["Type"] = asset["Type"];
-        assetPropertyMap["WriteProtectSupported"] =
-            asset["WriteProtectSupported"];
-        nsmChassisCreateSensors(mockManager,
-                                basicIntfName + ".ChassisAttributes", objPath);
+        auto rc = createAttributes(fpga, {{"WriteProtectSupported", true}});
+        EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
         EXPECT_GT(fpga->deviceSensors.size(), 0);
         sensor = std::dynamic_pointer_cast<NsmWriteProtectedJumper>(
@@ -1741,773 +1413,6 @@ TEST_F(NsmWriteProtectedJumperTest, badTestCompletionErrorResponse)
     responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
-}
-
-// Test for ResetMetricsSupported
-TEST_F(NsmChassisTest, goodTestCreateResetMetrics)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    // Set up base properties that coGetCachedBaseProperties needs
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    // First call: NSM_Chassis_Attributes with ResetMetricsSupported
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMap["Type"] = asset["Type"];
-    propertyMap["ResetMetricsSupported"] = true;
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify that reset metrics sensor was created
-    // It should be added to deviceSensors
-    EXPECT_GT(gpu->deviceSensors.size(), 0);
-}
-
-// Test for DeviceDiagnosticsSupported
-TEST_F(NsmChassisTest, goodTestCreateDeviceDiagnostics)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    // Set up base properties that coGetCachedBaseProperties needs
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    // First call: NSM_Chassis_Attributes with DeviceDiagnosticsSupported
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMap["Type"] = asset["Type"];
-    propertyMap["DeviceDiagnosticsSupported"] = true;
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify that device diagnostics sensor was created
-    // It should be added to staticSensors
-    EXPECT_GT(gpu->staticSensors.size(), 0);
-}
-
-// Test for GPIOStateSupported
-TEST_F(NsmChassisTest, goodTestCreateGPIOStateSensors)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    // Set up base properties that coGetCachedBaseProperties needs
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    // First call: NSM_Chassis_Attributes with GPIOStateSupported
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMap["Type"] = asset["Type"];
-    propertyMap["GPIOStateSupported"] = true;
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify that GPIO state sensors were created
-    EXPECT_GT(gpu->deviceSensors.size(), 0);
-}
-
-// Test for ErrorInjectionSupported with MCTP Bridge device
-// NOTE: This test is disabled because it's a duplicate of
-// goodTestCreateMCUErrorInjectionForMctpBridge and causes D-Bus object
-// conflicts in coverage build due to missing cleanup.
-TEST_F(NsmChassisTest, DISABLED_goodTestCreateErrorInjectionPayload)
-{
-    // Use FPGA device for this test since it can be MCTP_BRIDGE
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    // Set up base properties with MCTP_BRIDGE device type
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-    basePropertyMap["DeviceType"] = uint64_t(NSM_DEV_ID_MCTP_BRIDGE);
-
-    // First call: NSM_Chassis_Attributes with ErrorInjectionSupported
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMap["Type"] = asset["Type"];
-    propertyMap["ErrorInjectionSupported"] = true;
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // For MCTP_BRIDGE, error injection sensors should be created
-    // Verify the function was called by checking device sensors
-    // Note: The actual implementation depends on
-    // createNsmMCUErrorInjectionSensors
-}
-
-TEST_F(NsmChassisTest, goodTestCreatePrettyName)
-{
-    utils::MockDbusAsync::serviceMap() = gpuServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = basic["Type"];
-    propertyMapChassis["DeviceType"] = basic["DeviceType"];
-    propertyMapChassis["DEVICE_UUID"] = basic["DEVICE_UUID"];
-
-    auto& propertyMapAssociation0 = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".Associations0");
-    propertyMapAssociation0 = association;
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_GE(devices.size(), 1);
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["PrettyNameForChassis"] = std::string("GPU Module 1");
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(gpu->staticSensors.size(), 1);
-}
-
-TEST_F(NsmChassisTest, goodTestCreateLocationContext)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["LocationContext"] = std::string("Front Panel");
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 1);
-}
-
-TEST_F(NsmChassisTest, goodTestCreateGPIOState)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["GPIOStateSupported"] = true;
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->deviceSensors.size(), 1);
-}
-
-TEST_F(NsmChassisTest, goodTestAssetWithCustomManufacturer)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["AssetInformationAvailable"] = true;
-    propertyMapAttributes["Manufacturer"] = std::string("CustomManufacturer");
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 4);
-}
-
-TEST_F(NsmChassisTest, goodTestAssetWithoutManufacturer)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
-    propertyMapAttributes["AssetInformationAvailable"] = true;
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 4);
-}
-
-TEST_F(NsmChassisTest, goodTestFPGAAssetWithCustomManufacturer)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    propertyMap["Name"] = fpgaProperties["Name"];
-    propertyMap["UUID"] = fpgaProperties["UUID"];
-    propertyMap["Type"] = fpgaProperties["Type"];
-    propertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-    propertyMap["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    propertyMap["Type"] = "NSM_FPGA_Attributes";
-    propertyMap["Manufacturer"] = std::string("FPGAManufacturer");
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->deviceSensors.size(), 1);
-}
-
-TEST_F(NsmChassisTest, goodTestPowerStateWithPriority)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    propertyMap["Name"] = basic["Name"];
-    propertyMap["UUID"] = basic["UUID"];
-    propertyMap["Type"] = powerState["Type"];
-    propertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-    propertyMap["InstanceNumber"] = powerState["InstanceNumber"];
-    propertyMap["InventoryObjPaths"] = powerState["InventoryObjPaths"];
-    propertyMap["Priority"] = true;
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                            objPath);
-
-    EXPECT_GE(fpga->prioritySensors.size(), 0);
-}
-
-TEST_F(NsmChassisTest, goodTestPowerLimitWithPriority)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    propertyMap["Name"] = basic["Name"];
-    propertyMap["UUID"] = basic["UUID"];
-    propertyMap["Type"] = "NSM_Chassis_Attributes";
-    propertyMap["PowerLimitSupported"] = true;
-    propertyMap["Priority"] = true;
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(gpu->prioritySensors.size(), 0);
-}
-
-TEST_F(NsmChassisTest, goodTestOperationalStatusWithPriority)
-{
-    dbus::PropertyMap operationalStatus = {
-        {"Name", std::string("HGX_GPU_SXM_1")},
-        {"Type", std::string("NSM_OperationalStatus")},
-        {"UUID", fpgaUuid},
-        {"DeviceType", uint64_t(NSM_DEV_ID_BASEBOARD)},
-        {"InstanceNumber", uint64_t(0)},
-        {"InventoryObjPaths",
-         std::vector<std::string>{objPath,
-                                  processorsInventoryBasePath / "GPU_SXM_1"}},
-    };
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    propertyMap["Name"] = operationalStatus["Name"];
-    propertyMap["UUID"] = operationalStatus["UUID"];
-    propertyMap["Type"] = operationalStatus["Type"];
-    propertyMap["DeviceType"] = operationalStatus["DeviceType"];
-    propertyMap["InstanceNumber"] = operationalStatus["InstanceNumber"];
-    propertyMap["InventoryObjPaths"] = operationalStatus["InventoryObjPaths"];
-    propertyMap["Priority"] = true;
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".OperationalStatus",
-                            objPath);
-
-    EXPECT_GE(fpga->prioritySensors.size(), 0);
-}
-
-TEST_F(NsmChassisTest, badTestOperationalStatusWrongDeviceType)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    // Create a GPU device first
-    propertyMap["Name"] = std::string("GPU_1");
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
-    propertyMap["Type"] = "NSM_Chassis";
-    propertyMap["DEVICE_UUID"] = gpuUuid;
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    auto initialDeviceCount = devices.size();
-    auto initialSensorCount = devices.back()->deviceSensors.size() +
-                              devices.back()->prioritySensors.size();
-
-    // Try to add OperationalStatus to GPU device (should fail silently)
-    propertyMap["Type"] = "NSM_OperationalStatus";
-    propertyMap["InstanceNumber"] = uint64_t(1);
-    propertyMap["InventoryObjPaths"] = std::vector<std::string>{
-        objPath, processorsInventoryBasePath / "GPU_1"};
-
-    // This should handle the error gracefully without adding sensors
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".OperationalStatus",
-                            objPath);
-
-    // Verify no new sensors were added
-    EXPECT_EQ(initialDeviceCount, devices.size());
-    EXPECT_EQ(initialSensorCount, devices.back()->deviceSensors.size() +
-                                      devices.back()->prioritySensors.size());
-}
-
-TEST_F(NsmChassisTest, badTestPowerStateWrongDeviceType)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    // Create a GPU device first
-    propertyMap["Name"] = std::string("GPU_1");
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
-    propertyMap["Type"] = "NSM_Chassis";
-    propertyMap["DEVICE_UUID"] = gpuUuid;
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    auto initialDeviceCount = devices.size();
-    auto initialSensorCount = devices.back()->deviceSensors.size() +
-                              devices.back()->prioritySensors.size();
-
-    // Try to add PowerState to GPU device (should fail silently)
-    propertyMap["Type"] = "NSM_PowerState";
-    propertyMap["InstanceNumber"] = uint64_t(1);
-    propertyMap["InventoryObjPaths"] = std::vector<std::string>{objPath};
-
-    // This should handle the error gracefully without adding sensors
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                            objPath);
-
-    // Verify no new sensors were added
-    EXPECT_EQ(initialDeviceCount, devices.size());
-    EXPECT_EQ(initialSensorCount, devices.back()->deviceSensors.size() +
-                                      devices.back()->prioritySensors.size());
-}
-
-TEST_F(NsmChassisTest, badTestWriteProtectWrongDeviceType)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    // Create a GPU device first
-    propertyMap["Name"] = std::string("GPU_1");
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
-    propertyMap["Type"] = "NSM_Chassis";
-    propertyMap["DEVICE_UUID"] = gpuUuid;
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    auto initialDeviceCount = devices.size();
-    auto initialSensorCount = devices.back()->deviceSensors.size() +
-                              devices.back()->prioritySensors.size();
-
-    // Try to add WriteProtect to GPU device (should fail silently)
-    propertyMap["Type"] = "NSM_Chassis_Attributes";
-    propertyMap["WriteProtectSupported"] = true;
-
-    // This should handle the error gracefully without adding sensors
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify no new sensors were added
-    EXPECT_EQ(initialDeviceCount, devices.size());
-    EXPECT_EQ(initialSensorCount, devices.back()->deviceSensors.size() +
-                                      devices.back()->prioritySensors.size());
-}
-
-TEST_F(NsmChassisTest, goodTestChassisWithoutOptionalProperties)
-{
-    dbus::PropertyMap minimalProperties = {
-        {"Name", "Minimal_Chassis"},
-        {"Type", "NSM_Chassis"},
-        {"UUID", fpgaUuid},
-        {"DeviceType", uint64_t(NSM_DEV_ID_BASEBOARD)},
-        {"DEVICE_UUID", fpgaUuid},
-    };
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = minimalProperties["Name"];
-    basePropertyMap["UUID"] = minimalProperties["UUID"];
-    basePropertyMap["DeviceType"] = minimalProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = minimalProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = minimalProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-
-    EXPECT_GE(devices.size(), 1);
-}
-
-TEST_F(NsmChassisTest, goodTestChassisAttributesWithoutOptionalFlags)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 1);
-}
-
-TEST_F(NsmChassisTest, goodTestOperationalStatusWithoutOptionalProperties)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    // First create the FPGA device
-    propertyMap["Name"] = fpgaProperties["Name"];
-    propertyMap["UUID"] = fpgaProperties["UUID"];
-    propertyMap["Type"] = fpgaProperties["Type"];
-    propertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-    propertyMap["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-    fpga = dynamic_pointer_cast<MockNsmDevice>(devices[1]);
-
-    // Now add OperationalStatus without optional properties
-    propertyMap["Type"] = "NSM_OperationalStatus";
-    // InstanceNumber and InventoryObjPaths are missing
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".OperationalStatus",
-                            objPath);
-
-    EXPECT_GE(fpga->deviceSensors.size(), 1);
-}
-
-TEST_F(NsmChassisTest, goodTestPowerStateWithoutOptionalProperties)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-
-    // First create the FPGA device
-    propertyMap["Name"] = fpgaProperties["Name"];
-    propertyMap["UUID"] = fpgaProperties["UUID"];
-    propertyMap["Type"] = fpgaProperties["Type"];
-    propertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-    propertyMap["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-    fpga = dynamic_pointer_cast<MockNsmDevice>(devices[1]);
-
-    // Now add PowerState without optional properties
-    propertyMap["Type"] = "NSM_PowerState";
-    // InstanceNumber and InventoryObjPaths are missing
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                            objPath);
-
-    EXPECT_GE(fpga->deviceSensors.size(), 1);
-}
-
-#ifdef COVERAGE_DISABLE_COROUTINES
-// In coverage mode with coroutine mocking, empty enum strings throw exceptions
-TEST_F(NsmChassisTest, badTestChassisTypeWithEmptyString)
-#else
-// In regular mode, empty enum strings are handled gracefully
-TEST_F(NsmChassisTest, goodTestChassisTypeWithEmptyString)
-#endif
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
-    propertyMapAttributes["ChassisType"] = std::string("");
-
-#ifdef COVERAGE_DISABLE_COROUTINES
-    // Empty string is not a valid enum value, should throw exception in
-    // coverage mode
-    EXPECT_THROW(nsmChassisCreateSensors(mockManager,
-                                         basicIntfName + ".ChassisAttributes",
-                                         objPath),
-                 sdbusplus::exception::InvalidEnumString);
-#else
-    // In regular mode, empty strings are handled without throwing
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 1);
-#endif
-}
-
-#ifdef COVERAGE_DISABLE_COROUTINES
-// In coverage mode with coroutine mocking, empty enum strings throw exceptions
-TEST_F(NsmChassisTest, badTestLocationWithEmptyString)
-#else
-// In regular mode, empty enum strings are handled gracefully
-TEST_F(NsmChassisTest, goodTestLocationWithEmptyString)
-#endif
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
-    propertyMapAttributes["LocationType"] = std::string("");
-
-#ifdef COVERAGE_DISABLE_COROUTINES
-    // Empty string is not a valid enum value, should throw exception in
-    // coverage mode
-    EXPECT_THROW(nsmChassisCreateSensors(mockManager,
-                                         basicIntfName + ".ChassisAttributes",
-                                         objPath),
-                 sdbusplus::exception::InvalidEnumString);
-#else
-    // In regular mode, empty strings are handled without throwing
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 1);
-#endif
-}
-
-TEST_F(NsmChassisTest, goodTestLocationCodeWithEmptyString)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
-    propertyMapAttributes["LocationCode"] = std::string("");
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 1);
-}
-
-TEST_F(NsmChassisTest, goodTestMultipleSupportedFlags)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
-    propertyMapAttributes["AssetInformationAvailable"] = true;
-    propertyMapAttributes["DimensionSupported"] = true;
-    propertyMapAttributes["WriteProtectSupported"] = true;
-    propertyMapAttributes["ResetMetricsSupported"] = true;
-    propertyMapAttributes["GPIOStateSupported"] = true;
-    propertyMapAttributes["DeviceDiagnosticsSupported"] = true;
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 8);
-}
-
-TEST_F(NsmChassisTest, goodTestChassisWithAllOptionalProperties)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-    EXPECT_EQ(2, devices.size());
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
-    propertyMapAttributes["AssetInformationAvailable"] = true;
-    propertyMapAttributes["LocationType"] =
-        "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes."
-        "Embedded";
-    propertyMapAttributes["LocationCode"] = "SXM1";
-    propertyMapAttributes["LocationContext"] = "Rear Panel";
-    propertyMapAttributes["ChassisType"] =
-        "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Component";
-    propertyMapAttributes["PrettyNameForChassis"] = "FPGA Module";
-    propertyMapAttributes["DimensionSupported"] = true;
-    propertyMapAttributes["PowerLimitSupported"] = true;
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 10);
-}
-
-TEST_F(NsmChassisTest, goodTestChassisAttributesWithOptionalProperties)
-{
-    // Test optional properties that increase coverage:
-    // - Manufacturer in Asset
-    // - Priority in PowerLimit
-    // - FieldReplaceable
-    // - LocationContext
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = "NSM_Chassis_Attributes";
-
-    // Test Asset with custom Manufacturer (covers lines 48-49)
-    propertyMapAttributes["AssetInformationAvailable"] = true;
-    propertyMapAttributes["Manufacturer"] = "Custom Manufacturer";
-
-    // Test PowerLimit with Priority (covers lines 211-212, 215-218)
-    propertyMapAttributes["PowerLimitSupported"] = true;
-    propertyMapAttributes["Priority"] = true;
-
-    // Test FieldReplaceable (covers line 193)
-    propertyMapAttributes["FieldReplaceable"] = true;
-
-    // Test LocationContext (covers lines 175-176, 179-183)
-    propertyMapAttributes["LocationContext"] = "Test Location";
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Verify sensors were created
-    EXPECT_GE(gpu->staticSensors.size(), 3); // Asset sensors
-    EXPECT_GE(gpu->deviceSensors.size(), 2); // PowerLimit sensors with priority
 }
 
 // ============================================================================
@@ -2647,1239 +1552,6 @@ TEST_F(NsmChassisTest, goodTestUpdateNsmChassisSettingsIntf)
     chassisSettings->update(gpu);
 }
 
-// ============================================================================
-// Tests for createFieldReplaceable (standalone factory function)
-// ============================================================================
-
-TEST_F(NsmChassisTest, goodTestCreateFieldReplaceableTrue)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["FieldReplaceable"] = true;
-
-    size_t staticBefore = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Should have added ReplaceableIntf + SKU + Health at minimum
-    EXPECT_GT(gpu->staticSensors.size(), staticBefore);
-
-    // Find the ReplaceableIntf sensor
-    bool foundReplaceable = false;
-    for (const auto& sensor : gpu->staticSensors)
-    {
-        auto replaceableSensor =
-            dynamic_pointer_cast<NsmInterfaceProvider<ReplaceableIntf>>(sensor);
-        if (replaceableSensor)
-        {
-            EXPECT_TRUE(replaceableSensor->invoke(pdiMethod(fieldReplaceable)));
-            foundReplaceable = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundReplaceable);
-
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-TEST_F(NsmChassisTest, goodTestCreateFieldReplaceableFalse)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["FieldReplaceable"] = false;
-
-    size_t staticBefore = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GT(gpu->staticSensors.size(), staticBefore);
-
-    bool foundReplaceable = false;
-    for (const auto& sensor : gpu->staticSensors)
-    {
-        auto replaceableSensor =
-            dynamic_pointer_cast<NsmInterfaceProvider<ReplaceableIntf>>(sensor);
-        if (replaceableSensor)
-        {
-            EXPECT_FALSE(
-                replaceableSensor->invoke(pdiMethod(fieldReplaceable)));
-            foundReplaceable = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundReplaceable);
-
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// ============================================================================
-// Tests for createLocationContext (standalone factory path)
-// ============================================================================
-
-// ============================================================================
-// Tests covering previously-missed branches in nsmChassis.cpp
-// ============================================================================
-
-// Covers line 81 in createFPGAAsset: Manufacturer property present in the
-// current (NSM_FPGA_Attributes) interface -> uses custom manufacturer string.
-TEST_F(NsmChassisTest, CreateFPGAAttributes_WithManufacturer_CoversBranch)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    // Create FPGA chassis first
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"]; // "NSM_Chassis"
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-
-    // FPGA attributes with Manufacturer in the CURRENT interface map
-    auto& propertyMapFPGA = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapFPGA["Type"] = std::string("NSM_FPGA_Attributes");
-    propertyMapFPGA["Manufacturer"] = std::string("CustomFPGAManufacturer");
-
-    size_t deviceSensorsBefore = fpga->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // Asset sensor (NsmChassis<NsmAssetIntf>) goes to deviceSensors
-    EXPECT_GT(fpga->deviceSensors.size(), deviceSensorsBefore);
-
-    bool foundAsset = false;
-    for (const auto& s : fpga->deviceSensors)
-    {
-        auto assetSensor = dynamic_pointer_cast<NsmChassis<NsmAssetIntf>>(s);
-        if (assetSensor)
-        {
-            EXPECT_EQ("CustomFPGAManufacturer",
-                      assetSensor->invoke(pdiMethod(manufacturer)));
-            foundAsset = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundAsset);
-
-    fpga->deviceSensors.clear();
-    fpga->prioritySensors.clear();
-    fpga->roundRobinSensors.clear();
-    fpga->staticSensors.clear();
-}
-
-// Covers lines 426 and 430 in createFPGAAttributes: LocationType and
-// ChassisType properties present -> createLocation and createChassisType
-// called.
-TEST_F(
-    NsmChassisTest,
-    CreateFPGAAttributes_WithLocationTypeAndChassisType_CoversLocationBranches)
-{
-    auto& map = utils::MockDbusAsync::serviceMap();
-    map = fpgaServiceMap;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"];
-
-    // Create FPGA chassis first
-    auto& propertyMapChassis =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMapChassis["Type"] = fpgaProperties["Type"];
-    propertyMapChassis["DEVICE_UUID"] = fpgaProperties["DEVICE_UUID"];
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-
-    size_t staticSensorsBefore = fpga->staticSensors.size();
-
-    // FPGA attributes with both LocationType and ChassisType in current
-    // interface
-    auto& propertyMapFPGA = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapFPGA["Type"] = std::string("NSM_FPGA_Attributes");
-    propertyMapFPGA["LocationType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Location."
-        "LocationTypes.Embedded");
-    propertyMapFPGA["ChassisType"] = std::string(
-        "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module");
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    // createFPGAAttributes adds: SKU + Location + ChassisType + Health = 4
-    EXPECT_GE(fpga->staticSensors.size(), staticSensorsBefore + 4);
-
-    bool foundLocation = false;
-    bool foundChassisType = false;
-    for (const auto& s : fpga->staticSensors)
-    {
-        if (dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(s))
-            foundLocation = true;
-        if (dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(s))
-            foundChassisType = true;
-    }
-    EXPECT_TRUE(foundLocation);
-    EXPECT_TRUE(foundChassisType);
-
-    fpga->deviceSensors.clear();
-    fpga->prioritySensors.clear();
-    fpga->roundRobinSensors.clear();
-    fpga->staticSensors.clear();
-}
-
-// Covers line 451 in createOperationalStatus: DeviceType != BASEBOARD ->
-// throws. The CURRENT interface has Type="NSM_OperationalStatus", base
-// interface has DeviceType=NSM_DEV_ID_GPU -> createOperationalStatus throws
-// std::runtime_error.
-TEST_F(NsmChassisTest, CreateOperationalStatus_NonBaseboardDevice_Throws)
-{
-    // Base properties with GPU device type (not BASEBOARD)
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = gpuUuid;
-    basePropertyMap["DeviceType"] = basic["DeviceType"]; // NSM_DEV_ID_GPU
-
-    // Current interface must have Type so dispatch goes to
-    // createOperationalStatus
-    auto& propertyMapOp = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".OperationalStatus");
-    propertyMapOp["Type"] = std::string("NSM_OperationalStatus");
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(mockManager,
-                                basicIntfName + ".OperationalStatus", objPath),
-        std::runtime_error);
-}
-
-// Covers line 516 in createPowerState: Priority property present in the CURRENT
-// interface -> priority = true -> sensor added to prioritySensors.
-TEST_F(NsmChassisTest,
-       CreatePowerState_WithPriorityInCurrentInterface_AddsToPrioritySensors)
-{
-    // Base properties with BASEBOARD device type (required by createPowerState)
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = fpgaProperties["Name"];
-    basePropertyMap["UUID"] = fpgaProperties["UUID"];
-    basePropertyMap["DeviceType"] = fpgaProperties["DeviceType"]; // BASEBOARD
-    basePropertyMap["InstanceNumber"] = powerState["InstanceNumber"];
-
-    // Current interface with Type and Priority=true
-    auto& propertyMapPS = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".PowerState");
-    propertyMapPS["Type"] = powerState["Type"]; // "NSM_PowerState"
-    propertyMapPS["InventoryObjPaths"] = powerState["InventoryObjPaths"];
-    propertyMapPS["Priority"] = true;
-
-    size_t prioritySensorsBefore = fpga->prioritySensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                            objPath);
-
-    // With Priority=true, NsmPowerSupplyStatus is added to prioritySensors
-    EXPECT_GT(fpga->prioritySensors.size(), prioritySensorsBefore);
-}
-
-TEST_F(NsmChassisTest, goodTestCreateLocationContextWithValue)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["LocationContext"] = std::string("Rear Panel Slot 3");
-
-    size_t staticBefore = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-
-    EXPECT_GT(gpu->staticSensors.size(), staticBefore);
-
-    bool foundLocationCtx = false;
-    for (const auto& sensor : gpu->staticSensors)
-    {
-        auto locCtxSensor =
-            dynamic_pointer_cast<NsmInterfaceProvider<LocationContextIntf>>(
-                sensor);
-        if (locCtxSensor)
-        {
-            EXPECT_EQ("Rear Panel Slot 3",
-                      locCtxSensor->invoke(pdiMethod(locationContext)));
-            foundLocationCtx = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(foundLocationCtx);
-
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// Lines 562-564: early return when coGetCachedBaseProperties fails (no base
-// property map registered for the object path)
-TEST_F(NsmChassisTest, createChassisSensors_MissingBasePropertyMap_EarlyReturn)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/fresh_dev/no_base_props";
-    size_t initialDeviceCount = devices.size();
-    // No propertyMap registered for freshPath -> coGetCachedBaseProperties
-    // returns NSM_SW_ERROR -> factory returns early without creating sensors
-    EXPECT_NO_THROW(
-        nsmChassisCreateSensors(mockManager, basicIntfName, freshPath));
-    // No new NsmDevice should have been created
-    EXPECT_EQ(devices.size(), initialDeviceCount);
-}
-
-// Line 608: missing DEVICE_UUID property does not add uuid sensor
-TEST_F(NsmChassisTest, createNSMChassis_MissingDeviceUUID)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-    // Omit DEVICE_UUID from the NSM_Chassis interface property map; the
-    // factory should still succeed and create the device without uuid sensor
-    // staticSensors may or may not grow, but no crash expected
-    EXPECT_NO_THROW(
-        nsmChassisCreateSensors(mockManager, basicIntfName, objPath));
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// FieldReplaceable property present with value true -> sensor created
-TEST_F(NsmChassisTest, createChassisAttributes_FieldReplaceable_Present)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["FieldReplaceable"] = bool(true);
-
-    size_t staticBefore = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-    EXPECT_GT(gpu->staticSensors.size(), staticBefore);
-
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// PrettyNameForChassis property present -> sensor created
-TEST_F(NsmChassisTest, createChassisAttributes_PrettyNameForChassis_Present)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["PrettyNameForChassis"] = std::string("My Pretty Chassis");
-
-    size_t staticBefore = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-    EXPECT_GT(gpu->staticSensors.size(), staticBefore);
-
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// PowerLimitSupported=true -> PowerLimit sensors created
-TEST_F(NsmChassisTest, createChassisAttributes_PowerLimitSupported_True)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["PowerLimitSupported"] = bool(true);
-
-    size_t deviceBefore = gpu->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-    EXPECT_GT(gpu->deviceSensors.size(), deviceBefore);
-
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// All supported-flags set to false -> flag-guarded sensors not created
-// (createSKU and createHealth are still called unconditionally)
-TEST_F(NsmChassisTest, createChassisAttributes_SupportedFlags_False)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["AssetInformationAvailable"] = bool(false);
-    pm["DimensionSupported"] = bool(false);
-    pm["PowerLimitSupported"] = bool(false);
-    pm["ResetMetricsSupported"] = bool(false);
-    pm["GPIOStateSupported"] = bool(false);
-    pm["ErrorInjectionSupported"] = bool(false);
-    pm["DeviceDiagnosticsSupported"] = bool(false);
-
-    // Call should succeed; unconditional sensors (SKU, Health) are always
-    // added, but the flag-guarded branches should be skipped
-    EXPECT_NO_THROW(nsmChassisCreateSensors(
-        mockManager, basicIntfName + ".ChassisAttributes", objPath));
-
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// ResetMetricsSupported=true -> ResetMetrics sensor created
-TEST_F(NsmChassisTest, createChassisAttributes_ResetMetricsSupported_True)
-{
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = basic["Name"];
-    basePropertyMap["UUID"] = basic["UUID"];
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["ResetMetricsSupported"] = bool(true);
-
-    size_t deviceBefore = gpu->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            objPath);
-    EXPECT_GT(gpu->deviceSensors.size(), deviceBefore);
-
-    gpu->deviceSensors.clear();
-    gpu->prioritySensors.clear();
-    gpu->roundRobinSensors.clear();
-    gpu->staticSensors.clear();
-}
-
-// =============================================================================
-// FALSE-branch coverage: count() checks in nsmChassisCreateSensors
-// =============================================================================
-
-// Type absent from current interface -> type="" -> no if/else-if branch matches
-// -> same result as wrong type but exercises count("Type")=0 branch
-TEST_F(NsmChassisTest, createChassisSensors_MissingType_NoConditionalSensors)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/no_type_test";
-    // Register base interface
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("NoTypeDevice");
-    baseMap["UUID"] = gpuUuid;
-
-    // Register current sub-interface with NO "Type" property
-    auto& currMap = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".NoTypeSub");
-    (void)currMap; // intentionally empty -> type="" -> no branch matches
-
-    const size_t before = gpu->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".NoTypeSub",
-                            freshPath);
-    // No conditional sensor block executed -> size unchanged
-    EXPECT_EQ(before, gpu->deviceSensors.size());
-}
-
-// UUID absent from base interface -> uuid="" -> parseStaticUuid("") throws
-// inside getNsmDeviceFromStaticUUID -> propagates out of coroutine
-TEST_F(NsmChassisTest, createChassisSensors_MissingUUID_Throws)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/no_uuid_test";
-    // Register base interface WITHOUT "UUID" -> uuid=""
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("NoUuidDevice");
-    // "UUID" intentionally omitted -> uuid="" -> parseStaticUuid throws
-
-    auto& currMap = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    currMap["Type"] = std::string("NSM_Chassis_Attributes");
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(
-            mockManager, basicIntfName + ".ChassisAttributes", freshPath),
-        std::exception);
-}
-
-// Name absent from base interface -> count("Name") FALSE -> name="" ->
-// type also absent (currMap empty) -> no sensor block executes -> no crash
-TEST_F(NsmChassisTest, createChassisSensors_MissingName_NoSensor)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/no_name_test";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["UUID"] = gpuUuid;
-    // "Name" intentionally omitted -> count("Name") FALSE -> name=""
-    // No current sub-interface registered -> type="" -> no branch matches
-
-    const size_t before = gpu->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName, freshPath);
-    EXPECT_EQ(before, gpu->deviceSensors.size());
-}
-
-// DEVICE_UUID absent from current interface -> count("DEVICE_UUID") FALSE ->
-// deviceUuid unset (empty string) -> NsmChassis<UuidIntf> created with empty
-// device UUID (sensor still added as static)
-TEST_F(NsmChassisTest, createChassisSensors_MissingDeviceUUID_SensorCreated)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/no_dev_uuid_test";
-    // When interface == baseInterface, both allBase and allCurrent come from
-    // the same map -> use a single map with Name+UUID+Type but no DEVICE_UUID
-    auto& pm = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    pm["Name"] = std::string("NoChassisDUUID");
-    pm["UUID"] = gpuUuid;
-    pm["Type"] = std::string("NSM_Chassis");
-    // "DEVICE_UUID" intentionally omitted -> count("DEVICE_UUID") FALSE ->
-    // deviceUuid="" -> chassisUuid->invoke(pdiMethod(uuid), "") //
-
-    const size_t staticBefore = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName, freshPath);
-    // NsmChassis<UuidIntf> and NsmChassis<MctpUuidIntf> added as static sensors
-    EXPECT_GT(gpu->staticSensors.size(), staticBefore);
-}
-
-// ============================================================================
-// Boolean FALSE branches: Supported flags set to false
-// Each combined condition `count("X") && bool(value)` has three branches:
-//   1. count()==0 -> FALSE (short-circuit) – covered by tests that omit the key
-//   2. count()!=0 && bool==false -> FALSE – covered by the tests below
-//   3. count()!=0 && bool==true  -> TRUE  – covered by existing TRUE-branch
-//   tests
-// ============================================================================
-
-// AssetInformationAvailable=false -> count()!=0 but bool==false ->
-// createAsset() NOT called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_AssetInformationAvailableFalse_NoAsset)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_asset_false";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["AssetInformationAvailable"] = bool(false);
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    // No asset sensor created (no crash, factory completes)
-    EXPECT_NE(fpga, nullptr);
-}
-
-// DimensionSupported=false -> count()!=0 but bool==false ->
-// createDimension() NOT called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_DimensionSupportedFalse_NoDimension)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_dim_false";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["DimensionSupported"] = bool(false);
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    EXPECT_NE(fpga, nullptr);
-}
-
-// PowerLimitSupported=false -> count()!=0 but bool==false ->
-// createPowerLimit() NOT called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_PowerLimitSupportedFalse_NoPowerLimit)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_pwrlmt_false";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["PowerLimitSupported"] = bool(false);
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    EXPECT_NE(fpga, nullptr);
-}
-
-// WriteProtectSupported=false -> count()!=0 but bool==false ->
-// createWriteProtect() NOT called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_WriteProtectSupportedFalse_NoWriteProtect)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_wp_false";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["WriteProtectSupported"] = bool(false);
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    EXPECT_NE(fpga, nullptr);
-}
-
-// ResetMetricsSupported=false -> count()!=0 but bool==false ->
-// createResetMetrics() NOT called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_ResetMetricsSupportedFalse_NoResetMetrics)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_rm_false";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["ResetMetricsSupported"] = bool(false);
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    EXPECT_NE(fpga, nullptr);
-}
-
-// GPIOStateSupported=false -> count()!=0 but bool==false ->
-// createNsmGPIOStateSensors() NOT called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_GPIOStateSupportedFalse_NoGPIOState)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_gpio_false";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["GPIOStateSupported"] = bool(false);
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    EXPECT_NE(fpga, nullptr);
-}
-
-// ErrorInjectionSupported=false -> count()!=0 but bool==false ->
-// createErrorInjectionPayload() NOT called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_ErrorInjectionSupportedFalse_NoErrorInjection)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_ei_false";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["ErrorInjectionSupported"] = bool(false);
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    EXPECT_NE(fpga, nullptr);
-}
-
-// DeviceDiagnosticsSupported=false -> count()!=0 but bool==false ->
-// createDeviceDiagnostics() NOT called
-TEST_F(
-    NsmChassisTest,
-    createChassisAttributes_DeviceDiagnosticsSupportedFalse_NoDeviceDiagnostics)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_dd_false";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["DeviceDiagnosticsSupported"] = bool(false);
-
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    EXPECT_NE(fpga, nullptr);
-}
-
-// ============================================================================
-// SECTION: createFPGAAttributes – LocationType/ChassisType/Manufacturer TRUE
-// ============================================================================
-
-// LocationType and ChassisType PRESENT -> count() TRUE -> createLocation() +
-// createChassisType() both called
-TEST_F(NsmChassisTest,
-       createFPGAAttributes_WithLocationAndChassisType_TrueBranches)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_loc_chassis";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".FPGAAttributes");
-    pm["Type"] = std::string("NSM_FPGA_Attributes");
-    pm["LocationType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes."
-        "Embedded");
-    pm["ChassisType"] = std::string(
-        "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module");
-
-    const size_t before = fpga->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".FPGAAttributes",
-                            freshPath);
-    // Location and ChassisType sensors added in addition to asset/sku/health
-    EXPECT_GT(fpga->staticSensors.size(), before);
-}
-
-// Manufacturer PRESENT -> count("Manufacturer") TRUE -> uses custom
-// manufacturer
-TEST_F(NsmChassisTest, createFPGAAttributes_WithManufacturer_TrueBranch)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_mfg";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".FPGAAttributes");
-    pm["Type"] = std::string("NSM_FPGA_Attributes");
-    pm["Manufacturer"] = std::string("NVIDIA Corp");
-
-    const size_t before = fpga->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".FPGAAttributes",
-                            freshPath);
-    // Asset sensor added with custom manufacturer
-    EXPECT_GT(fpga->deviceSensors.size(), before);
-}
-
-// ============================================================================
-// SECTION: createOperationalStatus – count() FALSE-branch coverage
-// ============================================================================
-
-// count("DeviceType") FALSE -> deviceType=0 -> 0 != NSM_DEV_ID_BASEBOARD(3) ->
-// throws (covers DeviceType FALSE branch and exception path)
-TEST_F(NsmChassisTest, createOperationalStatus_MissingDeviceType_Throws)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_opstat_nodt";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    // "DeviceType" intentionally absent -> deviceType defaults to 0 -> throws
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".OperationalStatus");
-    pm["Type"] = std::string("NSM_OperationalStatus");
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(
-            mockManager, basicIntfName + ".OperationalStatus", freshPath),
-        std::runtime_error);
-}
-
-// DeviceType=baseboard; InventoryObjPaths absent -> count() FALSE ->
-// inventoryObjPaths={} -> NsmInterfaces constructor throws (empty interfaces)
-// Covers: count("InstanceNumber") FALSE, count("InventoryObjPaths") FALSE,
-//         count("Priority") FALSE (all before the throw in NsmInterfaces) //
-TEST_F(NsmChassisTest, createOperationalStatus_MissingInventoryObjPaths_Throws)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_opstat_nopaths";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-    baseMap["DeviceType"] = uint64_t(NSM_DEV_ID_BASEBOARD);
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".OperationalStatus");
-    pm["Type"] = std::string("NSM_OperationalStatus");
-    // InventoryObjPaths absent -> empty paths -> NsmInterfaces::ctor throws
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(
-            mockManager, basicIntfName + ".OperationalStatus", freshPath),
-        std::runtime_error);
-}
-
-// DeviceType=baseboard + valid InventoryObjPaths; InstanceNumber and Priority
-// absent -> count("InstanceNumber") FALSE, count("Priority") FALSE -> defaults
-TEST_F(NsmChassisTest,
-       createOperationalStatus_Baseboard_WithPaths_NoInstanceNoPriority)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_opstat_base";
-    const std::string sensorPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_opstat_sensor";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-    baseMap["DeviceType"] = uint64_t(NSM_DEV_ID_BASEBOARD);
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".OperationalStatus");
-    pm["Type"] = std::string("NSM_OperationalStatus");
-    pm["InventoryObjPaths"] = std::vector<std::string>{sensorPath};
-    // InstanceNumber and Priority absent -> count() FALSE -> use defaults
-
-    const size_t before = fpga->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".OperationalStatus",
-                            freshPath);
-    // NsmGpuPresenceAndPowerStatus sensor added (instanceNumber=0,
-    // priority=false)
-    EXPECT_GT(fpga->deviceSensors.size(), before);
-}
-
-// ============================================================================
-// SECTION: createPowerState – count() FALSE-branch coverage
-// ============================================================================
-
-// count("DeviceType") FALSE -> deviceType=0 -> throws (same as
-// OperationalStatus)
-TEST_F(NsmChassisTest, createPowerState_MissingDeviceType_Throws)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_pwrst_nodt";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    // "DeviceType" intentionally absent -> deviceType=0 -> throws
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(freshPath,
-                                                 basicIntfName + ".PowerState");
-    pm["Type"] = std::string("NSM_PowerState");
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                                freshPath),
-        std::runtime_error);
-}
-
-// DeviceType=baseboard; InventoryObjPaths absent -> count() FALSE ->
-// empty paths -> NsmInterfaces::ctor throws
-TEST_F(NsmChassisTest, createPowerState_MissingInventoryObjPaths_Throws)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_pwrst_nopaths";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-    baseMap["DeviceType"] = uint64_t(NSM_DEV_ID_BASEBOARD);
-
-    auto& pm = utils::MockDbusAsync::propertyMap(freshPath,
-                                                 basicIntfName + ".PowerState");
-    pm["Type"] = std::string("NSM_PowerState");
-    // InventoryObjPaths absent -> empty paths -> NsmInterfaces::ctor throws
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                                freshPath),
-        std::runtime_error);
-}
-
-// DeviceType=baseboard + valid InventoryObjPaths; InstanceNumber and Priority
-// absent -> count() FALSE -> defaults -> sensor added
-TEST_F(NsmChassisTest,
-       createPowerState_Baseboard_WithPaths_NoInstanceNoPriority)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_pwrst_base";
-    const std::string sensorPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_pwrst_sensor";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-    baseMap["DeviceType"] = uint64_t(NSM_DEV_ID_BASEBOARD);
-
-    auto& pm = utils::MockDbusAsync::propertyMap(freshPath,
-                                                 basicIntfName + ".PowerState");
-    pm["Type"] = std::string("NSM_PowerState");
-    pm["InventoryObjPaths"] = std::vector<std::string>{sensorPath};
-    // InstanceNumber and Priority absent -> count() FALSE -> use defaults
-
-    const size_t before = fpga->deviceSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                            freshPath);
-    // NsmPowerSupplyStatus sensor added (instanceNumber=0, priority=false)
-    EXPECT_GT(fpga->deviceSensors.size(), before);
-}
-
-// ============================================================================
-// SECTION: NSM_Chassis type – DEVICE_UUID and DeviceType FALSE branches
-// ============================================================================
-
-// count("DEVICE_UUID") FALSE -> deviceUuid="" -> UuidIntf sensor still created
-// with empty uuid (covers the DEVICE_UUID FALSE branch in NSM_Chassis block)
-TEST_F(NsmChassisTest, createNsmChassis_MissingDeviceUUID_EmptyUuid)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_no_devuuid";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = gpuUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(freshPath,
-                                                 basicIntfName + ".Chassis");
-    pm["Type"] = std::string("NSM_Chassis");
-    // "DEVICE_UUID" intentionally absent -> deviceUuid="" -> sensor still
-    // created
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", freshPath);
-    // UuidIntf and MctpUuidIntf static sensors added even with empty deviceUuid
-    EXPECT_GT(gpu->staticSensors.size(), before);
-}
-
-// count("DeviceType") FALSE in the NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT
-// block -> deviceType=0 -> 0 != NSM_DEV_ID_BASEBOARD -> no PCIeRefClock created
-TEST_F(NsmChassisTest, createNsmChassis_MissingDeviceType_NoPCIeRefClock)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/fpga_no_devtype";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    // "DeviceType" intentionally absent -> deviceType=0 -> no PCIeRefClock
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = fpgaUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(freshPath,
-                                                 basicIntfName + ".Chassis");
-    pm["Type"] = std::string("NSM_Chassis");
-    pm["DEVICE_UUID"] = fpgaUuid;
-
-    const size_t before = fpga->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", freshPath);
-    // UuidIntf and MctpUuidIntf added; PCIeRefClock NOT added (devType=0 != 3)
-    EXPECT_GT(fpga->staticSensors.size(), before);
-}
-
-// ============================================================================
-// SECTION: createChassisAttributes – TRUE-branch coverage (new optional props)
-// ============================================================================
-
-// LocationContext present -> count() TRUE -> createLocationContext called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_WithLocationContext_SensorCreated)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_locctx";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = gpuUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["LocationContext"] = std::string("Server");
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    // LocationContext sensor + createSKU + createHealth -> 3 static sensors
-    EXPECT_EQ(gpu->staticSensors.size(), before + 3);
-}
-
-// FieldReplaceable present -> count() TRUE -> createFieldReplaceable called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_WithFieldReplaceable_SensorCreated)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_fieldrep";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = gpuUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["FieldReplaceable"] = true;
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    // FieldReplaceable sensor + createSKU + createHealth -> 3 static sensors
-    EXPECT_EQ(gpu->staticSensors.size(), before + 3);
-}
-
-// PrettyNameForChassis present -> count() TRUE -> createPrettyName called
-TEST_F(NsmChassisTest, createChassisAttributes_WithPrettyName_SensorCreated)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_prettyname";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = gpuUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["PrettyNameForChassis"] = std::string("NVIDIA HGX GPU SXM");
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    // PrettyName sensor + createSKU + createHealth -> 3 static sensors
-    EXPECT_EQ(gpu->staticSensors.size(), before + 3);
-}
-
-// ResetMetricsSupported=true -> createResetMetrics called -> sensor added to
-// roundRobin
-TEST_F(NsmChassisTest,
-       createChassisAttributes_ResetMetricsSupportedTrue_SensorAdded)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_resetmetrics";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("gpu_resetmetrics_unique");
-    baseMap["UUID"] = gpuUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["ResetMetricsSupported"] = true;
-
-    const size_t before = gpu->roundRobinSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    // ResetStatisticsAggregator added to roundRobinSensors
-    EXPECT_GT(gpu->roundRobinSensors.size(), before);
-}
-
-// GPIOStateSupported=true -> createNsmGPIOStateSensors called -> sensor added
-TEST_F(NsmChassisTest,
-       createChassisAttributes_GPIOStateSupportedTrue_SensorAdded)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_gpiostate";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("gpu_gpio_unique");
-    baseMap["UUID"] = gpuUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["GPIOStateSupported"] = true;
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    // NsmGPIOState sensor added to staticSensors
-    EXPECT_GT(gpu->staticSensors.size(), before);
-}
-
-// ErrorInjectionSupported=true; DeviceType=GPU -> inner if FALSE (GPU !=
-// MCTP_BRIDGE) Covers ErrorInjectionSupported TRUE branch +
-// createErrorInjectionPayload inner FALSE
-TEST_F(NsmChassisTest, createChassisAttributes_ErrorInjectionTrue_GPUDevice)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_errinj";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = gpuUuid;
-    baseMap["DeviceType"] =
-        uint64_t(NSM_DEV_ID_GPU); // allBaseIfaceProperties DeviceType
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["ErrorInjectionSupported"] = true;
-
-    // DeviceType=GPU != MCTP_BRIDGE -> no MCU sensors, but no crash
-    EXPECT_NO_THROW(nsmChassisCreateSensors(
-        mockManager, basicIntfName + ".ChassisAttributes", freshPath));
-}
-
-// ErrorInjectionSupported=true; DeviceType absent from allBaseIfaceProperties
-// -> count("DeviceType") FALSE in createErrorInjectionPayload ->
-// deviceType=UNKNOWN
-TEST_F(NsmChassisTest,
-       createChassisAttributes_ErrorInjectionTrue_NoDeviceType_NoMCU)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_errinj_nodt";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = gpuUuid;
-    // "DeviceType" intentionally absent -> count() FALSE -> deviceType=UNKNOWN
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["ErrorInjectionSupported"] = true;
-
-    EXPECT_NO_THROW(nsmChassisCreateSensors(
-        mockManager, basicIntfName + ".ChassisAttributes", freshPath));
-}
-
-// DeviceDiagnosticsSupported=true -> createDeviceDiagnostics called
-TEST_F(NsmChassisTest,
-       createChassisAttributes_DeviceDiagnosticsTrue_SensorAdded)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_devdiag";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("gpu_devdiag_unique");
-    baseMap["UUID"] = gpuUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["DeviceDiagnosticsSupported"] = true;
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    // NsmDebugInfoObject + createSKU + createHealth -> static sensor count
-    // increases
-    EXPECT_GT(gpu->staticSensors.size(), before);
-}
-
-// createAsset: Manufacturer property present -> count() TRUE -> custom
-// manufacturer
-TEST_F(NsmChassisTest, createChassisAttributes_WithManufacturer_CustomMfr)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_mfr";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = gpuUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["AssetInformationAvailable"] = true;
-    pm["Manufacturer"] =
-        std::string("ACME Corp"); // count() TRUE in createAsset
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            freshPath);
-    // createAsset (3 sensors: partNumber, serialNumber, model) + createSKU +
-    // createHealth
-    EXPECT_EQ(gpu->staticSensors.size(), before + 5);
-}
-
-// ============================================================================
-// SECTION: createWriteProtect – DeviceType FALSE/throw branches //
-
-// ============================================================================
-
-// WriteProtectSupported=true; DeviceType absent from base props ->
-// count("DeviceType") FALSE -> deviceType=UNKNOWN ->
-// deviceType != BASEBOARD -> throws (covers L243 FALSE + L249/L252 TRUE)
-TEST_F(NsmChassisTest, createWriteProtect_MissingDeviceType_Throws)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_wp_nodt";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    // "DeviceType" intentionally absent -> deviceType=UNKNOWN -> throws
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = gpuUuid;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["WriteProtectSupported"] = true;
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(
-            mockManager, basicIntfName + ".ChassisAttributes", freshPath),
-        std::runtime_error);
-}
-
-// WriteProtectSupported=true; DeviceType=GPU (wrong) -> count("DeviceType")
-// TRUE
-// -> deviceType=GPU -> deviceType != BASEBOARD -> throws (covers L243 TRUE +
-// L249/L252 TRUE throw path)
-TEST_F(NsmChassisTest, createWriteProtect_WrongDeviceType_Throws)
-{
-    const std::string freshPath =
-        "/xyz/openbmc_project/inventory/system/chassis/gpu_wp_wrongdt";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(freshPath, basicIntfName);
-    baseMap["Name"] = std::string("HGX_GPU_SXM_1");
-    baseMap["UUID"] = gpuUuid;
-    baseMap["DeviceType"] =
-        uint64_t(NSM_DEV_ID_GPU); // wrong type -> throws in createWriteProtect
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        freshPath, basicIntfName + ".ChassisAttributes");
-    pm["Type"] = std::string("NSM_Chassis_Attributes");
-    pm["WriteProtectSupported"] = true;
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(
-            mockManager, basicIntfName + ".ChassisAttributes", freshPath),
-        std::runtime_error);
-}
-
 // =============================================================================
 // Direct tests for getErrorInjectionTypeAndSubtype
 // (nsmErrorInjectionCommon.hpp) covering uncovered switch cases: MemoryErrors,
@@ -3964,115 +1636,4 @@ TEST(GetErrorInjectionTypeAndSubtype, Unknown_ReturnsFalse)
     uint16_t type = 0xFF, subtype = 0xFF;
     EXPECT_FALSE(nsm::getErrorInjectionTypeAndSubtype(
         ErrorInjectionCapabilityIntf::Type::Unknown, &type, &subtype));
-}
-
-// =============================================================================
-// MCU error injection with HPM_SMA role: covers LeakDetectionErrors +
-// USBBridgeEmulationErrors branches in createNsmMCUErrorInjectionSensors
-// combined = (NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA=3 << 8) |
-// NSM_DEV_ID_MCTP_BRIDGE=5
-//          = 773
-// =============================================================================
-
-TEST_F(NsmChassisTest,
-       MCUErrorInjection_HPMSMARole_CoversLeakAndUSBBridgeBranches)
-{
-    const uuid_t hpmSmaUuid = "STATIC:773:0:NSM_DEVICE_INSTANCE_NUMBER:0";
-    const std::string hpmSmaObjPath =
-        "/xyz/openbmc_project/inventory/test/chassis/hpm_sma_ei";
-    const std::string hpmSmaName = "HGX_HPM_SMA_1";
-
-    auto& baseMap = utils::MockDbusAsync::propertyMap(hpmSmaObjPath,
-                                                      basicIntfName);
-    baseMap["Name"] = hpmSmaName;
-    baseMap["UUID"] = hpmSmaUuid;
-    baseMap["DeviceType"] = uint64_t(NSM_DEV_ID_MCTP_BRIDGE);
-
-    auto& chassisMap = utils::MockDbusAsync::propertyMap(
-        hpmSmaObjPath, basicIntfName + ".Chassis");
-    chassisMap["Type"] = std::string("NSM_Chassis");
-    chassisMap["DEVICE_UUID"] = hpmSmaUuid;
-
-    // Create the device (deviceRole=3=HPM_SMA is embedded in UUID)
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis",
-                            hpmSmaObjPath);
-
-    auto hpmDevice = std::dynamic_pointer_cast<MockNsmDevice>(
-        mockManager.getNsmDeviceFromStaticUUID(hpmSmaUuid));
-    ASSERT_NE(nullptr, hpmDevice);
-    // Verify device role was set from UUID
-    EXPECT_EQ(hpmDevice->getDeviceRole(), NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA);
-
-    auto& attrMap = utils::MockDbusAsync::propertyMap(
-        hpmSmaObjPath, basicIntfName + ".ChassisAttributes");
-    attrMap["Type"] = std::string("NSM_Chassis_Attributes");
-    attrMap["ErrorInjectionSupported"] = true;
-
-    const size_t sensorsBefore = hpmDevice->staticSensors.size();
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
-                            hpmSmaObjPath);
-
-    // Sensors for LeakDetectionErrors + USBBridgeEmulationErrors should be
-    // added
-    EXPECT_GT(hpmDevice->staticSensors.size(), sensorsBefore);
-
-    // Cleanup to avoid D-Bus object conflicts with subsequent tests
-    hpmDevice->deviceSensors.clear();
-    hpmDevice->prioritySensors.clear();
-    hpmDevice->roundRobinSensors.clear();
-    hpmDevice->staticSensors.clear();
-    devices.erase(std::remove(devices.begin(), devices.end(),
-                              std::static_pointer_cast<NsmDevice>(hpmDevice)),
-                  devices.end());
-}
-
-// L493 TRUE branch: createPowerState throws when DeviceType != BASEBOARD
-// Also covers L448 TRUE branch for NSM_OperationalStatus (same pattern).
-TEST_F(NsmChassisTest, createPowerState_NonBaseboardDevice_Throws)
-{
-    // Set up base properties with a non-baseboard UUID (GPU device, type=0)
-    // DeviceType=0 (NSM_DEV_ID_GPU) != 3 (NSM_DEV_ID_BASEBOARD) -> throws
-    const std::string uniquePath = chassisInventoryBasePath /
-                                   std::string("GPU_SXM_PowerState_Throw");
-
-    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                      basicIntfName);
-    baseMap["Name"] = std::string("GPU_SXM_PowerState_Throw");
-    baseMap["UUID"] = gpuUuid;
-    // DeviceType deliberately set to GPU (0) -> != BASEBOARD (3) -> throw
-    baseMap["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
-
-    auto& pwrMap = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".PowerState");
-    pwrMap["Type"] = std::string("NSM_PowerState");
-    pwrMap["InventoryObjPaths"] = std::vector<std::string>{uniquePath};
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
-                                uniquePath),
-        std::runtime_error);
-}
-
-TEST_F(NsmChassisTest, createOperationalStatus_NonBaseboardDevice_Throws)
-{
-    // DeviceType=0 (NSM_DEV_ID_GPU) != 3 (NSM_DEV_ID_BASEBOARD) -> L448 throw
-    const std::string uniquePath =
-        chassisInventoryBasePath /
-        std::string("GPU_SXM_OperationalStatus_Throw");
-
-    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                      basicIntfName);
-    baseMap["Name"] = std::string("GPU_SXM_OperationalStatus_Throw");
-    baseMap["UUID"] = gpuUuid;
-    baseMap["DeviceType"] = uint64_t(NSM_DEV_ID_GPU);
-
-    auto& opsMap = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".OperationalStatus");
-    opsMap["Type"] = std::string("NSM_OperationalStatus");
-    opsMap["InventoryObjPaths"] = std::vector<std::string>{uniquePath};
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisCreateSensors(
-            mockManager, basicIntfName + ".OperationalStatus", uniquePath),
-        std::runtime_error);
 }

@@ -1,6 +1,9 @@
 #include "nsmPCIeRetimerSwitchDI.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "features/associations.hpp"
+#include "globals.hpp"
+#include "nsmDeviceInventoryFeatures.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -337,23 +340,6 @@ requester::Coroutine CreatePCIeRetimerSwitch(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_SUCCESS;
     }
-    else if (type == "NSM_MultiPortPCIeSwitchDevice")
-    {
-        auto multiPortSwitchDi = std::make_shared<NsmPCIeRetimerSwitchDI>(
-            bus, name, associations, type, inventoryObjPath, deviceIndex, 0, 0,
-            0);
-        if (!multiPortSwitchDi)
-        {
-            lg2::error(
-                "Failed to create multiport switch device inventory: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
-                "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
-            // coverity[missing_return]
-            co_return NSM_ERROR;
-        }
-        nsmDevice->addStandByToDcRefreshSensor(multiPortSwitchDi);
-        nsmDevice->addStaticSensor(multiPortSwitchDi);
-        co_return NSM_SUCCESS;
-    }
     else
     {
         co_return NSM_ERROR;
@@ -361,9 +347,51 @@ requester::Coroutine CreatePCIeRetimerSwitch(SensorManager& manager,
 }
 
 dbus::Interfaces pcieRetimerSwitchInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Switch",
-    "xyz.openbmc_project.Configuration.NSM_MultiPortPCIeSwitchDevice"};
+    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Switch"};
 
 REGISTER_NSM_CREATION_FUNCTION(CreatePCIeRetimerSwitch,
                                pcieRetimerSwitchInterfaces)
 } // namespace nsm
+
+namespace nsm::features
+{
+
+requester::Coroutine createMultiPortPCIeSwitchDeviceFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("MultiPortPCIeSwitchDevice feature of {NAME}: no NsmDevice",
+                   "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+    auto& bus = utils::DBusHandler::getBus();
+    const std::string type = "NSM_MultiPortPCIeSwitchDevice";
+    auto name = param<std::string>(params, "Name").value_or("");
+    auto fabricName = param<std::string>(params, "FabricName").value_or("");
+    auto deviceInstance = param<uint64_t>(params, "DeviceInstance").value_or(0);
+    const auto fabricPath = (fabricsInventoryBasePath / fabricName).string();
+    // Legacy InventoryObjPath, with the trailing '/' it is joined on
+    std::string inventoryObjPath =
+        (path(fabricPath) / fabricSwitchesSubPath).string() + "/";
+
+    std::vector<utils::Association> associations{};
+    addAssociations(associations, params, "ParentChassisAssociationPaths",
+                    "parent_chassis", "all_switches");
+    addAssociations(associations, params, "FabricAssociationPaths", "fabrics",
+                    "all_switches");
+
+    // device_index are between [1 to 8] for retimers, which is
+    // calculated as device_instance + PCIE_RETIMER_DEVICE_INDEX_START
+    uint8_t deviceIndex = static_cast<uint8_t>(deviceInstance) +
+                          PCIE_RETIMER_DEVICE_INDEX_START;
+
+    auto multiPortSwitchDi = std::make_shared<NsmPCIeRetimerSwitchDI>(
+        bus, name, associations, type, inventoryObjPath, deviceIndex, 0, 0, 0);
+    dev.device->addStandByToDcRefreshSensor(multiPortSwitchDi);
+    dev.device->addStaticSensor(multiPortSwitchDi);
+    co_return NSM_SUCCESS;
+}
+
+} // namespace nsm::features

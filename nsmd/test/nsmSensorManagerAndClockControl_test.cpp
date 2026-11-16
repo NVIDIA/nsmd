@@ -26,9 +26,9 @@
  *   2. nsmd/nsmChassis/nsmGpuClockControl.cpp - NsmChassisClockControl:
  *      genRequestMsg, handleResponseMsg, updateMetricOnSharedMemory,
  *      setRangeClockLimits, clearReqClockLimit, clearClockLimit,
- *      createControlGpuClock factory
+ *      createClockLimitFeature
  *   3. nsmd/nsmNumericSensor/nsmThresholdFactory.cpp -
- *      NsmThresholdFactory: constructor, getThresholdInterfaces,
+ *      NsmThresholdFactory: constructor,
  *      NsmThresholdAggregatorBuilder::makeAggregator
  */
 
@@ -52,6 +52,7 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
 #include "nsmChassis/nsmGpuClockControl.hpp"
 #include "nsmNumericSensor/nsmNumericSensorFactory.hpp"
 #include "nsmNumericSensor/nsmThreshold.hpp"
@@ -64,14 +65,6 @@ using namespace ::testing;
 #undef protected
 
 using namespace nsm;
-
-// Forward declarations for factory functions
-namespace nsm
-{
-requester::Coroutine createControlGpuClock(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
 
 // ============================================================================
 // Helper: Build a valid get_clock_limit response buffer
@@ -560,50 +553,48 @@ TEST_F(NsmGpuClockControlTest, Constructor_SetsInventoryObjPath)
 }
 
 // ============================================================================
-// PART 7: createControlGpuClock factory tests
+// PART 7: createClockLimitFeature tests
 // ============================================================================
 
-TEST_F(NsmGpuClockControlTest, CreateControlGpuClock_AllProperties_Success)
+static nsm::features::DeviceContext
+    makeClockDev(const std::string& name, const uuid_t& uuid,
+                 std::shared_ptr<NsmDevice> device)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl1";
+    nsm::features::DeviceContext dev;
+    dev.name = name;
+    dev.kind = "gpu";
+    dev.staticUuid = uuid;
+    dev.platformPrefix = "HGX_";
+    dev.device = std::move(device);
+    return dev;
+}
+
+TEST_F(NsmGpuClockControlTest, CreateClockLimitFeature_AllParams_Success)
+{
     const std::string testName = "HGX_GPU 0 ClockLimit_1";
-    const std::string testType = "NSM_ControlClockLimit_0";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_1";
-    const std::string physicalContext =
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU";
-    const std::string clockMode =
-        "com.nvidia.ClockMode.Mode.MaximumPerformance";
-    const bool priority = false;
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = testName;
-    propertyMap["Type"] = testType;
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    propertyMap["PhysicalContext"] = physicalContext;
-    propertyMap["ClockMode"] = clockMode;
-    propertyMap["Priority"] = priority;
-
-    dbus::PropertyMap association = {
-        {"Forward", "parent_chassis"},
-        {"Backward", "clock_controls"},
-        {"AbsolutePath",
-         "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU 1"}};
-    auto& propertyMapAssociation0 = utils::MockDbusAsync::propertyMap(
-        testObjPath, interface + ".Associations0");
-    propertyMapAssociation0 = association;
+    dbus::PropertyMap params = {
+        {"Name", testName},
+        {"PhysicalContext",
+         std::string("xyz.openbmc_project.Inventory.Decorator.Area."
+                     "PhysicalContextType.GPU")},
+        {"ClockMode",
+         std::string("com.nvidia.ClockMode.Mode.MaximumPerformance")},
+        {"Priority", false},
+        {"ParentChassisAssociationPaths",
+         std::vector<std::string>{"chassis/HGX_GPU_1"}}};
 
     size_t initialSensorCount = gpu->deviceSensors.size();
-    createControlGpuClock(mockManager, interface, testObjPath);
+    size_t initialStaticCount = gpu->staticSensors.size();
+    auto rc = nsm::features::createClockLimitFeature(
+        mockManager, makeClockDev("HGX_GPU_1", gpuUuid, gpu), params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     EXPECT_GT(gpu->deviceSensors.size(), initialSensorCount);
+    // Min and max graphics clock limits are static sensors
+    EXPECT_EQ(gpu->staticSensors.size(), initialStaticCount + 2);
 
-    // Verify a NsmChassisClockControl sensor was added
+    // Verify a NsmChassisClockControl sensor was added at the accelerator
+    // controls path of the device
     bool foundSensor = false;
     for (const auto& sensor : gpu->deviceSensors)
     {
@@ -615,82 +606,52 @@ TEST_F(NsmGpuClockControlTest, CreateControlGpuClock_AllProperties_Success)
         }
     }
     EXPECT_TRUE(foundSensor);
+    EXPECT_NE(AsyncOperationManager::getInstance()->dispatchers.find(
+                  "/xyz/openbmc_project/inventory/system/accelerator/GPU_1/"
+                  "Controls/ClockLimit_0"),
+              AsyncOperationManager::getInstance()->dispatchers.end());
 }
 
 TEST_F(NsmGpuClockControlTest,
-       CreateControlGpuClock_WithPriority_AddsToCorrectQueue)
+       CreateClockLimitFeature_WithPriority_AddsToCorrectQueue)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl2";
-    const std::string testName = "HGX_GPU 0 PriorityClockLimit";
-    const std::string testType = "NSM_ControlClockLimit_0";
-    const std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_2";
-    const std::string physicalContext =
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU";
-    const std::string clockMode =
-        "com.nvidia.ClockMode.Mode.MaximumPerformance";
-    const bool priority = true;
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = testName;
-    propertyMap["Type"] = testType;
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["InventoryObjPath"] = inventoryObjPath;
-    propertyMap["PhysicalContext"] = physicalContext;
-    propertyMap["ClockMode"] = clockMode;
-    propertyMap["Priority"] = priority;
+    dbus::PropertyMap params = {
+        {"Name", std::string("HGX_GPU 0 PriorityClockLimit")},
+        {"PhysicalContext",
+         std::string("xyz.openbmc_project.Inventory.Decorator.Area."
+                     "PhysicalContextType.GPU")},
+        {"ClockMode",
+         std::string("com.nvidia.ClockMode.Mode.MaximumPerformance")},
+        {"Priority", true}};
 
     size_t initialPrioritySensors = gpu->prioritySensors.size();
-    createControlGpuClock(mockManager, interface, testObjPath);
+    auto rc = nsm::features::createClockLimitFeature(
+        mockManager, makeClockDev("HGX_GPU_2", gpuUuid, gpu), params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     EXPECT_GT(gpu->prioritySensors.size(), initialPrioritySensors);
 }
 
-TEST_F(NsmGpuClockControlTest, CreateControlGpuClock_InvalidUUID_ReturnsError)
+TEST_F(NsmGpuClockControlTest, CreateClockLimitFeature_NullDevice_ReturnsError)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/invalid/ClockControlX";
-    const uuid_t invalidUuid = "INVALID:UUID:DOES:NOT:EXIST";
+    dbus::PropertyMap params = {{"Name", std::string("InvalidClockControl")}};
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["Name"] = std::string("InvalidClockControl");
-    propertyMap["Type"] = std::string("NSM_ClockControl");
-    propertyMap["UUID"] = invalidUuid;
-    propertyMap["InventoryObjPath"] = std::string("/test/path");
-
-    EXPECT_THROW_COROUTINE(
-        createControlGpuClock(mockManager, interface, testObjPath),
-        std::runtime_error);
+    size_t initialSensorCount = gpu->deviceSensors.size();
+    auto rc = nsm::features::createClockLimitFeature(
+        mockManager, makeClockDev("HGX_GPU_X", gpuUuid, nullptr), params);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount);
 }
 
 TEST_F(NsmGpuClockControlTest,
-       CreateControlGpuClock_EmptyProperties_HandledGracefully)
+       CreateClockLimitFeature_EmptyParams_HandledGracefully)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/ClockControl3";
-
-    // Only set UUID and InventoryObjPath (minimum required)
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                          interface);
-    propertyMap["UUID"] = gpuUuid;
-    propertyMap["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_3");
-
-    // With missing Name/Type/PhysicalContext/ClockMode, the factory
-    // may throw during string conversion (e.g. empty physicalContext).
-    // Verify it does not crash the test - the coroutine handles errors
-    // internally or the exception is stored in the coroutine promise.
-    EXPECT_NO_THROW_COROUTINE(
-        createControlGpuClock(mockManager, interface, testObjPath));
+    // With missing Name/PhysicalContext/ClockMode, the creator may throw
+    // during string conversion (e.g. empty physicalContext). Verify it does
+    // not crash the test - the exception is stored in the coroutine promise.
+    EXPECT_NO_THROW_COROUTINE(nsm::features::createClockLimitFeature(
+        mockManager, makeClockDev("HGX_GPU_3", gpuUuid, gpu),
+        dbus::PropertyMap{}));
 }
 
 // ============================================================================
@@ -974,9 +935,6 @@ struct NsmThresholdFactoryTest :
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
-    const std::string interface = "xyz.openbmc_project.Configuration.NSM_Temp";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_0/Temp0";
     NumericSensorInfo info = {};
 
     NsmThresholdFactoryTest() : SensorManagerTest(devices)
@@ -1002,44 +960,24 @@ TEST_F(NsmThresholdFactoryTest, Constructor_InitializesMembers)
 {
     // Arrange
     auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
+    std::unordered_map<std::string, FeatureThreshold> thresholds{
+        {"LowerCaution",
+         FeatureThreshold{.value = 5.0, .parameterId = std::nullopt}},
+        {"UpperCaution", FeatureThreshold{.parameterId = 2}}};
 
     // Act
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
-
-    // Assert
-    EXPECT_EQ(factory.interface, interface);
-    EXPECT_EQ(factory.objPath, testObjPath);
-    EXPECT_NE(factory.nsmDevice, nullptr);
-}
-
-TEST_F(NsmThresholdFactoryTest, Constructor_SetsNsmDevice)
-{
-    // Arrange
-    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-
-    // Act
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
+    NsmThresholdFactory factory(mockManager, numericSensor, info, gpuUuid, gpu,
+                                thresholds);
 
     // Assert
     EXPECT_EQ(factory.nsmDevice, gpu);
-}
-
-TEST_F(NsmThresholdFactoryTest, Constructor_DifferentUUIDs_GetDifferentDevices)
-{
-    // Arrange
-    const uuid_t gpu1Uuid = "STATIC:0:1:NSM_DEVICE_INSTANCE_NUMBER:1";
-    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-
-    // Act
-    NsmThresholdFactory factory0(mockManager, interface, testObjPath,
-                                 numericSensor, info, gpuUuid);
-    NsmThresholdFactory factory1(mockManager, interface, testObjPath,
-                                 numericSensor, info, gpu1Uuid);
-
-    // Assert
-    EXPECT_NE(factory0.nsmDevice, factory1.nsmDevice);
+    EXPECT_EQ(factory.uuid, gpuUuid);
+    ASSERT_EQ(factory.featureThresholds.size(), 2u);
+    EXPECT_FALSE(
+        factory.featureThresholds.at("LowerCaution").parameterId.has_value());
+    ASSERT_TRUE(
+        factory.featureThresholds.at("UpperCaution").parameterId.has_value());
+    EXPECT_EQ(*factory.featureThresholds.at("UpperCaution").parameterId, 2u);
 }
 
 // ============================================================================
@@ -1452,54 +1390,6 @@ TEST(NsmThresholdValueTypesTest,
 }
 
 // ============================================================================
-// PART 18: NsmThresholdFactory - getThresholdInterfaces (sync version)
-// ============================================================================
-
-// The sync getThresholdInterfaces() requires a real DBus call via mapper.
-// We can test the factory constructor and interface/objPath storage.
-
-TEST_F(NsmThresholdFactoryTest, Constructor_StoresInterfaceAndObjPath)
-{
-    // Arrange
-    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-
-    // Act
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
-
-    // Assert
-    EXPECT_EQ(factory.interface, interface);
-    EXPECT_EQ(factory.objPath, testObjPath);
-}
-
-TEST_F(NsmThresholdFactoryTest, Constructor_StoresNumericSensor)
-{
-    // Arrange
-    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-
-    // Act
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
-
-    // Assert
-    EXPECT_EQ(factory.numericSensor, numericSensor);
-}
-
-TEST_F(NsmThresholdFactoryTest, Constructor_ResolversDevice)
-{
-    // Arrange
-    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-
-    // Act
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
-
-    // Assert
-    EXPECT_NE(factory.nsmDevice, nullptr);
-    EXPECT_EQ(factory.nsmDevice->getDeviceType(), gpu->getDeviceType());
-}
-
-// ============================================================================
 // PART 19: Additional edge cases for NsmChassisClockControl
 // ============================================================================
 
@@ -1885,46 +1775,10 @@ TEST_F(NsmThresholdFactoryTest, Constructor_WithNullNumericSensor_StoresNull)
     auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
 
     // Act
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
+    NsmThresholdFactory factory(mockManager, numericSensor, info, gpuUuid, gpu,
+                                {});
 
     // Assert
     EXPECT_EQ(factory.numericSensor, nullptr);
-}
-
-TEST_F(NsmThresholdFactoryTest, Constructor_WithDifferentInterfaces_Works)
-{
-    // Arrange
-    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-    std::string intf1 = "xyz.openbmc_project.Configuration.NSM_Temp";
-    std::string intf2 = "xyz.openbmc_project.Configuration.NSM_Power";
-    std::string intf3 = "xyz.openbmc_project.Configuration.NSM_Voltage";
-
-    // Act & Assert
-    EXPECT_NO_THROW({
-        NsmThresholdFactory f1(mockManager, intf1, testObjPath, numericSensor,
-                               info, gpuUuid);
-        NsmThresholdFactory f2(mockManager, intf2, testObjPath, numericSensor,
-                               info, gpuUuid);
-        NsmThresholdFactory f3(mockManager, intf3, testObjPath, numericSensor,
-                               info, gpuUuid);
-    });
-}
-
-TEST_F(NsmThresholdFactoryTest, Constructor_WithDifferentObjPaths_Works)
-{
-    // Arrange
-    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-    std::string path1 = "/xyz/openbmc_project/inventory/sensor1";
-    std::string path2 = "/xyz/openbmc_project/inventory/sensor2";
-
-    // Act
-    NsmThresholdFactory f1(mockManager, interface, path1, numericSensor, info,
-                           gpuUuid);
-    NsmThresholdFactory f2(mockManager, interface, path2, numericSensor, info,
-                           gpuUuid);
-
-    // Assert
-    EXPECT_EQ(f1.objPath, path1);
-    EXPECT_EQ(f2.objPath, path2);
+    EXPECT_TRUE(factory.featureThresholds.empty());
 }

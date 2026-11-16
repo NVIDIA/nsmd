@@ -17,8 +17,9 @@
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmGpmOem.hpp"
-#include "nsmObjectFactory.hpp"
 
 #undef private
 #undef protected
@@ -32,15 +33,14 @@ namespace nsm
 {
 std::vector<uint8_t> convertToBytes(const std::vector<uint64_t>& data);
 
-requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
-                                         const std::string& interface,
-                                         const std::string& objPath);
-
-requester::Coroutine createNsmPerInstanceGPMMetric(
+int addNsmPerInstanceGPMMetric(
     std::shared_ptr<NsmGPMInterfaceCreator> gpmInterfaceCreator,
     std::shared_ptr<NsmDevice> nsmDevice, const std::string& inventoryObjPath,
-    const std::string& interface, const std::string& objPath,
-    const std::string& uuid);
+    const std::string& name, const std::string& type, uint8_t retrievalSource,
+    uint8_t gpuInstance, uint8_t computeInstance, const std::string& metric,
+    uint8_t metricId, std::optional<uint64_t> v1BitmaskOpt,
+    const std::optional<std::vector<uint64_t>>& v2InstanceBitfield,
+    const std::string& uuid, const std::string& interface);
 } // namespace nsm
 
 using namespace nsm;
@@ -139,9 +139,39 @@ TEST(NsmGpmOemFactoryTest, ConvertToBytesValuesAreOnlyLowByte)
     EXPECT_EQ(result[1], static_cast<uint8_t>(0x00));
 }
 
+namespace
+{
+// Count how many items in `deviceSensors` are convertible to T.
+template <typename T>
+size_t countSensors(
+    const std::vector<std::shared_ptr<nsm::NsmObject>>& deviceSensors)
+{
+    size_t n = 0;
+    for (const auto& s : deviceSensors)
+    {
+        if (std::dynamic_pointer_cast<T>(s))
+        {
+            ++n;
+        }
+    }
+    return n;
+}
+
+features::DeviceContext gpuContext(const std::string& name, const uuid_t& uuid,
+                                   std::shared_ptr<NsmDevice> device)
+{
+    features::DeviceContext dev;
+    dev.name = name;
+    dev.kind = "gpu";
+    dev.staticUuid = uuid;
+    dev.platformPrefix = "HGX_";
+    dev.device = std::move(device);
+    return dev;
+}
+} // namespace
+
 // ============================================================================
-// Test fixture for createNsmPerPortGPMMetrics
-// (static function, accessed via NsmObjectFactory)
+// Test fixture for createGPMPortMetricsFeature
 // ============================================================================
 
 struct NsmPerPortGPMMetricsTestFixture :
@@ -149,10 +179,6 @@ struct NsmPerPortGPMMetricsTestFixture :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string portInterface =
-        "xyz.openbmc_project.Configuration.NSM_GPMPortMetrics";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/gpm_port_test";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
@@ -173,103 +199,144 @@ struct NsmPerPortGPMMetricsTestFixture :
         cleanupDeviceSensors(devices);
     }
 
-    void setupProperties(const std::vector<std::string>& metrics,
-                         const std::vector<uint64_t>& ports = {},
-                         const std::vector<uint64_t>& instanceBitfield = {0x01},
-                         const std::string& inventoryPath =
-                             "/xyz/openbmc_project/inventory/gpm_port")
+    static dbus::PropertyMap
+        portParams(const std::vector<std::string>& metrics,
+                   uint64_t nvlinkCount = 0,
+                   const std::vector<uint64_t>& instanceBitfield = {0x01},
+                   const std::string& parentPath =
+                       "/xyz/openbmc_project/inventory/gpm_port")
     {
-        auto& pm = utils::MockDbusAsync::propertyMap(objPath, portInterface);
-        pm["Name"] = std::string("TestGPMPort");
-        pm["UUID"] = gpuUuid;
-        pm["RetrievalSource"] = uint64_t(1);
-        pm["GpuInstance"] = uint64_t(0);
-        pm["ComputeInstance"] = uint64_t(0);
-        pm["Metrics"] = metrics;
-        pm["Ports"] = ports;
-        pm["InstanceBitfield"] = instanceBitfield;
-        pm["InventoryObjPath"] = inventoryPath;
+        return {
+            {"Name", std::string("TestGPMPort")},
+            {"RetrievalSource", uint64_t(1)},
+            {"GpuInstance", uint64_t(0)},
+            {"ComputeInstance", uint64_t(0)},
+            {"Metrics", metrics},
+            {"NVLinkCount", nvlinkCount},
+            {"InstanceBitfield", instanceBitfield},
+            {"ParentObjPath", parentPath},
+        };
     }
 
-    void callFactory()
+    requester::Coroutine callFactory(const dbus::PropertyMap& params,
+                                     bool withDevice = true)
     {
-        auto& factory = NsmObjectFactory::instance();
-        auto it = factory.creationFunctions.find(portInterface);
-        ASSERT_NE(it, factory.creationFunctions.end());
-        it->second(mockManager, portInterface, objPath);
+        auto dev = gpuContext("HGX_GPU_SXM_0", gpuUuid,
+                              withDevice ? gpu : nullptr);
+        return features::createGPMPortMetricsFeature(mockManager, dev, params);
     }
 };
 
 TEST_F(NsmPerPortGPMMetricsTestFixture, AllValidMetrics_SensorsAdded)
 {
-    setupProperties({"NVLinkRawTxBandwidthGbps", "NVLinkDataTxBandwidthGbps",
-                     "NVLinkRawRxBandwidthGbps", "NVLinkDataRxBandwidthGbps"},
-                    {}, {0x01}, "/xyz/openbmc_project/inventory/gpm_port_all");
-    callFactory();
+    auto rc = callFactory(
+        portParams({"NVLinkRawTxBandwidthGbps", "NVLinkDataTxBandwidthGbps",
+                    "NVLinkRawRxBandwidthGbps", "NVLinkDataRxBandwidthGbps"},
+                   0, {0x01}, "/xyz/openbmc_project/inventory/gpm_port_all"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 4);
+    EXPECT_EQ(countSensors<nsm::NsmGetSupportedPerInstanceGPMMetrics>(
+                  gpu->deviceSensors),
+              4u);
+}
+
+TEST_F(NsmPerPortGPMMetricsTestFixture, NoDevice_ReturnsError)
+{
+    auto rc = callFactory(portParams({"NVLinkRawTxBandwidthGbps"}), false);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount);
 }
 
 TEST_F(NsmPerPortGPMMetricsTestFixture, UnknownMetric_Skipped)
 {
-    setupProperties({"UnknownMetricXYZ"}, {}, {0x01},
-                    "/xyz/openbmc_project/inventory/gpm_port_unk");
-    callFactory();
+    auto rc =
+        callFactory(portParams({"UnknownMetricXYZ"}, 0, {0x01},
+                               "/xyz/openbmc_project/inventory/gpm_port_unk"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 0);
 }
 
 TEST_F(NsmPerPortGPMMetricsTestFixture, MixedMetrics_OnlyValidAdded)
 {
-    setupProperties({"NVLinkRawTxBandwidthGbps", "UnknownMetric",
-                     "NVLinkDataRxBandwidthGbps"},
-                    {}, {0x01},
-                    "/xyz/openbmc_project/inventory/gpm_port_mixed");
-    callFactory();
+    auto rc = callFactory(
+        portParams({"NVLinkRawTxBandwidthGbps", "UnknownMetric",
+                    "NVLinkDataRxBandwidthGbps"},
+                   0, {0x01}, "/xyz/openbmc_project/inventory/gpm_port_mixed"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 2);
 }
 
-TEST_F(NsmPerPortGPMMetricsTestFixture, EmptyPorts_SensorCreated)
+TEST_F(NsmPerPortGPMMetricsTestFixture, NoPorts_SensorCreated)
 {
-    setupProperties({"NVLinkRawTxBandwidthGbps"}, {}, {0x01},
-                    "/xyz/openbmc_project/inventory/gpm_port_empty_ports");
-    callFactory();
+    auto rc = callFactory(
+        portParams({"NVLinkRawTxBandwidthGbps"}, 0, {0x01},
+                   "/xyz/openbmc_project/inventory/gpm_port_empty_ports"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
 }
 
-TEST_F(NsmPerPortGPMMetricsTestFixture, DuplicatePorts_Deduped)
+// NVLinkCount ports are created per sensor's updator; still one sensor per
+// metric
+TEST_F(NsmPerPortGPMMetricsTestFixture, NVLinkCount_OneSensorPerMetric)
 {
-    setupProperties({"NVLinkDataTxBandwidthGbps"}, {2, 2, 3, 3}, {0x01},
-                    "/xyz/openbmc_project/inventory/gpm_port_dup");
-    callFactory();
+    auto rc =
+        callFactory(portParams({"NVLinkDataTxBandwidthGbps"}, 4, {0x01},
+                               "/xyz/openbmc_project/inventory/gpm_port_nvl"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
 }
 
 TEST_F(NsmPerPortGPMMetricsTestFixture, EmptyMetrics_NoSensorsAdded)
 {
-    setupProperties({}, {}, {0x01},
-                    "/xyz/openbmc_project/inventory/gpm_port_empty_metrics");
-    callFactory();
+    auto rc = callFactory(
+        portParams({}, 0, {0x01},
+                   "/xyz/openbmc_project/inventory/gpm_port_empty_metrics"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 0);
 }
 
 TEST_F(NsmPerPortGPMMetricsTestFixture, MultipleInstanceBitfieldBytes_Converted)
 {
     // Tests instanceBitfield conversion loop with multiple bytes
-    setupProperties({"NVLinkRawRxBandwidthGbps"}, {}, {0x01, 0x02, 0x03},
-                    "/xyz/openbmc_project/inventory/gpm_port_multi_bitfield");
-    callFactory();
+    auto rc = callFactory(
+        portParams({"NVLinkRawRxBandwidthGbps"}, 0, {0x01, 0x02, 0x03},
+                   "/xyz/openbmc_project/inventory/gpm_port_multi_bitfield"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
 }
 
 TEST_F(NsmPerPortGPMMetricsTestFixture, NVLinkDataRxBandwidthGbps_SensorAdded)
 {
-    setupProperties({"NVLinkDataRxBandwidthGbps"}, {}, {0x01},
-                    "/xyz/openbmc_project/inventory/gpm_port_rx");
-    callFactory();
+    auto rc =
+        callFactory(portParams({"NVLinkDataRxBandwidthGbps"}, 0, {0x01},
+                               "/xyz/openbmc_project/inventory/gpm_port_rx"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
 }
 
+TEST_F(NsmPerPortGPMMetricsTestFixture,
+       V1_BitmaskPresent_OnePerInstanceV1PerMetric)
+{
+    auto params =
+        portParams({"NVLinkRawTxBandwidthGbps", "NVLinkDataRxBandwidthGbps"}, 0,
+                   {}, "/xyz/openbmc_project/inventory/gpm_port_v1");
+    // V1 config: InstanceBitfield set as scalar uint64_t.
+    params["InstanceBitfield"] = uint64_t(0x000000FFU);
+
+    auto rc = callFactory(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 2);
+    EXPECT_EQ(countSensors<nsm::NsmGPMPerInstanceV1>(gpu->deviceSensors), 2u);
+    EXPECT_EQ(countSensors<nsm::NsmGetSupportedPerInstanceGPMMetrics>(
+                  gpu->deviceSensors),
+              0u);
+}
+
 // ============================================================================
-// Test fixture for createNsmPerInstanceGPMMetric
+// Per-instance metrics of createGPMMetricsFeature (<Metric>PerInstance*
+// params). Each enabled metric adds one per-instance sensor next to the
+// aggregate NsmGetSupportedGPMMetrics sensor.
 // ============================================================================
 
 struct NsmPerInstanceGPMMetricTestFixture :
@@ -277,10 +344,6 @@ struct NsmPerInstanceGPMMetricTestFixture :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_GPMMetrics.PerInstanceMetrics0";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/gpm_per_inst_test";
     const std::string inventoryObjPath =
         "/xyz/openbmc_project/inventory/gpm_per_inst";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
@@ -310,214 +373,108 @@ struct NsmPerInstanceGPMMetricTestFixture :
         cleanupDeviceSensors(devices);
     }
 
-    void setupProperties(const std::string& metric)
+    // Aggregated params plus one enabled per-instance metric
+    static dbus::PropertyMap perInstanceParams(const std::string& metric,
+                                               const dbus::Value& bitfield)
     {
-        auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
-        pm["Name"] = std::string("TestPerInstanceMetric");
-        pm["Type"] = std::string("GPMPerInstance");
-        pm["RetrievalSource"] = uint64_t(1);
-        pm["GpuInstance"] = uint64_t(0);
-        pm["ComputeInstance"] = uint64_t(0);
-        pm["Metric"] = metric;
-        pm["MetricId"] = uint64_t(5);
-        pm["InstanceBitfield"] = std::vector<uint64_t>{0x01};
+        const std::string prefix = metric + "PerInstance";
+        return {
+            {"Name", std::string("GPM_Metrics_PI")},
+            {"AggregatedRetrievalSource", uint64_t(2)},
+            {"AggregatedMetricsBitfield",
+             std::vector<uint64_t>{0x89, 0x04, 0x15}},
+            {prefix + "Enabled", true},
+            {prefix + "Name", std::string("TestPerInstanceMetric")},
+            {prefix + "RetrievalSource", uint64_t(1)},
+            {prefix + "GpuInstance", uint64_t(0)},
+            {prefix + "ComputeInstance", uint64_t(0)},
+            {prefix + "Bitfield", bitfield},
+        };
+    }
+
+    requester::Coroutine createGPMMetrics(const dbus::PropertyMap& params)
+    {
+        auto dev = gpuContext("HGX_GPU_SXM_1", gpuUuid, gpu);
+        return features::createGPMMetricsFeature(mockManager, dev, params);
+    }
+
+    size_t perInstanceSensorCount() const
+    {
+        return countSensors<nsm::NsmGPMPerInstanceV1>(gpu->deviceSensors) +
+               countSensors<nsm::NsmGetSupportedPerInstanceGPMMetrics>(
+                   gpu->deviceSensors);
     }
 };
 
 TEST_F(NsmPerInstanceGPMMetricTestFixture, MetricNVDEC_SensorAdded)
 {
-    setupProperties("NVDEC");
-    createNsmPerInstanceGPMMetric(gpmCreator, gpu, inventoryObjPath, interface,
-                                  objPath, gpuUuid);
-    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
+    auto rc = createGPMMetrics(
+        perInstanceParams("NVDEC", std::vector<uint64_t>{0x01}));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // aggregate + per-instance
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 2);
+    EXPECT_EQ(perInstanceSensorCount(), 1u);
 }
 
 TEST_F(NsmPerInstanceGPMMetricTestFixture, MetricNVJPG_SensorAdded)
 {
-    setupProperties("NVJPG");
-    createNsmPerInstanceGPMMetric(gpmCreator, gpu, inventoryObjPath, interface,
-                                  objPath, gpuUuid);
-    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
+    auto rc = createGPMMetrics(
+        perInstanceParams("NVJPG", std::vector<uint64_t>{0x01}));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 2);
+    EXPECT_EQ(perInstanceSensorCount(), 1u);
 }
 
 TEST_F(NsmPerInstanceGPMMetricTestFixture, MetricNVENC_SensorAdded)
 {
-    setupProperties("NVENC");
-    createNsmPerInstanceGPMMetric(gpmCreator, gpu, inventoryObjPath, interface,
-                                  objPath, gpuUuid);
-    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
+    auto rc = createGPMMetrics(
+        perInstanceParams("NVENC", std::vector<uint64_t>{0x01}));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 2);
+    EXPECT_EQ(perInstanceSensorCount(), 1u);
 }
 
+// Per-instance metric not enabled → only the aggregate sensor
+TEST_F(NsmPerInstanceGPMMetricTestFixture, MetricDisabled_NoPerInstanceSensor)
+{
+    auto params = perInstanceParams("NVDEC", std::vector<uint64_t>{0x01});
+    params["NVDECPerInstanceEnabled"] = false;
+
+    auto rc = createGPMMetrics(params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
+    EXPECT_EQ(perInstanceSensorCount(), 0u);
+}
+
+// Unsupported metric name → addNsmPerInstanceGPMMetric rejects it
 TEST_F(NsmPerInstanceGPMMetricTestFixture, MetricUnknown_NoSensorAdded)
 {
-    setupProperties("UnknownMetric");
-    createNsmPerInstanceGPMMetric(gpmCreator, gpu, inventoryObjPath, interface,
-                                  objPath, gpuUuid);
+    auto rc = addNsmPerInstanceGPMMetric(
+        gpmCreator, gpu, inventoryObjPath, "TestPerInstanceMetric",
+        "NSM_GPMPerInstanceMetrics", 1, 0, 0, "UnknownMetric", 5, std::nullopt,
+        std::vector<uint64_t>{0x01}, gpuUuid, "UnknownMetricPerInstance");
+    EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 0);
 }
 
 TEST_F(NsmPerInstanceGPMMetricTestFixture, MultipleInstanceBitfieldBytes)
 {
     // Tests instanceBitfield conversion loop with multiple bytes
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
-    pm["Name"] = std::string("TestPerInstanceMetric");
-    pm["Type"] = std::string("GPMPerInstance");
-    pm["RetrievalSource"] = uint64_t(1);
-    pm["GpuInstance"] = uint64_t(0);
-    pm["ComputeInstance"] = uint64_t(0);
-    pm["Metric"] = std::string("NVENC");
-    pm["MetricId"] = uint64_t(5);
-    pm["InstanceBitfield"] = std::vector<uint64_t>{0x01, 0x02, 0x03};
-
-    createNsmPerInstanceGPMMetric(gpmCreator, gpu, inventoryObjPath, interface,
-                                  objPath, gpuUuid);
-    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
+    auto rc = createGPMMetrics(
+        perInstanceParams("NVENC", std::vector<uint64_t>{0x01, 0x02, 0x03}));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(countSensors<nsm::NsmGetSupportedPerInstanceGPMMetrics>(
+                  gpu->deviceSensors),
+              1u);
 }
-
-// ============================================================================
-// Test fixture for createNsmGPMMetrics with per-instance interfaces
-// (covers getPerInstanceInterfacesAsync loop branches)
-// ============================================================================
-
-struct NsmGPMMetricsWithPerInstanceTestFixture :
-    public ::testing::Test,
-    public utils::DBusTest,
-    public SensorManagerTest
-{
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_GPMMetrics";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/gpm_with_pi_test";
-    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:2";
-
-    boost::asio::io_context io;
-    NsmDeviceTable devices;
-    std::shared_ptr<MockNsmDevice> gpu;
-    std::shared_ptr<sdbusplus::asio::object_server> objServer;
-    size_t initialSensorCount = 0;
-
-    NsmGPMMetricsWithPerInstanceTestFixture() : SensorManagerTest(devices)
-    {
-        gpu = std::dynamic_pointer_cast<MockNsmDevice>(
-            mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
-        EXPECT_NE(gpu, nullptr);
-        auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
-        objServer = std::make_shared<sdbusplus::asio::object_server>(systemBus);
-        // NsmDevice constructor adds msgTypesSensor to deviceSensors
-        initialSensorCount = gpu->deviceSensors.size();
-    }
-
-    ~NsmGPMMetricsWithPerInstanceTestFixture()
-    {
-        cleanupDeviceSensors(devices);
-    }
-
-    void setupMainProperties()
-    {
-        auto& pm = utils::MockDbusAsync::propertyMap(objPath, basicIntfName);
-        pm["Name"] = std::string("GPM_Metrics_PI");
-        pm["UUID"] = gpuUuid;
-        pm["RetrievalSource"] = uint64_t(2);
-        pm["GpuInstance"] = uint64_t(0);
-        pm["ComputeInstance"] = uint64_t(0);
-        pm["MetricsBitfield"] = std::vector<uint64_t>{0x89, 0x04, 0x15};
-        pm["InventoryObjPath"] =
-            std::string("/xyz/openbmc_project/inventory/gpm_pi");
-    }
-};
-
-TEST_F(NsmGPMMetricsWithPerInstanceTestFixture,
-       WithPerInstanceInterface_LoopExecutes)
-{
-    setupMainProperties();
-
-    // Set up serviceMap so getPerInstanceInterfacesAsync finds a per-instance
-    // interface
-    const std::string piIntf = basicIntfName + ".PerInstanceMetrics0";
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {piIntf}}};
-
-    // Set up per-instance metric properties (using NVDEC metric)
-    auto& piPm = utils::MockDbusAsync::propertyMap(objPath, piIntf);
-    piPm["Name"] = std::string("PerInstMetric");
-    piPm["Type"] = std::string("GPMPerInstance");
-    piPm["RetrievalSource"] = uint64_t(1);
-    piPm["GpuInstance"] = uint64_t(0);
-    piPm["ComputeInstance"] = uint64_t(0);
-    piPm["Metric"] = std::string("NVDEC");
-    piPm["MetricId"] = uint64_t(5);
-    piPm["InstanceBitfield"] = std::vector<uint64_t>{0x01};
-
-    EXPECT_CALL(mockManager, getObjServer())
-        .WillRepeatedly(testing::ReturnRef(*objServer));
-
-    createNsmGPMMetrics(mockManager, basicIntfName, objPath);
-
-    // Expect: initial + 1 aggregate sensor + 1 per-instance sensor
-    EXPECT_GE(gpu->deviceSensors.size(), initialSensorCount + 2);
-}
-
-TEST_F(NsmGPMMetricsWithPerInstanceTestFixture,
-       WithNonMatchingServiceMap_NoPerInstance)
-{
-    setupMainProperties();
-
-    // serviceMap has an interface that does NOT match the per-instance pattern
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager",
-         {"xyz.openbmc_project.Configuration.NSM_GPMMetrics.OtherInterface0"}}};
-
-    EXPECT_CALL(mockManager, getObjServer())
-        .WillRepeatedly(testing::ReturnRef(*objServer));
-
-    createNsmGPMMetrics(mockManager, basicIntfName, objPath);
-
-    // Only the aggregate sensor should be added (no per-instance)
-    EXPECT_GE(gpu->deviceSensors.size(), initialSensorCount + 1);
-}
-
-// ============================================================================
-// V1 (legacy) path tests: InstanceBitfield stored as a scalar uint64_t selects
-// the V1 wire command; when stored as vector<uint64_t> it routes to the V2
-// discovery flow.
-// ============================================================================
-
-namespace
-{
-// Count how many items in `deviceSensors` are convertible to T.
-template <typename T>
-size_t countSensors(
-    const std::vector<std::shared_ptr<nsm::NsmObject>>& deviceSensors)
-{
-    size_t n = 0;
-    for (const auto& s : deviceSensors)
-    {
-        if (std::dynamic_pointer_cast<T>(s))
-        {
-            ++n;
-        }
-    }
-    return n;
-}
-} // namespace
 
 TEST_F(NsmPerInstanceGPMMetricTestFixture, V1_BitmaskPresent_RoutesToV1Sensor)
 {
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
-    pm["Name"] = std::string("TestPerInstanceMetricV1");
-    pm["Type"] = std::string("GPMPerInstance");
-    pm["RetrievalSource"] = uint64_t(1);
-    pm["GpuInstance"] = uint64_t(0);
-    pm["ComputeInstance"] = uint64_t(0);
-    pm["Metric"] = std::string("NVDEC");
-    pm["MetricId"] = uint64_t(5);
-    // V1 config: InstanceBitfield stored as scalar uint64_t.
-    pm["InstanceBitfield"] = uint64_t(0x0000000FU);
+    // V1 config: Bitfield set as scalar uint64_t.
+    auto rc =
+        createGPMMetrics(perInstanceParams("NVDEC", uint64_t(0x0000000FU)));
 
-    createNsmPerInstanceGPMMetric(gpmCreator, gpu, inventoryObjPath, interface,
-                                  objPath, gpuUuid);
-
-    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(countSensors<nsm::NsmGPMPerInstanceV1>(gpu->deviceSensors), 1u);
     EXPECT_EQ(countSensors<nsm::NsmGetSupportedPerInstanceGPMMetrics>(
                   gpu->deviceSensors),
@@ -527,70 +484,43 @@ TEST_F(NsmPerInstanceGPMMetricTestFixture, V1_BitmaskPresent_RoutesToV1Sensor)
 TEST_F(NsmPerInstanceGPMMetricTestFixture,
        V1_BitmaskPresent_AbovedUint32_Truncated)
 {
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
-    pm["Name"] = std::string("TestPerInstanceMetricV1Trunc");
-    pm["Type"] = std::string("GPMPerInstance");
-    pm["RetrievalSource"] = uint64_t(1);
-    pm["GpuInstance"] = uint64_t(0);
-    pm["ComputeInstance"] = uint64_t(0);
-    pm["Metric"] = std::string("NVENC");
-    pm["MetricId"] = uint64_t(5);
     // high bits > 31 must be silently truncated with a warning, not throw
-    pm["InstanceBitfield"] = uint64_t(0x0000000F'FFFFFFFFULL);
+    auto rc = createGPMMetrics(
+        perInstanceParams("NVENC", uint64_t(0x0000000F'FFFFFFFFULL)));
 
-    createNsmPerInstanceGPMMetric(gpmCreator, gpu, inventoryObjPath, interface,
-                                  objPath, gpuUuid);
-
-    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
     EXPECT_EQ(countSensors<nsm::NsmGPMPerInstanceV1>(gpu->deviceSensors), 1u);
 }
 
 TEST_F(NsmPerInstanceGPMMetricTestFixture, V2_NoBitmask_RoutesToStaticSensor)
 {
     // Baseline: confirm V2 path still creates the discovery static sensor and
-    // NOT a V1 sensor when InstanceBitfield is stored as a vector.
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, interface);
-    pm["Name"] = std::string("TestPerInstanceMetricV2");
-    pm["Type"] = std::string("GPMPerInstance");
-    pm["RetrievalSource"] = uint64_t(1);
-    pm["GpuInstance"] = uint64_t(0);
-    pm["ComputeInstance"] = uint64_t(0);
-    pm["Metric"] = std::string("NVDEC");
-    pm["MetricId"] = uint64_t(5);
-    pm["InstanceBitfield"] = std::vector<uint64_t>{0x01};
+    // NOT a V1 sensor when the Bitfield is a vector.
+    auto rc = createGPMMetrics(
+        perInstanceParams("NVDEC", std::vector<uint64_t>{0x01}));
 
-    createNsmPerInstanceGPMMetric(gpmCreator, gpu, inventoryObjPath, interface,
-                                  objPath, gpuUuid);
-
-    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(countSensors<nsm::NsmGPMPerInstanceV1>(gpu->deviceSensors), 0u);
     EXPECT_EQ(countSensors<nsm::NsmGetSupportedPerInstanceGPMMetrics>(
                   gpu->deviceSensors),
               1u);
 }
 
-TEST_F(NsmPerPortGPMMetricsTestFixture,
-       V1_BitmaskPresent_OnePerInstanceV1PerMetric)
+// All three per-instance metrics enabled at once → three per-instance sensors
+TEST_F(NsmPerInstanceGPMMetricTestFixture, AllPerInstanceMetrics_Enabled)
 {
-    auto& pm = utils::MockDbusAsync::propertyMap(objPath, portInterface);
-    pm["Name"] = std::string("TestGPMPortV1");
-    pm["UUID"] = gpuUuid;
-    pm["RetrievalSource"] = uint64_t(1);
-    pm["GpuInstance"] = uint64_t(0);
-    pm["ComputeInstance"] = uint64_t(0);
-    pm["Metrics"] = std::vector<std::string>{"NVLinkRawTxBandwidthGbps",
-                                             "NVLinkDataRxBandwidthGbps"};
-    pm["Ports"] = std::vector<uint64_t>{};
-    // V1 config: InstanceBitfield stored as scalar uint64_t.
-    pm["InstanceBitfield"] = uint64_t(0x000000FFU);
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/gpm_port_v1");
+    auto params = perInstanceParams("NVDEC", std::vector<uint64_t>{0x01});
+    for (const std::string metric : {"NVJPG", "NVENC"})
+    {
+        const std::string prefix = metric + "PerInstance";
+        params[prefix + "Enabled"] = true;
+        params[prefix + "Name"] = std::string("PI_") + metric;
+        params[prefix + "Bitfield"] = std::vector<uint64_t>{0x01};
+    }
 
-    callFactory();
-
-    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 2);
-    EXPECT_EQ(countSensors<nsm::NsmGPMPerInstanceV1>(gpu->deviceSensors), 2u);
-    EXPECT_EQ(countSensors<nsm::NsmGetSupportedPerInstanceGPMMetrics>(
-                  gpu->deviceSensors),
-              0u);
+    auto rc = createGPMMetrics(params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount + 4);
+    EXPECT_EQ(perInstanceSensorCount(), 3u);
 }

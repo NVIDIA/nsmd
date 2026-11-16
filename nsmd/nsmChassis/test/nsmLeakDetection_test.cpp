@@ -25,14 +25,9 @@ using namespace ::testing;
 #include "base.h"
 #include "libnsm/platform-environmental.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmLeakDetection.hpp"
-
-namespace nsm
-{
-requester::Coroutine nsmLeakDetectionCreateSensors(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -2101,7 +2096,7 @@ TEST_F(NsmLeakDetectionPatchDeviceTest, DISABLED_OnDevice_EncodeFail_NullData)
 }
 
 // ============================================================================
-// nsmLeakDetectionCreateSensors factory function coverage
+// createLeakDetectionFeature coverage
 // ============================================================================
 
 struct NsmLeakDetectionCreateTest :
@@ -2109,10 +2104,6 @@ struct NsmLeakDetectionCreateTest :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_LeakDetection";
-    const std::string objPath =
-        "/xyz/openbmc_project/sensors/voltage/LeakDetCreate";
     const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
@@ -2129,229 +2120,224 @@ struct NsmLeakDetectionCreateTest :
     {
         cleanupDeviceSensors(devices);
     }
+
+    size_t sensorCount() const
+    {
+        return fpga->deviceSensors.size();
+    }
+
+    /** @brief Feature params of one leak detector on chassis HGX */
+    static dbus::PropertyMap leakParams(const std::string& name,
+                                        std::vector<uint64_t> ids,
+                                        std::vector<std::string> names)
+    {
+        return {{"Name", name},
+                {"ChassisName", std::string("HGX")},
+                {"SensorIdMap", std::move(ids)},
+                {"SensorNameMap", std::move(names)}};
+    }
+
+    static void addThresholds(dbus::PropertyMap& params,
+                              std::vector<uint64_t> min,
+                              std::vector<uint64_t> critical,
+                              std::vector<uint64_t> max)
+    {
+        params["MinThresholdsmV"] = std::move(min);
+        params["CriticalThresholdsmV"] = std::move(critical);
+        params["MaxThresholdsmV"] = std::move(max);
+    }
+
+    /** @brief Run the LeakDetection feature on the mock NsmDevice */
+    requester::Coroutine createLeak(const dbus::PropertyMap& params,
+                                    bool withDevice = true)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_BASEBOARD";
+        dev.kind = "fpga";
+        dev.staticUuid = fpgaUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = fpga;
+        }
+        return nsm::features::createLeakDetectionFeature(mockManager, dev,
+                                                         params);
+    }
 };
 
-// Happy path: all required properties present → sensors added to device
+// Happy path: thresholds given → NsmLeakDetection,
+// NsmSetLeakDetectionThresholds and one NsmLeakDetectionThresholdsPatch per
+// sensor are added
 TEST_F(NsmLeakDetectionCreateTest, goodTestCreateLeakDetectionSensors)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap["Name"] = std::string("LeakDetCreate");
-    propertyMap["Type"] = std::string("NSM_LeakDetection");
-    propertyMap["UUID"] = fpgaUuid;
-    propertyMap["SensorIdMap"] = std::vector<uint64_t>{1};
-    propertyMap["SensorNameMap"] = std::vector<std::string>{"LeakSensor1"};
-    propertyMap["ChassisPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/HGX");
-    propertyMap["MinThresholdsmV"] = std::vector<uint64_t>{100};
-    propertyMap["CriticalThresholdsmV"] = std::vector<uint64_t>{300};
-    propertyMap["MaxThresholdsmV"] = std::vector<uint64_t>{500};
+    auto params = leakParams("LeakDetCreate", {1}, {"LeakDetCreate_S1"});
+    addThresholds(params, {100}, {300}, {500});
 
-    size_t initialSensorCount = fpga->deviceSensors.size();
-    size_t initialStaticCount = fpga->staticSensors.size();
+    const size_t initialStatic = fpga->staticSensors.size();
+    const size_t initialTotal = sensorCount();
 
-    nsmLeakDetectionCreateSensors(mockManager, basicIntfName, objPath);
+    auto rc = createLeak(params);
 
-    // Both deviceSensors (NsmLeakDetection) and staticSensors
-    // (NsmSetLeakDetectionThresholds + NsmLeakDetectionThresholdsPatch) grow
-    EXPECT_GT(fpga->deviceSensors.size() + fpga->staticSensors.size(),
-              initialSensorCount + initialStaticCount);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    // NsmSetLeakDetectionThresholds + NsmLeakDetectionThresholdsPatch
+    EXPECT_EQ(fpga->staticSensors.size(), initialStatic + 2);
+    // ... plus the NsmLeakDetection sensor itself
+    EXPECT_EQ(sensorCount(), initialTotal + 3);
 }
 
-// Array size mismatch → returns early without adding sensors (lines 672-682)
+// BoardName takes precedence over ChassisName
+TEST_F(NsmLeakDetectionCreateTest, goodTestCreateWithBoardName)
+{
+    auto params = leakParams("LeakDetBoard", {1}, {"LeakDetBoard_S1"});
+    params.erase("ChassisName");
+    params["BoardName"] = std::string("HGX_Board");
+
+    const size_t initialTotal = sensorCount();
+
+    auto rc = createLeak(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(sensorCount(), initialTotal);
+}
+
+// Neither ChassisName nor BoardName → NSM_ERROR, nothing added
+TEST_F(NsmLeakDetectionCreateTest, badTestCreateNoChassisOrBoard)
+{
+    auto params = leakParams("LeakDetNoChassis", {1}, {"LeakDetNoChassis_S1"});
+    params.erase("ChassisName");
+    params["BoardName"] = std::string("");
+
+    const size_t initialTotal = sensorCount();
+
+    auto rc = createLeak(params);
+
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(sensorCount(), initialTotal);
+}
+
+// No NsmDevice in the device context → NSM_ERROR
+TEST_F(NsmLeakDetectionCreateTest, badTestCreateNoNsmDevice)
+{
+    auto params = leakParams("LeakDetNoDevice", {1}, {"LeakDetNoDevice_S1"});
+
+    const size_t initialTotal = sensorCount();
+
+    auto rc = createLeak(params, false);
+
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(sensorCount(), initialTotal);
+}
+
+// SensorIdMap / SensorNameMap size mismatch → NSM_ERROR, nothing added
 TEST_F(NsmLeakDetectionCreateTest, testCreateSensors_SizeMismatch)
 {
-    const std::string mismatchPath = objPath + "_mismatch";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(mismatchPath,
-                                                          basicIntfName);
-    propertyMap["Name"] = std::string("LeakDetMismatch");
-    propertyMap["UUID"] = fpgaUuid;
-    // sensorIdMap has 2 elements, sensorNameMap has only 1 → mismatch
-    propertyMap["SensorIdMap"] = std::vector<uint64_t>{1, 2};
-    propertyMap["SensorNameMap"] = std::vector<std::string>{"Sensor1"};
-    propertyMap["MinThresholdsmV"] = std::vector<uint64_t>{100, 200};
-    propertyMap["CriticalThresholdsmV"] = std::vector<uint64_t>{300, 400};
-    propertyMap["MaxThresholdsmV"] = std::vector<uint64_t>{500, 600};
+    auto params = leakParams("LeakDetMismatch", {1, 2}, {"Sensor1"});
+    addThresholds(params, {100, 200}, {300, 400}, {500, 600});
 
-    size_t initialSensorCount = fpga->deviceSensors.size();
-    size_t initialStaticCount = fpga->staticSensors.size();
+    const size_t initialTotal = sensorCount();
 
-    nsmLeakDetectionCreateSensors(mockManager, basicIntfName, mismatchPath);
+    auto rc = createLeak(params);
 
-    // No sensors should be added when sizes mismatch
-    EXPECT_EQ(fpga->deviceSensors.size(), initialSensorCount);
-    EXPECT_EQ(fpga->staticSensors.size(), initialStaticCount);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(sensorCount(), initialTotal);
 }
 
-// L689 maxThresholds size mismatch: sensorNameMap, minThresholds, and
-// criticalThresholds all match sensorIdMap size → || short-circuits at L686,
-// L687, L688 evaluate FALSE; maxThresholds size differs → L689 TRUE → error.
+// Only MaxThresholdsmV size differs from SensorIdMap → NSM_ERROR
 TEST_F(NsmLeakDetectionCreateTest,
        CreateSensors_MaxThresholdSizeMismatch_NoSensors)
 {
-    const std::string testPath = objPath + "_max_thresh_mismatch";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          basicIntfName);
-    propertyMap["Name"] = std::string("LeakDetMaxMismatch");
-    propertyMap["UUID"] = fpgaUuid;
-    // All sizes match sensorIdMap (2) except maxThresholds (1)
-    propertyMap["SensorIdMap"] = std::vector<uint64_t>{1, 2};
-    propertyMap["SensorNameMap"] = std::vector<std::string>{"S1", "S2"};
-    propertyMap["MinThresholdsmV"] = std::vector<uint64_t>{100, 200};
-    propertyMap["CriticalThresholdsmV"] = std::vector<uint64_t>{300, 400};
-    propertyMap["MaxThresholdsmV"] = std::vector<uint64_t>{500};
+    auto params =
+        leakParams("LeakDetMaxMismatch", {1, 2},
+                   {"LeakDetMaxMismatch_S1", "LeakDetMaxMismatch_S2"});
+    addThresholds(params, {100, 200}, {300, 400}, {500});
 
-    const size_t initialSensorCount = fpga->deviceSensors.size();
-    const size_t initialStaticCount = fpga->staticSensors.size();
+    const size_t initialTotal = sensorCount();
 
-    nsmLeakDetectionCreateSensors(mockManager, basicIntfName, testPath);
+    auto rc = createLeak(params);
 
-    // No sensors added when maxThresholds array size mismatches sensorIdMap
-    EXPECT_EQ(fpga->deviceSensors.size(), initialSensorCount);
-    EXPECT_EQ(fpga->staticSensors.size(), initialStaticCount);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(sensorCount(), initialTotal);
 }
 
-// createNsmLeakDetectionSensors: UUID not in device table →
-// getNsmDeviceFromStaticUUID returns nullptr → co_return NSM_ERROR (line 686).
-//
-TEST_F(NsmLeakDetectionCreateTest,
-       DISABLED_CreateSensors_UnknownUUID_ReturnsError)
-{
-    const std::string unknownPath = objPath + "_unknown_uuid";
-    const uuid_t unknownUuid = "ffffffff-ffff-ffff-ffff-ffffffffffff";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(unknownPath,
-                                                          basicIntfName);
-    propertyMap["Name"] = std::string("LeakDetUnknown");
-    propertyMap["Type"] = std::string("NSM_LeakDetection");
-    propertyMap["UUID"] = unknownUuid;
-    propertyMap["SensorIdMap"] = std::vector<uint64_t>{1};
-    propertyMap["SensorNameMap"] = std::vector<std::string>{"LeakSensor1"};
-    propertyMap["ChassisPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/HGX");
-    propertyMap["MinThresholdsmV"] = std::vector<uint64_t>{100};
-    propertyMap["CriticalThresholdsmV"] = std::vector<uint64_t>{300};
-    propertyMap["MaxThresholdsmV"] = std::vector<uint64_t>{500};
-
-    size_t initialSensorCount = fpga->deviceSensors.size();
-    size_t initialStaticCount = fpga->staticSensors.size();
-
-    nsmLeakDetectionCreateSensors(mockManager, basicIntfName, unknownPath);
-
-    // No sensors added when device not found
-    EXPECT_EQ(fpga->deviceSensors.size(), initialSensorCount);
-    EXPECT_EQ(fpga->staticSensors.size(), initialStaticCount);
-}
-
-// createNsmLeakDetectionSensors: "UUID" key absent in property map →
-// uuid="" → getNsmDeviceFromStaticUUID("") → parseStaticUuid("") throws
-// std::runtime_error. Covers the FALSE branch of if (count("UUID")).
-TEST_F(NsmLeakDetectionCreateTest, CreateSensors_MissingUUID_Throws)
-{
-    const std::string noUuidPath = objPath + "_no_uuid";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(noUuidPath,
-                                                          basicIntfName);
-    propertyMap["Name"] = std::string("LeakDetNoUUID");
-    propertyMap["Type"] = std::string("NSM_LeakDetection");
-    // "UUID" intentionally absent → uuid="" → parseStaticUuid("") throws
-    propertyMap["SensorIdMap"] = std::vector<uint64_t>{1};
-    propertyMap["SensorNameMap"] = std::vector<std::string>{"LeakSensor1"};
-    propertyMap["ChassisPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/HGX");
-    propertyMap["MinThresholdsmV"] = std::vector<uint64_t>{100};
-    propertyMap["CriticalThresholdsmV"] = std::vector<uint64_t>{300};
-    propertyMap["MaxThresholdsmV"] = std::vector<uint64_t>{500};
-
-    EXPECT_THROW_COROUTINE(
-        nsmLeakDetectionCreateSensors(mockManager, basicIntfName, noUuidPath),
-        std::runtime_error);
-}
-
-// createNsmLeakDetectionSensors: "Name", "Type", "ChassisPath" keys absent →
-// name="", type="", chassisPath="" → sensor still created (covers false
-// branches of if (count("Name")), if (count("Type")), if
-// (count("ChassisPath"))).
-TEST_F(NsmLeakDetectionCreateTest,
-       CreateSensors_MissingNameTypeChassis_StillCreates)
-{
-    const std::string partialPath = objPath + "_partial_props";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(partialPath,
-                                                          basicIntfName);
-    // "Name", "Type", "ChassisPath" intentionally absent
-    propertyMap["UUID"] = fpgaUuid;
-    propertyMap["SensorIdMap"] = std::vector<uint64_t>{1};
-    propertyMap["SensorNameMap"] = std::vector<std::string>{"S1"};
-    propertyMap["MinThresholdsmV"] = std::vector<uint64_t>{100};
-    propertyMap["CriticalThresholdsmV"] = std::vector<uint64_t>{300};
-    propertyMap["MaxThresholdsmV"] = std::vector<uint64_t>{500};
-
-    size_t initialTotal = fpga->deviceSensors.size() +
-                          fpga->staticSensors.size();
-
-    nsmLeakDetectionCreateSensors(mockManager, basicIntfName, partialPath);
-
-    // Sensors still created despite missing optional text properties
-    EXPECT_GT(fpga->deviceSensors.size() + fpga->staticSensors.size(),
-              initialTotal);
-}
-
-// FALSE branches for count("SensorIdMap"), count("SensorNameMap"),
-// count("MinThresholdsmV"), count("CriticalThresholdsmV"),
-// count("MaxThresholdsmV").
-// All default to empty vectors → size check passes (all 0 == 0) →
-// setThresholdsSensor and leakDetectorInfoObject created with empty vectors →
-// no loop iterations → returns NSM_SUCCESS.
-TEST_F(NsmLeakDetectionCreateTest, CreateSensors_MissingSensorMaps_StillCreates)
-{
-    const std::string testPath = objPath + "_no_maps";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          basicIntfName);
-    propertyMap["Name"] = std::string("LeakDetNoMaps");
-    propertyMap["Type"] = std::string("NSM_LeakDetection");
-    propertyMap["UUID"] = fpgaUuid;
-    propertyMap["ChassisPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/HGX");
-    // SensorIdMap, SensorNameMap, MinThresholdsmV, CriticalThresholdsmV,
-    // MaxThresholdsmV intentionally absent → all default to empty vectors
-
-    const size_t initialTotal = fpga->deviceSensors.size() +
-                                fpga->staticSensors.size();
-
-    nsmLeakDetectionCreateSensors(mockManager, basicIntfName, testPath);
-
-    // Sensors created even with empty vectors (size check: 0==0==0==0 passes)
-    EXPECT_GT(fpga->deviceSensors.size() + fpga->staticSensors.size(),
-              initialTotal);
-}
-
-// Threshold array sizes do not match sensorIdMap size → early return NSM_ERROR
-// at L701-715 (all three threshold arrays present but wrong count).
+// MinThresholdsmV size differs from SensorIdMap → NSM_ERROR
 TEST_F(NsmLeakDetectionCreateTest,
        CreateSensors_ThresholdSizeMismatch_NoSensors)
 {
-    const std::string testPath = objPath + "_thresh_mismatch";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          basicIntfName);
-    propertyMap["Name"] = std::string("LeakDetThreshMismatch");
-    propertyMap["Type"] = std::string("NSM_LeakDetection");
-    propertyMap["UUID"] = fpgaUuid;
-    propertyMap["SensorIdMap"] = std::vector<uint64_t>{1, 2};
-    propertyMap["SensorNameMap"] = std::vector<std::string>{"S1", "S2"};
-    propertyMap["ChassisPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/HGX");
-    // All three threshold arrays present (thresholdsGiven=true) but sizes
-    // differ from sensorIdMap (2 sensors, 1 threshold each)
-    propertyMap["MinThresholdsmV"] = std::vector<uint64_t>{100};
-    propertyMap["CriticalThresholdsmV"] = std::vector<uint64_t>{300, 400};
-    propertyMap["MaxThresholdsmV"] = std::vector<uint64_t>{500, 600};
+    auto params =
+        leakParams("LeakDetThreshMismatch", {1, 2},
+                   {"LeakDetThreshMismatch_S1", "LeakDetThreshMismatch_S2"});
+    addThresholds(params, {100}, {300, 400}, {500, 600});
 
-    const size_t initialSensors = fpga->deviceSensors.size() +
-                                  fpga->staticSensors.size();
+    const size_t initialTotal = sensorCount();
 
-    nsmLeakDetectionCreateSensors(mockManager, basicIntfName, testPath);
+    auto rc = createLeak(params);
 
-    // No sensors added when threshold array sizes mismatch
-    EXPECT_EQ(fpga->deviceSensors.size() + fpga->staticSensors.size(),
-              initialSensors);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(sensorCount(), initialTotal);
+}
+
+// Thresholds not given → no NsmSetLeakDetectionThresholds; the per-sensor
+// thresholds patch object is still added
+TEST_F(NsmLeakDetectionCreateTest, CreateSensors_NoThresholds_NoSetThresholds)
+{
+    auto params = leakParams("LeakDetNoThresh", {1}, {"LeakDetNoThresh_S1"});
+
+    const size_t initialStatic = fpga->staticSensors.size();
+
+    auto rc = createLeak(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // NsmLeakDetectionThresholdsPatch only
+    EXPECT_EQ(fpga->staticSensors.size(), initialStatic + 1);
+}
+
+// Partial thresholds (not all three) are ignored rather than rejected
+TEST_F(NsmLeakDetectionCreateTest, CreateSensors_PartialThresholds_Ignored)
+{
+    auto params = leakParams("LeakDetPartial", {1, 2},
+                             {"LeakDetPartial_S1", "LeakDetPartial_S2"});
+    params["MinThresholdsmV"] = std::vector<uint64_t>{100};
+
+    const size_t initialStatic = fpga->staticSensors.size();
+
+    auto rc = createLeak(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // One NsmLeakDetectionThresholdsPatch per sensor
+    EXPECT_EQ(fpga->staticSensors.size(), initialStatic + 2);
+}
+
+// No sensor maps → empty vectors, sizes match, detector still created
+TEST_F(NsmLeakDetectionCreateTest, CreateSensors_MissingSensorMaps_StillCreates)
+{
+    dbus::PropertyMap params{{"Name", std::string("LeakDetNoMaps")},
+                             {"ChassisName", std::string("HGX")}};
+
+    const size_t initialStatic = fpga->staticSensors.size();
+    const size_t initialTotal = sensorCount();
+
+    auto rc = createLeak(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // NsmLeakDetection only: no thresholds, no per-sensor patch objects
+    EXPECT_EQ(fpga->staticSensors.size(), initialStatic);
+    EXPECT_EQ(sensorCount(), initialTotal + 1);
+}
+
+// Missing Name param → empty name, sensor still created
+TEST_F(NsmLeakDetectionCreateTest, CreateSensors_MissingName_StillCreates)
+{
+    auto params = leakParams("", {1}, {"LeakDetNoName_S1"});
+    params.erase("Name");
+    addThresholds(params, {100}, {300}, {500});
+
+    const size_t initialTotal = sensorCount();
+
+    auto rc = createLeak(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(sensorCount(), initialTotal);
 }
 
 // ============================================================================
@@ -2410,36 +2396,20 @@ TEST_F(NsmLeakDetectionDeepTest,
 #endif // COVERAGE_DISABLE_COROUTINES
 
 // ============================================================================
-// nsmLeakDetectionCreateSensors: MaxValue and MinValue properties present
-// Covers lines 678 and 682 (the TRUE branches of count("MaxValue") and
-// count("MinValue") property reads in nsmLeakDetectionCreateSensors).
+// createLeakDetectionFeature: MaxValue and MinValue params present
 // ============================================================================
 
 TEST_F(NsmLeakDetectionCreateTest, CreateSensors_MaxValueMinValue_BothCovered)
 {
-    const std::string testPath = objPath + "_maxmin_value";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          basicIntfName);
-    propertyMap["Name"] = std::string("LeakDetMaxMin");
-    propertyMap["Type"] = std::string("NSM_LeakDetection");
-    propertyMap["UUID"] = fpgaUuid;
-    propertyMap["SensorIdMap"] = std::vector<uint64_t>{1};
-    propertyMap["SensorNameMap"] = std::vector<std::string>{"LeakSensor1"};
-    propertyMap["ChassisPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/HGX");
-    propertyMap["MinThresholdsmV"] = std::vector<uint64_t>{100};
-    propertyMap["CriticalThresholdsmV"] = std::vector<uint64_t>{300};
-    propertyMap["MaxThresholdsmV"] = std::vector<uint64_t>{500};
-    // These cover lines 678 and 682 (MaxValue/MinValue TRUE branches)
-    propertyMap["MaxValue"] = double(5.0);
-    propertyMap["MinValue"] = double(0.0);
+    auto params = leakParams("LeakDetMaxMin", {1}, {"LeakDetMaxMin_S1"});
+    addThresholds(params, {100}, {300}, {500});
+    params["MaxValue"] = double(5.0);
+    params["MinValue"] = double(0.0);
 
-    const size_t initialTotal = fpga->deviceSensors.size() +
-                                fpga->staticSensors.size();
+    const size_t initialTotal = sensorCount();
 
-    nsmLeakDetectionCreateSensors(mockManager, basicIntfName, testPath);
+    auto rc = createLeak(params);
 
-    // Sensors should be created successfully with MaxValue/MinValue
-    EXPECT_GT(fpga->deviceSensors.size() + fpga->staticSensors.size(),
-              initialTotal);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(sensorCount(), initialTotal);
 }

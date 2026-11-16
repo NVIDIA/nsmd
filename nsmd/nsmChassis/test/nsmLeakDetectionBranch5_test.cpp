@@ -55,13 +55,6 @@ using namespace ::testing;
 
 #include <xyz/openbmc_project/Common/error.hpp>
 
-namespace nsm
-{
-requester::Coroutine nsmLeakDetectionCreateSensors(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath);
-} // namespace nsm
-
 using namespace nsm;
 
 using PatchTuple =

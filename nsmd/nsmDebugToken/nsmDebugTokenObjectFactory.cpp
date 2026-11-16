@@ -21,6 +21,7 @@
 #include "common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmDebugTokenAggregation.hpp"
+#include "nsmDebugTokenFeatures.hpp"
 #include "nsmDebugTokenNIC.hpp"
 #include "nsmDebugTokenUnified.hpp"
 #include "nsmObjectFactory.hpp"
@@ -33,51 +34,33 @@
 #include <variant>
 #include <vector>
 
-namespace nsm
+#ifdef ENABLE_DEBUG_TOKEN
+namespace nsm::features
 {
 
-requester::Coroutine createNsmDebugToken(SensorManager& manager,
-                                         const std::string& interface,
-                                         const std::string& objPath)
+requester::Coroutine createDebugTokenFeature(SensorManager& manager,
+                                             const DeviceContext& dev,
+                                             const dbus::PropertyMap& params)
 {
+    if (!dev.device)
+    {
+        lg2::error("DebugToken feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
+    }
+
     DebugTokenAggregationManager::getInstance();
 
     auto& bus = utils::DBusHandler::getBus();
-    dbus::PropertyMap allBaseIfaceProperties;
-    auto rc = co_await utils::coGetCachedBaseProperties(objPath, interface,
-                                                        allBaseIfaceProperties);
-    if (rc != NSM_SUCCESS)
-    {
-        co_return rc;
-    }
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-    std::string chassisName{};
-    if (allBaseIfaceProperties.count("ChassisName"))
-    {
-        chassisName =
-            std::get<std::string>(allBaseIfaceProperties.at("ChassisName"));
-    }
-    std::vector<std::string> debugTokenType{};
-    if (allCurrentIfaceProperties.count("DebugTokenType"))
-    {
-        debugTokenType = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("DebugTokenType"));
-    }
-    uuid_t uuid{};
-    if (allBaseIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
-    }
-    std::string debugTokenDeviceType{};
-    if (allCurrentIfaceProperties.count("DebugTokenDeviceType"))
-    {
-        debugTokenDeviceType = std::get<std::string>(
-            allCurrentIfaceProperties.at("DebugTokenDeviceType"));
-    }
+    std::string chassisName =
+        param<std::string>(params, "ChassisName").value_or("");
+    auto debugTokenType = arrayParam<std::string>(params, "DebugTokenType");
+    const uuid_t& uuid = dev.staticUuid;
+    std::string debugTokenDeviceType =
+        param<std::string>(params, "DebugTokenDeviceType").value_or("");
 
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
+    auto device = dev.device;
     if (std::find(debugTokenType.begin(), debugTokenType.end(), "NIC") !=
         debugTokenType.end())
     {
@@ -97,7 +80,5 @@ requester::Coroutine createNsmDebugToken(SensorManager& manager,
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmDebugToken, "xyz.openbmc_project.Configuration.NSM_DebugToken")
-
-} // namespace nsm
+} // namespace nsm::features
+#endif

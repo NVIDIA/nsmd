@@ -19,6 +19,9 @@
 
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "features/associations.hpp"
+#include "globals.hpp"
+#include "nsmChassisFeatures.hpp"
 #include "sensorManager.hpp"
 
 #include <nsmCommon/nsmCommon.hpp>
@@ -306,74 +309,41 @@ requester::Coroutine NsmChassisClockControl::setRangeClockLimits(
     co_return cc ? cc : rc;
 }
 
-requester::Coroutine createControlGpuClock(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    auto& bus = utils::DBusHandler::getBus();
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
+requester::Coroutine
+    createClockLimitFeature([[maybe_unused]] SensorManager& manager,
+                            const DeviceContext& dev,
+                            const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-
-    uuid_t uuid{};
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-
-    std::string type{};
-    if (allCurrentIfaceProperties.count("Type"))
-    {
-        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
-    }
-
-    bool priority{};
-    if (allCurrentIfaceProperties.count("Priority"))
-    {
-        priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
-    }
-
-    std::string inventoryObjPath{};
-    if (allCurrentIfaceProperties.count("InventoryObjPath"))
-    {
-        inventoryObjPath = std::get<std::string>(
-            allCurrentIfaceProperties.at("InventoryObjPath"));
-    }
-
-    std::vector<utils::Association> associations{};
-    co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                      associations);
-    std::string physicalContext{};
-    if (allCurrentIfaceProperties.count("PhysicalContext"))
-    {
-        physicalContext = std::get<std::string>(
-            allCurrentIfaceProperties.at("PhysicalContext"));
-    }
-    std::string clockMode{};
-    if (allCurrentIfaceProperties.count("ClockMode"))
-    {
-        clockMode =
-            std::get<std::string>(allCurrentIfaceProperties.at("ClockMode"));
-    }
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-
-    if (!nsmDevice)
-    {
-        // cannot found a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of CreateControlGpuClock PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
+        lg2::error("ClockLimit feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
         co_return NSM_ERROR;
     }
 
-    inventoryObjPath += "/Controls/ClockLimit_0";
+    auto& bus = utils::DBusHandler::getBus();
+    auto nsmDevice = dev.device;
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_ControlClockLimit_0";
+    auto priority = param<bool>(params, "Priority").value_or(false);
+    auto physicalContext =
+        param<std::string>(params, "PhysicalContext").value_or("");
+    auto clockMode = param<std::string>(params, "ClockMode").value_or("");
+
+    std::vector<utils::Association> associations{};
+    addAssociations(associations, params, "ParentChassisAssociationPaths",
+                    "parent_chassis", "clock_controls");
+
+    std::string inventoryObjPath = (acceleratorInventoryBasePath /
+                                    deviceBaseName(dev) /
+                                    "Controls/ClockLimit_0")
+                                       .string();
     auto cpuOperatingConfigIntf =
         std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
 
@@ -404,11 +374,7 @@ requester::Coroutine createControlGpuClock(SensorManager& manager,
             "RequestedSpeedLimits",
             AsyncSetOperationInfo{setRangeClockLimitsHandler,
                                   nsmChassisControlSensor, nsmDevice});
-    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createControlGpuClock,
-    "xyz.openbmc_project.Configuration.NSM_ControlClockLimit_0")
-} // namespace nsm
+} // namespace nsm::features

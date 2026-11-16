@@ -36,6 +36,10 @@
 
 namespace nsm
 {
+namespace features
+{
+class DeviceCoordinator;
+}
 using RequesterHandler = requester::Handler<requester::Request>;
 class NsmNumericSensorComposite;
 class NsmPowerCap;
@@ -198,5 +202,6 @@ class SensorManagerImpl : public SensorManager
     std::coroutine_handle<> interfaceAddedTaskHandle;
     requester::Coroutine interfaceAddedTask();
     std::map<eid_t, StateChangeLogger> stateChangeLoggers;
+    std::unique_ptr<features::DeviceCoordinator> deviceCoordinator;
 };
 } // namespace nsm

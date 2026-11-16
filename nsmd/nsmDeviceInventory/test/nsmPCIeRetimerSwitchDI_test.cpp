@@ -454,8 +454,6 @@ struct NsmPCIeRetimerSwitchFactoryTest :
 {
     const std::string retimerIntf =
         "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Switch";
-    const std::string multiPortIntf =
-        "xyz.openbmc_project.Configuration.NSM_MultiPortPCIeSwitchDevice";
     const uuid_t retimerUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
@@ -495,23 +493,6 @@ TEST_F(NsmPCIeRetimerSwitchFactoryTest,
 
     const size_t before = device->standByToDcRefreshSensors.size();
     NsmObjectFactory::instance().createObjects(mockManager, retimerIntf,
-                                               testPath);
-    EXPECT_GT(device->standByToDcRefreshSensors.size(), before);
-}
-
-// NSM_MultiPortPCIeSwitchDevice interface → else-if branch taken →
-// NsmPCIeRetimerSwitchDI (multi-port variant) created and added
-// DISABLED: same D-Bus path registration issue as above
-TEST_F(NsmPCIeRetimerSwitchFactoryTest,
-       DISABLED_Factory_MultiPortPCIeSwitchDevice_SensorCreated)
-{
-    const std::string testPath = "/xyz/test/retimer_switch/multiport";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = basicProperties;
-    pm["Name"] = std::string("MultiPortSwitch0"); // unique name
-
-    const size_t before = device->standByToDcRefreshSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, multiPortIntf,
                                                testPath);
     EXPECT_GT(device->standByToDcRefreshSensors.size(), before);
 }
@@ -569,31 +550,6 @@ TEST_F(NsmPCIeRetimerSwitchFactoryTest,
 // Branch coverage: FALSE branches for property count() checks in
 // CreatePCIeRetimerSwitch (nsmPCIeRetimerSwitchDI.cpp lines 272-282)
 // =============================================================================
-
-// DeviceInstance absent → FALSE branch for count("DeviceInstance") →
-// deviceInstance=0 (default uint64_t{}) →
-// deviceIndex=PCIE_RETIMER_DEVICE_INDEX_START → NsmPCIeRetimerSwitchDI created
-// with device index START → sensor added. DISABLED: NsmPCIeRetimerSwitchDI
-// constructor registers multiple D-Bus interfaces (AssociationDefinitionsInft +
-// SwitchIntf) at the same path, which throws in the test D-Bus environment —
-// same root cause as the existing
-// DISABLED_Factory_MultiPortPCIeSwitchDevice_SensorCreated test.
-TEST_F(NsmPCIeRetimerSwitchFactoryTest,
-       DISABLED_Factory_MultiPort_MissingDeviceInstance_DefaultsToStartIndex)
-{
-    const std::string testPath = "/xyz/test/retimer_switch/no_devinst";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = basicProperties;
-    pm["Name"] = std::string("MultiPortSwitch_no_devinst"); // unique name
-    // Intentionally omit "DeviceInstance" → FALSE branch → deviceInstance=0 →
-    // deviceIndex = PCIE_RETIMER_DEVICE_INDEX_START + 0
-    pm.erase("DeviceInstance");
-
-    const size_t before = device->standByToDcRefreshSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, multiPortIntf,
-                                               testPath);
-    EXPECT_GT(device->standByToDcRefreshSensors.size(), before);
-}
 
 // Priority absent (ENABLE_CLOCK_OUTPUT_STATE path) → FALSE branch for
 // count("Priority") → priority=false (default bool{}) → addSensor(sensor, //

@@ -2,6 +2,8 @@
 
 #include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "globals.hpp"
+#include "nsmPortFeatures.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -24,69 +26,34 @@ NsmZone::NsmZone(sdbusplus::bus_t& bus, const std::string& name,
     zoneIntf->routingEnabled(bool(true));
 }
 
-requester::Coroutine createNsmZones(SensorManager& manager,
-                                    const std::string& interface,
-                                    const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    auto& bus = utils::DBusHandler::getBus();
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
+requester::Coroutine
+    createFabricsZoneFeature([[maybe_unused]] SensorManager& manager,
+                             const DeviceContext& dev,
+                             const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    std::string zoneType{};
-    if (allCurrentIfaceProperties.count("ZoneType"))
-    {
-        zoneType =
-            std::get<std::string>(allCurrentIfaceProperties.at("ZoneType"));
-    }
-    std::string fabricsObjPath{};
-    if (allCurrentIfaceProperties.count("FabricsObjPath"))
-    {
-        fabricsObjPath = std::get<std::string>(
-            allCurrentIfaceProperties.at("FabricsObjPath"));
-    }
-    uuid_t uuid{};
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-    if (!nsmDevice)
-    {
-        // cannot find a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of NSM_FabricsZone PDI matches no NsmDevice : UUID={UUID}, Fabric={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", fabricsObjPath, "TYPE", type);
-        // coverity[missing_return]
+        lg2::error("FabricsZone feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
         co_return NSM_ERROR;
     }
+    auto& bus = utils::DBusHandler::getBus();
+    const std::string type = "NSM_FabricsZone";
+    auto name = param<std::string>(params, "Name").value_or("");
+    auto zoneType = param<std::string>(params, "ZoneType").value_or("");
+    auto fabricName = param<std::string>(params, "FabricName").value_or("");
+    const auto fabricsObjPath =
+        (fabricsInventoryBasePath / fabricName).string();
 
-    // create zone on fabric
     auto fabricsZoneSensor =
         std::make_shared<NsmZone>(bus, name, type, fabricsObjPath, zoneType);
-
-    if (!fabricsZoneSensor)
-    {
-        lg2::error(
-            "Failed to create NSM Fabrics Zone : UUID={UUID}, Type={TYPE}, Fabrics_Path={OBJPATH}",
-            "UUID", uuid, "TYPE", type, "OBJPATH", fabricsObjPath);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
-    }
-
-    nsmDevice->addDeviceSensors(fabricsZoneSensor);
-    // coverity[missing_return]
+    dev.device->addDeviceSensors(fabricsZoneSensor);
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmZones, "xyz.openbmc_project.Configuration.NSM_FabricsZone")
-
-} // namespace nsm
+} // namespace nsm::features

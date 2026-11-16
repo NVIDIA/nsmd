@@ -29,6 +29,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmProcessor.hpp"
 #include "nsmWorkloadPowerProfile.hpp"
 
@@ -40,18 +42,9 @@ using namespace nsm;
 static auto busPFB = sdbusplus::bus::new_default();
 
 // =============================================================================
-// NsmProcessor factory: createWorkloadPowerProfile branch test
-// This is already covered by TEST_F(NsmProcessorTest,
-// goodTestCreateWorkloadPowerProfileSensors) in existing test file.
-// We add a test exercising the WorkloadPowerProfile factory with ProfileIdMap.
+// Processor feature creators: createWorkloadPowerProfileFeature,
+// createPowerCapFeature, createReconfigPermissionsFeature
 // =============================================================================
-
-namespace nsm
-{
-requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
-                                              const std::string& interface,
-                                              const std::string& objPath);
-}; // namespace nsm
 
 struct NsmProcessorBatch12CTest :
     public testing::Test,
@@ -60,10 +53,6 @@ struct NsmProcessorBatch12CTest :
 {
     eid_t eid = 28;
     uint8_t instanceId = 0;
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_Processor";
-    const std::string name = "GPU_SXM_1";
-    const std::string objPath = processorsInventoryBasePath / name;
 
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
 
@@ -83,27 +72,36 @@ struct NsmProcessorBatch12CTest :
     {
         cleanupDeviceSensors(devices);
     }
+
+    /** @brief Run a processor feature of the device `name`; each test uses
+     *  its own name so the inventory objects do not collide on D-Bus
+     */
+    requester::Coroutine run(nsm::features::CreatorFn create,
+                             const std::string& name, dbus::PropertyMap params,
+                             bool withDevice = true)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = name;
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        params["Name"] = name;
+        return create(mockManager, dev, params);
+    }
 };
 
-TEST_F(NsmProcessorBatch12CTest,
-       goodTestCreateWorkloadPowerProfileWithProfileIdMap)
+TEST_F(NsmProcessorBatch12CTest, goodTestCreateWorkloadPowerProfileFeature)
 {
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = name;
-    basePropertyMap["UUID"] = gpuUuid;
-    basePropertyMap["InventoryObjPath"] = objPath;
+    auto rc = run(nsm::features::createWorkloadPowerProfileFeature,
+                  "HGX_GPU_SXM_1", {});
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".WorkloadPowerProfile");
-    propertyMap["Type"] = std::string("NSM_WorkloadPowerProfile");
-    propertyMap["ProfileIdMap"] =
-        std::vector<std::string>{"Performance", "Balanced", "PowerSaver"};
-
-    createNsmProcessorSensor(mockManager,
-                             basicIntfName + ".WorkloadPowerProfile", objPath);
-
-    // The factory should create:
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    // The creator should create:
     // - NsmWorkLoadProfileEnum (static)
     // - OemProfileInfoIntf (non-sensor)
     // - NsmWorkloadProfileInfoAsyncIntf (non-sensor)
@@ -111,97 +109,65 @@ TEST_F(NsmProcessorBatch12CTest,
     // - NsmWorkloadPowerProfileCollection (static)
     // - NsmWorkloadPowerProfilePageCollection (static)
     // - NsmWorkloadPowerProfilePage (RR, first page)
-    // + 1 msgTypes sensor at index 0
     // So we expect at least 2 RR sensors and 3+ static sensors
     EXPECT_GE(gpu->roundRobinSensors.size(), 2u);
     EXPECT_GE(gpu->staticSensors.size(), 3u);
 }
 
-TEST_F(NsmProcessorBatch12CTest,
-       goodTestCreateWorkloadPowerProfile_EmptyProfileIdMap)
+TEST_F(NsmProcessorBatch12CTest, badTestWorkloadPowerProfileFeatureNoDevice)
 {
-    // Use a unique path to avoid D-Bus path conflict with the sibling test
-    // that registers objects at processorsInventoryBasePath/GPU_SXM_1.
-    const std::string uniquePath = processorsInventoryBasePath /
-                                   std::string("GPU_SXM_1_EmptyProfile");
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = std::string("GPU_SXM_1_EmptyProfile");
-    basePropertyMap["UUID"] = gpuUuid;
-    basePropertyMap["InventoryObjPath"] = uniquePath;
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = run(nsm::features::createWorkloadPowerProfileFeature,
+                  "HGX_GPU_SXM_1_NoDevice", {}, false);
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".WorkloadPowerProfile");
-    propertyMap["Type"] = std::string("NSM_WorkloadPowerProfile");
-    // No ProfileIdMap property → count("ProfileIdMap") = 0 → FALSE branch
-    // profileIdMap stays empty → NsmWorkLoadProfileEnum created with empty list
-
-    createNsmProcessorSensor(
-        mockManager, basicIntfName + ".WorkloadPowerProfile", uniquePath);
-
-    // Sensors still created with empty profileIdMap
-    EXPECT_GE(gpu->roundRobinSensors.size(), 2u);
-    EXPECT_GE(gpu->staticSensors.size(), 3u);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
 // =============================================================================
-// createPowerCap FALSE branch: L607 count("CompositeNumericSensors") == 0
+// createPowerCapFeature: no CompositeNumericSensors property is passed
 // =============================================================================
 
 TEST_F(NsmProcessorBatch12CTest,
-       createPowerCap_NoCompositeNumericSensors_FalseBranch)
+       createPowerCapFeature_NoCompositeNumericSensors)
 {
-    // Unique path to avoid D-Bus conflicts with nsmProcessor_test.cpp tests
-    const std::string uniquePath = processorsInventoryBasePath /
-                                   std::string("GPU_SXM_PwrCap_NoCNS");
+    auto rc = run(nsm::features::createPowerCapFeature,
+                  "HGX_GPU_SXM_PwrCap_NoCNS", {});
 
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = std::string("GPU_SXM_PwrCap_NoCNS");
-    basePropertyMap["UUID"] = gpuUuid;
-    basePropertyMap["InventoryObjPath"] = uniquePath;
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".PowerCap");
-    propertyMap["Type"] = std::string("NSM_PowerCap");
-    // "CompositeNumericSensors" deliberately absent → L607 FALSE branch
-
-    createNsmProcessorSensor(mockManager, basicIntfName + ".PowerCap",
-                             uniquePath);
-
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     // createPowerCap adds NsmPowerCap (RR) + 3 static sensors
     EXPECT_GE(gpu->roundRobinSensors.size(), 1u);
     EXPECT_GE(gpu->staticSensors.size(), 3u);
 }
 
 // =============================================================================
-// createReconfigPermissions FALSE branch: L674 count("Features") == 0
+// createReconfigPermissionsFeature: no enabled knob → no sensors
 // =============================================================================
 
-TEST_F(NsmProcessorBatch12CTest,
-       createReconfigPermissions_NoFeaturesKey_FalseBranch)
+TEST_F(NsmProcessorBatch12CTest, createReconfigPermissionsFeature_NoKnobs)
 {
-    // Unique path to avoid D-Bus conflicts
-    const std::string uniquePath = processorsInventoryBasePath /
-                                   std::string("GPU_SXM_Reconfig_NoFeat");
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = run(nsm::features::createReconfigPermissionsFeature,
+                  "HGX_GPU_SXM_Reconfig_NoFeat", {});
 
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = std::string("GPU_SXM_Reconfig_NoFeat");
-    basePropertyMap["UUID"] = gpuUuid;
-    basePropertyMap["InventoryObjPath"] = uniquePath;
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".ReconfigPermissions");
-    propertyMap["Type"] = std::string("NSM_ReconfigPermissions");
-    // "Features" deliberately absent → L674 FALSE branch → empty featuresNames
-    // → feature loop body never entered → no sensors added
-
-    createNsmProcessorSensor(
-        mockManager, basicIntfName + ".ReconfigPermissions", uniquePath);
-
-    // With empty features, no sensors are added to the device
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(1u, devices.size());
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
+}
+
+TEST_F(NsmProcessorBatch12CTest,
+       createReconfigPermissionsFeature_AllKnobsDisabled)
+{
+    // Disabled knobs are dropped before their names are converted, so an
+    // unknown knob that is also disabled creates nothing
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = run(nsm::features::createReconfigPermissionsFeature,
+                  "HGX_GPU_SXM_Reconfig_Disabled",
+                  {{"AvailableKnobs", std::vector<std::string>{"NotAKnob"}},
+                   {"DisabledKnobs", std::vector<std::string>{"NotAKnob"}}});
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
 TEST(NsmAcceleratorIntf, GoodConstruction)

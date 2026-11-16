@@ -19,7 +19,7 @@
  * Additional branch coverage tests for nsmMemory.cpp:
  *
  * Targets uncovered branches in:
- *   - createNsmMemorySensor factory: various property presence/absence combos
+ *   - createMemoryAttributesFeature: with and without Name
  *   - createNSMMemory: ErrorCorrection/DeviceType/Priority combos
  *   - NsmMemoryErrorCorrection: constructor with different correction types
  *   - NsmMemoryDeviceType: constructor with different device types
@@ -40,15 +40,10 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "interfaceWrapper.hpp"
 #include "nsmMemory.hpp"
-
-namespace nsm
-{
-requester::Coroutine createNsmMemorySensor(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -66,12 +61,7 @@ class NsmMemoryBranch2Fixture :
     public SensorManagerTest
 {
   protected:
-    static constexpr const char* baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_Memory";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:11";
-    const std::string sensorName = "Memory_B2";
-    const std::string inventoryPath =
-        "/xyz/openbmc_project/inventory/system/b2/memory/";
 
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
@@ -88,25 +78,21 @@ class NsmMemoryBranch2Fixture :
         cleanupDeviceSensors(devices);
     }
 
-    void setupBaseProperties(const std::string& path,
-                             dbus::PropertyMap extra = {})
+    /** @brief Run the MemoryAttributes feature of device "HGX_<baseName>"
+     *  (DIMM dimm/<baseName>_DRAM_0) on the mock GPU
+     */
+    requester::Coroutine runAttributes(const std::string& baseName,
+                                       const dbus::PropertyMap& params)
     {
-        auto& pm = utils::MockDbusAsync::propertyMap(path, baseIntf);
-        pm["Name"] = sensorName;
-        pm["UUID"] = gpuUuid;
-        pm["InventoryObjPath"] = inventoryPath;
-        for (auto& [k, v] : extra)
-        {
-            pm[k] = v;
-        }
-    }
-
-    void setupCurrentProperties(const std::string& path,
-                                const std::string& intf,
-                                dbus::PropertyMap props)
-    {
-        auto& pm = utils::MockDbusAsync::propertyMap(path, intf);
-        pm = props;
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_" + baseName;
+        dev.kind = "gpu";
+        dev.deviceType = NSM_DEV_ID_GPU;
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = gpu;
+        return nsm::features::createMemoryAttributesFeature(mockManager, dev,
+                                                            params);
     }
 
     static std::vector<uint8_t> decodeFail()
@@ -119,81 +105,27 @@ class NsmMemoryBranch2Fixture :
 };
 
 // ============================================================================
-// Factory: NSM_Memory_Attributes type -> creates RowRemapping + ECC +
-// MemCapUtil (exercises with separate current interface)
+// MemoryAttributes feature -> creates RowRemapping + ECC + MemCapUtil
 // ============================================================================
-TEST_F(NsmMemoryBranch2Fixture, Factory_MemoryAttributes_SeparateIntf)
+TEST_F(NsmMemoryBranch2Fixture, Feature_MemoryAttributes)
 {
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_Memory.MemoryAttributes";
-    const std::string path = "/test/memb2/attrs_sep";
-
-    setupBaseProperties(path);
-    setupCurrentProperties(path, intf,
-                           {{"Type", std::string("NSM_Memory_Attributes")}});
-
     const size_t rrBefore = gpu->roundRobinSensors.size();
-    createNsmMemorySensor(mockManager, intf, path);
+    auto rc = runAttributes("GPU_B2Attrs",
+                            {{"Name", std::string("Memory_B2")}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     // 3 roundRobin: RowRemapState, RowRemappingCounts, RemappingAvailability
     // + EccErrorCountsDram + MemoryCapacityUtil (longRunning)
     EXPECT_GT(gpu->roundRobinSensors.size(), rrBefore);
 }
 
 // ============================================================================
-// Factory: Missing Name from base -> name="" (FALSE branch)
+// MemoryAttributes feature: Name param absent -> name="" (FALSE branch)
 // ============================================================================
-TEST_F(NsmMemoryBranch2Fixture, Factory_MissingName)
+TEST_F(NsmMemoryBranch2Fixture, Feature_MissingName)
 {
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_Memory.MemoryAttributes";
-    const std::string path = "/test/memb2/no_name";
-    auto& pm = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    // No "Name"
-    pm["UUID"] = gpuUuid;
-    pm["InventoryObjPath"] = inventoryPath + "noname/";
-
-    setupCurrentProperties(path, intf,
-                           {{"Type", std::string("NSM_Memory_Attributes")}});
-
     const size_t rrBefore = gpu->roundRobinSensors.size();
-    createNsmMemorySensor(mockManager, intf, path);
-    EXPECT_GT(gpu->roundRobinSensors.size(), rrBefore);
-}
-
-// ============================================================================
-// Factory: Missing Type -> no sensor created (FALSE branch for all type checks)
-// ============================================================================
-TEST_F(NsmMemoryBranch2Fixture, Factory_MissingType_NoSensor)
-{
-    const std::string path = "/test/memb2/no_type";
-    setupBaseProperties(path);
-    // No Type property in current interface
-
-    const size_t before = gpu->deviceSensors.size() +
-                          gpu->roundRobinSensors.size();
-    createNsmMemorySensor(mockManager, baseIntf, path);
-    EXPECT_EQ(gpu->deviceSensors.size() + gpu->roundRobinSensors.size(),
-              before);
-}
-
-// ============================================================================
-// Factory: Missing InventoryObjPath -> inventoryObjPath="" (FALSE branch)
-// ============================================================================
-TEST_F(NsmMemoryBranch2Fixture, DISABLED_Factory_MissingInventoryObjPath)
-{
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_Memory.MemoryAttributes";
-    const std::string path = "/test/memb2/no_inv";
-    auto& pm = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    pm["Name"] = sensorName;
-    pm["UUID"] = gpuUuid;
-    // No "InventoryObjPath"
-
-    setupCurrentProperties(path, intf,
-                           {{"Type", std::string("NSM_Memory_Attributes")}});
-
-    const size_t rrBefore = gpu->roundRobinSensors.size();
-    createNsmMemorySensor(mockManager, intf, path);
+    auto rc = runAttributes("GPU_B2NoName", {});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->roundRobinSensors.size(), rrBefore);
 }
 

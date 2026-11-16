@@ -28,7 +28,7 @@
  *   → convertLocationTypesFromString("") throws (FALSE branch at line 115)
  * - createNsmChassis: missing Name in base props (FALSE branch for
  * count("Name")) → name="" (the factory proceeds with empty name)
- * - createNsmNVLinkMgmtNicChassis wrapper function
+ * - createNVLinkMgmtNicChassisFeature / AttributesFeature (NIC variant)
  */
 
 #include "test/mockDBusHandler.hpp"
@@ -40,6 +40,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmNVSwitchAndNVMgmtNICChassis.hpp"
 
@@ -55,9 +57,6 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
                                       const std::string& interface,
                                       const std::string& objPath,
                                       const std::string baseType);
-requester::Coroutine createNsmNVLinkMgmtNicChassis(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath);
 } // namespace nsm
 
 using namespace nsm;
@@ -76,11 +75,19 @@ static const std::string kBaseIntf =
 static const std::string kAttrIntf =
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.ChassisAttributes";
 
-static const std::string kNicBaseType = "NSM_NVLinkMgmtNic_Chassis";
-static const std::string kNicBaseIntf =
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis";
-static const std::string kNicAttrIntf =
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.ChassisAttributes";
+/** @brief Device context of a NIC chassis feature on a mock device */
+static nsm::features::DeviceContext
+    nicContext(const std::string& name, const uuid_t& uuid,
+               std::shared_ptr<NsmDevice> device)
+{
+    nsm::features::DeviceContext ctx;
+    ctx.name = name;
+    ctx.kind = "cx_nic";
+    ctx.staticUuid = uuid;
+    ctx.platformPrefix = "HGX_";
+    ctx.device = std::move(device);
+    return ctx;
+}
 
 // ============================================================================
 // Fixture
@@ -234,25 +241,71 @@ TEST_F(NsmNVSwitchChassisBranch3Test, Factory_PCIeBridge_CX8_AllOptionalAttrs)
 }
 
 // ============================================================================
-// createNsmNVLinkMgmtNicChassis wrapper - covers the NIC variant
+// createNVLinkMgmtNicChassisFeature / AttributesFeature - the NIC variant
 // ============================================================================
 
-TEST_F(NsmNVSwitchChassisBranch3Test, Factory_NVLinkMgmtNic_BaseType_Wrapper)
+TEST_F(NsmNVSwitchChassisBranch3Test, Feature_NVLinkMgmtNic_Chassis)
 {
-    // NIC device: use the same switch UUID (type=1) since NIC also uses type=1
     const uuid_t nicUuid = "STATIC:1:1:NSM_DEVICE_INSTANCE_NUMBER:0";
     auto nicDev = std::dynamic_pointer_cast<MockNsmDevice>(
         mockManager.getNsmDeviceFromStaticUUID(nicUuid));
     ASSERT_NE(nicDev, nullptr);
-
-    const std::string objPath = "/xyz/test/nic_b3/base";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kNicBaseIntf);
-    baseMap["Name"] = std::string("NIC_Chassis_br3");
-    baseMap["UUID"] = nicUuid;
-    baseMap["Type"] = kNicBaseType;
+    auto ctx = nicContext("NIC_Chassis_br3", nicUuid, nicDev);
 
     const size_t before = nicDev->staticSensors.size();
-    createNsmNVLinkMgmtNicChassis(mockManager, kNicBaseIntf, objPath);
-    // base type branch: creates UuidIntf sensor
-    EXPECT_GT(nicDev->staticSensors.size(), before);
+    auto rc = nsm::features::createNVLinkMgmtNicChassisFeature(
+        mockManager, ctx, {{"Name", std::string("NIC_Chassis_br3")}});
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    // base type: creates the UuidIntf sensor
+    EXPECT_EQ(nicDev->staticSensors.size(), before + 1);
+}
+
+TEST_F(NsmNVSwitchChassisBranch3Test, Feature_NVLinkMgmtNic_NoNsmDevice)
+{
+    auto ctx = nicContext("NIC_Chassis_br3_none", kSwitchUuid, nullptr);
+    auto rc = nsm::features::createNVLinkMgmtNicChassisFeature(
+        mockManager, ctx, {{"Name", std::string("NIC_Chassis_br3_none")}});
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+
+    rc = nsm::features::createNVLinkMgmtNicChassisAttributesFeature(
+        mockManager, ctx, {{"Name", std::string("NIC_Chassis_br3_none")}});
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+}
+
+TEST_F(NsmNVSwitchChassisBranch3Test,
+       Feature_NVLinkMgmtNic_Attributes_CX8_AllOptional)
+{
+    auto ctx = nicContext("NIC_Attr_CX8", kCX8Uuid, cx8Dev);
+    dbus::PropertyMap params{
+        {"Name", std::string("NIC_Attr_CX8")},
+        {"ChassisType",
+         std::string(
+             "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module")},
+        {"LocationType", std::string("xyz.openbmc_project.Inventory.Decorator."
+                                     "Location.LocationTypes.Embedded")},
+        {"LocationCode", std::string("U1-NIC")},
+        {"PrettyNameForChassis", std::string("NIC Chassis")},
+        {"LocationContext", std::string("HGX_Chassis_0")},
+        {"FieldReplaceable", false}};
+
+    const size_t before = cx8Dev->staticSensors.size();
+    auto rc = nsm::features::createNVLinkMgmtNicChassisAttributesFeature(
+        mockManager, ctx, params);
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    // asset(3) + SKU + health + chassisType + locationType + locationCode +
+    // prettyName + locationContext + replaceable + (CX8) assetTag + version
+    EXPECT_EQ(cx8Dev->staticSensors.size(), before + 13);
+}
+
+TEST_F(NsmNVSwitchChassisBranch3Test,
+       Feature_NVLinkMgmtNic_Attributes_Switch_NoOptional)
+{
+    auto ctx = nicContext("NIC_Attr_Sw", kSwitchUuid, switchDev);
+
+    const size_t before = switchDev->staticSensors.size();
+    auto rc = nsm::features::createNVLinkMgmtNicChassisAttributesFeature(
+        mockManager, ctx, {{"Name", std::string("NIC_Attr_Sw")}});
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    // asset(3) + SKU + health; not a PCIe bridge -> no assetTag / version
+    EXPECT_EQ(switchDev->staticSensors.size(), before + 5);
 }

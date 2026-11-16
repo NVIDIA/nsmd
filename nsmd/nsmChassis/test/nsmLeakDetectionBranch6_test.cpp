@@ -43,13 +43,6 @@ using namespace ::testing;
 #include <memory>
 #include <tuple>
 
-namespace nsm
-{
-requester::Coroutine nsmLeakDetectionCreateSensors(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath);
-} // namespace nsm
-
 using namespace nsm;
 
 /** Assert Area.PhysicalContext on the leak detector inventory for sensorId. */

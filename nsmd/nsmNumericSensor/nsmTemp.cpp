@@ -22,7 +22,9 @@
 #include "platform-environmental.h"
 
 #include "nsmNumericSensorFactory.hpp"
+#include "nsmNumericSensorFeatures.hpp"
 #include "nsmTempAggregator.hpp"
+#include "nsmThresholdFactory.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 #ifdef NVIDIA_SHMEM
@@ -119,10 +121,79 @@ class TempSensorFactory : public NumericSensorBuilder
     };
 };
 
-static NumericSensorFactory numericSensorFactory{
-    std::make_unique<TempSensorFactory>()};
-
-REGISTER_NSM_CREATION_FUNCTION(numericSensorFactory.getCreationFunction(),
-                               "xyz.openbmc_project.Configuration.NSM_Temp")
-
 } // namespace nsm
+
+namespace nsm::features
+{
+
+requester::Coroutine createTempFeature(SensorManager& manager,
+                                       const DeviceContext& dev,
+                                       const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("Temp feature of {NAME}: no NsmDevice", "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto featureInfo = NumericSensorFactory::makeFeatureSensorInfo(dev, params,
+                                                                   "NSM_Temp");
+    if (!featureInfo)
+    {
+        co_return NSM_ERROR;
+    }
+    auto& info = *featureInfo;
+
+    TempSensorFactory builder;
+    auto sensor = builder.makeSensor({}, {}, utils::DBusHandler::getBus(),
+                                     info);
+    lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
+              "UUID", dev.staticUuid, "NAME", info.name, "TYPE", info.type);
+
+    NumericSensorFactory::makeAggregatorAndAddSensor(
+        &builder, info, sensor, dev.staticUuid, dev.device.get());
+
+    if (param<bool>(params, "ThresholdsEnabled").value_or(false))
+    {
+        std::unordered_map<std::string, FeatureThreshold> thresholds;
+        for (const std::string tier :
+             {"UpperFatal", "UpperCritical", "UpperCaution", "LowerFatal",
+              "LowerCritical", "LowerCaution"})
+        {
+            if (auto parameterId =
+                    param<uint64_t>(params, (tier + "ParameterId").c_str()))
+            {
+                thresholds.emplace(
+                    tier,
+                    FeatureThreshold{
+                        .parameterId = *parameterId,
+                        .periodicUpdate =
+                            param<bool>(params,
+                                        (tier + "PeriodicUpdate").c_str())
+                                .value_or(false),
+                        .priority = param<bool>(params,
+                                                (tier + "Priority").c_str())
+                                        .value_or(false),
+                        .aggregated = param<bool>(params,
+                                                  (tier + "Aggregated").c_str())
+                                          .value_or(false)});
+            }
+            else if (auto value = param<double>(params, tier.c_str()))
+            {
+                FeatureThreshold threshold{};
+                threshold.value = *value;
+                thresholds.emplace(tier, threshold);
+            }
+        }
+        if (!thresholds.empty())
+        {
+            co_await NsmThresholdFactory{manager,    sensor,
+                                         info,       dev.staticUuid,
+                                         dev.device, std::move(thresholds)}
+                .make();
+        }
+    }
+    co_return NSM_SUCCESS;
+}
+
+} // namespace nsm::features

@@ -23,6 +23,7 @@
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
+#include "nsmEventConfigFeatures.hpp"
 #include "nsmObjectFactory.hpp"
 #include "sensorManager.hpp"
 
@@ -296,72 +297,40 @@ bool NsmGetEventConfig::validateEventIds(
     return !anyOfEventIdNotSupported;
 }
 
-requester::Coroutine createNsmEventConfig(SensorManager& manager,
-                                          const std::string& interface,
-                                          const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    std::string baseInterface =
-        "xyz.openbmc_project.Configuration.NSM_EventConfig";
 
-    dbus::PropertyMap allBaseIfaceProperties;
-    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
-                                                        allBaseIfaceProperties);
-    if (rc != NSM_SUCCESS)
+requester::Coroutine
+    createEventConfigFeature([[maybe_unused]] SensorManager& manager,
+                             const DeviceContext& dev,
+                             const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        co_return rc;
-    }
-
-    std::string name{};
-    if (allBaseIfaceProperties.count("Name"))
-    {
-        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
-    }
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-    uuid_t uuid{};
-    if (allBaseIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
-    }
-    uint64_t messageType{};
-    if (allBaseIfaceProperties.count("MessageType"))
-    {
-        messageType =
-            std::get<uint64_t>(allBaseIfaceProperties.at("MessageType"));
-    }
-    std::vector<uint64_t> subscribedEventIds{};
-    if (allBaseIfaceProperties.count("SubscribedEventIDs"))
-    {
-        subscribedEventIds = std::get<std::vector<uint64_t>>(
-            allBaseIfaceProperties.at("SubscribedEventIDs"));
-    }
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-    if (!nsmDevice)
-    {
-        lg2::error(
-            "found NSM_EventConfig [{NAME}] but not applied since no NsmDevice UUID={UUID}",
-            "NAME", name, "UUID", uuid);
-        // coverity[missing_return]
+        lg2::error("EventConfig feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
         co_return NSM_ERROR;
     }
 
-    // ack support to be added in future. JIRA
-    // https://jirasw.nvidia.com/browse/DGXOPENBMC-11623
+    auto name = std::get<std::string>(params.at("Name"));
+    auto messageType = param<uint64_t>(params, "MessageType").value_or(0);
+    auto subscribedEventIds = param<std::vector<uint64_t>>(params,
+                                                           "SubscribedEventIDs")
+                                  .value_or(std::vector<uint64_t>{});
+
+    const std::string type = "NSM_EventConfig";
     std::vector<uint64_t> ackIds{};
     auto sensor = std::make_shared<NsmEventConfig>(name, type, messageType,
                                                    subscribedEventIds, ackIds);
     auto getEventSensor = std::make_shared<NsmGetEventConfig>(
         name, type, messageType, subscribedEventIds, sensor);
 
-    nsmDevice->addCapabilityRefreshSensor(sensor);
-    // update sensor
-    nsmDevice->addStaticSensor(sensor);
-    nsmDevice->addSensor(getEventSensor, false);
-    // coverity[missing_return]
+    dev.device->addCapabilityRefreshSensor(sensor);
+    dev.device->addStaticSensor(sensor);
+    dev.device->addSensor(getEventSensor, false);
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmEventConfig, "xyz.openbmc_project.Configuration.NSM_EventConfig")
-
-} // namespace nsm
+} // namespace nsm::features

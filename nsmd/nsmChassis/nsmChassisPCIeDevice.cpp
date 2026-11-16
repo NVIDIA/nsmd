@@ -40,6 +40,8 @@
 #if defined(ENABLE_PCIE_LTSSM_STATE)
 #include "nsmPCIeLTSSMState.hpp"
 #endif
+#include "features/associations.hpp"
+#include "nsmChassisFeatures.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 
@@ -287,118 +289,119 @@ void createChassisPCIeDeviceClockOutputEnableState(
 }
 #endif
 
-requester::Coroutine
-    nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
-                                      const std::string& interface,
-                                      const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    std::string baseInterface =
-        "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice";
 
-    dbus::PropertyMap allBaseIfaceProperties;
-    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
-                                                        allBaseIfaceProperties);
-    if (rc != NSM_SUCCESS)
-    {
-        co_return rc;
-    }
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
-
-    std::string chassisName{};
-    if (allBaseIfaceProperties.count("ChassisName"))
-    {
-        chassisName =
-            std::get<std::string>(allBaseIfaceProperties.at("ChassisName"));
-    }
-    std::string name{};
-    if (allBaseIfaceProperties.count("Name"))
-    {
-        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
-    }
-    std::string type{};
-    if (allCurrentIfaceProperties.count("Type"))
-    {
-        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
-    }
-    uuid_t uuid{};
-    if (allBaseIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
-    }
-
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-
-    if (type == "NSM_ChassisPCIeDevice")
-    {
-        uuid_t deviceUuid{};
-        if (allCurrentIfaceProperties.count("DEVICE_UUID"))
-        {
-            deviceUuid =
-                std::get<uuid_t>(allCurrentIfaceProperties.at("DEVICE_UUID"));
-        }
-
-        auto uuidObject =
-            std::make_shared<NsmChassisPCIeDevice<UuidIntf>>(chassisName, name);
-        std::vector<utils::Association> associations{};
-        co_await utils::coGetAssociations(
-            objPath, baseInterface + ".Associations", associations);
-        auto associationsObject =
-            std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsIntf>>(
-                chassisName, name);
-
-        uuidObject->invoke(pdiMethod(uuid), deviceUuid);
-        associationsObject->invoke(pdiMethod(associations),
-                                   utils::getAssociations(associations));
-
-        device->addStaticSensor(uuidObject);
-        device->addStaticSensor(associationsObject);
-    }
-    else if (type == "NSM_Chassis_Attributes")
-    {
-        createChassisPCIeDeviceAsset(device, name, chassisName);
-        createChassisPCIeDeviceHealth(device, name, chassisName);
-    }
-    else if (type == "NSM_PCIeDevice")
-    {
-        createChassisPCIeDevicePCIeDevice(device, name, chassisName,
-                                          allCurrentIfaceProperties);
-    }
-    else if (type == "NSM_MultiPortPCIeDevice")
-    {
-        createChassisPCIeDeviceMultiPortPCIeDevice(device, name, chassisName,
-                                                   allCurrentIfaceProperties);
-        createChassisPCIeDeviceRetimerAERErrorStatus(device, name, chassisName);
-    }
-    else if (type == "NSM_LTSSMState")
-    {
-#if defined(ENABLE_PCIE_LTSSM_STATE)
-        createChassisPCIeDeviceLTSSMState(device, name,
-                                          allCurrentIfaceProperties);
-#endif
-    }
-    else if (type == "NSM_ClockOutputEnableState")
-    {
-#if defined(ENABLE_CLOCK_OUTPUT_STATE)
-        createChassisPCIeDeviceClockOutputEnableState(
-            device, name, chassisName, allCurrentIfaceProperties);
-#endif
-    }
-
-    // coverity[missing_return]
+requester::Coroutine
+    createChassisPCIeDeviceUUIDFeature([[maybe_unused]] SensorManager& manager,
+                                       const DeviceContext& dev,
+                                       const dbus::PropertyMap& params)
+{
+    auto name = std::get<std::string>(params.at("Name"));
+    // Starts empty; update() reads the device UUID over MCTP.
+    dev.device->addStaticSensor(
+        std::make_shared<NsmChassisPCIeDevice<UuidIntf>>(dev.name, name));
     co_return NSM_SUCCESS;
 }
 
-dbus::Interfaces chassisPCIeDeviceInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.ChassisAttributes",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.PCIeDevice",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.MultiPortPCIeDevice",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.LTSSMState",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.ClockOutputEnableState",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.AERErrorStatus"};
+requester::Coroutine createChassisPCIeDeviceAssociationsFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    auto name = std::get<std::string>(params.at("Name"));
 
-REGISTER_NSM_CREATION_FUNCTION(nsmChassisPCIeDeviceCreateSensors,
-                               chassisPCIeDeviceInterfaces)
+    std::vector<utils::Association> associations;
+    addAssociations(associations, params, "ChassisAssociationPaths", "chassis",
+                    "pciedevice");
+    if (associations.empty())
+    {
+        co_return NSM_SUCCESS;
+    }
 
-} // namespace nsm
+    auto associationsObject =
+        std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsIntf>>(
+            dev.name, name);
+    associationsObject->invoke(pdiMethod(associations),
+                               utils::getAssociations(associations));
+    dev.device->addStaticSensor(associationsObject);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createChassisPCIeDeviceAssetFeature([[maybe_unused]] SensorManager& manager,
+                                        const DeviceContext& dev,
+                                        const dbus::PropertyMap& params)
+{
+    auto name = std::get<std::string>(params.at("Name"));
+    createChassisPCIeDeviceAsset(dev.device, name, dev.name);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine createChassisPCIeDeviceHealthFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    auto name = std::get<std::string>(params.at("Name"));
+    createChassisPCIeDeviceHealth(dev.device, name, dev.name);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine createChassisPCIeDevicePCIeDeviceFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    auto name = std::get<std::string>(params.at("Name"));
+    auto attributes = params;
+    createChassisPCIeDevicePCIeDevice(dev.device, name, dev.name, attributes);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine createChassisPCIeDeviceMultiPortPCIeDeviceFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    auto name = std::get<std::string>(params.at("Name"));
+    auto attributes = params;
+    createChassisPCIeDeviceMultiPortPCIeDevice(dev.device, name, dev.name,
+                                               attributes);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine createChassisPCIeDeviceRetimerAERErrorStatusFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    auto name = std::get<std::string>(params.at("Name"));
+    createChassisPCIeDeviceRetimerAERErrorStatus(dev.device, name, dev.name);
+    co_return NSM_SUCCESS;
+}
+
+#if defined(ENABLE_PCIE_LTSSM_STATE)
+requester::Coroutine createChassisPCIeDeviceLTSSMStateFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    auto name = std::get<std::string>(params.at("Name"));
+    auto attributes = params;
+    createChassisPCIeDeviceLTSSMState(dev.device, name, attributes);
+    co_return NSM_SUCCESS;
+}
+#endif
+
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
+requester::Coroutine createChassisPCIeDeviceClockOutputEnableStateFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    auto name = std::get<std::string>(params.at("Name"));
+    auto attributes = params;
+    attributes.try_emplace("InstanceNumber", uint64_t{dev.instance});
+    createChassisPCIeDeviceClockOutputEnableState(dev.device, name, dev.name,
+                                                  attributes);
+    co_return NSM_SUCCESS;
+}
+#endif
+
+} // namespace nsm::features

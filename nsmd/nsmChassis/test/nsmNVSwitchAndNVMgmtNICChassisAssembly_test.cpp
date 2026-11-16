@@ -22,6 +22,9 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
+#include "nsmInventoryProperty.hpp"
 #include "nsmNVSwitchAndNVMgmtNICChassisAssembly.hpp"
 
 namespace nsm
@@ -30,10 +33,6 @@ requester::Coroutine
     createNsmNVSwitchChassisAssembly(SensorManager& manager,
                                      const std::string& interface,
                                      const std::string& objPath);
-requester::Coroutine
-    createNsmNVLinkMgmtNicChassisAssembly(SensorManager& manager,
-                                          const std::string& interface,
-                                          const std::string& objPath);
 void createAssemblyAsset(std::shared_ptr<NsmDevice> device,
                          const std::string& chassisName,
                          const std::string& name, const std::string& baseType,
@@ -163,8 +162,6 @@ struct NsmNVSwitchChassisAssemblyCreateTest :
 {
     const std::string nvSwitchBaseIntf =
         "xyz.openbmc_project.Configuration.NSM_NVSwitch_ChassisAssembly";
-    const std::string nvLinkBaseIntf =
-        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
 
     NsmDeviceTable devices;
@@ -183,76 +180,158 @@ struct NsmNVSwitchChassisAssemblyCreateTest :
     }
 };
 
-namespace nsm
-{
-requester::Coroutine
-    createNsmNVLinkMgmtNicChassisAssembly(SensorManager& manager,
-                                          const std::string& interface,
-                                          const std::string& objPath);
-} // namespace nsm
-
 // ============================================================================
-// Factory tests: createNsmNVLinkMgmtNicChassisAssembly
+// createNVLinkMgmtNicChassisAssemblyFeature
 // These tests cover createAssemblyAsset, createAssemblyHealth,
-// createPhysicalContext, createLocationType, and the top-level factory.
+// createPhysicalContext, createLocationType through the feature creator.
 // ============================================================================
 
-struct NsmNVLinkMgmtNicChassisAssemblyFactoryTest :
+struct NsmNVLinkMgmtNicChassisAssemblyFeatureTest :
     public Test,
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string baseIntfName =
-        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/nvlink_asm_factory";
+    const std::string chassisName = "HGX_NVLinkMgmt_0";
     const uuid_t deviceUuid = "STATIC:2:0:NSM_DEVICE_INSTANCE_NUMBER:10";
 
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> device;
+    nsm::features::DeviceContext dev;
 
-    NsmNVLinkMgmtNicChassisAssemblyFactoryTest() : SensorManagerTest(devices)
+    NsmNVLinkMgmtNicChassisAssemblyFeatureTest() : SensorManagerTest(devices)
     {
         device = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(deviceUuid));
         EXPECT_NE(device, nullptr);
+        dev.name = chassisName;
+        dev.kind = "cx_nic";
+        dev.staticUuid = deviceUuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = device;
     }
 
-    ~NsmNVLinkMgmtNicChassisAssemblyFactoryTest()
+    ~NsmNVLinkMgmtNicChassisAssemblyFeatureTest()
     {
         cleanupDeviceSensors(devices);
     }
+
+    requester::Coroutine createAssembly(const dbus::PropertyMap& params)
+    {
+        return nsm::features::createNVLinkMgmtNicChassisAssemblyFeature(
+            mockManager, dev, params);
+    }
 };
 
-TEST_F(NsmNVLinkMgmtNicChassisAssemblyFactoryTest,
-       CreateChassisAttributes_WithPhysicalContextAndLocationType)
+TEST_F(NsmNVLinkMgmtNicChassisAssemblyFeatureTest,
+       CreateAssembly_WithPhysicalContextAndLocationType)
 {
-    const std::string currentIntf = baseIntfName + ".ChassisAttributes";
+    dbus::PropertyMap params{
+        {"Name", std::string("NVLinkMgmtNic0_Asm")},
+        {"PhysicalContext",
+         std::string("xyz.openbmc_project.Inventory.Decorator.Area."
+                     "PhysicalContextType.Backplane")},
+        {"LocationType", std::string("xyz.openbmc_project.Inventory.Decorator."
+                                     "Location.LocationTypes.Embedded")}};
 
-    // Set up base properties
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              baseIntfName);
-    basePropertyMap["Name"] = std::string("NVLinkMgmtNic0_Asm");
-    basePropertyMap["UUID"] = deviceUuid;
-    basePropertyMap["ChassisName"] = std::string("HGX_NVLinkMgmt_0");
+    const size_t staticBefore = device->staticSensors.size();
+    auto rc = createAssembly(params);
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
 
-    // Set up attributes properties
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath, currentIntf);
-    propertyMap["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMap["Name"] = std::string("NVLinkMgmtNic0_Asm");
-    propertyMap["PhysicalContext"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Area."
-        "PhysicalContextType.Backplane");
-    propertyMap["LocationType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Location."
-        "LocationTypes.Embedded");
-
-    size_t staticBefore = device->staticSensors.size();
-    createNsmNVLinkMgmtNicChassisAssembly(mockManager, currentIntf, objPath);
-
-    // Should have created Health + Asset sensors + PhysicalContext + Location
-    EXPECT_GT(device->staticSensors.size(), staticBefore);
+    // Assembly + revision + health + 4 asset + area + location
+    EXPECT_EQ(device->staticSensors.size(), staticBefore + 9);
+    size_t areas = 0, locations = 0;
+    for (const auto& sensor : device->staticSensors)
+    {
+        areas += dynamic_pointer_cast<NsmInterfaceProvider<AreaIntf>>(sensor)
+                     ? 1
+                     : 0;
+        locations +=
+            dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(sensor)
+                ? 1
+                : 0;
+    }
+    EXPECT_EQ(areas, 1u);
+    EXPECT_EQ(locations, 1u);
 }
+
+TEST_F(NsmNVLinkMgmtNicChassisAssemblyFeatureTest, CreateAssembly_NoOptionals)
+{
+    const size_t staticBefore = device->staticSensors.size();
+    auto rc = createAssembly({{"Name", std::string("NVLink_Attrs")}});
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+
+    // Assembly + revision + health + 4 asset
+    EXPECT_EQ(device->staticSensors.size(), staticBefore + 7);
+    auto assembly = dynamic_pointer_cast<NsmInterfaceProvider<AssemblyIntf>>(
+        device->staticSensors[staticBefore]);
+    ASSERT_NE(assembly, nullptr);
+    EXPECT_EQ(assembly->getName(), "Assembly0");
+    EXPECT_EQ(assembly->getType(), "NSM_NVLinkMgmtNic_ChassisAssembly");
+}
+
+TEST_F(NsmNVLinkMgmtNicChassisAssemblyFeatureTest,
+       CreateAssembly_IndexesPerDevice)
+{
+    auto rc0 = createAssembly({{"Name", std::string("First")}});
+    auto rc1 = createAssembly({{"Name", std::string("Second")}});
+    EXPECT_EQ(rc0.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(rc1.data(), NSM_SW_SUCCESS);
+
+    std::vector<std::string> names;
+    for (const auto& sensor : device->staticSensors)
+    {
+        if (dynamic_pointer_cast<NsmInterfaceProvider<AssemblyIntf>>(sensor))
+        {
+            names.push_back(sensor->getName());
+        }
+    }
+    EXPECT_EQ((std::vector<std::string>{"Assembly0", "Assembly1"}), names);
+}
+
+TEST_F(NsmNVLinkMgmtNicChassisAssemblyFeatureTest,
+       CreateAssembly_MissingName_Rejected)
+{
+    const size_t staticBefore = device->staticSensors.size();
+    auto rc = createAssembly({});
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_DATA);
+    EXPECT_EQ(device->staticSensors.size(), staticBefore);
+    // The rejected assembly did not take an index
+    EXPECT_EQ(dev.nextIndex("Assembly"), 0u);
+}
+
+TEST_F(NsmNVLinkMgmtNicChassisAssemblyFeatureTest,
+       CreateAssembly_NonStringParam_Rejected)
+{
+    const size_t staticBefore = device->staticSensors.size();
+    auto rc = createAssembly({{"Name", std::string("NVLink_Bad")},
+                              {"PhysicalContext", uint64_t{1}}});
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_DATA);
+    EXPECT_EQ(device->staticSensors.size(), staticBefore);
+}
+
+TEST_F(NsmNVLinkMgmtNicChassisAssemblyFeatureTest,
+       CreateAssembly_InvalidLocationType_Throws)
+{
+    const size_t staticBefore = device->staticSensors.size();
+    EXPECT_THROW_COROUTINE(
+        createAssembly({{"Name", std::string("NVLink_BadLoc")},
+                        {"LocationType", std::string("NotALocation")}}),
+        std::exception);
+    EXPECT_EQ(device->staticSensors.size(), staticBefore);
+}
+
+TEST_F(NsmNVLinkMgmtNicChassisAssemblyFeatureTest,
+       CreateAssembly_NoNsmDevice_Fails)
+{
+    dev.device = nullptr;
+    auto rc = createAssembly({{"Name", std::string("NVLink_NoDevice")}});
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+    EXPECT_FALSE(rc.exception());
+}
+
+// ============================================================================
+// Legacy NSM_NVSwitch_ChassisAssembly creator (still registered)
+// ============================================================================
 
 // coGetCachedBaseProperties fails (no base property map) → early return
 TEST_F(NsmNVSwitchChassisAssemblyCreateTest, CreateNVSwitch_BasePropertiesFail)
@@ -337,45 +416,6 @@ TEST_F(NsmNVSwitchChassisAssemblyCreateTest,
     createNsmNVSwitchChassisAssembly(mockManager, interface, objPath);
 
     // health + 4 asset sensors = 5 added
-    EXPECT_GT(gpu->staticSensors.size(), initialCount);
-}
-
-// createNsmNVLinkMgmtNicChassisAssembly with type == baseType
-TEST_F(NsmNVSwitchChassisAssemblyCreateTest, CreateNVLink_TypeIsBaseType)
-{
-    const std::string objPath = "/test/nvlink/assembly_base";
-
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, nvLinkBaseIntf);
-    baseMap["Name"] = std::string("NVLink_Base");
-    baseMap["UUID"] = gpuUuid;
-    baseMap["ChassisName"] = std::string("HGX_NL_Base");
-    baseMap["Type"] = std::string("NSM_NVLinkMgmtNic_ChassisAssembly");
-
-    size_t initialCount = gpu->staticSensors.size();
-    createNsmNVLinkMgmtNicChassisAssembly(mockManager, nvLinkBaseIntf, objPath);
-
-    EXPECT_GT(gpu->staticSensors.size(), initialCount);
-}
-
-// createNsmNVLinkMgmtNicChassisAssembly with NSM_Chassis_Attributes
-TEST_F(NsmNVSwitchChassisAssemblyCreateTest,
-       CreateNVLink_ChassisAttributes_NoOptionals)
-{
-    const std::string objPath = "/test/nvlink/chassis_attrs";
-    const std::string interface = nvLinkBaseIntf + ".ChassisAttributes";
-
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, nvLinkBaseIntf);
-    baseMap["Name"] = std::string("NVLink_Attrs");
-    baseMap["UUID"] = gpuUuid;
-    baseMap["ChassisName"] = std::string("HGX_NL_Attrs");
-
-    auto& currentMap = utils::MockDbusAsync::propertyMap(objPath, interface);
-    currentMap["Type"] = std::string("NSM_Chassis_Attributes");
-    currentMap["Name"] = std::string("NVLink_Attrs");
-
-    size_t initialCount = gpu->staticSensors.size();
-    createNsmNVLinkMgmtNicChassisAssembly(mockManager, interface, objPath);
-
     EXPECT_GT(gpu->staticSensors.size(), initialCount);
 }
 

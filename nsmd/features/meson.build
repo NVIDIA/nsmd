@@ -1,4 +1,5 @@
 sources += [
+    'features/deviceCoordinator.cpp',
     'features/discovery/telemetryDiscovery.cpp',
     'features/featureDriver.cpp',
     'features/overrides/overrideApply.cpp',

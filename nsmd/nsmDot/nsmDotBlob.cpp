@@ -21,6 +21,7 @@
 #include "dBusAsyncUtils.hpp"
 #include "globals.hpp"
 #include "nsmDotBlobUtils.hpp"
+#include "nsmDotFeatures.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSetAsync/asyncOperationManager.hpp"
 #include "sensorManager.hpp"
@@ -257,24 +258,18 @@ sdbusplus::object_path
     return objPath;
 }
 
-requester::Coroutine createNsmDotBlob(SensorManager& manager,
-                                      const std::string& interface,
-                                      const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
+{
+
+requester::Coroutine
+    createDotBlobFeature([[maybe_unused]] SensorManager& manager,
+                         const DeviceContext& dev,
+                         const dbus::PropertyMap& params)
 {
     auto& bus = utils::DBusHandler::getBus();
-    dbus::PropertyMap allBaseIfaceProperties;
-    auto rc = co_await utils::coGetCachedBaseProperties(objPath, interface,
-                                                        allBaseIfaceProperties);
-    if (rc != NSM_SUCCESS)
-    {
-        co_return rc;
-    }
-
-    std::string pathName{};
-    if (allBaseIfaceProperties.count("PathName"))
-    {
-        pathName = std::get<std::string>(allBaseIfaceProperties.at("PathName"));
-    }
+    std::string pathName = param<std::string>(params, "PathName").value_or("");
 
     if (pathName.empty())
     {
@@ -282,13 +277,7 @@ requester::Coroutine createNsmDotBlob(SensorManager& manager,
         co_return NSM_ERR_INVALID_DATA;
     }
 
-    uuid_t uuid{};
-    if (allBaseIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
-    }
-
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
+    auto device = dev.device;
     if (!device)
     {
         lg2::error("DotBlob: Failed to find device for UUID, pathName={PATH}",
@@ -305,7 +294,4 @@ requester::Coroutine createNsmDotBlob(SensorManager& manager,
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(createNsmDotBlob,
-                               "xyz.openbmc_project.Configuration.NSM_DOTBlob")
-
-} // namespace nsm
+} // namespace nsm::features

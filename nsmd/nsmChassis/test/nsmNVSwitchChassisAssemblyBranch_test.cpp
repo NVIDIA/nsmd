@@ -162,8 +162,6 @@ namespace nsm
 requester::Coroutine createNsmNVSwitchChassisAssembly(SensorManager& manager,
                                                       const std::string& intf,
                                                       const std::string& path);
-requester::Coroutine createNsmNVLinkMgmtNicChassisAssembly(
-    SensorManager& manager, const std::string& intf, const std::string& path);
 } // namespace nsm
 
 struct NsmChassisAssemblyFactoryTest :
@@ -283,26 +281,3 @@ TEST_F(NsmChassisAssemblyFactoryTest,
     // Health + asset sensors created; no physical context or location type
     EXPECT_GT(gpu->staticSensors.size(), before);
 }
-
-// Same FALSE branches via NVLinkMgmtNic variant (exercises the sibling factory)
-// count("Name") FALSE → name="" → sd_bus rejects empty D-Bus path → throws
-// Only runs in coverage build: same reason as
-// Factory_BaseInterface_NoNameNoChassisName.
-#ifdef COVERAGE_DISABLE_COROUTINES
-TEST_F(NsmChassisAssemblyFactoryTest,
-       Factory_NVLinkMgmtNic_BaseInterface_NoName)
-{
-    const std::string nicBaseIface =
-        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly";
-    const std::string uniquePath = objPath + "_nic_noname";
-
-    auto& baseMap = utils::MockDbusAsync::propertyMap(uniquePath, nicBaseIface);
-    // "Name" and "ChassisName" absent → FALSE branches; empty name → throws
-    baseMap["UUID"] = deviceUuid;
-    baseMap["Type"] = std::string("NSM_NVLinkMgmtNic_ChassisAssembly");
-
-    EXPECT_THROW_COROUTINE(nsm::createNsmNVLinkMgmtNicChassisAssembly(
-                               mockManager, nicBaseIface, uniquePath),
-                           std::exception);
-}
-#endif // COVERAGE_DISABLE_COROUTINES

@@ -19,11 +19,12 @@
  * Branch coverage tests for nsmPCIeRetimerSwitchDI.cpp
  *
  * Calls CreatePCIeRetimerSwitch directly (forward-declared, no longer static)
- * to bypass SIOF issues with NsmObjectFactory registration.
+ * to bypass SIOF issues with NsmObjectFactory registration, and
+ * nsm::features::createMultiPortPCIeSwitchDeviceFeature.
  *
  * Covers:
- *  - Factory: all properties present (NSM_PCIeRetimer_Switch and
- *    NSM_MultiPortPCIeSwitchDevice types)
+ *  - Factory: all properties present (NSM_PCIeRetimer_Switch)
+ *  - Feature: NSM_MultiPortPCIeSwitchDevice params, null device
  *  - Factory: missing optional properties (Name, UUID, InventoryObjPath absent)
  *  - Factory: invalid UUID -> nsmDevice == nullptr -> error path
  *  - Factory: unknown type -> else branch
@@ -47,6 +48,7 @@ using namespace ::testing;
 
 #include "base.h"
 
+#include "features/creators.hpp"
 #include "nsmDeviceInventory/nsmPCIeRetimerSwitchDI.hpp"
 
 #undef private
@@ -73,8 +75,6 @@ struct NsmPCIeRetimerSwitchDIBranchTest :
 {
     const std::string retimerIntf =
         "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Switch";
-    const std::string multiPortIntf =
-        "xyz.openbmc_project.Configuration.NSM_MultiPortPCIeSwitchDevice";
     const uuid_t deviceUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
     const std::string invPath =
         "/xyz/openbmc_project/inventory/brtest/retimer/";
@@ -92,6 +92,39 @@ struct NsmPCIeRetimerSwitchDIBranchTest :
     ~NsmPCIeRetimerSwitchDIBranchTest()
     {
         cleanupDeviceSensors(devices);
+    }
+
+    features::DeviceContext makeDev(bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "HGX_PCIeSwitch_0";
+        dev.kind = "pcie_switch";
+        dev.staticUuid = deviceUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return dev;
+    }
+
+    static dbus::PropertyMap multiPortParams(const std::string& name)
+    {
+        return {{"Name", name},
+                {"FabricName", std::string("HGX_PCIeSwitchTopology_0")}};
+    }
+
+    std::shared_ptr<NsmPCIeRetimerSwitchDI> findSwitch() const
+    {
+        for (const auto& sensor : gpu->deviceSensors)
+        {
+            if (auto sw =
+                    std::dynamic_pointer_cast<NsmPCIeRetimerSwitchDI>(sensor))
+            {
+                return sw;
+            }
+        }
+        return nullptr;
     }
 };
 
@@ -118,22 +151,52 @@ TEST_F(NsmPCIeRetimerSwitchDIBranchTest,
 }
 
 // ============================================================================
-// Factory: NSM_MultiPortPCIeSwitchDevice with all properties -> sensors created
+// Feature: createMultiPortPCIeSwitchDeviceFeature with all params -> sensor
+// created as static and standby-to-DC refresh sensor
 // ============================================================================
 
 TEST_F(NsmPCIeRetimerSwitchDIBranchTest,
-       Factory_MultiPortSwitch_AllProps_SensorCreated)
+       Feature_MultiPortSwitch_AllParams_SensorCreated)
 {
-    const std::string testPath = "/xyz/test/brtest/multiport_all";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm["Name"] = std::string("BrMultiPort0");
-    pm["UUID"] = deviceUuid;
-    pm["InventoryObjPath"] = invPath;
-    pm["DeviceInstance"] = uint64_t(1);
+    auto params = multiPortParams("BrMultiPort0");
+    params["DeviceInstance"] = uint64_t(1);
+    params["ParentChassisAssociationPaths"] =
+        std::vector<std::string>{"chassis/HGX_PCIeSwitch_0"};
+    params["FabricAssociationPaths"] =
+        std::vector<std::string>{"fabrics/HGX_PCIeSwitchTopology_0"};
 
     const size_t before = gpu->standByToDcRefreshSensors.size();
-    CreatePCIeRetimerSwitch(mockManager, multiPortIntf, testPath);
-    EXPECT_GT(gpu->standByToDcRefreshSensors.size(), before);
+    const size_t staticBefore = gpu->staticSensors.size();
+    auto rc = features::createMultiPortPCIeSwitchDeviceFeature(
+        mockManager, makeDev(), params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(gpu->standByToDcRefreshSensors.size(), before + 1);
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore + 1);
+
+    auto sw = findSwitch();
+    ASSERT_NE(sw, nullptr);
+    EXPECT_EQ(sw->getType(), "NSM_MultiPortPCIeSwitchDevice");
+    EXPECT_TRUE(sw->isMultiPciePortEnabled);
+    EXPECT_EQ(sw->deviceIndex, 1 + PCIE_RETIMER_DEVICE_INDEX_START);
+    const auto& assocs = sw->associationDefIntf->associations();
+    ASSERT_EQ(assocs.size(), 2u);
+    EXPECT_EQ(std::get<0>(assocs[0]), "parent_chassis");
+    EXPECT_EQ(std::get<1>(assocs[0]), "all_switches");
+    EXPECT_EQ(std::get<0>(assocs[1]), "fabrics");
+    EXPECT_EQ(std::get<1>(assocs[1]), "all_switches");
+}
+
+// ============================================================================
+// Feature: no NsmDevice -> NSM_ERROR, nothing created
+// ============================================================================
+
+TEST_F(NsmPCIeRetimerSwitchDIBranchTest, Feature_MultiPortSwitch_NullDevice)
+{
+    const size_t before = gpu->standByToDcRefreshSensors.size();
+    auto rc = features::createMultiPortPCIeSwitchDeviceFeature(
+        mockManager, makeDev(false), multiPortParams("BrMultiPortNull"));
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(before, gpu->standByToDcRefreshSensors.size());
 }
 
 // ============================================================================
@@ -229,22 +292,21 @@ TEST_F(NsmPCIeRetimerSwitchDIBranchTest, Factory_UnknownType_ReturnsError)
 }
 
 // ============================================================================
-// Factory: missing DeviceInstance -> defaults to 0 -> sensor still created
+// Feature: missing DeviceInstance -> defaults to 0 -> sensor still created
 // ============================================================================
 
 TEST_F(NsmPCIeRetimerSwitchDIBranchTest,
-       Factory_MissingDeviceInstance_DefaultsToZero)
+       Feature_MissingDeviceInstance_DefaultsToZero)
 {
-    const std::string testPath = "/xyz/test/brtest/retimer_nodevinst";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm["Name"] = std::string("BrMultiPortNoDevInst");
-    pm["UUID"] = deviceUuid;
-    pm["InventoryObjPath"] = invPath;
-    // DeviceInstance deliberately absent -> uint64_t{} == 0
-
     const size_t before = gpu->standByToDcRefreshSensors.size();
-    CreatePCIeRetimerSwitch(mockManager, multiPortIntf, testPath);
+    auto rc = features::createMultiPortPCIeSwitchDeviceFeature(
+        mockManager, makeDev(), multiPortParams("BrMultiPortNoDevInst"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->standByToDcRefreshSensors.size(), before);
+    auto sw = findSwitch();
+    ASSERT_NE(sw, nullptr);
+    EXPECT_EQ(sw->deviceIndex, PCIE_RETIMER_DEVICE_INDEX_START);
+    EXPECT_TRUE(sw->associationDefIntf->associations().empty());
 }
 
 // ============================================================================

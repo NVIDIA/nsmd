@@ -21,6 +21,9 @@
 
 #include <sdbusplus/asio/object_server.hpp>
 
+#include <optional>
+#include <unordered_map>
+
 namespace nsm
 {
 
@@ -29,13 +32,29 @@ class NsmNumericSensor;
 class NsmDevice;
 class NsmThresholdValue;
 
+/** @brief One threshold tier given by value; static when
+ *  parameterId is empty, else read from the device by ParameterId
+ */
+struct FeatureThreshold
+{
+    double value{};
+    std::optional<uint64_t> parameterId;
+    bool periodicUpdate{false};
+    bool priority{false};
+    bool aggregated{false};
+};
+
 class NsmThresholdFactory
 {
   public:
-    NsmThresholdFactory(SensorManager& manager, const std::string& interface,
-                        const std::string& objPath,
-                        std::shared_ptr<NsmNumericSensor> numericSensor,
-                        const NumericSensorInfo& info, const uuid_t& uuid);
+    /** @brief Thresholds given by value (tier name, e.g. "UpperFatal", to
+     *  threshold)
+     */
+    NsmThresholdFactory(
+        SensorManager& manager, std::shared_ptr<NsmNumericSensor> numericSensor,
+        const NumericSensorInfo& info, const uuid_t& uuid,
+        std::shared_ptr<NsmDevice> nsmDevice,
+        std::unordered_map<std::string, FeatureThreshold> featureThresholds);
     requester::Coroutine make();
 
   private:
@@ -44,10 +63,6 @@ class NsmThresholdFactory
         std::string lowerThreshold;
         std::string upperThreshold;
     };
-
-    std::unordered_map<std::string, std::string> getThresholdInterfaces();
-    requester::Coroutine getThresholdInterfacesAsync(
-        std::unordered_map<std::string, std::string>& thresholdInterfaces);
 
     // outIntf, when non-null, receives the created tier D-Bus interface
     // object (e.g. ThresholdWarningIntf) on success, for use by the caller
@@ -68,12 +83,11 @@ class NsmThresholdFactory
 
   private:
     SensorManager& manager;
-    const std::string interface;
-    const std::string objPath;
     std::shared_ptr<NsmNumericSensor> numericSensor;
     const NumericSensorInfo& info;
     const uuid_t& uuid;
     std::shared_ptr<NsmDevice> nsmDevice;
+    std::unordered_map<std::string, FeatureThreshold> featureThresholds;
 };
 
 } // namespace nsm

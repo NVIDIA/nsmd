@@ -129,19 +129,16 @@ TEST(NsmPCIeRetimerFabricsDITest, ConstructorEmptyAssociations)
 }
 
 // =============================================================================
-// createNSMPCIeRetimerFabrics factory branch coverage
-// (exercised via NsmObjectFactory dispatch — static linkage workaround)
+// createPCIeRetimerFabricsFeature coverage
 // =============================================================================
 
-#include "nsmObjectFactory.hpp"
+#include "features/creators.hpp"
 
 struct NsmPCIeRetimerFabricsDIFactoryTest :
     public ::testing::Test,
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Fabrics";
     // UUID that maps to a MockNsmDevice (created on demand by
     // MockMctpDiscovery)
     const uuid_t retimerUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
@@ -160,94 +157,73 @@ struct NsmPCIeRetimerFabricsDIFactoryTest :
     {
         cleanupDeviceSensors(devices);
     }
+
+    nsm::features::DeviceContext makeDev()
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_PCIeRetimer_0";
+        dev.kind = "pcie_retimer";
+        dev.staticUuid = retimerUuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = retimer;
+        return dev;
+    }
+
+    requester::Coroutine create(const dbus::PropertyMap& params)
+    {
+        return nsm::features::createPCIeRetimerFabricsFeature(
+            mockManager, makeDev(), params);
+    }
 };
 
-// All three properties present → all TRUE branches → sensor created and added
-TEST_F(NsmPCIeRetimerFabricsDIFactoryTest, Factory_AllProperties_SensorCreated)
+// All params present → sensor created and added
+TEST_F(NsmPCIeRetimerFabricsDIFactoryTest, Feature_AllParams_SensorCreated)
 {
-    const std::string testPath = "/xyz/test/fabrics/all_props";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabricsDI_0");
-    pm["UUID"] = retimerUuid;
-    pm["FabricType"] = std::string(fabricTypePCIe);
-
     const size_t before = retimer->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
-    EXPECT_GT(retimer->deviceSensors.size(), before);
+    auto rc = create({{"Name", std::string("FabricsDI_0")},
+                      {"FabricType", std::string(fabricTypePCIe)}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(retimer->deviceSensors.size(), before + 1);
 }
 
-// Missing UUID → FALSE branch for count("UUID") → uuid="" →
-// parseStaticUuid("") throws → caught by createObjects → no sensor
-TEST_F(NsmPCIeRetimerFabricsDIFactoryTest, Factory_MissingUUID_NoSensor)
+// Missing Name → name="" → D-Bus path ends with "/" (invalid) →
+// sdbusplus throws → no sensor
+TEST_F(NsmPCIeRetimerFabricsDIFactoryTest, Feature_MissingName_NoSensor)
 {
-    const std::string testPath = "/xyz/test/fabrics/no_uuid";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabricsDI_NoUUID");
-    pm["FabricType"] = std::string(fabricTypePCIe);
-    // "UUID" intentionally omitted → uuid remains ""
-
     const size_t before = retimer->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
+    EXPECT_THROW_COROUTINE(
+        create({{"FabricType", std::string(fabricTypePCIe)}}), std::exception);
     EXPECT_EQ(before, retimer->deviceSensors.size());
 }
 
-// Missing Name → FALSE branch for count("Name") → name="" →
-// D-Bus path ends with "/" (invalid) → sdbusplus throws → no sensor
-TEST_F(NsmPCIeRetimerFabricsDIFactoryTest, Factory_MissingName_NoSensor)
+// Missing FabricType → fabricType="" → convertFabricTypeFromString("")
+// throws → no sensor
+TEST_F(NsmPCIeRetimerFabricsDIFactoryTest, Feature_MissingFabricType_NoSensor)
 {
-    const std::string testPath = "/xyz/test/fabrics/no_name";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["UUID"] = retimerUuid;
-    pm["FabricType"] = std::string(fabricTypePCIe);
-    // "Name" intentionally omitted → name=""
-
     const size_t before = retimer->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
+    EXPECT_THROW_COROUTINE(create({{"Name", std::string("FabricsDI_NoType")}}),
+                           std::exception);
     EXPECT_EQ(before, retimer->deviceSensors.size());
 }
 
-// Missing FabricType → FALSE branch for count("FabricType") → fabricType="" →
-// convertFabricTypeFromString("") throws → caught → no sensor
-TEST_F(NsmPCIeRetimerFabricsDIFactoryTest, Factory_MissingFabricType_NoSensor)
-{
-    const std::string testPath = "/xyz/test/fabrics/no_fabrictype";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabricsDI_NoType");
-    pm["UUID"] = retimerUuid;
-    // "FabricType" intentionally omitted → fabricType=""
-
-    const size_t before = retimer->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
-    EXPECT_EQ(before, retimer->deviceSensors.size());
-}
-
-// NVLink fabric type → TRUE branch for count("FabricType"), NVLink value →
-// sensor created
+// NVLink fabric type → sensor created
 TEST_F(NsmPCIeRetimerFabricsDIFactoryTest,
-       Factory_NVLinkFabricType_SensorCreated)
+       Feature_NVLinkFabricType_SensorCreated)
 {
-    const std::string testPath = "/xyz/test/fabrics/nvlink";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabricsDI_NVLink");
-    pm["UUID"] = retimerUuid;
-    pm["FabricType"] = std::string(fabricTypeNVLink);
-
     const size_t before = retimer->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
-    EXPECT_GT(retimer->deviceSensors.size(), before);
+    auto rc = create({{"Name", std::string("FabricsDI_NVLink")},
+                      {"FabricType", std::string(fabricTypeNVLink)}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(retimer->deviceSensors.size(), before + 1);
 }
 
-// Ethernet fabric type → sensor created (covers third FabricType TRUE branch)
+// Ethernet fabric type → sensor created
 TEST_F(NsmPCIeRetimerFabricsDIFactoryTest,
-       Factory_EthernetFabricType_SensorCreated)
+       Feature_EthernetFabricType_SensorCreated)
 {
-    const std::string testPath = "/xyz/test/fabrics/ethernet";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("FabricsDI_Eth");
-    pm["UUID"] = retimerUuid;
-    pm["FabricType"] = std::string(fabricTypeEthernet);
-
     const size_t before = retimer->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
-    EXPECT_GT(retimer->deviceSensors.size(), before);
+    auto rc = create({{"Name", std::string("FabricsDI_Eth")},
+                      {"FabricType", std::string(fabricTypeEthernet)}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(retimer->deviceSensors.size(), before + 1);
 }

@@ -9,7 +9,9 @@
 #include "sharedMemCommon.hpp"
 #endif
 
+#include "globals.hpp"
 #include "nsmPort/nsmPortConfigurationInfo.hpp"
+#include "nsmPortFeatures.hpp"
 #include "nsmSetAsync/asyncOperationManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -1958,59 +1960,46 @@ static std::optional<uint8_t> asUpstreamPortIndex(const dbus::Value& value)
     return static_cast<uint8_t>(raw);
 }
 
-requester::Coroutine
-    createNsmMultiPCIeRetimerPorts(SensorManager& manager,
-                                   const std::string& interface,
-                                   const std::string& objPath)
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmPCIeRetimerPorts,
+    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_PCIeLink")
+
+} // namespace nsm
+
+namespace nsm::features
 {
-    auto allProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath, interface);
 
-    std::string name{};
-    if (allProperties.count("Name"))
+requester::Coroutine
+    createMultiPCIeLinkFeature([[maybe_unused]] SensorManager& manager,
+                               const DeviceContext& dev,
+                               const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        name = std::get<std::string>(allProperties.at("Name"));
+        lg2::error("MultiPCIeLink feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
     }
-    name = utils::makeDBusNameValid(name);
-
-    std::string inventoryObjPath{};
-    if (allProperties.count("InventoryObjPath"))
-    {
-        inventoryObjPath =
-            std::get<std::string>(allProperties.at("InventoryObjPath"));
-    }
-
-    uuid_t uuid{};
-    if (allProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allProperties.at("UUID"));
-    }
-
-    bool priority = false;
-    if (allProperties.count("Priority"))
-    {
-        priority = std::get<bool>(allProperties.at("Priority"));
-    }
-
-    std::string upPortName = "UP";
-    if (allProperties.count("UpstreamPortName"))
-    {
-        upPortName =
-            std::get<std::string>(allProperties.at("UpstreamPortName"));
-    }
-
-    std::string downPortName = "DOWN";
-    if (allProperties.count("DownstreamPortName"))
-    {
-        downPortName =
-            std::get<std::string>(allProperties.at("DownstreamPortName"));
-    }
+    const std::string type = "NSM_PCIeRetimer_MultiPCIeLink";
+    auto name = utils::makeDBusNameValid(
+        param<std::string>(params, "Name").value_or(""));
+    auto fabricName = param<std::string>(params, "FabricName").value_or("");
+    auto switchName = param<std::string>(params, "SwitchName").value_or("");
+    const auto switchPath = (fabricsInventoryBasePath / fabricName /
+                             fabricSwitchesSubPath / switchName)
+                                .string();
+    // Legacy InventoryObjPath, with the trailing '/' it is joined on
+    const auto inventoryObjPath = switchPath + "/Ports/";
+    auto priority = param<bool>(params, "Priority").value_or(false);
+    auto upPortName =
+        param<std::string>(params, "UpstreamPortName").value_or("UP");
+    auto downPortName =
+        param<std::string>(params, "DownstreamPortName").value_or("DOWN");
 
     std::optional<uint8_t> upstreamPortIndex;
-    if (allProperties.count("UpstreamPortIndex"))
+    if (auto it = params.find("UpstreamPortIndex"); it != params.end())
     {
-        upstreamPortIndex =
-            asUpstreamPortIndex(allProperties.at("UpstreamPortIndex"));
+        upstreamPortIndex = asUpstreamPortIndex(it->second);
         if (!upstreamPortIndex)
         {
             lg2::error(
@@ -2020,40 +2009,21 @@ requester::Coroutine
         }
     }
 
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-
     std::vector<utils::Association> associations{};
-    co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                      associations);
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-    if (!nsmDevice)
+    if (param<bool>(params, "ParentDeviceAssociationsEnabled").value_or(false))
     {
-        lg2::error(
-            "NsmPCIePortDiscovery: UUID matches no NsmDevice : UUID={UUID}, Name={NAME}",
-            "UUID", uuid, "NAME", name);
-        co_return NSM_ERROR;
+        associations.push_back({"parent_device", "all_states", switchPath});
     }
 
     auto discoverySensor = std::make_shared<NsmPCIePortDiscovery>(
         name, type, inventoryObjPath, upPortName, downPortName, priority,
-        associations, upstreamPortIndex, nsmDevice);
-
-    nsmDevice->addStaticSensor(discoverySensor);
+        associations, upstreamPortIndex, dev.device);
+    dev.device->addStaticSensor(discoverySensor);
 
     lg2::info(
         "NsmPCIePortDiscovery: registered static discovery sensor for {NAME}",
         "NAME", name);
-
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmPCIeRetimerPorts,
-    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_PCIeLink")
-
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmMultiPCIeRetimerPorts,
-    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_MultiPCIeLink")
-
-} // namespace nsm
+} // namespace nsm::features

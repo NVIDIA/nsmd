@@ -26,9 +26,6 @@
  * - handleResponseMsg: slot count mismatch with count>0 (free path)
  * - handleResponseMsg: slot count mismatch with count==0 (no free path)
  * - handleResponseMsg: success with 0 slots (no free needed)
- * - Factory: device not found (UUID returns nullptr)
- * - Factory: NSM_Chassis type (vs NSM_ChassisRoT)
- * - Factory: only AP slots (no EC → rotProgressIntf created fresh)
  */
 
 #include "test/mockDBusHandler.hpp"
@@ -43,13 +40,6 @@ using namespace ::testing;
 #include "nsmChassis/nsmErot.hpp"
 
 using namespace nsm;
-
-namespace nsm
-{
-requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
-                                          const std::string& interface,
-                                          const std::string& objPath);
-} // namespace nsm
 
 // ============================================================================
 // NsmBuildTypeObject: genRequestMsg / handleResponseMsg branch tests
@@ -281,135 +271,3 @@ struct NsmErotFactoryBranch2Test :
         },
     }};
 };
-
-// Device not found (invalid UUID) → co_return NSM_SW_ERROR
-TEST_F(NsmErotFactoryBranch2Test, DeviceNotFound_ReturnsError)
-{
-    const uuid_t badUuid = "INVALID:UUID:DEVICE:NOT:FOUND";
-    const std::string uniquePath = "/xyz/test/erot_branch2/no_device";
-
-    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    pm["Type"] = std::string("NSM_ChassisRoT");
-    pm["Name"] = std::string("ErotNoDevice");
-    pm["UUID"] = badUuid;
-    pm["SlotCount"] = uint64_t(0);
-
-    EXPECT_THROW_COROUTINE(
-        nsmErotCreateSensors(mockManager, basicIntfName, uniquePath),
-        std::runtime_error);
-}
-
-// NSM_Chassis type (not NSM_ChassisRoT) with SlotCount → still processes
-TEST_F(NsmErotFactoryBranch2Test, NSMChassisType_WithSlots)
-{
-    utils::MockDbusAsync::serviceMap() = slotServiceMap;
-
-    const std::string uniqueName = "HGX_Chassis_Branch2";
-    const std::string uniquePath = std::string(chassisInventoryBasePath) + "/" +
-                                   uniqueName;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    pm["Type"] = std::string("NSM_Chassis");
-    pm["Name"] = uniqueName;
-    pm["UUID"] = fpgaUuid;
-    pm["SlotCount"] = uint64_t(1);
-
-    std::string slot1Path = uniquePath + "/Slot1";
-    auto& slotProps = utils::MockDbusAsync::propertyMap(
-        slot1Path, "xyz.openbmc_project.Configuration.NSM_RoT_Slot");
-    slotProps["Name"] = std::string("Slot1");
-    slotProps["FirmwareType"] = std::string("EC");
-    slotProps["ChassisName"] = uniqueName;
-    slotProps["ComponentClassification"] = uint64_t(1);
-    slotProps["ComponentIdentifier"] = uint64_t(1);
-    slotProps["ComponentIndex"] = uint64_t(0);
-
-    auto& slotAssocProps = utils::MockDbusAsync::propertyMap(
-        slot1Path,
-        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations");
-    slotAssocProps["Forward"] = std::string("chassis");
-    slotAssocProps["Backward"] = std::string("firmware_slot");
-    slotAssocProps["AbsolutePath"] = uniquePath;
-
-    const size_t before = fpga->deviceSensors.size();
-    nsmErotCreateSensors(mockManager, basicIntfName, uniquePath);
-    EXPECT_GT(fpga->deviceSensors.size(), before);
-}
-
-// Only AP slots (no EC) → rotProgressIntf == nullptr && ecProgressIntf ==
-// nullptr → else branch at L548: fresh ProgressIntf created
-TEST_F(NsmErotFactoryBranch2Test, OnlyAPSlots_FreshProgressIntfCreated)
-{
-    utils::MockDbusAsync::serviceMap() = slotServiceMap;
-
-    const std::string uniqueName = "HGX_RoT_OnlyAP_Branch2";
-    const std::string uniquePath = std::string(chassisInventoryBasePath) + "/" +
-                                   uniqueName;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    pm["Type"] = std::string("NSM_ChassisRoT");
-    pm["Name"] = uniqueName;
-    pm["UUID"] = fpgaUuid;
-    pm["SlotCount"] = uint64_t(1);
-
-    std::string slot1Path = uniquePath + "/Slot1";
-    auto& slotProps = utils::MockDbusAsync::propertyMap(
-        slot1Path, "xyz.openbmc_project.Configuration.NSM_RoT_Slot");
-    slotProps["Name"] = std::string("Slot1");
-    slotProps["FirmwareType"] = std::string("AP");
-    slotProps["ChassisName"] = uniqueName + "_AP";
-    slotProps["ComponentClassification"] = uint64_t(1);
-    slotProps["ComponentIdentifier"] = uint64_t(1);
-    slotProps["ComponentIndex"] = uint64_t(0);
-
-    auto& slotAssocProps = utils::MockDbusAsync::propertyMap(
-        slot1Path,
-        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations");
-    slotAssocProps["Forward"] = std::string("chassis");
-    slotAssocProps["Backward"] = std::string("firmware_slot");
-    slotAssocProps["AbsolutePath"] = uniquePath;
-
-    const size_t before = fpga->deviceSensors.size();
-    nsmErotCreateSensors(mockManager, basicIntfName, uniquePath);
-    // At minimum apFirmwareType + apMinSecVersion + securityCfg
-    EXPECT_GT(fpga->deviceSensors.size(), before);
-}
-
-// AP slot with IsRoT=true → slotKey = name (not chassisName) → different
-// map key for apFirmwareTypeMap
-TEST_F(NsmErotFactoryBranch2Test, APSlotIsRoT_SlotKeyIsName)
-{
-    utils::MockDbusAsync::serviceMap() = slotServiceMap;
-
-    const std::string uniqueName = "HGX_RoT_APIsRoT_Branch2";
-    const std::string uniquePath = std::string(chassisInventoryBasePath) + "/" +
-                                   uniqueName;
-
-    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    pm["Type"] = std::string("NSM_ChassisRoT");
-    pm["Name"] = uniqueName;
-    pm["UUID"] = fpgaUuid;
-    pm["SlotCount"] = uint64_t(1);
-
-    std::string slot1Path = uniquePath + "/Slot1";
-    auto& slotProps = utils::MockDbusAsync::propertyMap(
-        slot1Path, "xyz.openbmc_project.Configuration.NSM_RoT_Slot");
-    slotProps["Name"] = std::string("Slot1");
-    slotProps["FirmwareType"] = std::string("AP");
-    slotProps["ChassisName"] = uniqueName + "_AP";
-    slotProps["ComponentClassification"] = uint64_t(1);
-    slotProps["ComponentIdentifier"] = uint64_t(1);
-    slotProps["ComponentIndex"] = uint64_t(0);
-    slotProps["IsRoT"] = bool(true); // slotKey = name instead of chassisName
-
-    auto& slotAssocProps = utils::MockDbusAsync::propertyMap(
-        slot1Path,
-        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations");
-    slotAssocProps["Forward"] = std::string("chassis");
-    slotAssocProps["Backward"] = std::string("firmware_slot");
-    slotAssocProps["AbsolutePath"] = uniquePath;
-
-    const size_t before = fpga->deviceSensors.size();
-    nsmErotCreateSensors(mockManager, basicIntfName, uniquePath);
-    EXPECT_GT(fpga->deviceSensors.size(), before);
-}

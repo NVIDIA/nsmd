@@ -25,18 +25,13 @@ using namespace ::testing;
 
 #include "base.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmIRoTResponder.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 
 #include <libnsm/debug-token.h>
-
-namespace nsm
-{
-requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
-                                            const std::string& interface,
-                                            const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -62,6 +57,38 @@ struct NsmIRoTResponderTest :
     ~NsmIRoTResponderTest()
     {
         cleanupDeviceSensors(devices);
+    }
+
+    /** @brief Run an IRoT feature creator of the device `deviceName` on the
+     *  mock NsmDevice; params gets "Name" unless withName is false
+     */
+    requester::Coroutine runFeature(nsm::features::CreatorFn creator,
+                                    dbus::PropertyMap params,
+                                    const std::string& deviceName,
+                                    bool withName = true)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = deviceName;
+        dev.kind = "irot";
+        dev.staticUuid = fpgaUuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = fpga;
+        if (withName)
+        {
+            params["Name"] = deviceName;
+        }
+        return creator(mockManager, dev, params);
+    }
+
+    /** @brief Last static sensor of the mock device as T, nullptr if none */
+    template <typename T>
+    std::shared_ptr<T> lastStatic()
+    {
+        if (fpga->staticSensors.size() == 0)
+        {
+            return nullptr;
+        }
+        return std::dynamic_pointer_cast<T>(fpga->staticSensors.back());
     }
 };
 
@@ -110,69 +137,6 @@ TEST_F(NsmIRoTResponderTest, testMultipleInstances)
     EXPECT_EQ(irot2->getName(), name2);
 }
 
-TEST_F(NsmIRoTResponderTest, goodTestCreateIRoTResponder)
-{
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/irot";
-
-    dbus::PropertyMap baseProperties = {
-        {"Name", name},
-        {"UUID", fpgaUuid},
-    };
-
-    dbus::PropertyMap responderProperties = {
-        {"Type", std::string("NSM_ChassisIRoTResponder")},
-        {"UUID", fpgaUuid},
-    };
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap = baseProperties;
-
-    auto& propertyMap =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMap = responderProperties;
-
-    createNsmIRoTResponder(mockManager, basicIntfName + ".Chassis", objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 1);
-}
-
-TEST_F(NsmIRoTResponderTest, testCreateIRoTResponderWithAttributes)
-{
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/irot";
-
-    dbus::PropertyMap baseProperties = {
-        {"Name", name},
-        {"UUID", fpgaUuid},
-    };
-
-    dbus::PropertyMap attributesProperties = {
-        {"Type", std::string("NSM_Chassis_Attributes")},
-        {"Name", std::string("IRoT_Attributes")},
-        {"LocationType",
-         "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"},
-        {"ChassisType",
-         "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"},
-    };
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap = baseProperties;
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMap = attributesProperties;
-
-    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
-                           objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 1);
-}
-
 TEST_F(NsmIRoTResponderTest, testUpdateAssetIntfCoroutine)
 {
     auto irotResponder = std::make_shared<NsmIRoTResponder<NsmAssetIntf>>(name,
@@ -192,36 +156,6 @@ TEST_F(NsmIRoTResponderTest, testUpdateAssetIntfCoroutine)
         .WillOnce(mockSensorIO(queryDeviceIdsResp, Response{}));
 
     irotResponder->update(fpga);
-}
-
-TEST_F(NsmIRoTResponderTest, badTestMissingUUID)
-{
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/irot";
-
-    dbus::PropertyMap baseProperties = {
-        {"Name", name},
-        // Missing UUID
-    };
-
-    dbus::PropertyMap chassisProperties = {
-        {"Type", std::string("NSM_ChassisIRoTResponder")},
-        // Missing UUID
-    };
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap = baseProperties;
-
-    auto& propertyMap =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMap = chassisProperties;
-
-    EXPECT_THROW_COROUTINE(createNsmIRoTResponder(mockManager,
-                                                  basicIntfName + ".Chassis",
-                                                  objPath),
-                           std::runtime_error);
 }
 
 TEST_F(NsmIRoTResponderTest, testUpdateAssetIntfDecodeFailure)
@@ -268,95 +202,6 @@ TEST_F(NsmIRoTResponderTest, testUpdateUuidIntfSuccess)
         reinterpret_cast<mctp::MctpDiscovery*>(&mockManager.mockMctpDiscovery));
     irotResponder->update(fpga);
     mctp::mctpDiscoveryInstance.release();
-}
-
-TEST_F(NsmIRoTResponderTest, testCreateIRoTResponderWithAssociations)
-{
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/irot";
-
-    dbus::PropertyMap baseProperties = {
-        {"Name", name},
-        {"UUID", fpgaUuid},
-    };
-
-    dbus::PropertyMap responderProperties = {
-        {"Type", std::string("NSM_ChassisIRoTResponder")},
-        {"UUID", fpgaUuid},
-    };
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap = baseProperties;
-
-    auto& propertyMap =
-        utils::MockDbusAsync::propertyMap(objPath, basicIntfName + ".Chassis");
-    propertyMap = responderProperties;
-
-    // Setup associations
-    auto& serviceMap = utils::MockDbusAsync::serviceMap();
-    MapperServiceMap assocServiceMap = {
-        {
-            {
-                "xyz.openbmc_project.NSM",
-                {
-                    basicIntfName + ".Chassis.Associations",
-                },
-            },
-        },
-    };
-    serviceMap = assocServiceMap;
-
-    dbus::PropertyMap assocProperties = {
-        {"Forward", "parent_chassis"},
-        {"Backward", "irot_responder"},
-        {"AbsolutePath", "/xyz/openbmc_project/inventory/system/chassis"},
-    };
-
-    auto& assocPropertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".Chassis.Associations");
-    assocPropertyMap = assocProperties;
-
-    createNsmIRoTResponder(mockManager, basicIntfName + ".Chassis", objPath);
-
-    EXPECT_GE(fpga->staticSensors.size(), 2); // UUID + Associations
-}
-
-TEST_F(NsmIRoTResponderTest, testCreateIRoTResponderInventoryProperties)
-{
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/irot";
-
-    dbus::PropertyMap baseProperties = {
-        {"Name", name},
-        {"UUID", fpgaUuid},
-    };
-
-    dbus::PropertyMap attributesProperties = {
-        {"Type", std::string("NSM_Chassis_Attributes")},
-        {"Name", std::string("IRoT_Asset")},
-        {"LocationType",
-         "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"},
-        {"ChassisType",
-         "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"},
-    };
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap = baseProperties;
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    propertyMap = attributesProperties;
-
-    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
-                           objPath);
-
-    // Should create Asset, Health, Location, Chassis, and inventory property
-    // sensors
-    EXPECT_GE(fpga->staticSensors.size(), 4);
 }
 
 TEST_F(NsmIRoTResponderTest, testUpdateAssetIntfWithEmptyDeviceId)
@@ -407,43 +252,6 @@ TEST_F(NsmIRoTResponderTest, testUpdateAssetIntfWithLargeDeviceId)
     irotResponder->update(fpga);
 }
 
-TEST_F(NsmIRoTResponderTest, testCreateIRoTHelperFunctions)
-{
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/irot_helpers";
-
-    dbus::PropertyMap baseProperties = {
-        {"Name", std::string("IRoT_Helpers")},
-        {"UUID", fpgaUuid},
-    };
-
-    dbus::PropertyMap attributesProps = {
-        {"Type", std::string("NSM_Chassis_Attributes")},
-        {"Name", std::string("IRoT_Asset_Full")},
-        {"LocationType",
-         "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"},
-        {"ChassisType",
-         "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"},
-    };
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              basicIntfName);
-    basePropertyMap = baseProperties;
-
-    auto& attrPropertyMap = utils::MockDbusAsync::propertyMap(
-        objPath, basicIntfName + ".ChassisAttributes");
-    attrPropertyMap = attributesProps;
-
-    createNsmIRoTResponder(mockManager, basicIntfName + ".ChassisAttributes",
-                           objPath);
-
-    // Should create: Asset (with 3 inventory properties), Health, Location,
-    // Chassis Total: at least 7 sensors
-    EXPECT_GE(fpga->staticSensors.size(), 7);
-}
-
 TEST_F(NsmIRoTResponderTest, testUpdateAssetIntfSendError)
 {
     auto irotResponder =
@@ -492,181 +300,281 @@ TEST_F(NsmIRoTResponderTest, testUpdateAssetIntfSecondDecodeFailure)
 }
 
 // =============================================================================
-// FALSE-branch coverage: count() checks in createNsmIRoTResponder
+// IRoT feature creators (nsm::features::createIRoT*Feature)
 // =============================================================================
 
-// Type absent → type="" → neither "NSM_ChassisIRoTResponder" nor
-// "NSM_Chassis_Attributes" block executes → no sensors created
-TEST_F(NsmIRoTResponderTest, CreateIRoTResponder_MissingType_NoSensors)
+TEST_F(NsmIRoTResponderTest, goodTestSPDMResponderFeature)
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string uniquePath = "/xyz/test/irot/no_type_false_branch";
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(nsm::features::createIRoTSPDMResponderFeature, {},
+                         "HGX_IRoT_SPDM");
 
-    // Register base interface so coGetCachedBaseProperties succeeds
-    auto& baseProps = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                        basicIntfName);
-    baseProps["Name"] = std::string("IRoT_NoType");
-    baseProps["UUID"] = fpgaUuid;
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(fpga->staticSensors.size(), before + 1);
+    auto uuidObject = lastStatic<NsmIRoTResponder<UuidIntf>>();
+    ASSERT_NE(uuidObject, nullptr);
+    EXPECT_EQ(uuidObject->invoke(pdiMethod(uuid)), fpgaUuid);
+}
 
-    // Register current sub-interface WITHOUT "Type" → type="" → no block runs
-    auto& currProps = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".NoTypeIface");
-    (void)currProps; // intentionally empty
+TEST_F(NsmIRoTResponderTest, goodTestSPDMResponderFeatureMctpUuidEnabled)
+{
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(nsm::features::createIRoTSPDMResponderFeature,
+                         {{"MctpUuidEnabled", true}}, "HGX_IRoT_SPDM_Mctp");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // Common.UUID + MCTP.UUID
+    EXPECT_EQ(fpga->staticSensors.size(), before + 2);
+}
+
+TEST_F(NsmIRoTResponderTest, goodTestSPDMResponderFeatureMctpUuidDisabled)
+{
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(nsm::features::createIRoTSPDMResponderFeature,
+                         {{"MctpUuidEnabled", false}}, "HGX_IRoT_SPDM_NoMctp");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(fpga->staticSensors.size(), before + 1);
+}
+
+TEST_F(NsmIRoTResponderTest, goodTestAssociationsFeatureAllPaths)
+{
+    dbus::PropertyMap params{
+        {"ParentChassisAssociationPaths",
+         std::vector<std::string>{"chassis/HGX_Chassis_0"}},
+        {"RoTInventoryAssociationPaths",
+         std::vector<std::string>{"chassis/HGX_GPU_0", "chassis/HGX_GPU_1"}},
+        {"InventoryChassisAssociationPaths",
+         std::vector<std::string>{"chassis/HGX_GPU_0"}}};
 
     const size_t before = fpga->staticSensors.size();
-    createNsmIRoTResponder(mockManager, basicIntfName + ".NoTypeIface",
-                           uniquePath);
-    // Neither if/else-if block ran → no new sensors
-    EXPECT_EQ(before, fpga->staticSensors.size());
+    auto rc = runFeature(nsm::features::createIRoTAssociationsFeature, params,
+                         "HGX_IRoT_Assoc");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(fpga->staticSensors.size(), before + 1);
+    auto associationsObject =
+        lastStatic<NsmIRoTResponder<AssociationDefinitionsIntf>>();
+    ASSERT_NE(associationsObject, nullptr);
+    auto associations = associationsObject->invoke(pdiMethod(associations));
+    ASSERT_EQ(associations.size(), 4);
+    EXPECT_EQ(
+        associations[0],
+        std::make_tuple(
+            std::string("parent_chassis"), std::string("all_chassis"),
+            std::string(
+                "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0")));
+    EXPECT_EQ(
+        associations[1],
+        std::make_tuple(
+            std::string("inventory"), std::string("associated_ROT"),
+            std::string(
+                "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_0")));
+    EXPECT_EQ(
+        associations[2],
+        std::make_tuple(
+            std::string("inventory"), std::string("associated_ROT"),
+            std::string(
+                "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_1")));
+    EXPECT_EQ(
+        associations[3],
+        std::make_tuple(
+            std::string("inventory_chassis"), std::string("associated_chassis"),
+            std::string(
+                "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_0")));
 }
 
-// Name absent from base → name="" → createIRoTResponderAsset constructs
-// NsmIRoTResponder<NsmAssetIntf> at path ending with "/" → sdbusplus throws
-TEST_F(NsmIRoTResponderTest, CreateIRoTResponder_MissingName_InBase_Throws)
+TEST_F(NsmIRoTResponderTest, goodTestAssociationsFeatureEmptyEntriesSkipped)
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string uniquePath = "/xyz/test/irot/no_base_name";
-
-    // Base interface has UUID but NOT "Name" → name=""
-    auto& baseProps = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                        basicIntfName);
-    baseProps["UUID"] = fpgaUuid;
-    // "Name" intentionally omitted → FALSE branch → name=""
-
-    // Current interface triggers NSM_Chassis_Attributes block (needs Name)
-    auto& currProps = utils::MockDbusAsync::propertyMap(
-        uniquePath, basicIntfName + ".NoNameAttrs");
-    currProps["Type"] = std::string("NSM_Chassis_Attributes");
-    currProps["LocationType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Location"
-        ".LocationTypes.Embedded");
-    currProps["ChassisType"] = std::string(
-        "xyz.openbmc_project.Inventory.Item.Chassis"
-        ".ChassisType.Module");
-
-    // name="" → NsmIRoTResponder<NsmAssetIntf>("", ...) → path ends with "/"
-    // → sdbusplus SdBusError (InvalidArgs)
-    EXPECT_THROW_COROUTINE(
-        createNsmIRoTResponder(mockManager, basicIntfName + ".NoNameAttrs",
-                               uniquePath),
-        std::exception);
-}
-
-// createNsmIRoTResponder: base interface NOT registered at path →
-// coGetCachedBaseProperties returns non-NSM_SUCCESS → co_return rc (line 259).
-//
-TEST_F(NsmIRoTResponderTest, CreateIRoTResponder_BasePropertiesFail_EarlyReturn)
-{
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string uniquePath = "/xyz/test/irot/base_fail_unique";
-
-    // Register a different sub-interface so the path exists but basicIntfName
-    // (the hardcoded baseInterface inside createNsmIRoTResponder) is absent.
-    auto& other = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                    basicIntfName + ".Sub");
-    other["Type"] = std::string("NSM_ChassisIRoTResponder");
+    dbus::PropertyMap params{
+        {"ParentChassisAssociationPaths", std::vector<std::string>{""}},
+        {"RoTInventoryAssociationPaths",
+         std::vector<std::string>{"", "chassis/HGX_GPU_0"}}};
 
     const size_t before = fpga->staticSensors.size();
-    createNsmIRoTResponder(mockManager, basicIntfName + ".Chassis", uniquePath);
-    EXPECT_EQ(before, fpga->staticSensors.size());
+    auto rc = runFeature(nsm::features::createIRoTAssociationsFeature, params,
+                         "HGX_IRoT_AssocEmpty");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(fpga->staticSensors.size(), before + 1);
+    auto associationsObject =
+        lastStatic<NsmIRoTResponder<AssociationDefinitionsIntf>>();
+    ASSERT_NE(associationsObject, nullptr);
+    EXPECT_EQ(associationsObject->invoke(pdiMethod(associations)).size(), 1);
 }
 
-// NSM_Chassis_Attributes: LocationCode/LocationContext/FieldReplaceable present
-// but NO LocationType and NO ChassisType → covers:
-//   - line 136 count("Name") FALSE (Name absent from current props)
-//   - line 312 count("LocationType") FALSE
-//   - line 317 count("ChassisType") FALSE
-//   - lines 322/327/332 TRUE (creates LocationCode, LocationContext,
-//   Replaceable)
-//   - lines 201/218/235 TRUE inside static helper functions
-TEST_F(
-    NsmIRoTResponderTest,
-    CreateIRoTResponder_ChassisAttributes_OptionalPropsNoLocTypeOrChassisType)
+TEST_F(NsmIRoTResponderTest, goodTestAssociationsFeatureNoPathsNoObject)
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string subIntfName = basicIntfName + ".AttrOptProps";
-    const std::string uniquePath = "/xyz/test/irot/chassis_attr_opt_props";
-
-    // Base interface: Name and UUID
-    auto& baseProps = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                        basicIntfName);
-    baseProps["Name"] = std::string("IRoT_OptProps");
-    baseProps["UUID"] = fpgaUuid;
-
-    // Current interface: Type + optional location props, but NO Name,
-    // NO LocationType, NO ChassisType
-    auto& currProps = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                        subIntfName);
-    currProps["Type"] = std::string("NSM_Chassis_Attributes");
-    // "Name" intentionally omitted → line 136 FALSE → assetName=""
-    // "LocationType" omitted → line 312 FALSE → skip
-    // createIRoTResponderLocation "ChassisType" omitted → line 317 FALSE → skip
-    // createIRoTResponderChassis
-    currProps["LocationCode"] = std::string("U1.A.B");   // line 322 TRUE
-    currProps["LocationContext"] = std::string("Slot0"); // line 327 TRUE
-    currProps["FieldReplaceable"] = bool(false);         // line 332 TRUE
-
     const size_t before = fpga->staticSensors.size();
-    createNsmIRoTResponder(mockManager, subIntfName, uniquePath);
-    // asset + health + locationCode + locationContext + replaceable sensors
-    // added
-    EXPECT_GT(fpga->staticSensors.size(), before);
+    auto rc = runFeature(nsm::features::createIRoTAssociationsFeature, {},
+                         "HGX_IRoT_AssocNone");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(fpga->staticSensors.size(), before);
 }
 
-// type=="NSM_ChassisIRoTResponder" (baseType) but current props have no "UUID"
-// → line 289 count("UUID") FALSE → local uuid stays empty, still adds sensors
-TEST_F(NsmIRoTResponderTest, CreateIRoTResponder_BaseType_NoCurrentUUID)
+TEST_F(NsmIRoTResponderTest, goodTestAssetFeatureWithAssetName)
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string subIntfName = basicIntfName + ".BaseNoUUID";
-    const std::string uniquePath = "/xyz/test/irot/base_type_no_curr_uuid";
-
-    // Base interface: Name and UUID (so device lookup succeeds)
-    auto& baseProps = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                        basicIntfName);
-    baseProps["Name"] = std::string("IRoT_BaseNoUUID");
-    baseProps["UUID"] = fpgaUuid;
-
-    // Current interface: type=baseType but NO "UUID"
-    // → count("UUID") at line 289 is FALSE → local uuid{} stays empty
-    auto& currProps = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                        subIntfName);
-    currProps["Type"] = std::string("NSM_ChassisIRoTResponder");
-    // "UUID" intentionally omitted → FALSE branch at line 289
-
     const size_t before = fpga->staticSensors.size();
-    createNsmIRoTResponder(mockManager, subIntfName, uniquePath);
-    // uuidObject and associationsObject were created and added
-    EXPECT_GT(fpga->staticSensors.size(), before);
+    auto rc = runFeature(nsm::features::createIRoTAssetFeature,
+                         {{"AssetName", std::string("IRoT_Asset")}},
+                         "HGX_IRoT_Asset");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // Asset + build date, model and part number inventory properties
+    ASSERT_EQ(fpga->staticSensors.size(), before + 4);
+    auto assetObject =
+        std::dynamic_pointer_cast<NsmIRoTResponder<NsmAssetIntf>>(
+            fpga->staticSensors[before]);
+    ASSERT_NE(assetObject, nullptr);
+    EXPECT_EQ(assetObject->invoke(pdiMethod(name)), "IRoT_Asset");
+    EXPECT_EQ(assetObject->invoke(pdiMethod(manufacturer)),
+              MANUFACTURER_NVIDIA);
 }
 
-// count("UUID") FALSE in base interface (line 275): base "UUID" absent →
-// uuid="" → getNsmDeviceFromStaticUUID("") throws std::runtime_error.
-TEST_F(NsmIRoTResponderTest, CreateIRoTResponder_MissingBaseUUID_Throws)
+TEST_F(NsmIRoTResponderTest, goodTestAssetFeatureWithoutAssetName)
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder";
-    const std::string subIntfName = basicIntfName + ".NoBaseUUID";
-    const std::string uniquePath = "/xyz/test/irot/no_base_uuid";
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(nsm::features::createIRoTAssetFeature, {},
+                         "HGX_IRoT_AssetNoName");
 
-    // Base interface: has Name but NO "UUID" → uuid="" at line 275
-    auto& baseProps = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                        basicIntfName);
-    baseProps["Name"] = std::string("IRoT_NoBaseUUID");
-    // "UUID" intentionally omitted → FALSE branch → uuid="" → throws
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(fpga->staticSensors.size(), before + 4);
+    auto assetObject =
+        std::dynamic_pointer_cast<NsmIRoTResponder<NsmAssetIntf>>(
+            fpga->staticSensors[before]);
+    ASSERT_NE(assetObject, nullptr);
+    EXPECT_EQ(assetObject->invoke(pdiMethod(name)), "");
+}
 
-    // Current interface has valid type (so the device lookup is reached)
-    auto& currProps = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                        subIntfName);
-    currProps["Type"] = std::string("NSM_ChassisIRoTResponder");
+TEST_F(NsmIRoTResponderTest, badTestAssetFeatureNoName)
+{
+    // No "Name" param -> object path ends with "/" -> sdbusplus throws
+    EXPECT_THROW_COROUTINE(runFeature(nsm::features::createIRoTAssetFeature, {},
+                                      "HGX_IRoT_NoName", false),
+                           std::exception);
+}
 
-    // uuid="" → getNsmDeviceFromStaticUUID("") throws std::runtime_error
-    EXPECT_THROW_COROUTINE(
-        createNsmIRoTResponder(mockManager, subIntfName, uniquePath),
-        std::runtime_error);
+TEST_F(NsmIRoTResponderTest, goodTestHealthFeature)
+{
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(nsm::features::createIRoTHealthFeature, {},
+                         "HGX_IRoT_Health");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(fpga->staticSensors.size(), before + 1);
+    auto healthObject = lastStatic<NsmIRoTResponder<HealthIntf>>();
+    ASSERT_NE(healthObject, nullptr);
+    EXPECT_EQ(healthObject->invoke(pdiMethod(health)),
+              HealthIntf::HealthType::OK);
+}
+
+TEST_F(NsmIRoTResponderTest, goodTestChassisTypeFeature)
+{
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(
+        nsm::features::createIRoTChassisTypeFeature,
+        {{"ChassisType",
+          std::string(
+              "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module")}},
+        "HGX_IRoT_ChassisType");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(fpga->staticSensors.size(), before + 1);
+    auto chassisObject = lastStatic<NsmIRoTResponder<ChassisIntf>>();
+    ASSERT_NE(chassisObject, nullptr);
+    EXPECT_EQ(chassisObject->invoke(pdiMethod(type)),
+              ChassisIntf::ChassisType::Module);
+}
+
+TEST_F(NsmIRoTResponderTest, goodTestLocationTypeFeature)
+{
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(
+        nsm::features::createIRoTLocationTypeFeature,
+        {{"LocationType",
+          std::string("xyz.openbmc_project.Inventory.Decorator.Location."
+                      "LocationTypes.Embedded")}},
+        "HGX_IRoT_LocationType");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(fpga->staticSensors.size(), before + 1);
+    auto locationObject = lastStatic<NsmIRoTResponder<LocationIntf>>();
+    ASSERT_NE(locationObject, nullptr);
+    EXPECT_EQ(locationObject->invoke(pdiMethod(locationType)),
+              LocationIntf::LocationTypes::Embedded);
+}
+
+TEST_F(NsmIRoTResponderTest, goodTestLocationCodeFeature)
+{
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(nsm::features::createIRoTLocationCodeFeature,
+                         {{"LocationCode", std::string("U1.A.B")}},
+                         "HGX_IRoT_LocationCode");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(fpga->staticSensors.size(), before + 1);
+    auto locationCodeObject = lastStatic<NsmIRoTResponder<LocationCodeIntf>>();
+    ASSERT_NE(locationCodeObject, nullptr);
+    EXPECT_EQ(locationCodeObject->invoke(pdiMethod(locationCode)), "U1.A.B");
+}
+
+TEST_F(NsmIRoTResponderTest, goodTestLocationContextFeature)
+{
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(nsm::features::createIRoTLocationContextFeature,
+                         {{"LocationContext", std::string("Slot0")}},
+                         "HGX_IRoT_LocationContext");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(fpga->staticSensors.size(), before + 1);
+    auto locationContextObject =
+        lastStatic<NsmIRoTResponder<LocationContextIntf>>();
+    ASSERT_NE(locationContextObject, nullptr);
+    EXPECT_EQ(locationContextObject->invoke(pdiMethod(locationContext)),
+              "Slot0");
+}
+
+TEST_F(NsmIRoTResponderTest, goodTestFieldReplaceableFeature)
+{
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(nsm::features::createIRoTFieldReplaceableFeature,
+                         {{"FieldReplaceable", true}},
+                         "HGX_IRoT_FieldReplaceable");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(fpga->staticSensors.size(), before + 1);
+    auto replaceableObject = lastStatic<NsmIRoTResponder<ReplaceableIntf>>();
+    ASSERT_NE(replaceableObject, nullptr);
+    EXPECT_TRUE(replaceableObject->invoke(pdiMethod(fieldReplaceable)));
+}
+
+// Optional-property features create nothing when their param is not set
+TEST_F(NsmIRoTResponderTest, goodTestOptionalFeaturesWithoutParams)
+{
+    const size_t before = fpga->staticSensors.size();
+    const nsm::features::CreatorFn creators[] = {
+        nsm::features::createIRoTChassisTypeFeature,
+        nsm::features::createIRoTLocationTypeFeature,
+        nsm::features::createIRoTLocationCodeFeature,
+        nsm::features::createIRoTLocationContextFeature,
+        nsm::features::createIRoTFieldReplaceableFeature};
+    for (auto creator : creators)
+    {
+        auto rc = runFeature(creator, {}, "HGX_IRoT_NoOptional");
+        EXPECT_EQ(rc.data(), NSM_SUCCESS);
+        EXPECT_FALSE(rc.exception());
+    }
+    EXPECT_EQ(fpga->staticSensors.size(), before);
+}
+
+TEST_F(NsmIRoTResponderTest, goodTestSKUFeature)
+{
+    const size_t before = fpga->staticSensors.size();
+    auto rc = runFeature(nsm::features::createIRoTSKUFeature, {},
+                         "HGX_IRoT_SKU");
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(fpga->staticSensors.size(), before + 1);
 }

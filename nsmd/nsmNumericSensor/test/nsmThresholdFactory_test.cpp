@@ -20,21 +20,16 @@
  *
  * Covers:
  * - Constructor
- * - make(): empty serviceMap → no sensors
- * - make(): non-matching interface → no sensors
- * - make(): LowerCaution/UpperCaution, Dynamic=false → static threshold
- * - make(): LowerCritical, Dynamic=false → static critical threshold
- * - make(): LowerFatal/UpperFatal, Dynamic=false → static hard-shutdown
- * threshold
- * - make(): Dynamic=true, unsupported type → error, no sensor
- * - make(): Dynamic=true, NSM_ThermalParameter, no PeriodicUpdate →
- * addStaticSensor
- * - make(): Dynamic=true, NSM_ThermalParameter, periodicUpdate=true →
- * roundRobin
- * - make(): Dynamic=true, NSM_ThermalParameter, periodicUpdate=true, priority →
- * priority queue
- * - make(): Dynamic=true, NSM_ThermalParameter, periodicUpdate=true, aggregated
- * → aggregator
+ * - make(): no thresholds → no sensors
+ * - make(): unknown tier name → no sensors
+ * - make(): LowerCaution/UpperCaution by value → static threshold
+ * - make(): LowerCritical/UpperCritical by value → static critical threshold
+ * - make(): LowerFatal/UpperFatal by value → static hard-shutdown threshold
+ * - make(): Soft shutdown / performance loss tiers by value
+ * - make(): ParameterId, no PeriodicUpdate → addStaticSensor
+ * - make(): ParameterId, periodicUpdate=true → roundRobin
+ * - make(): ParameterId, periodicUpdate=true, priority → priority queue
+ * - make(): ParameterId, periodicUpdate=true, aggregated → aggregator
  * - make(): both lower and upper caution → two device sensors
  */
 
@@ -84,6 +79,8 @@ class StubThresholdNumericSensor : public nsm::NsmNumericSensor
     }
 };
 
+using Thresholds = std::unordered_map<std::string, FeatureThreshold>;
+
 // ============================================================================
 // Test fixture
 // ============================================================================
@@ -94,9 +91,6 @@ struct NsmThresholdFactoryTest :
     public SensorManagerTest
 {
     const uuid_t sensorUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
-    const std::string interface = "xyz.openbmc_project.Configuration.NSM_Temp";
-    const std::string baseObjPath =
-        "/xyz/openbmc_project/inventory/system/sensor/thresh_test";
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> nsmDev;
 
@@ -112,17 +106,12 @@ struct NsmThresholdFactoryTest :
         cleanupDeviceSensors(devices);
     }
 
-    // Returns a unique object path per test to avoid D-Bus object conflicts.
-    std::string objPath(const std::string& suffix) const
-    {
-        return baseObjPath + suffix;
-    }
-
     std::shared_ptr<StubThresholdNumericSensor> makeSensor() const
     {
         return std::make_shared<StubThresholdNumericSensor>("TestSensor", 0);
     }
 
+    // Unique sensor name per test to avoid D-Bus object conflicts
     NumericSensorInfo makeInfo(const std::string& suffix = "") const
     {
         NumericSensorInfo info{};
@@ -130,43 +119,33 @@ struct NsmThresholdFactoryTest :
         return info;
     }
 
-    // Sets up the mock serviceMap and property map for a single interface
-    // that represents a static (Dynamic=false) threshold.
-    void setupStaticThreshold(const std::string& op, const std::string& intf,
-                              const std::string& name,
-                              double value = 75.0) const
+    // Threshold given by value (static)
+    static Thresholds staticThreshold(const std::string& tier, double value)
     {
-        utils::MockDbusAsync::serviceMap() = {
-            {"xyz.openbmc_project.EntityManager", {intf}}};
-        auto& pm = utils::MockDbusAsync::propertyMap(op, intf);
-        pm["Name"] = std::string(name);
-        // Dynamic not set → defaults to false in production code
-        pm["Value"] = double(value);
+        FeatureThreshold threshold{};
+        threshold.value = value;
+        return {{tier, threshold}};
     }
 
-    // Sets up the mock serviceMap and property map for a single interface
-    // that represents a dynamic (Dynamic=true) threshold.
-    void setupDynamicThreshold(const std::string& op, const std::string& intf,
-                               const std::string& name,
-                               const std::string& type = "NSM_ThermalParameter",
-                               uint64_t sensorId = 1,
-                               bool periodicUpdate = false,
-                               bool priority = false,
-                               bool aggregated = false) const
+    // Threshold read from the device by ParameterId (dynamic)
+    static Thresholds dynamicThreshold(const std::string& tier,
+                                       uint64_t parameterId,
+                                       bool periodicUpdate = false,
+                                       bool priority = false,
+                                       bool aggregated = false)
     {
-        utils::MockDbusAsync::serviceMap() = {
-            {"xyz.openbmc_project.EntityManager", {intf}}};
-        auto& pm = utils::MockDbusAsync::propertyMap(op, intf);
-        pm["Name"] = std::string(name);
-        pm["Dynamic"] = bool(true);
-        pm["Type"] = std::string(type);
-        pm["ParameterId"] = uint64_t(sensorId);
-        if (periodicUpdate)
-        {
-            pm["PeriodicUpdate"] = bool(true);
-        }
-        pm["Priority"] = bool(priority);
-        pm["Aggregated"] = bool(aggregated);
+        return {{tier, FeatureThreshold{.parameterId = parameterId,
+                                        .periodicUpdate = periodicUpdate,
+                                        .priority = priority,
+                                        .aggregated = aggregated}}};
+    }
+
+    void make(const NumericSensorInfo& info, Thresholds thresholds)
+    {
+        NsmThresholdFactory factory(mockManager, makeSensor(), info, sensorUuid,
+                                    nsmDev, std::move(thresholds));
+        auto rc = factory.make();
+        EXPECT_EQ(rc.data(), NSM_SUCCESS);
     }
 };
 
@@ -178,27 +157,22 @@ TEST_F(NsmThresholdFactoryTest, Constructor_Succeeds)
 {
     auto sensor = makeSensor();
     auto info = makeInfo();
-    EXPECT_NO_THROW(NsmThresholdFactory(
-        mockManager, interface, objPath("_ctor"), sensor, info, sensorUuid));
+    EXPECT_NO_THROW(NsmThresholdFactory(mockManager, sensor, info, sensorUuid,
+                                        nsmDev, Thresholds{}));
 }
 
 // ============================================================================
-// make() – empty serviceMap → no threshold interfaces found → no sensors
+// make() – no thresholds → no sensors
 // ============================================================================
 
-TEST_F(NsmThresholdFactoryTest, Make_EmptyServiceMap_NoSensorsAdded)
+TEST_F(NsmThresholdFactoryTest, Make_NoThresholds_NoSensorsAdded)
 {
-    const std::string op = objPath("_esm");
-    auto sensor = makeSensor();
     auto info = makeInfo("_esm");
-    // serviceMap is empty (default from DBusTest::~DBusTest cleanup)
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t beforeDev = nsmDev->deviceSensors.size();
     size_t beforeCap = nsmDev->capabilityRefreshSensors.size();
     size_t beforeStatic = nsmDev->staticSensors.size();
     size_t beforeRr = nsmDev->roundRobinSensors.size();
-    factory.make();
+    make(info, {});
 
     EXPECT_EQ(nsmDev->deviceSensors.size(), beforeDev);
     EXPECT_EQ(nsmDev->capabilityRefreshSensors.size(), beforeCap);
@@ -207,194 +181,150 @@ TEST_F(NsmThresholdFactoryTest, Make_EmptyServiceMap_NoSensorsAdded)
 }
 
 // ============================================================================
-// make() – serviceMap has interface that doesn't contain ThermalParameters →
-// no threshold interfaces found → no sensors
+// make() – tier name that is no threshold tier → no sensors
 // ============================================================================
 
-TEST_F(NsmThresholdFactoryTest, Make_NonMatchingInterface_NoSensorsAdded)
+TEST_F(NsmThresholdFactoryTest, Make_UnknownTier_NoSensorsAdded)
 {
-    const std::string op = objPath("_nmi");
-    auto sensor = makeSensor();
     auto info = makeInfo("_nmi");
-    // Interface name does not contain interface + ".ThermalParameters"
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager",
-         {"xyz.openbmc_project.SomeOtherInterface"}}};
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t beforeDev = nsmDev->deviceSensors.size();
     size_t beforeStatic = nsmDev->staticSensors.size();
-    factory.make();
+    make(info, staticThreshold("SomeUnrelated", 75.0));
 
     EXPECT_EQ(nsmDev->deviceSensors.size(), beforeDev);
     EXPECT_EQ(nsmDev->staticSensors.size(), beforeStatic);
 }
 
 // ============================================================================
-// make() – LowerCaution, no Dynamic key → static threshold → deviceSensors
-// grows
+// make() – LowerCaution by default value → static threshold with 0.0
 // ============================================================================
 
-TEST_F(NsmThresholdFactoryTest, Make_LowerCaution_NoDynamic_DeviceSensorAdded)
+TEST_F(NsmThresholdFactoryTest, Make_LowerCaution_DefaultValue_DeviceSensor)
 {
-    const std::string op = objPath("_lcnd");
-    auto sensor = makeSensor();
     auto info = makeInfo("_lcnd");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {intf}}};
-    auto& pm = utils::MockDbusAsync::propertyMap(op, intf);
-    pm["Name"] = std::string("LowerCaution");
-    // "Dynamic" intentionally absent → dynamic=false, "Value" absent →
-    // threshold=0.0
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, {{"LowerCaution", FeatureThreshold{}}});
 
-    EXPECT_GT(nsmDev->deviceSensors.size(), before);
+    ASSERT_EQ(nsmDev->deviceSensors.size(), before + 1);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueWarningLow*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->warningLow(), 0.0);
 }
 
 // ============================================================================
-// make() – LowerCaution, Dynamic=false, Value set → static with value
+// make() – LowerCaution with value → static with value
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest,
        Make_LowerCaution_StaticWithValue_DeviceSensorAdded)
 {
-    const std::string op = objPath("_lcwv");
-    auto sensor = makeSensor();
     auto info = makeInfo("_lcwv");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-    setupStaticThreshold(op, intf, "LowerCaution", 85.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("LowerCaution", 85.0));
 
-    EXPECT_GT(nsmDev->deviceSensors.size(), before);
+    ASSERT_EQ(nsmDev->deviceSensors.size(), before + 1);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueWarningLow*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->warningLow(), 85.0);
 }
 
 // ============================================================================
-// make() – UpperCaution, Dynamic=false → static upper warning threshold
+// make() – UpperCaution by value → static upper warning threshold
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest, Make_UpperCaution_Static_DeviceSensorAdded)
 {
-    const std::string op = objPath("_uc");
-    auto sensor = makeSensor();
     auto info = makeInfo("_uc");
-    const std::string intf = interface + ".ThermalParameters.UpperCaution";
-    setupStaticThreshold(op, intf, "UpperCaution", 95.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("UpperCaution", 95.0));
 
-    EXPECT_GT(nsmDev->deviceSensors.size(), before);
+    ASSERT_EQ(nsmDev->deviceSensors.size(), before + 1);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueWarningHigh*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->warningHigh(), 95.0);
 }
 
 // ============================================================================
-// make() – LowerCritical, Dynamic=false → static critical threshold
+// make() – LowerCritical by value → static critical threshold
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest, Make_LowerCritical_Static_DeviceSensorAdded)
 {
-    const std::string op = objPath("_lcrit");
-    auto sensor = makeSensor();
     auto info = makeInfo("_lcrit");
-    const std::string intf = interface + ".ThermalParameters.LowerCritical";
-    setupStaticThreshold(op, intf, "LowerCritical", 70.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("LowerCritical", 70.0));
 
-    EXPECT_GT(nsmDev->deviceSensors.size(), before);
+    ASSERT_EQ(nsmDev->deviceSensors.size(), before + 1);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueCriticalLow*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->criticalLow(), 70.0);
 }
 
 // ============================================================================
-// make() – UpperCritical, Dynamic=false → static critical high threshold
+// make() – UpperCritical by value → static critical high threshold
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest, Make_UpperCritical_Static_DeviceSensorAdded)
 {
-    const std::string op = objPath("_ucrit");
-    auto sensor = makeSensor();
     auto info = makeInfo("_ucrit");
-    const std::string intf = interface + ".ThermalParameters.UpperCritical";
-    setupStaticThreshold(op, intf, "UpperCritical", 105.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("UpperCritical", 105.0));
 
-    EXPECT_GT(nsmDev->deviceSensors.size(), before);
+    ASSERT_EQ(nsmDev->deviceSensors.size(), before + 1);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueCriticalHigh*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->criticalHigh(), 105.0);
 }
 
 // ============================================================================
-// make() – LowerFatal, Dynamic=false → static hard-shutdown low threshold
+// make() – LowerFatal by value → static hard-shutdown low threshold
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest, Make_LowerFatal_Static_DeviceSensorAdded)
 {
-    const std::string op = objPath("_lf");
-    auto sensor = makeSensor();
     auto info = makeInfo("_lf");
-    const std::string intf = interface + ".ThermalParameters.LowerFatal";
-    setupStaticThreshold(op, intf, "LowerFatal", 60.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("LowerFatal", 60.0));
 
-    EXPECT_GT(nsmDev->deviceSensors.size(), before);
+    ASSERT_EQ(nsmDev->deviceSensors.size(), before + 1);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueHardShutdownLow*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->hardShutdownLow(), 60.0);
 }
 
 // ============================================================================
-// make() – UpperFatal, Dynamic=false → static hard-shutdown high threshold
+// make() – UpperFatal by value → static hard-shutdown high threshold
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest, Make_UpperFatal_Static_DeviceSensorAdded)
 {
-    const std::string op = objPath("_uf");
-    auto sensor = makeSensor();
     auto info = makeInfo("_uf");
-    const std::string intf = interface + ".ThermalParameters.UpperFatal";
-    setupStaticThreshold(op, intf, "UpperFatal", 120.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("UpperFatal", 120.0));
 
-    EXPECT_GT(nsmDev->deviceSensors.size(), before);
+    ASSERT_EQ(nsmDev->deviceSensors.size(), before + 1);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueHardShutdownHigh*>(
+        nsmDev->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->hardShutdownHigh(), 120.0);
 }
 
 // ============================================================================
-// make() – LowerSoftShutdown, Dynamic=false → static soft-shutdown low
-// threshold (STH-REQ-09 — infra-only tier, no sensor configured with it yet)
+// make() – LowerSoftShutdown by value → static soft-shutdown low threshold
+// (STH-REQ-09 — infra-only tier, no sensor configured with it yet)
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest, Make_LowerSoftShutdown_Static_DeviceSensorAdded)
 {
-    const std::string op = objPath("_lss");
-    auto sensor = makeSensor();
     auto info = makeInfo("_lss");
-    const std::string intf = interface + ".ThermalParameters.LowerSoftShutdown";
-    setupStaticThreshold(op, intf, "LowerSoftShutdown", 65.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("LowerSoftShutdown", 65.0));
 
     ASSERT_GT(nsmDev->deviceSensors.size(), before);
     auto* thresholdValue = dynamic_cast<NsmThresholdValueSoftShutdownLow*>(
@@ -404,22 +334,14 @@ TEST_F(NsmThresholdFactoryTest, Make_LowerSoftShutdown_Static_DeviceSensorAdded)
 }
 
 // ============================================================================
-// make() – UpperSoftShutdown, Dynamic=false → static soft-shutdown high
-// threshold
+// make() – UpperSoftShutdown by value → static soft-shutdown high threshold
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest, Make_UpperSoftShutdown_Static_DeviceSensorAdded)
 {
-    const std::string op = objPath("_uss");
-    auto sensor = makeSensor();
     auto info = makeInfo("_uss");
-    const std::string intf = interface + ".ThermalParameters.UpperSoftShutdown";
-    setupStaticThreshold(op, intf, "UpperSoftShutdown", 110.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("UpperSoftShutdown", 110.0));
 
     ASSERT_GT(nsmDev->deviceSensors.size(), before);
     auto* thresholdValue = dynamic_cast<NsmThresholdValueSoftShutdownHigh*>(
@@ -429,24 +351,16 @@ TEST_F(NsmThresholdFactoryTest, Make_UpperSoftShutdown_Static_DeviceSensorAdded)
 }
 
 // ============================================================================
-// make() – LowerPerformanceLoss, Dynamic=false → static performance-loss low
+// make() – LowerPerformanceLoss by value → static performance-loss low
 // threshold (STH-REQ-09 — infra-only tier, no sensor configured with it yet)
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest,
        Make_LowerPerformanceLoss_Static_DeviceSensorAdded)
 {
-    const std::string op = objPath("_lpl");
-    auto sensor = makeSensor();
     auto info = makeInfo("_lpl");
-    const std::string intf = interface +
-                             ".ThermalParameters.LowerPerformanceLoss";
-    setupStaticThreshold(op, intf, "LowerPerformanceLoss", 80.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("LowerPerformanceLoss", 80.0));
 
     ASSERT_GT(nsmDev->deviceSensors.size(), before);
     auto* thresholdValue = dynamic_cast<NsmThresholdValuePerformanceLossLow*>(
@@ -456,24 +370,16 @@ TEST_F(NsmThresholdFactoryTest,
 }
 
 // ============================================================================
-// make() – UpperPerformanceLoss, Dynamic=false → static performance-loss high
+// make() – UpperPerformanceLoss by value → static performance-loss high
 // threshold
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest,
        Make_UpperPerformanceLoss_Static_DeviceSensorAdded)
 {
-    const std::string op = objPath("_upl");
-    auto sensor = makeSensor();
     auto info = makeInfo("_upl");
-    const std::string intf = interface +
-                             ".ThermalParameters.UpperPerformanceLoss";
-    setupStaticThreshold(op, intf, "UpperPerformanceLoss", 90.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, staticThreshold("UpperPerformanceLoss", 90.0));
 
     ASSERT_GT(nsmDev->deviceSensors.size(), before);
     auto* thresholdValue = dynamic_cast<NsmThresholdValuePerformanceLossHigh*>(
@@ -488,238 +394,84 @@ TEST_F(NsmThresholdFactoryTest,
 
 TEST_F(NsmThresholdFactoryTest, Make_BothWarningThresholds_TwoSensorsAdded)
 {
-    const std::string op = objPath("_bw");
-    auto sensor = makeSensor();
     auto info = makeInfo("_bw");
-    const std::string lowerIntf = interface + ".ThermalParameters.LowerCaution";
-    const std::string upperIntf = interface + ".ThermalParameters.UpperCaution";
+    auto thresholds = staticThreshold("LowerCaution", 75.0);
+    thresholds.merge(staticThreshold("UpperCaution", 95.0));
 
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {lowerIntf, upperIntf}}};
-
-    auto& lpm = utils::MockDbusAsync::propertyMap(op, lowerIntf);
-    lpm["Name"] = std::string("LowerCaution");
-    lpm["Dynamic"] = bool(false);
-    lpm["Value"] = double(75.0);
-
-    auto& upm = utils::MockDbusAsync::propertyMap(op, upperIntf);
-    upm["Name"] = std::string("UpperCaution");
-    upm["Dynamic"] = bool(false);
-    upm["Value"] = double(95.0);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->deviceSensors.size();
-    factory.make();
+    make(info, std::move(thresholds));
 
     // Both lower and upper threshold → two device sensors added
-    EXPECT_GE(nsmDev->deviceSensors.size(), before + 2u);
+    EXPECT_EQ(nsmDev->deviceSensors.size(), before + 2u);
 }
 
 // ============================================================================
-// make() – Dynamic=true, unsupported type → error path, no sensor added
+// make() – ParameterId, no PeriodicUpdate → addStaticSensor and
+// capability refresh
 // ============================================================================
 
-TEST_F(NsmThresholdFactoryTest, Make_DynamicUnsupportedType_NoSensorAdded)
+TEST_F(NsmThresholdFactoryTest, Make_DynamicNoPeriodicUpdate_StaticSensorAdded)
 {
-    const std::string op = objPath("_ust");
-    auto sensor = makeSensor();
-    auto info = makeInfo("_ust");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-    setupDynamicThreshold(op, intf, "LowerCaution",
-                          /*type=*/"UNSUPPORTED_TYPE");
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
-    size_t beforeDev = nsmDev->deviceSensors.size();
+    auto info = makeInfo("_dns");
     size_t beforeStatic = nsmDev->staticSensors.size();
+    size_t beforeCapRefresh = nsmDev->capabilityRefreshSensors.size();
     size_t beforeRr = nsmDev->roundRobinSensors.size();
-    factory.make();
+    make(info, dynamicThreshold("LowerCaution", /*parameterId=*/1));
 
-    EXPECT_EQ(nsmDev->deviceSensors.size(), beforeDev);
-    EXPECT_EQ(nsmDev->staticSensors.size(), beforeStatic);
+    EXPECT_GT(nsmDev->staticSensors.size(), beforeStatic);
+    EXPECT_GT(nsmDev->capabilityRefreshSensors.size(), beforeCapRefresh);
     EXPECT_EQ(nsmDev->roundRobinSensors.size(), beforeRr);
 }
 
 // ============================================================================
-// make() – Dynamic=true, NSM_ThermalParameter, PeriodicUpdate not in map
-// (getDbusProperty throws, exception caught) → addStaticSensor called
-// ============================================================================
-
-TEST_F(NsmThresholdFactoryTest,
-       Make_DynamicNSMType_NoPeriodicUpdate_StaticSensorAdded)
-{
-    const std::string op = objPath("_dns");
-    auto sensor = makeSensor();
-    auto info = makeInfo("_dns");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-    // periodicUpdate=false → "PeriodicUpdate" not in map → exception caught →
-    // non-periodic path
-    setupDynamicThreshold(op, intf, "LowerCaution", "NSM_ThermalParameter",
-                          /*sensorId=*/1, /*periodicUpdate=*/false);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
-    size_t beforeStatic = nsmDev->staticSensors.size();
-    size_t beforeCapRefresh = nsmDev->capabilityRefreshSensors.size();
-    factory.make();
-
-    EXPECT_GT(nsmDev->staticSensors.size(), beforeStatic);
-    EXPECT_GT(nsmDev->capabilityRefreshSensors.size(), beforeCapRefresh);
-}
-
-// ============================================================================
-// make() – Dynamic=true, NSM_ThermalParameter, periodicUpdate=true,
-// not aggregated → roundRobinSensors grows
+// make() – ParameterId, periodicUpdate=true, not aggregated →
+// roundRobinSensors grows
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest,
        Make_DynamicPeriodicNotAggregated_RoundRobinAdded)
 {
-    const std::string op = objPath("_dpu");
-    auto sensor = makeSensor();
     auto info = makeInfo("_dpu");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-    setupDynamicThreshold(op, intf, "LowerCaution", "NSM_ThermalParameter",
-                          /*sensorId=*/1, /*periodicUpdate=*/true,
-                          /*priority=*/false, /*aggregated=*/false);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->roundRobinSensors.size();
-    factory.make();
+    make(info, dynamicThreshold("LowerCaution", /*parameterId=*/1,
+                                /*periodicUpdate=*/true));
 
-    EXPECT_GT(nsmDev->roundRobinSensors.size(), before);
+    EXPECT_EQ(nsmDev->roundRobinSensors.size(), before + 1);
+    EXPECT_TRUE(nsmDev->sensorAggregators.empty());
 }
 
 // ============================================================================
-// make() – Dynamic=true, NSM_ThermalParameter, periodicUpdate=true,
-// priority=true → prioritySensors grows
+// make() – ParameterId, periodicUpdate=true, priority=true →
+// prioritySensors grows
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest,
        Make_DynamicPeriodicPriority_PrioritySensorAdded)
 {
-    const std::string op = objPath("_dpp");
-    auto sensor = makeSensor();
     auto info = makeInfo("_dpp");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-    setupDynamicThreshold(op, intf, "LowerCaution", "NSM_ThermalParameter",
-                          /*sensorId=*/2, /*periodicUpdate=*/true,
-                          /*priority=*/true, /*aggregated=*/false);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->prioritySensors.size();
-    factory.make();
+    make(info, dynamicThreshold("LowerCaution", /*parameterId=*/2,
+                                /*periodicUpdate=*/true, /*priority=*/true));
 
-    EXPECT_GT(nsmDev->prioritySensors.size(), before);
+    EXPECT_EQ(nsmDev->prioritySensors.size(), before + 1);
 }
 
 // ============================================================================
-// make() – Dynamic=true, NSM_ThermalParameter, periodicUpdate=true,
-// aggregated=true → new aggregator created (NsmThresholdAggregatorBuilder path)
+// make() – ParameterId, periodicUpdate=true, aggregated=true → new aggregator
+// created (NsmThresholdAggregatorBuilder path)
 // ============================================================================
 
 TEST_F(NsmThresholdFactoryTest,
        Make_DynamicPeriodicAggregated_AggregatorCreated)
 {
-    const std::string op = objPath("_dpa");
-    auto sensor = makeSensor();
     auto info = makeInfo("_dpa");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-    setupDynamicThreshold(op, intf, "LowerCaution", "NSM_ThermalParameter",
-                          /*sensorId=*/3, /*periodicUpdate=*/true,
-                          /*priority=*/false, /*aggregated=*/true);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
     size_t before = nsmDev->sensorAggregators.size();
-    factory.make();
+    make(info, dynamicThreshold("LowerCaution", /*parameterId=*/3,
+                                /*periodicUpdate=*/true, /*priority=*/false,
+                                /*aggregated=*/true));
 
-    EXPECT_GT(nsmDev->sensorAggregators.size(), before);
-}
-
-// make(): Dynamic=false, "Value" key absent →
-// if (count("Value")) = false → threshold defaults to 0.0 → sensor still added.
-TEST_F(NsmThresholdFactoryTest, Make_StaticThreshold_MissingValue_UsesDefault)
-{
-    const std::string op = objPath("_smv");
-    auto sensor = makeSensor();
-    auto info = makeInfo("_smv");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-
-    // Set up property map WITHOUT "Value" key; Dynamic absent → false
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {intf}}};
-    auto& pm = utils::MockDbusAsync::propertyMap(op, intf);
-    pm["Name"] = std::string("LowerCaution");
-    // "Value" intentionally absent → threshold = 0.0 (default)
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
-    size_t before = nsmDev->deviceSensors.size();
-    factory.make();
-
-    // Threshold sensor still added with default value 0.0
-    EXPECT_GT(nsmDev->deviceSensors.size(), before);
-}
-
-// make(): Dynamic=true, periodicUpdate=true, "Priority" key absent →
-// if (count("Priority")) = false → priority=false → roundRobinSensors grows.
-TEST_F(NsmThresholdFactoryTest,
-       Make_DynamicPeriodic_MissingPriority_DefaultsToRoundRobin)
-{
-    const std::string op = objPath("_mpr");
-    auto sensor = makeSensor();
-    auto info = makeInfo("_mpr");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {intf}}};
-    auto& pm = utils::MockDbusAsync::propertyMap(op, intf);
-    pm["Name"] = std::string("LowerCaution");
-    pm["Dynamic"] = bool(true);
-    pm["Type"] = std::string("NSM_ThermalParameter");
-    pm["ParameterId"] = uint64_t(10);
-    pm["PeriodicUpdate"] = bool(true);
-    // "Priority" intentionally absent → defaults to false
-    pm["Aggregated"] = bool(false);
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
-    size_t before = nsmDev->roundRobinSensors.size();
-    factory.make();
-
-    EXPECT_GT(nsmDev->roundRobinSensors.size(), before);
-}
-
-// make(): Dynamic=true, periodicUpdate=true, "Aggregated" key absent →
-// if (count("Aggregated")) = false → aggregated=false → roundRobinSensors
-// grows.
-TEST_F(NsmThresholdFactoryTest,
-       Make_DynamicPeriodic_MissingAggregated_DefaultsToRoundRobin)
-{
-    const std::string op = objPath("_mag");
-    auto sensor = makeSensor();
-    auto info = makeInfo("_mag");
-    const std::string intf = interface + ".ThermalParameters.LowerCaution";
-
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {intf}}};
-    auto& pm = utils::MockDbusAsync::propertyMap(op, intf);
-    pm["Name"] = std::string("LowerCaution");
-    pm["Dynamic"] = bool(true);
-    pm["Type"] = std::string("NSM_ThermalParameter");
-    pm["ParameterId"] = uint64_t(11);
-    pm["PeriodicUpdate"] = bool(true);
-    pm["Priority"] = bool(false);
-    // "Aggregated" intentionally absent → defaults to false
-
-    NsmThresholdFactory factory(mockManager, interface, op, sensor, info,
-                                sensorUuid);
-    size_t before = nsmDev->roundRobinSensors.size();
-    factory.make();
-
-    EXPECT_GT(nsmDev->roundRobinSensors.size(), before);
+    ASSERT_EQ(nsmDev->sensorAggregators.size(), before + 1);
+    EXPECT_NE(std::dynamic_pointer_cast<NsmThresholdAggregator>(
+                  nsmDev->sensorAggregators.back()),
+              nullptr);
 }

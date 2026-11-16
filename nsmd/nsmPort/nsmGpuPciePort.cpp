@@ -24,11 +24,13 @@
 #include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "globals.hpp"
 #include "nsmAsioInterface/nsmAsioPortInfoInterface.hpp"
 #include "nsmCommon/nsmPcieGroup.hpp"
 #include "nsmCommon/nsmPciePortIntf.hpp"
 #include "nsmInterface.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
+#include "nsmPortFeatures.hpp"
 #include "sensorManager.hpp"
 
 #ifdef NVIDIA_SHMEM
@@ -632,11 +634,151 @@ requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
 }
 
 REGISTER_NSM_CREATION_FUNCTION(
-    createNsmGpuPcieSensor, "xyz.openbmc_project.Configuration.NSM_GPU_PCIe_0")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmGpuPcieSensor,
-    "xyz.openbmc_project.Configuration.NSM_GPU_PCIe_0.PortInfo")
-REGISTER_NSM_CREATION_FUNCTION(
     createNsmGpuPcieSensor,
     "xyz.openbmc_project.Configuration.NSM_GPU_PCIe_0.PortState")
 } // namespace nsm
+
+namespace nsm::features
+{
+
+static std::string gpuPCIeProcessorPath(const DeviceContext& dev)
+{
+    return (acceleratorInventoryBasePath / deviceBaseName(dev)).string();
+}
+
+static std::string gpuPCIePortPath(const DeviceContext& dev)
+{
+    return gpuPCIeProcessorPath(dev) + "/Ports/PCIe_0";
+}
+
+requester::Coroutine
+    createGpuPCIeFeature([[maybe_unused]] SensorManager& manager,
+                         const DeviceContext& dev,
+                         const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("PCIe_0 feature of {NAME}: no NsmDevice", "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto& bus = utils::DBusHandler::getBus();
+    auto nsmDevice = dev.device;
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_GPU_PCIe_0";
+    auto processorPath = gpuPCIeProcessorPath(dev);
+    auto inventoryObjPath = gpuPCIePortPath(dev);
+
+    std::vector<utils::Association> associations{};
+    if (param<bool>(params, "AllStatesAssociationsEnabled").value_or(false))
+    {
+        associations.push_back({"parent_device", "all_states",
+                                utils::makeDBusNameValid(processorPath)});
+    }
+    auto health = param<std::string>(params, "Health").value_or("");
+    auto chasisState =
+        param<std::string>(params, "ChasisPowerState").value_or("");
+
+    auto sensor = std::make_shared<NsmGpuPciePort>(
+        bus, name, type, health, chasisState, associations, inventoryObjPath);
+    nsmDevice->addDeviceSensors(sensor);
+    auto deviceIndex = param<uint64_t>(params, "DeviceIndex").value_or(0);
+    auto clearableScalarGroup =
+        param<std::vector<uint64_t>>(params, "ClearableScalarGroup")
+            .value_or(std::vector<uint64_t>{});
+
+    auto clearPCIeIntf = std::make_shared<NsmClearPCIeIntf>(
+        bus, inventoryObjPath.c_str(), deviceIndex, nsmDevice);
+
+    for (auto groupId : clearableScalarGroup)
+    {
+        auto clearPCIeSensorGroup = std::make_shared<NsmClearPCIeCounters>(
+            name, type, groupId, deviceIndex, clearPCIeIntf);
+        nsmDevice->addStaticSensor(clearPCIeSensorGroup);
+    }
+
+    auto laneErrorIntf =
+        std::make_shared<LaneErrorIntf>(bus, inventoryObjPath.c_str());
+    auto perLanErrorSensor = std::make_shared<NsmPCIeECCGroup8>(
+        name, type, laneErrorIntf, deviceIndex, inventoryObjPath);
+    nsmDevice->addSensor(perLanErrorSensor, PER_LANE_ERROR_COUNT_PRIORITY);
+
+    bool priority = false;
+    auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus,
+                                                     processorPath.c_str());
+    auto pcieDeviceProvider = NsmInterfaceProvider(name, type, processorPath,
+                                                   pcieECCIntf);
+
+    nsmDevice->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeEccIntf>>(
+                             pcieDeviceProvider, deviceIndex, false),
+                         priority);
+
+    auto pciePortIntf = std::make_shared<PCIeEccIntf>(bus,
+                                                      inventoryObjPath.c_str());
+
+    auto pciPortSensor = std::make_shared<NsmPciePortIntf>(bus, name, type,
+                                                           inventoryObjPath);
+
+    auto sensorGroup2 = std::make_shared<NsmPciGroup2>(
+        name, type, pcieECCIntf, pciePortIntf, deviceIndex, processorPath);
+
+    auto sensorGroup3 = std::make_shared<NsmPciGroup3>(
+        name, type, pcieECCIntf, pciePortIntf, deviceIndex, processorPath);
+
+    auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
+        name, type, pcieECCIntf, pciePortIntf, deviceIndex, processorPath);
+    nsmDevice->addDeviceSensors(pciPortSensor);
+    nsmDevice->addSensor(sensorGroup2, priority);
+    nsmDevice->addSensor(sensorGroup3, priority);
+    nsmDevice->addSensor(sensorGroup4, priority);
+    clearPCIeIntf->addClearCoutnerSensor(2, sensorGroup2);
+    clearPCIeIntf->addClearCoutnerSensor(3, sensorGroup3);
+    clearPCIeIntf->addClearCoutnerSensor(4, sensorGroup4);
+    lg2::info("Type NSM_GPU_PCIe_0 all sensors created");
+
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createGpuPCIePortInfoFeature([[maybe_unused]] SensorManager& manager,
+                                 const DeviceContext& dev,
+                                 const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("PCIe_0_PortInfo feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto& bus = utils::DBusHandler::getBus();
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_PortInfo";
+    auto inventoryObjPath = gpuPCIePortPath(dev);
+
+    auto portType = param<std::string>(params, "PortType").value_or("");
+    auto portProtocol = param<std::string>(params, "PortProtocol").value_or("");
+    auto priority = param<bool>(params, "Priority").value_or(false);
+    auto deviceIndex = param<uint64_t>(params, "DeviceIndex").value_or(0);
+
+    auto portInfoIntf = NsmAsioPortInfoInterface::createSinglePortDevice(
+        SensorManager::getInstance().getObjServer(), inventoryObjPath, portType,
+        portProtocol);
+    if (!portInfoIntf)
+    {
+        lg2::error("Failed to create PortInfo interface for {NAME} at {PATH}",
+                   "NAME", name, "PATH", inventoryObjPath);
+        co_return NSM_ERROR;
+    }
+
+    auto portInfoGroup1 = std::make_shared<NsmPCIePortInfoGroup1>(
+        bus, name, type, inventoryObjPath, std::move(portInfoIntf),
+        deviceIndex);
+    dev.device->addSensor(portInfoGroup1, priority);
+
+    co_return NSM_SUCCESS;
+}
+
+} // namespace nsm::features

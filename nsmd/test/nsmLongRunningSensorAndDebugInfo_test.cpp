@@ -963,9 +963,6 @@ struct NsmThresholdFactoryTestB12F :
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
-    const std::string interface = "xyz.openbmc_project.Configuration.NSM_Temp";
-    const std::string testObjPath =
-        "/xyz/openbmc_project/inventory/system/b12f/Temp0";
     NumericSensorInfo info = {};
 
     NsmThresholdFactoryTestB12F() : SensorManagerTest(devices)
@@ -991,52 +988,20 @@ TEST_F(NsmThresholdFactoryTestB12F, Constructor_StoresAllMembers)
 {
     // Arrange
     auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
+    std::unordered_map<std::string, FeatureThreshold> thresholds{
+        {"UpperCaution",
+         FeatureThreshold{.value = 85.0, .parameterId = std::nullopt}}};
 
     // Act
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
+    NsmThresholdFactory factory(mockManager, numericSensor, info, gpuUuid, gpu,
+                                thresholds);
 
     // Assert
-    EXPECT_EQ(factory.interface, interface);
-    EXPECT_EQ(factory.objPath, testObjPath);
     EXPECT_EQ(factory.numericSensor, numericSensor);
-    EXPECT_NE(factory.nsmDevice, nullptr);
     EXPECT_EQ(factory.nsmDevice, gpu);
-}
-
-TEST_F(NsmThresholdFactoryTestB12F,
-       Constructor_DifferentUUID_GetsDifferentDevice)
-{
-    // Arrange
-    const uuid_t gpu1Uuid = "STATIC:0:1:NSM_DEVICE_INSTANCE_NUMBER:1";
-    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-
-    // Act
-    NsmThresholdFactory f0(mockManager, interface, testObjPath, numericSensor,
-                           info, gpuUuid);
-    NsmThresholdFactory f1(mockManager, interface, testObjPath, numericSensor,
-                           info, gpu1Uuid);
-
-    // Assert
-    EXPECT_NE(f0.nsmDevice, f1.nsmDevice);
-}
-
-TEST_F(NsmThresholdFactoryTestB12F, Constructor_MultipleInterfaces_AllStored)
-{
-    // Arrange
-    auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-    std::string intf1 = "xyz.openbmc_project.Configuration.NSM_Power";
-    std::string intf2 = "xyz.openbmc_project.Configuration.NSM_Voltage";
-
-    // Act
-    NsmThresholdFactory f1(mockManager, intf1, testObjPath, numericSensor, info,
-                           gpuUuid);
-    NsmThresholdFactory f2(mockManager, intf2, testObjPath, numericSensor, info,
-                           gpuUuid);
-
-    // Assert
-    EXPECT_EQ(f1.interface, intf1);
-    EXPECT_EQ(f2.interface, intf2);
+    EXPECT_EQ(&factory.info, &info);
+    ASSERT_EQ(factory.featureThresholds.size(), 1u);
+    EXPECT_DOUBLE_EQ(factory.featureThresholds.at("UpperCaution").value, 85.0);
 }
 
 // ============================================================================
@@ -1064,140 +1029,87 @@ class TFTestNumericSensor : public NsmNumericSensor
     }
 };
 
-// Empty service map → getThresholdInterfacesAsync returns empty map
-// → all processThresholdsPair calls skip the if block (false branch)
-TEST_F(NsmThresholdFactoryTestB12F, Make_EmptyServiceMap_NoSensorsAdded)
+// No thresholds → all processThresholdsPair calls skip the if block
+TEST_F(NsmThresholdFactoryTestB12F, Make_NoThresholds_NoSensorsAdded)
 {
-    // serviceMap is empty by default (cleared by DBusTest destructor setup)
     auto numericSensor = std::shared_ptr<NsmNumericSensor>(nullptr);
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
+    NsmThresholdFactory factory(mockManager, numericSensor, info, gpuUuid, gpu,
+                                {});
     size_t initialStaticCount = gpu->staticSensors.size();
-    factory.make();
+    size_t initialDeviceCount = gpu->deviceSensors.size();
+    auto rc = factory.make();
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(gpu->staticSensors.size(), initialStaticCount);
+    EXPECT_EQ(gpu->deviceSensors.size(), initialDeviceCount);
 }
 
-// Non-empty service map with "LowerCaution" → processThresholdsPair creates
-// ThresholdWarningIntf and calls createNsmThreshold with dynamic=false.
-// Covers: getThresholdInterfacesAsync loop, processThresholdsPair if-branch,
-// createNsmThreshold static path (addDeviceSensors).
+// "LowerCaution" by value → processThresholdsPair creates
+// ThresholdWarningIntf and createNsmThreshold takes the static path
+// (addDeviceSensors).
 TEST_F(NsmThresholdFactoryTestB12F, Make_StaticLowerCautionThreshold)
 {
-    const std::string threshIntf = interface +
-                                   ".ThermalParameters.LowerCaution";
-
-    // Set up service map so getThresholdInterfacesAsync finds our interface
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {threshIntf}}};
-
-    // Set "Name" property for coGetDbusProperty lookup
-    auto& nameProps = utils::MockDbusAsync::propertyMap(testObjPath,
-                                                        threshIntf);
-    nameProps["Name"] = std::string("LowerCaution");
-
-    // Set threshold interface properties for createNsmThreshold
-    nameProps["Dynamic"] = bool(false);
-    nameProps["Value"] = double(45.0);
-
     auto numericSensor = std::make_shared<TFTestNumericSensor>("TF_B12F_Temp0");
     info.name = "TF_B12F_Temp0";
 
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
+    NsmThresholdFactory factory(
+        mockManager, numericSensor, info, gpuUuid, gpu,
+        {{"LowerCaution",
+          FeatureThreshold{.value = 45.0, .parameterId = std::nullopt}}});
     size_t initialCount = gpu->deviceSensors.size();
-    factory.make();
+    auto rc = factory.make();
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     // createNsmThreshold static path adds to addDeviceSensors
-    EXPECT_GT(gpu->deviceSensors.size(), initialCount);
+    ASSERT_EQ(gpu->deviceSensors.size(), initialCount + 1);
+    auto* thresholdValue = dynamic_cast<NsmThresholdValueWarningLow*>(
+        gpu->deviceSensors.back().get());
+    ASSERT_NE(thresholdValue, nullptr);
+    EXPECT_DOUBLE_EQ(thresholdValue->intf->warningLow(), 45.0);
 }
 
-// Dynamic threshold with NSM_ThermalParameter type, non-periodic.
-// Covers: createNsmThreshold dynamic=true path, type check pass,
+// ParameterId, non-periodic.
+// Covers: createNsmThreshold dynamic path,
 // periodicUpdate=false → addStaticSensor + addCapabilityRefreshSensor.
 TEST_F(NsmThresholdFactoryTestB12F, Make_DynamicLowerCritical_NonPeriodic)
 {
-    const std::string threshIntf = interface +
-                                   ".ThermalParameters.LowerCritical";
-
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {threshIntf}}};
-
-    auto& props = utils::MockDbusAsync::propertyMap(testObjPath, threshIntf);
-    props["Name"] = std::string("LowerCritical");
-    props["Dynamic"] = bool(true);
-    props["Type"] = std::string("NSM_ThermalParameter");
-    props["ParameterId"] = uint64_t(5);
-    // "PeriodicUpdate" not set → getDbusProperty throws → periodicUpdate=false
-
     auto numericSensor =
         std::make_shared<TFTestNumericSensor>("TF_B12F_Temp0_Dyn");
     info.name = "TF_B12F_Temp0_Dyn";
 
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
+    NsmThresholdFactory factory(
+        mockManager, numericSensor, info, gpuUuid, gpu,
+        {{"LowerCritical", FeatureThreshold{.parameterId = 5}}});
     size_t initialCount = gpu->staticSensors.size();
-    factory.make();
+    size_t initialCapCount = gpu->capabilityRefreshSensors.size();
+    auto rc = factory.make();
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->staticSensors.size(), initialCount);
+    EXPECT_GT(gpu->capabilityRefreshSensors.size(), initialCapCount);
 }
 
-// Dynamic threshold with unsupported type.
-// Covers: createNsmThreshold type check fail → co_return NSM_ERROR path. //
-
-TEST_F(NsmThresholdFactoryTestB12F, Make_DynamicThreshold_UnsupportedType)
-{
-    const std::string threshIntf = interface +
-                                   ".ThermalParameters.UpperCaution";
-
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {threshIntf}}};
-
-    auto& props = utils::MockDbusAsync::propertyMap(testObjPath, threshIntf);
-    props["Name"] = std::string("UpperCaution");
-    props["Dynamic"] = bool(true);
-    props["Type"] = std::string("NSM_UnsupportedType"); // wrong type
-
-    auto numericSensor =
-        std::make_shared<TFTestNumericSensor>("TF_B12F_Temp0_Bad");
-    info.name = "TF_B12F_Temp0_Bad";
-
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
-    size_t initialCount = gpu->staticSensors.size();
-    factory.make();
-    // Type mismatch → returns NSM_ERROR → no sensors added
-    EXPECT_EQ(gpu->staticSensors.size(), initialCount);
-}
-
-// Dynamic threshold with periodic update + aggregation.
-// Covers: periodicUpdate=true path, Priority/Aggregated properties,
+// ParameterId with periodic update + aggregation.
+// Covers: periodicUpdate=true path,
 // NumericSensorFactory::makeAggregatorAndAddSensor,
 // NsmThresholdAggregatorBuilder::makeAggregator.
 TEST_F(NsmThresholdFactoryTestB12F, Make_DynamicThreshold_Periodic_Aggregated)
 {
-    const std::string threshIntf = interface +
-                                   ".ThermalParameters.UpperCritical";
-
-    utils::MockDbusAsync::serviceMap() = {
-        {"xyz.openbmc_project.EntityManager", {threshIntf}}};
-
-    auto& props = utils::MockDbusAsync::propertyMap(testObjPath, threshIntf);
-    props["Name"] = std::string("UpperCritical");
-    props["Dynamic"] = bool(true);
-    props["Type"] = std::string("NSM_ThermalParameter");
-    props["ParameterId"] = uint64_t(7);
-    props["PeriodicUpdate"] = bool(true);
-    props["Priority"] = bool(false);
-    props["Aggregated"] = bool(true);
-
     auto numericSensor =
         std::make_shared<TFTestNumericSensor>("TF_B12F_Temp0_Agg");
     info.name = "TF_B12F_Temp0_Agg";
 
-    NsmThresholdFactory factory(mockManager, interface, testObjPath,
-                                numericSensor, info, gpuUuid);
-    factory.make();
-    // Periodic+aggregated adds via makeAggregatorAndAddSensor
-    // (aggregator map, not directly to staticSensors/deviceSensors)
-    SUCCEED(); // Verifies make() completes without crash
+    NsmThresholdFactory factory(
+        mockManager, numericSensor, info, gpuUuid, gpu,
+        {{"UpperCritical", FeatureThreshold{.parameterId = 7,
+                                            .periodicUpdate = true,
+                                            .priority = false,
+                                            .aggregated = true}}});
+    size_t initialAggCount = gpu->sensorAggregators.size();
+    auto rc = factory.make();
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // Periodic+aggregated adds a threshold aggregator
+    ASSERT_EQ(gpu->sensorAggregators.size(), initialAggCount + 1);
+    EXPECT_NE(std::dynamic_pointer_cast<NsmThresholdAggregator>(
+                  gpu->sensorAggregators.back()),
+              nullptr);
 }
 
 // ============================================================================

@@ -21,9 +21,12 @@
 
 #include "platform-environmental.h"
 
+#include "globals.hpp"
 #include "nsmDevice.hpp"
 #include "nsmNumericSensorFactory.hpp"
+#include "nsmNumericSensorFeatures.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmPeakPower.hpp"
 #include "nsmPowerAggregator.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
@@ -150,10 +153,76 @@ class PowerSensorFactory : public NumericSensorBuilder
     };
 };
 
-static NumericSensorFactory numericSensorFactory{
-    std::make_unique<PowerSensorFactory>()};
-
-REGISTER_NSM_CREATION_FUNCTION(numericSensorFactory.getCreationFunction(),
-                               "xyz.openbmc_project.Configuration.NSM_Power")
-
 } // namespace nsm
+
+namespace nsm::features
+{
+
+requester::Coroutine createPowerFeature([[maybe_unused]] SensorManager& manager,
+                                        const DeviceContext& dev,
+                                        const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("Power feature of {NAME}: no NsmDevice", "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto featureInfo = NumericSensorFactory::makeFeatureSensorInfo(dev, params,
+                                                                   "NSM_Power");
+    if (!featureInfo)
+    {
+        co_return NSM_ERROR;
+    }
+    auto& info = *featureInfo;
+    auto& bus = utils::DBusHandler::getBus();
+
+    auto sensor = std::make_shared<NsmPower>(
+        bus, info.name, info.type, info.sensorId,
+        param<uint64_t>(params, "AveragingInterval").value_or(0),
+        info.associations, info.chassis_association, info.physicalContext,
+        info.implementation.get(), info.maxAllowableValue, info.maxValue,
+        info.minValue, info.readingBasis.get(), info.description.get());
+
+    if (param<bool>(params, "CompositeNumericSensorsEnabled").value_or(false))
+    {
+        sensor->getSensorValueObject()->append(
+            std::make_unique<NsmNumericSensorCompositeChildValue>(
+                info.name, info.type,
+                std::vector<std::string>{totalGpuPowerSensorPath.string()}));
+    }
+    lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
+              "UUID", dev.staticUuid, "NAME", info.name, "TYPE", info.type);
+
+    PowerSensorFactory builder;
+    NumericSensorFactory::makeAggregatorAndAddSensor(
+        &builder, info, sensor, dev.staticUuid, dev.device.get());
+
+    if (param<bool>(params, "PeakValueEnabled").value_or(false))
+    {
+        NumericSensorInfo peakInfo{};
+        peakInfo.name = info.name;
+        peakInfo.type = info.type + "_PeakValue";
+        peakInfo.sensorId =
+            param<uint64_t>(params, "PeakValueSensorId").value_or(0);
+        peakInfo.priority =
+            param<bool>(params, "PeakValuePriority").value_or(false);
+        peakInfo.aggregated =
+            param<bool>(params, "PeakValueAggregated").value_or(false);
+
+        auto peakSensor = std::make_shared<NsmPeakPower>(
+            bus, peakInfo.name, peakInfo.type, peakInfo.sensorId,
+            param<uint64_t>(params, "PeakValueAveragingInterval").value_or(0));
+        lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
+                  "UUID", dev.staticUuid, "NAME", peakInfo.name, "TYPE",
+                  peakInfo.type);
+
+        PeakPowerSensorBuilder peakBuilder;
+        NumericSensorFactory::makeAggregatorAndAddSensor(
+            &peakBuilder, peakInfo, peakSensor, dev.staticUuid,
+            dev.device.get());
+    }
+    co_return NSM_SUCCESS;
+}
+
+} // namespace nsm::features

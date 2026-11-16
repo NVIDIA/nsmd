@@ -1717,10 +1717,6 @@ namespace nsm
 requester::Coroutine createNsmPCIeRetimerPorts(SensorManager& manager,
                                                const std::string& interface,
                                                const std::string& objPath);
-requester::Coroutine
-    createNsmMultiPCIeRetimerPorts(SensorManager& manager,
-                                   const std::string& interface,
-                                   const std::string& objPath);
 } // namespace nsm
 
 // Factory fixture reusing the branch test fixture
@@ -1733,8 +1729,6 @@ struct NsmRetimerPortBranchFactoryTest :
 
     const std::string retimerIntf =
         "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_PCIeLink";
-    const std::string multiPortIntf =
-        "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_MultiPCIeLink";
 
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> retimer;
@@ -1825,28 +1819,4 @@ TEST_F(NsmRetimerPortBranchFactoryTest,
     // static sensor = 2*(3+1) = 8 sensors added, but static sensors go to
     // a different list. At minimum, deviceSensors should grow.
     EXPECT_GT(retimer->deviceSensors.size(), before);
-}
-
-// Multi-port factory: nsmDevice==nullptr path (line 1591-1598)
-TEST_F(NsmRetimerPortBranchFactoryTest,
-       MultiFactory_NonMatchingUUID_ReturnsError)
-{
-    const std::string testPath = "/xyz/test/br_factory/multi_no_uuid";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortIntf);
-    pm = {
-        {"Name", std::string("MultiNoUuid")},
-        {"Priority", false},
-        {"Counts", std::vector<uint64_t>{1}},
-        {"InventoryObjPath",
-         std::string("/xyz/openbmc_project/inventory/br_factory/mnu/")},
-        {"UUID", std::string("")},
-        {"PortType",
-         std::string("xyz.openbmc_project.Inventory.Decorator.PortInfo."
-                     "PortType.UpstreamPort")},
-        {"UpstreamPortNumbers", std::vector<uint64_t>{0}},
-    };
-
-    EXPECT_THROW_COROUTINE(
-        createNsmMultiPCIeRetimerPorts(mockManager, multiPortIntf, testPath),
-        std::runtime_error);
 }

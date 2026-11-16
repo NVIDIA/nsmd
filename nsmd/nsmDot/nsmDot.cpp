@@ -24,6 +24,7 @@
 #include "globals.hpp"
 #include "nsmDevice.hpp"
 #include "nsmDotBlobUtils.hpp"
+#include "nsmDotFeatures.hpp"
 #include "nsmDotUtils.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
@@ -1968,85 +1969,6 @@ requester::Coroutine NsmDotObject::recoverDOTAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine createNsmDot(SensorManager& manager,
-                                  const std::string& interface,
-                                  const std::string& objPath)
-{
-    auto& bus = utils::DBusHandler::getBus();
-    dbus::PropertyMap allBaseIfaceProperties;
-    auto rc = co_await utils::coGetCachedBaseProperties(objPath, interface,
-                                                        allBaseIfaceProperties);
-    if (rc != NSM_SUCCESS)
-    {
-        co_return rc;
-    }
-
-    std::string chassisName{};
-    if (allBaseIfaceProperties.count("ChassisName"))
-    {
-        chassisName =
-            std::get<std::string>(allBaseIfaceProperties.at("ChassisName"));
-    }
-
-    uuid_t uuid{};
-    if (allBaseIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
-    }
-
-    std::string blobPathName{};
-    auto chassisPath = std::string(chassisInventoryBasePath) + "/" +
-                       chassisName;
-    auto dotBlobPath = chassisPath + "/DOTBlob";
-
-    try
-    {
-        auto dotBlobProperties = co_await utils::coGetAllDbusProperty(
-            utils::entityManagerServiceStr, dotBlobPath.c_str(),
-            "xyz.openbmc_project.Configuration.NSM_DOTBlob");
-
-        if (dotBlobProperties.count("PathName"))
-        {
-            blobPathName =
-                std::get<std::string>(dotBlobProperties.at("PathName"));
-        }
-    }
-    catch (const std::exception& e)
-    {
-        lg2::error("Dot: Could not fetch DOTBlob PathName: {ERROR}", "ERROR",
-                   e.what());
-    }
-
-    if (blobPathName.empty())
-    {
-        blobPathName = chassisName;
-        lg2::info("Dot: Using ChassisName as PathName fallback: {NAME}", "NAME",
-                  blobPathName);
-    }
-
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    if (!device)
-    {
-        lg2::error("Dot: Failed to find device for UUID in chassis: {CHASSIS}",
-                   "CHASSIS", chassisName);
-        co_return NSM_SW_ERROR;
-    }
-
-    auto object = std::make_shared<NsmDotObject>(bus, chassisName, uuid,
-                                                 blobPathName);
-    auto dotStatusSensor = std::make_shared<NsmDotStatusObject>(
-        chassisName, "NSM_Dot_Status", object.get(), uuid);
-    object->dotStatusSensor_ = dotStatusSensor.get();
-    device->addSensor(object, PollingType::RoundRobin);
-    device->addSensor(dotStatusSensor, PollingType::RoundRobin);
-
-    lg2::debug(
-        "Dot: Created DOT object and status sensor for chassis: {CHASSIS}",
-        "CHASSIS", chassisName);
-
-    co_return NSM_SUCCESS;
-}
-
 NsmDotStatusObject::NsmDotStatusObject(const std::string& name,
                                        const std::string& type,
                                        DotActionIntf* dotActionIntf,
@@ -2131,7 +2053,50 @@ uint8_t NsmDotStatusObject::handleResponseMsg(const nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(createNsmDot,
-                               "xyz.openbmc_project.Configuration.NSM_DOT")
-
 } // namespace nsm
+
+namespace nsm::features
+{
+
+requester::Coroutine createDotFeature([[maybe_unused]] SensorManager& manager,
+                                      const DeviceContext& dev,
+                                      const dbus::PropertyMap& params)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::string chassisName =
+        param<std::string>(params, "ChassisName").value_or("");
+    const uuid_t& uuid = dev.staticUuid;
+
+    std::string blobPathName =
+        param<std::string>(params, "BlobPathName").value_or("");
+    if (blobPathName.empty())
+    {
+        blobPathName = chassisName;
+        lg2::info("Dot: Using ChassisName as PathName fallback: {NAME}", "NAME",
+                  blobPathName);
+    }
+
+    auto device = dev.device;
+    if (!device)
+    {
+        lg2::error("Dot: Failed to find device for UUID in chassis: {CHASSIS}",
+                   "CHASSIS", chassisName);
+        co_return NSM_SW_ERROR;
+    }
+
+    auto object = std::make_shared<NsmDotObject>(bus, chassisName, uuid,
+                                                 blobPathName);
+    auto dotStatusSensor = std::make_shared<NsmDotStatusObject>(
+        chassisName, "NSM_Dot_Status", object.get(), uuid);
+    object->dotStatusSensor_ = dotStatusSensor.get();
+    device->addSensor(object, PollingType::RoundRobin);
+    device->addSensor(dotStatusSensor, PollingType::RoundRobin);
+
+    lg2::debug(
+        "Dot: Created DOT object and status sensor for chassis: {CHASSIS}",
+        "CHASSIS", chassisName);
+
+    co_return NSM_SUCCESS;
+}
+
+} // namespace nsm::features

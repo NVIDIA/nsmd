@@ -37,6 +37,8 @@
 #include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "features/associations.hpp"
+#include "globals.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmDevice.hpp"
 #include "nsmErrorInjection/nsmErrorInjectionCommon.hpp"
@@ -48,6 +50,7 @@
 #include "nsmPCIeLinkSpeed.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
 #include "nsmPowerSmoothing.hpp"
+#include "nsmProcessorFeatures.hpp"
 #include "nsmReconfigPermissions.hpp"
 #include "nsmSetCpuOperatingConfig.hpp"
 #include "nsmSetECCMode.hpp"
@@ -69,8 +72,6 @@
 #include <optional>
 #include <unordered_map>
 #include <vector>
-
-#define PROCESSOR_INTERFACE "xyz.openbmc_project.Configuration.NSM_Processor"
 
 using std::filesystem::path;
 
@@ -3663,370 +3664,182 @@ requester::Coroutine NsmAdaptiveTGPMode::patchAdaptiveTGPMode(
     co_return cc ? cc : rc;
 }
 
-requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
-                                              const std::string& interface,
-                                              const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
+
+static std::string processorInventoryObjPath(const DeviceContext& dev)
+{
+    return (acceleratorInventoryBasePath / deviceBaseName(dev)).string();
+}
+
+requester::Coroutine createProcessorFeature(SensorManager& manager,
+                                            const DeviceContext& dev,
+                                            const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("Processor feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
+    }
+
     auto& bus = utils::DBusHandler::getBus();
+    auto nsmDevice = dev.device;
 
-    dbus::PropertyMap allBaseIfaceProperties;
-    auto rc = co_await utils::coGetCachedBaseProperties(
-        objPath, PROCESSOR_INTERFACE, allBaseIfaceProperties);
-    if (rc != NSM_SUCCESS)
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_Processor";
+    uuid_t uuid = dev.staticUuid;
+    std::string inventoryObjPath = processorInventoryObjPath(dev);
+
+    std::vector<utils::Association> associations{};
+    addAssociations(associations, params, "ParentChassisAssociationPaths",
+                    "parent_chassis", "all_processors");
+    // The bridge chassis gets bridging_processor back to this processor
+    addAssociation(associations, params, "BridgingChassisAssociationPath",
+                   "bridged_processor", "bridging_processor");
+    // The total GPU power sensor gets all_processors back to this processor
+    if (param<bool>(params, "TotalPowerAssociationEnabled").value_or(false))
     {
-        co_return rc;
+        associations.emplace_back("total_power", "all_processors",
+                                  totalGpuPowerSensorPath.string());
     }
-    dbus::PropertyMap allCurrentIfaceProperties =
-        co_await utils::coGetAllDbusProperty(utils::entityManagerServiceStr,
-                                             objPath, interface);
+    auto associationSensor = std::make_shared<NsmProcessorAssociation>(
+        bus, name, type, inventoryObjPath, associations);
+    nsmDevice->addDeviceSensors(associationSensor);
 
-    std::string name{};
-    uuid_t uuid{};
-    std::string type{};
-    std::string inventoryObjPath{};
-
-    if (allBaseIfaceProperties.count("Name"))
-    {
-        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
-    }
-    if (allBaseIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
-    }
-    if (allCurrentIfaceProperties.count("Type"))
-    {
-        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
-    }
-    if (allBaseIfaceProperties.count("InventoryObjPath"))
-    {
-        inventoryObjPath = std::get<std::string>(
-            allBaseIfaceProperties.at("InventoryObjPath"));
-    }
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-
-    if (type == "NSM_Processor")
-    {
-        std::vector<utils::Association> associations{};
-        co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                          associations);
-        auto associationSensor = std::make_shared<NsmProcessorAssociation>(
-            bus, name, type, inventoryObjPath, associations);
-        nsmDevice->addDeviceSensors(associationSensor);
-
-#ifdef ACCELERATOR_DBUS
-        auto sensor = std::make_shared<NsmAcceleratorIntf>(bus, name, type,
-                                                           inventoryObjPath);
-        nsmDevice->addDeviceSensors(sensor);
-#endif
+    auto sensor = std::make_shared<NsmAcceleratorIntf>(bus, name, type,
+                                                       inventoryObjPath);
+    nsmDevice->addDeviceSensors(sensor);
 
 #ifdef NVIDIA_RESET_METRICS
-        auto resetSupportSensor =
-            std::make_shared<NsmResetCountersSupportedIntf>(bus, name, type,
-                                                            inventoryObjPath);
-        nsmDevice->addDeviceSensors(resetSupportSensor);
+    auto resetSupportSensor = std::make_shared<NsmResetCountersSupportedIntf>(
+        bus, name, type, inventoryObjPath);
+    nsmDevice->addDeviceSensors(resetSupportSensor);
 #endif
 
-        uuid_t deviceUuid{};
-        if (allBaseIfaceProperties.count("DEVICE_UUID"))
-        {
-            deviceUuid =
-                std::get<uuid_t>(allBaseIfaceProperties.at("DEVICE_UUID"));
-        }
-
-        auto uuidSensor = std::make_shared<NsmUuidIntf>(
-            bus, name, type, inventoryObjPath, deviceUuid);
-        nsmDevice->addStaticSensor(uuidSensor);
+    // Starts empty; update() reads the device UUID over MCTP.
+    uuid_t deviceUuid{};
+    auto uuidSensor = std::make_shared<NsmUuidIntf>(
+        bus, name, type, inventoryObjPath, deviceUuid);
+    nsmDevice->addStaticSensor(uuidSensor);
 
 #ifdef ENABLE_SYSTEM_GUID
-        auto sysGuidSensor = std::make_shared<NsmSysGuidIntf>(bus, name, type,
-                                                              inventoryObjPath);
+    auto sysGuidSensor = std::make_shared<NsmSysGuidIntf>(bus, name, type,
+                                                          inventoryObjPath);
 
-        // Note: Setting this to addSensor as opposed to addStaticSensor:
-        //       Ideally this would be a static sensor, but the GPU changes
-        //       state with the host. A static sensor does not update so
-        //       the System GUID gets wiped. Polling here resolves the issue
-        //       and ensures the GUID is always correctly loaded.
-        // TBD:  A more optimal solution would be to update static sensors
-        //       when nsmObjects go online/offline but that may have other
-        //       impacts so needs some further investigation.
-        nsmDevice->addSensor(sysGuidSensor, false, true);
+    // Polled rather than static: the GPU changes state with the host and a
+    // static sensor would leave the System GUID wiped.
+    nsmDevice->addSensor(sysGuidSensor, false, true);
 #endif
 
 #if defined(ENABLE_DEBUG_INFO)
-        // GPU exposes DebugInfo (Network) + Diagnostics; LogInfo/Erase are not
-        // implemented by GPU firmware. Per-platform support is gated by the
-        // NETIR_DUMP_ENABLED / DIAGNOSTIC_DUMP_ENABLED meson options.
-        size_t pos = inventoryObjPath.find_last_of('/');
-        std::string basePath = inventoryObjPath;
-        std::string processorName = name;
-        if (pos != std::string::npos)
-        {
-            basePath = inventoryObjPath.substr(0, pos + 1);
-            processorName = inventoryObjPath.substr(pos + 1);
-        }
-        lg2::debug("NetIR: processor {NAME} at {PATH}", "NAME", processorName,
-                   "PATH", basePath + processorName);
+    size_t pos = inventoryObjPath.find_last_of('/');
+    std::string basePath = inventoryObjPath;
+    std::string processorName = name;
+    if (pos != std::string::npos)
+    {
+        basePath = inventoryObjPath.substr(0, pos + 1);
+        processorName = inventoryObjPath.substr(pos + 1);
+    }
+    lg2::debug("NetIR: processor {NAME} at {PATH}", "NAME", processorName,
+               "PATH", basePath + processorName);
 
 #if NETIR_DUMP_ENABLED
-        auto processorDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
-            bus, processorName, basePath, type, uuid, DebugDumpType::Network);
-        nsmDevice->addStaticSensor(processorDebugInfoObject);
+    auto processorDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
+        bus, processorName, basePath, type, uuid, DebugDumpType::Network);
+    nsmDevice->addStaticSensor(processorDebugInfoObject);
 #endif
 
 #if DIAGNOSTIC_DUMP_ENABLED
-        auto processorDiagnosticsObject = std::make_shared<NsmDebugInfoObject>(
-            bus, processorName, basePath, type, uuid,
-            DebugDumpType::Diagnostics);
-        nsmDevice->addStaticSensor(processorDiagnosticsObject);
+    auto processorDiagnosticsObject = std::make_shared<NsmDebugInfoObject>(
+        bus, processorName, basePath, type, uuid, DebugDumpType::Diagnostics);
+    nsmDevice->addStaticSensor(processorDiagnosticsObject);
 #endif
 #endif
 
-        auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
-            bus, name, type, inventoryObjPath);
-        nsmDevice->addStaticSensor(gpuRevisionSensor);
+    auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
+        bus, name, type, inventoryObjPath);
+    nsmDevice->addStaticSensor(gpuRevisionSensor);
 
-        auto persistentMemoryIntf = std::make_shared<PersistentMemoryInterface>(
-            bus, inventoryObjPath.c_str());
+    auto persistentMemoryIntf = std::make_shared<PersistentMemoryInterface>(
+        bus, inventoryObjPath.c_str());
 
-        auto totalMemorySizeSensor = std::make_shared<NsmTotalMemorySize>(
-            name, type, persistentMemoryIntf);
-        nsmDevice->addStaticSensor(totalMemorySizeSensor);
+    auto totalMemorySizeSensor =
+        std::make_shared<NsmTotalMemorySize>(name, type, persistentMemoryIntf);
+    nsmDevice->addStaticSensor(totalMemorySizeSensor);
 
-        auto healthSensor = std::make_shared<NsmGpuHealth>(bus, name, type,
-                                                           inventoryObjPath);
-        nsmDevice->addDeviceSensors(healthSensor);
+    auto healthSensor = std::make_shared<NsmGpuHealth>(bus, name, type,
+                                                       inventoryObjPath);
+    nsmDevice->addDeviceSensors(healthSensor);
 
-        createNsmErrorInjectionSensors(manager, nsmDevice, inventoryObjPath);
-        auto confidentialComputeIntf =
-            std::make_shared<ConfidentialComputeIntf>(bus,
-                                                      inventoryObjPath.c_str());
-        auto confidentialComputeSensor =
-            std::make_shared<NsmConfidentialCompute>(
-                name, type, confidentialComputeIntf, inventoryObjPath);
-        nsmDevice->addSensor(confidentialComputeSensor,
-                             CONFIDENTIAL_COMPUTE_MODE_PRIORITY);
-        nsm::AsyncSetOperationHandler setconfidentialComputeHandler =
-            std::bind(&NsmConfidentialCompute::patchCCMode,
-                      confidentialComputeSensor, std::placeholders::_1,
-                      std::placeholders::_2, std::placeholders::_3);
+    createNsmErrorInjectionSensors(manager, nsmDevice, inventoryObjPath);
+    auto confidentialComputeIntf = std::make_shared<ConfidentialComputeIntf>(
+        bus, inventoryObjPath.c_str());
+    auto confidentialComputeSensor = std::make_shared<NsmConfidentialCompute>(
+        name, type, confidentialComputeIntf, inventoryObjPath);
+    nsmDevice->addSensor(confidentialComputeSensor,
+                         CONFIDENTIAL_COMPUTE_MODE_PRIORITY);
+    nsm::AsyncSetOperationHandler setconfidentialComputeHandler = std::bind(
+        &NsmConfidentialCompute::patchCCMode, confidentialComputeSensor,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
 
-        AsyncOperationManager::getInstance()
-            ->getDispatcher(inventoryObjPath)
-            ->addAsyncSetOperation(
-                "com.nvidia.CCMode", "CCModeEnabled",
-                AsyncSetOperationInfo{setconfidentialComputeHandler,
-                                      confidentialComputeSensor, nsmDevice});
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(inventoryObjPath)
+        ->addAsyncSetOperation(
+            "com.nvidia.CCMode", "CCModeEnabled",
+            AsyncSetOperationInfo{setconfidentialComputeHandler,
+                                  confidentialComputeSensor, nsmDevice});
 
-        nsm::AsyncSetOperationHandler setconfidentialComputeDevtoolHandler =
-            std::bind(&NsmConfidentialCompute::patchCCDevMode,
-                      confidentialComputeSensor, std::placeholders::_1,
-                      std::placeholders::_2, std::placeholders::_3);
+    nsm::AsyncSetOperationHandler setconfidentialComputeDevtoolHandler =
+        std::bind(&NsmConfidentialCompute::patchCCDevMode,
+                  confidentialComputeSensor, std::placeholders::_1,
+                  std::placeholders::_2, std::placeholders::_3);
 
-        AsyncOperationManager::getInstance()
-            ->getDispatcher(inventoryObjPath)
-            ->addAsyncSetOperation(
-                "com.nvidia.CCMode", "CCDevModeEnabled",
-                AsyncSetOperationInfo{setconfidentialComputeDevtoolHandler,
-                                      confidentialComputeSensor, nsmDevice});
-    }
-    else if (type == "NSM_Processor_Attributes")
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(inventoryObjPath)
+        ->addAsyncSetOperation(
+            "com.nvidia.CCMode", "CCDevModeEnabled",
+            AsyncSetOperationInfo{setconfidentialComputeDevtoolHandler,
+                                  confidentialComputeSensor, nsmDevice});
+
+    if (param<bool>(params, "PCIeEnabled").value_or(false))
     {
-        // Handle Asset (always NVIDIA manufacturer)
-        auto assetIntf =
-            std::make_shared<NsmAssetIntf>(bus, inventoryObjPath.c_str());
-        std::string manufacturer = MANUFACTURER_NVIDIA;
+        std::string pcieType = "NSM_PCIe";
+        dbus::PropertyMap pcieProperties{};
+        if (auto deviceId = param<uint64_t>(params, "PCIeDeviceId"))
+        {
+            pcieProperties.emplace("DeviceId", *deviceId);
+        }
+        if (auto count = param<uint64_t>(params, "PCIePortCount"))
+        {
+            pcieProperties.emplace("Count", *count);
+        }
+        createPCIe(nsmDevice, bus, name, pcieType, inventoryObjPath,
+                   pcieProperties);
+    }
 
-        auto assetObject = NsmInterfaceProvider<NsmAssetIntf>(
-            name, type, inventoryObjPath, assetIntf);
-        assetObject.invoke(pdiMethod(manufacturer), manufacturer);
-        nsmDevice->addStaticSensor(
-            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-                assetObject, DEVICE_PART_NUMBER));
-        nsmDevice->addStaticSensor(
-            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-                assetObject, SERIAL_NUMBER));
-        const auto modelProperty = getModelInventoryProperty(
-            nsmDevice->getDeviceType(), nsmDevice->getDeviceRole());
-        nsmDevice->addStaticSensor(
-            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-                assetObject, modelProperty));
-
-        // Handle Location and LocationCode from ProcessorAttributes
-        if (allCurrentIfaceProperties.count("LocationType"))
-        {
-            std::string locationType = std::get<std::string>(
-                allCurrentIfaceProperties.at("LocationType"));
-            auto sensor = std::make_shared<NsmLocationIntfProcessor>(
-                bus, name, type, inventoryObjPath, locationType);
-            nsmDevice->addDeviceSensors(sensor);
-        }
-        if (allCurrentIfaceProperties.count("LocationCode"))
-        {
-            std::string locationCode = std::get<std::string>(
-                allCurrentIfaceProperties.at("LocationCode"));
-            auto sensor = std::make_shared<NsmLocationCodeIntfProcessor>(
-                bus, name, type, inventoryObjPath, locationCode);
-            nsmDevice->addDeviceSensors(sensor);
-        }
-
-        if (allCurrentIfaceProperties.count("MIGModeSupported") &&
-            std::get<bool>(allCurrentIfaceProperties.at("MIGModeSupported")))
-        {
-            createMIGMode(nsmDevice, bus, name, type, inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("PortDisableFutureSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("PortDisableFutureSupported")))
-        {
-            createPortDisableFuture(nsmDevice, name, type, inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("ECCModeSupported") &&
-            std::get<bool>(allCurrentIfaceProperties.at("ECCModeSupported")))
-        {
-            createECCMode(nsmDevice, bus, name, type, inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("EDPpScalingFactorSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("EDPpScalingFactorSupported")))
-        {
-            createEDPpScalingFactor(nsmDevice, bus, name, type,
-                                    inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("PowerSmoothingSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("PowerSmoothingSupported")))
-        {
-            createPowerSmoothing(nsmDevice, bus, name, type, inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("SoCPowerSmoothingSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("SoCPowerSmoothingSupported")))
-        {
-            createSoCPowerSmoothing(nsmDevice, bus, name, type,
-                                    inventoryObjPath, SoCDeviceType::GPU);
-        }
-        if (allCurrentIfaceProperties.count("CpuOperatingConfigSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("CpuOperatingConfigSupported")))
-        {
-            createCpuOperatingConfig(nsmDevice, bus, name, type,
-                                     inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("MemCapacityUtilSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("MemCapacityUtilSupported")))
-        {
-            createMemCapacityUtil(nsmDevice, name, type, inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("TotalNvLinksCountSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("TotalNvLinksCountSupported")))
-        {
-            createTotalNvLinksCount(nsmDevice, bus, name, type,
-                                    inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("EGMModeSupported") &&
-            std::get<bool>(allCurrentIfaceProperties.at("EGMModeSupported")))
-        {
-            createEGMMode(nsmDevice, bus, name, type, inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("MNNVLTopologySupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("MNNVLTopologySupported")))
-        {
-            createMNNVLTopology(nsmDevice, bus, name, type, inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count(
-                "MctpNsmOperationalStatusSupported") &&
-            std::get<bool>(allCurrentIfaceProperties.at(
-                "MctpNsmOperationalStatusSupported")))
-        {
-            createGpuOperationalStatus(nsmDevice, bus, name, type,
-                                       inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("GPUBasePowerLimitSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("GPUBasePowerLimitSupported")))
-        {
-            createGPUPowerLimit(nsmDevice, bus, name,
-                                "NSM_GPU_BASE_POWER_LIMIT", inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("GPUCopyCPUPowerLimitSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("GPUCopyCPUPowerLimitSupported")))
-        {
-            createGPUPowerLimit(nsmDevice, bus, name,
-                                "NSM_GPU_COPY_CPU_POWER_LIMIT",
-                                inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count(
-                "GPUCopySwitchPowerLimitSupported") &&
-            std::get<bool>(allCurrentIfaceProperties.at(
-                "GPUCopySwitchPowerLimitSupported")))
-        {
-            createGPUPowerLimit(nsmDevice, bus, name,
-                                "NSM_GPU_COPY_SWITCH_POWER_LIMIT",
-                                inventoryObjPath);
-        }
-        if (allCurrentIfaceProperties.count("CPEREventSupported") &&
-            std::get<bool>(allCurrentIfaceProperties.at("CPEREventSupported")))
-        {
-            createNsmCPEREvent(nsmDevice, name, "NSM_Event_CPER");
-        }
-    }
-    else if (type == "NSM_PCIe")
-    {
-        createPCIe(nsmDevice, bus, name, type, inventoryObjPath,
-                   allCurrentIfaceProperties);
-    }
-    else if (type == "NSM_ProcessorPerformance")
-    {
-        createProcessorPerformance(nsmDevice, bus, name, type, inventoryObjPath,
-                                   allCurrentIfaceProperties);
-    }
-    else if (type == "NSM_PowerCap")
-    {
-        createPowerCap(nsmDevice, bus, name, type, inventoryObjPath,
-                       allCurrentIfaceProperties, manager);
-    }
-    else if (type == "NSM_ReconfigPermissions")
-    {
-        createReconfigPermissions(nsmDevice, bus, name, type, inventoryObjPath,
-                                  allCurrentIfaceProperties);
-    }
-    else if (type == "NSM_WorkloadPowerProfile")
-    {
-        createWorkloadPowerProfile(nsmDevice, bus, name, type, inventoryObjPath,
-                                   allCurrentIfaceProperties);
-    }
 #ifdef NVIDIA_RESET_METRICS
-    // Fetch the priority property
     auto resetMetricsPriority = false;
-    // Fetch the ResetStatistics name property
     auto resetMetricsName = "ResetMetrics";
     auto resetPath = inventoryObjPath + "/ResetStatistics";
-    // Create the Reset Statistics D-Bus Interface
     using ResetCountersServer = sdbusplus::server::object_t<
         sdbusplus::com::nvidia::ResetCounters::server::ResetCounterMetrics>;
     auto resetCountersObj =
         std::make_shared<ResetCountersServer>(bus, resetPath.c_str());
-    // Add association
-    //  Define associations
-    std::vector<utils::Association> associations{
+    std::vector<utils::Association> resetAssociations{
         {"parent", "reset_statistics", inventoryObjPath}};
-    // Add associations
     auto resetMetricsAssociationDef =
         std::make_unique<AssociationDefinitionsIntf>(bus, resetPath.c_str());
     std::vector<std::tuple<std::string, std::string, std::string>>
         associationsList;
-    for (const auto& association : associations)
+    for (const auto& association : resetAssociations)
     {
         associationsList.emplace_back(association.forward, association.backward,
                                       association.absolutePath);
     }
     resetMetricsAssociationDef->associations(associationsList);
-    // Initialize all properties to their default values
     resetCountersObj->lastResetType(
         sdbusplus::com::nvidia::ResetCounters::server::ResetCounterMetrics::
             ResetTypes::Conventional);
@@ -4037,30 +3850,279 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     resetCountersObj->fundamentalResetEntryCount(std::nan(""));
     resetCountersObj->fundamentalResetExitCount(std::nan(""));
     resetCountersObj->iRoTResetExitCount(std::nan(""));
-    // Create the ResetStatistics sensor
     auto resetStatisticsSensor = std::make_shared<ResetStatisticsAggregator>(
         resetMetricsName, "NSM_ResetStatistics", resetPath, resetCountersObj,
         std::move(resetMetricsAssociationDef));
     nsmDevice->addDeviceSensors(resetStatisticsSensor);
-    // Add sensor to the device with priority
     nsmDevice->addSensor(resetStatisticsSensor, resetMetricsPriority);
 #endif
 
-    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
-dbus::Interfaces nsmProcessorInterfaces = {
-    "xyz.openbmc_project.Configuration.NSM_Processor",
-    "xyz.openbmc_project.Configuration.NSM_Processor.ProcessorAttributes",
-    "xyz.openbmc_project.Configuration.NSM_Processor.PCIe",
-    "xyz.openbmc_project.Configuration.NSM_Processor.ProcessorPerformance",
-    "xyz.openbmc_project.Configuration.NSM_Processor.PowerCap",
-    "xyz.openbmc_project.Configuration.NSM_Processor.ReconfigPermissions",
-    "xyz.openbmc_project.Configuration.NSM_Processor.PCIeDevice",
-    "xyz.openbmc_project.Configuration.NSM_Processor.WorkloadPowerProfile",
-    "xyz.openbmc_project.Configuration.NSM_Processor.ResetStatistics"};
+requester::Coroutine
+    createProcessorAttributesFeature([[maybe_unused]] SensorManager& manager,
+                                     const DeviceContext& dev,
+                                     const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("ProcessorAttributes feature of {NAME}: no NsmDevice",
+                   "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
 
-REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor, nsmProcessorInterfaces)
+    auto& bus = utils::DBusHandler::getBus();
+    auto nsmDevice = dev.device;
 
-} // namespace nsm
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_Processor_Attributes";
+    std::string inventoryObjPath = processorInventoryObjPath(dev);
+
+    auto supported = [&params](const char* key) {
+        return param<bool>(params, key).value_or(false);
+    };
+
+    auto assetIntf = std::make_shared<NsmAssetIntf>(bus,
+                                                    inventoryObjPath.c_str());
+    std::string manufacturer = MANUFACTURER_NVIDIA;
+
+    auto assetObject = NsmInterfaceProvider<NsmAssetIntf>(
+        name, type, inventoryObjPath, assetIntf);
+    assetObject.invoke(pdiMethod(manufacturer), manufacturer);
+    nsmDevice->addStaticSensor(
+        std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+            assetObject, DEVICE_PART_NUMBER));
+    nsmDevice->addStaticSensor(
+        std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(assetObject,
+                                                             SERIAL_NUMBER));
+    const auto modelProperty = getModelInventoryProperty(
+        nsmDevice->getDeviceType(), nsmDevice->getDeviceRole());
+    nsmDevice->addStaticSensor(
+        std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(assetObject,
+                                                             modelProperty));
+
+    if (auto locationType = param<std::string>(params, "LocationType"))
+    {
+        auto sensor = std::make_shared<NsmLocationIntfProcessor>(
+            bus, name, type, inventoryObjPath, *locationType);
+        nsmDevice->addDeviceSensors(sensor);
+    }
+    if (auto locationCode = param<std::string>(params, "LocationCode"))
+    {
+        auto sensor = std::make_shared<NsmLocationCodeIntfProcessor>(
+            bus, name, type, inventoryObjPath, *locationCode);
+        nsmDevice->addDeviceSensors(sensor);
+    }
+    if (auto context = param<std::string>(params, "LocationContext"))
+    {
+        auto sensor = std::make_shared<
+            NsmInterfaceProvider<LocationContextIntfProcessor>>(
+            name, type, dbus::Interfaces{inventoryObjPath});
+        sensor->invoke(pdiMethod(locationContext), *context);
+        nsmDevice->addDeviceSensors(sensor);
+    }
+    if (auto replaceable = param<bool>(params, "FieldReplaceable"))
+    {
+        auto sensor =
+            std::make_shared<NsmInterfaceProvider<ReplaceableIntfProcessor>>(
+                name, type, dbus::Interfaces{inventoryObjPath});
+        sensor->invoke(pdiMethod(fieldReplaceable), *replaceable);
+        nsmDevice->addDeviceSensors(sensor);
+    }
+
+    if (supported("MIGModeSupported"))
+    {
+        createMIGMode(nsmDevice, bus, name, type, inventoryObjPath);
+    }
+    if (supported("PortDisableFutureSupported"))
+    {
+        createPortDisableFuture(nsmDevice, name, type, inventoryObjPath);
+    }
+    if (supported("ECCModeSupported"))
+    {
+        createECCMode(nsmDevice, bus, name, type, inventoryObjPath);
+    }
+    if (supported("EDPpScalingFactorSupported"))
+    {
+        createEDPpScalingFactor(nsmDevice, bus, name, type, inventoryObjPath);
+    }
+    if (supported("PowerSmoothingSupported"))
+    {
+        createPowerSmoothing(nsmDevice, bus, name, type, inventoryObjPath);
+    }
+    if (supported("SoCPowerSmoothingSupported"))
+    {
+        createSoCPowerSmoothing(nsmDevice, bus, name, type, inventoryObjPath,
+                                SoCDeviceType::GPU);
+    }
+    if (supported("CpuOperatingConfigSupported"))
+    {
+        createCpuOperatingConfig(nsmDevice, bus, name, type, inventoryObjPath);
+    }
+    if (supported("MemCapacityUtilSupported"))
+    {
+        createMemCapacityUtil(nsmDevice, name, type, inventoryObjPath);
+    }
+    if (supported("TotalNvLinksCountSupported"))
+    {
+        createTotalNvLinksCount(nsmDevice, bus, name, type, inventoryObjPath);
+    }
+    if (supported("EGMModeSupported"))
+    {
+        createEGMMode(nsmDevice, bus, name, type, inventoryObjPath);
+    }
+    if (supported("MNNVLTopologySupported"))
+    {
+        createMNNVLTopology(nsmDevice, bus, name, type, inventoryObjPath);
+    }
+    if (supported("MctpNsmOperationalStatusSupported"))
+    {
+        createGpuOperationalStatus(nsmDevice, bus, name, type,
+                                   inventoryObjPath);
+    }
+    if (supported("GPUBasePowerLimitSupported"))
+    {
+        createGPUPowerLimit(nsmDevice, bus, name, "NSM_GPU_BASE_POWER_LIMIT",
+                            inventoryObjPath);
+    }
+    if (supported("GPUCopyCPUPowerLimitSupported"))
+    {
+        createGPUPowerLimit(nsmDevice, bus, name,
+                            "NSM_GPU_COPY_CPU_POWER_LIMIT", inventoryObjPath);
+    }
+    if (supported("GPUCopySwitchPowerLimitSupported"))
+    {
+        createGPUPowerLimit(nsmDevice, bus, name,
+                            "NSM_GPU_COPY_SWITCH_POWER_LIMIT",
+                            inventoryObjPath);
+    }
+    if (supported("CPEREventSupported"))
+    {
+        createNsmCPEREvent(nsmDevice, name, "NSM_Event_CPER");
+    }
+
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine createPowerCapFeature(SensorManager& manager,
+                                           const DeviceContext& dev,
+                                           const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("PowerCap feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto& bus = utils::DBusHandler::getBus();
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_PowerCap";
+    std::string inventoryObjPath = processorInventoryObjPath(dev);
+
+    dbus::PropertyMap properties{};
+    createPowerCap(dev.device, bus, name, type, inventoryObjPath, properties,
+                   manager);
+
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createWorkloadPowerProfileFeature([[maybe_unused]] SensorManager& manager,
+                                      const DeviceContext& dev,
+                                      const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("WorkloadPowerProfile feature of {NAME}: no NsmDevice",
+                   "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto& bus = utils::DBusHandler::getBus();
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_WorkloadPowerProfile";
+    std::string inventoryObjPath = processorInventoryObjPath(dev);
+
+    dbus::PropertyMap properties{{"ProfileIdMap", workloadProfileIdMap}};
+    createWorkloadPowerProfile(dev.device, bus, name, type, inventoryObjPath,
+                               properties);
+
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createProcessorPerformanceFeature([[maybe_unused]] SensorManager& manager,
+                                      const DeviceContext& dev,
+                                      const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("ProcessorPerformance feature of {NAME}: no NsmDevice",
+                   "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto& bus = utils::DBusHandler::getBus();
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_ProcessorPerformance";
+    std::string inventoryObjPath = processorInventoryObjPath(dev);
+
+    dbus::PropertyMap properties{};
+    if (auto deviceId = param<uint64_t>(params, "DeviceId"))
+    {
+        properties.emplace("DeviceId", *deviceId);
+    }
+    createProcessorPerformance(dev.device, bus, name, type, inventoryObjPath,
+                               properties);
+
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createReconfigPermissionsFeature([[maybe_unused]] SensorManager& manager,
+                                     const DeviceContext& dev,
+                                     const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("ReconfigPermissions feature of {NAME}: no NsmDevice",
+                   "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto& bus = utils::DBusHandler::getBus();
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_ReconfigPermissions";
+    std::string inventoryObjPath = processorInventoryObjPath(dev);
+
+    auto availableKnobs = param<std::vector<std::string>>(params,
+                                                          "AvailableKnobs")
+                              .value_or(std::vector<std::string>{});
+    auto disabledKnobs = param<std::vector<std::string>>(params,
+                                                         "DisabledKnobs")
+                             .value_or(std::vector<std::string>{});
+
+    std::vector<std::string> knobs{};
+    for (const auto& knob : availableKnobs)
+    {
+        if (std::find(disabledKnobs.begin(), disabledKnobs.end(), knob) ==
+            disabledKnobs.end())
+        {
+            knobs.push_back(knob);
+        }
+    }
+
+    dbus::PropertyMap properties{{"Features", knobs}};
+    createReconfigPermissions(dev.device, bus, name, type, inventoryObjPath,
+                              properties);
+
+    co_return NSM_SUCCESS;
+}
+
+} // namespace nsm::features

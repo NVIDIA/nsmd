@@ -25,14 +25,9 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmEventSetting.hpp"
-
-namespace nsm
-{
-requester::Coroutine createNsmEventSetting(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -96,9 +91,6 @@ struct NsmEventSettingTestFixture :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_EventSetting";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/test";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:5";
 
     NsmDeviceTable devices;
@@ -117,100 +109,95 @@ struct NsmEventSettingTestFixture :
     {
         cleanupDeviceSensors(devices);
     }
+
+    requester::Coroutine createEventSetting(const dbus::PropertyMap& params,
+                                            bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "GPU_SXM_5";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return features::createEventSettingFeature(mockManager, dev, params);
+    }
 };
 
 TEST_F(NsmEventSettingTestFixture, goodTestCreateEventSetting)
 {
     dbus::PropertyMap properties = {
         {"Name", std::string("EventSetting")},
-        {"UUID", gpuUuid},
         {"EventGenerationSetting",
          uint64_t(GLOBAL_EVENT_GENERATION_ENABLE_POLLING)},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
+    const size_t before = gpu->deviceSensors.size();
+    const size_t refreshBefore = gpu->capabilityRefreshSensors.size();
+    auto rc = createEventSetting(properties);
 
-    createNsmEventSetting(mockManager, basicIntfName, objPath);
-
-    EXPECT_GE(gpu->deviceSensors.size(),
-              2); // NsmEventSetting + NsmGetEventSetting (may have more)
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    // NsmEventSetting + NsmGetEventSetting
+    EXPECT_EQ(gpu->deviceSensors.size(), before + 2);
+    EXPECT_EQ(gpu->capabilityRefreshSensors.size(), refreshBefore + 1);
+    EXPECT_TRUE(gpu->hasNsmEventSettingConfig());
 }
 
-TEST_F(NsmEventSettingTestFixture, badTestMissingUUID)
+TEST_F(NsmEventSettingTestFixture, badTestNoDevice)
 {
     dbus::PropertyMap properties = {
         {"Name", std::string("EventSetting")},
         {"EventGenerationSetting",
          uint64_t(GLOBAL_EVENT_GENERATION_ENABLE_POLLING)},
-        // Missing UUID - empty uuid will be used
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = createEventSetting(properties, false);
 
-    EXPECT_THROW_COROUTINE(
-        createNsmEventSetting(mockManager, basicIntfName, objPath),
-        std::runtime_error);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
 TEST_F(NsmEventSettingTestFixture, badTestInvalidEventGenerationSetting)
 {
     dbus::PropertyMap properties = {
         {"Name", std::string("EventSetting")},
-        {"UUID", gpuUuid},
         {"EventGenerationSetting", uint64_t(99)}, // Invalid value
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    auto result = createNsmEventSetting(mockManager, basicIntfName, objPath);
+    const size_t before = gpu->deviceSensors.size();
+    auto result = createEventSetting(properties);
     EXPECT_EQ(result.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
-// Missing "Name" → FALSE branch for count("Name") → name="" is used;
-// EventGenerationSetting=0 (DISABLE) is a valid value → sensor IS created
-TEST_F(NsmEventSettingTestFixture, Factory_MissingName_SensorCreated)
+// "Name" is mandatory for the feature creator: params.at("Name") throws
+TEST_F(NsmEventSettingTestFixture, Factory_MissingName_Throws)
 {
-    const std::string uniquePath =
-        "/xyz/openbmc_project/inventory/system/test_noname";
     dbus::PropertyMap properties = {
-        {"UUID", gpuUuid},
         {"EventGenerationSetting",
          uint64_t(GLOBAL_EVENT_GENERATION_ENABLE_POLLING)},
-        // "Name" deliberately absent → FALSE branch of count("Name")
     };
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                          basicIntfName);
-    propertyMap = properties;
 
     const size_t before = gpu->deviceSensors.size();
-    createNsmEventSetting(mockManager, basicIntfName, uniquePath);
-    EXPECT_GT(gpu->deviceSensors.size(), before);
+    EXPECT_THROW_COROUTINE(createEventSetting(properties), std::out_of_range);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
-// Missing "EventGenerationSetting" → FALSE branch for
-// count("EventGenerationSetting") → default 0 (GLOBAL_EVENT_GENERATION_DISABLE)
-// is valid → sensor IS created
+// Missing "EventGenerationSetting" → default 0
+// (GLOBAL_EVENT_GENERATION_DISABLE) is valid → sensor IS created
 TEST_F(NsmEventSettingTestFixture, Factory_MissingEventGenSetting_SensorCreated)
 {
-    const std::string uniquePath =
-        "/xyz/openbmc_project/inventory/system/test_noeventgen";
     dbus::PropertyMap properties = {
         {"Name", std::string("EventSetting_NoGen")},
-        {"UUID", gpuUuid},
-        // "EventGenerationSetting" deliberately absent → default 0 used
     };
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                          basicIntfName);
-    propertyMap = properties;
 
     const size_t before = gpu->deviceSensors.size();
-    createNsmEventSetting(mockManager, basicIntfName, uniquePath);
+    auto rc = createEventSetting(properties);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->deviceSensors.size(), before);
 }
 
@@ -401,19 +388,13 @@ TEST_F(NsmEventSettingTestFixture, testAllEventGenerationSettings)
 
     for (size_t i = 0; i < settings.size(); i++)
     {
-        std::string testPath = objPath + "_setting_" + std::to_string(i);
-
         dbus::PropertyMap properties = {
             {"Name", std::string("EventSetting_") + std::to_string(i)},
-            {"UUID", gpuUuid},
             {"EventGenerationSetting", uint64_t(settings[i])},
         };
 
-        auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                              basicIntfName);
-        propertyMap = properties;
-
-        createNsmEventSetting(mockManager, basicIntfName, testPath);
+        auto rc = createEventSetting(properties);
+        EXPECT_EQ(rc.data(), NSM_SUCCESS);
     }
 
     // Should have created 2 sensors per setting (EventSetting +

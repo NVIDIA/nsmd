@@ -40,9 +40,10 @@ using namespace ::testing;
 #include "device-capability-discovery.h"
 #include "platform-environmental.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmEvent/nsmRediscoveryEvent.hpp"
 #include "nsmFwSwInventory/GPUSWInventory.hpp"
-#include "nsmObjectFactory.hpp"
 
 using namespace nsm;
 
@@ -387,7 +388,7 @@ TEST_F(HandleRediscovery_WithGpuDriverFixture,
 }
 
 // =============================================================================
-// createNsmRediscoveryEvent factory tests (via NsmObjectFactory dispatch)
+// createRediscoveryEventFeature tests
 // =============================================================================
 
 struct NsmRediscoveryEventFactoryTest :
@@ -395,10 +396,6 @@ struct NsmRediscoveryEventFactoryTest :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string interfaceName =
-        "xyz.openbmc_project.Configuration.NSM_Event_Rediscovery";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/rediscovery0";
     const std::string name = "Rediscovery_Test";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
 
@@ -419,117 +416,134 @@ struct NsmRediscoveryEventFactoryTest :
 
     dbus::PropertyMap basicProperties = {
         {"Name", name},
-        {"UUID", gpuUuid},
-        {"OriginOfCondition",
-         std::string("/xyz/openbmc_project/inventory/system/chassis/GPU_1")},
         {"MessageId", std::string("ResourceEvent.1.0.ResourceChanged")},
         {"LoggingNamespace", std::string("GPU_Rediscovery")},
         {"Resolution", std::string("No action required")},
         {"MessageArgs", std::vector<std::string>{"GPU_1"}},
         {"Severity", std::string("Informational")},
     };
+
+    requester::Coroutine create(const dbus::PropertyMap& params,
+                                bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "GPU_1";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return features::createRediscoveryEventFeature(mockManager, dev,
+                                                       params);
+    }
+
+    std::shared_ptr<NsmRediscoveryEvent> lastEvent()
+    {
+        if (gpu->deviceEvents.empty())
+        {
+            return nullptr;
+        }
+        return std::dynamic_pointer_cast<NsmRediscoveryEvent>(
+            gpu->deviceEvents.back());
+    }
 };
 
-// Full property map with valid UUID → event registered on device
+// Full params with a device → event registered on device
 TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_Success)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          interfaceName);
-    propertyMap = basicProperties;
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = create(basicProperties);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               objPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(gpu->deviceEvents.size(), before + 1);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->getName(), name);
+    EXPECT_EQ(event->getType(), "NSM_Event_Rediscovery");
+    EXPECT_EQ(event->info.uuid, gpuUuid);
+    EXPECT_EQ(event->info.originOfCondition, "/redfish/v1/Chassis/GPU_1");
+    EXPECT_EQ(event->info.severity, Level::Informational);
+    EXPECT_TRUE(event->info.logging);
 }
 
-// Missing UUID → empty string → parseStaticUuid fails → exception caught
-// internally
-TEST_F(NsmRediscoveryEventFactoryTest, Factory_MissingUUID_NoEvent)
+// No NsmDevice in the context → NSM_ERROR, no event
+TEST_F(NsmRediscoveryEventFactoryTest, Factory_NoDevice_NoEvent)
 {
-    const std::string uniquePath =
-        "/xyz/openbmc_project/inventory/system/rediscovery_no_uuid";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                          interfaceName);
-    dbus::PropertyMap props = basicProperties;
-    props.erase("UUID");
-    propertyMap = props;
-
     const size_t before = gpu->deviceEvents.size();
+    auto rc = create(basicProperties, false);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               uniquePath);
-
+    EXPECT_EQ(rc.data(), NSM_ERROR);
     EXPECT_EQ(before, gpu->deviceEvents.size());
 }
 
 // With Severity=Warning → severityEnum has_value() → value_or uses actual value
 TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_WithSeverityWarning)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/rediscovery_warning";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
     dbus::PropertyMap props = basicProperties;
     props["Severity"] = std::string("Warning");
-    propertyMap = props;
+    auto rc = create(props);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.severity, Level::Warning);
 }
 
-// Only UUID and Name → all other optional property checks hit FALSE branches
-// Missing Severity → severityEnum empty → value_or(Level::Critical) used
+// Only Name → all other params default; missing Severity →
+// value_or(Level::Critical); Logging defaults to true
 TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_MinimalProperties)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/rediscovery_minimal";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
-    propertyMap = {
-        {"Name", name},
-        {"UUID", gpuUuid},
-    };
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = create({{"Name", name}});
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceEvents.size(), before + 1);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.severity, Level::Critical);
+    EXPECT_TRUE(event->info.messageArgs.empty());
+    EXPECT_TRUE(event->info.logging);
+}
 
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+// Logging=false is honoured
+TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_LoggingDisabled)
+{
+    dbus::PropertyMap props = basicProperties;
+    props["Logging"] = false;
+    auto rc = create(props);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_FALSE(event->info.logging);
 }
 
 // With MessageArgs present → covers the MessageArgs branch
 TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_WithMessageArgs)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/rediscovery_msgargs";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
     dbus::PropertyMap props = basicProperties;
     props["MessageArgs"] = std::vector<std::string>{"arg1", "arg2"};
-    propertyMap = props;
+    auto rc = create(props);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.messageArgs.size(), 2u);
 }
 
-// With EventIds present → covers the new EventIds D-Bus read branch
+// With EventIds present → stored in info.errorId
 TEST_F(NsmRediscoveryEventFactoryTest, Factory_CreateEvent_WithEventIds)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/rediscovery_eventids";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
     dbus::PropertyMap props = basicProperties;
     props["EventIds"] = std::vector<std::string>{"Rediscovery",
                                                  "GPU-REDISCOVERY-EVENT"};
-    propertyMap = props;
+    auto rc = create(props);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.errorId.size(), 2u);
 }

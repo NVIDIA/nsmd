@@ -23,14 +23,25 @@
 
 using std::filesystem::path;
 
+const path inventorySystemBasePath = "/xyz/openbmc_project/inventory/system";
 const path chassisInventoryBasePath =
     "/xyz/openbmc_project/inventory/system/chassis";
 const path processorsInventoryBasePath =
     "/xyz/openbmc_project/inventory/system/processors/";
+const path acceleratorInventoryBasePath =
+    "/xyz/openbmc_project/inventory/system/accelerator";
+const path dimmInventoryBasePath = "/xyz/openbmc_project/inventory/system/dimm";
+const path boardInventoryBasePath =
+    "/xyz/openbmc_project/inventory/system/board";
+const path totalGpuPowerSensorPath =
+    "/xyz/openbmc_project/sensors/power/HGX_Chassis_0_TotalGPU_Power_0";
 const path fabricsInventoryBasePath =
     "/xyz/openbmc_project/inventory/system/fabrics";
+const path networkAdaptersSubPath = "NetworkAdapters";
+const path fabricSwitchesSubPath = "Switches";
 const path firmwareInventoryBasePath = "/xyz/openbmc_project/software";
 const path sotwareInventoryBasePath = "/xyz/openbmc_project/inventory_software";
+const path redfishChassisBasePath = "/redfish/v1/Chassis";
 const path debugTokenObjectBasePath = "/xyz/openbmc_project/debug_token";
 const path progressCountersObjectBasePath =
     "/xyz/openbmc_project/progress_counters";

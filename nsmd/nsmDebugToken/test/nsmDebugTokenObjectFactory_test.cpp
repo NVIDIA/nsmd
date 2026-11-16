@@ -25,222 +25,155 @@ using namespace ::testing;
 
 #include "base.h"
 
-// Forward declare the function to test
-namespace nsm
-{
-requester::Coroutine createNsmDebugToken(SensorManager& manager,
-                                         const std::string& interface,
-                                         const std::string& objPath);
-}
+#include "features/creators.hpp"
 
 using namespace nsm;
+
+#ifdef ENABLE_DEBUG_TOKEN
 
 struct NsmDebugTokenObjectFactoryTest :
     public Test,
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string interfaceName =
-        "xyz.openbmc_project.Configuration.NSM_DebugToken";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/debug_token0";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
+    size_t staticBefore = 0;
 
     NsmDebugTokenObjectFactoryTest() : SensorManagerTest(devices)
     {
         gpu = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
         EXPECT_NE(gpu, nullptr);
+        staticBefore = gpu->staticSensors.size();
     }
 
     ~NsmDebugTokenObjectFactoryTest()
     {
+        mockManager.debugTokenList.clear();
         cleanupDeviceSensors(devices);
     }
 
-    dbus::PropertyMap basicProperties = {
-        {"Name", std::string("DebugToken0")},
-        {"Type", std::string("NSM_DebugToken")},
-        {"UUID", gpuUuid},
+    features::DeviceContext makeDev(bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "HGX_GPU_SXM_0";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return dev;
+    }
+
+    requester::Coroutine create(const dbus::PropertyMap& params,
+                                bool withDevice = true)
+    {
+        return features::createDebugTokenFeature(mockManager,
+                                                 makeDev(withDevice), params);
+    }
+
+    dbus::PropertyMap basicParams = {
         {"ChassisName", std::string("HGX_GPU_SXM_0")},
     };
 };
 
-TEST_F(NsmDebugTokenObjectFactoryTest, testCreateNsmDebugTokenWithNICType)
+TEST_F(NsmDebugTokenObjectFactoryTest, testCreateDebugTokenWithNICType)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          interfaceName);
+    dbus::PropertyMap params = basicParams;
+    params["DebugTokenType"] = std::vector<std::string>{"NIC"};
 
-    dbus::PropertyMap props = basicProperties;
-    props["DebugTokenType"] = std::vector<std::string>{"NIC"};
-    propertyMap = props;
+    auto rc = create(params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    createNsmDebugToken(mockManager, interfaceName, objPath);
-
-    // Verify that NIC debug token was created
-    EXPECT_GT(gpu->staticSensors.size(), 0);
+    // NIC debug token is a static sensor and not in the unified list
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore + 1);
+    EXPECT_TRUE(mockManager.debugTokenList.empty());
 }
 
-TEST_F(NsmDebugTokenObjectFactoryTest, testCreateNsmDebugTokenWithUnifiedType)
+TEST_F(NsmDebugTokenObjectFactoryTest, testCreateDebugTokenWithUnifiedType)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          interfaceName);
+    dbus::PropertyMap params = basicParams;
+    params["DebugTokenType"] = std::vector<std::string>{"Unified"};
 
-    dbus::PropertyMap props = basicProperties;
-    props["DebugTokenType"] = std::vector<std::string>{"Unified"};
-    propertyMap = props;
+    const size_t rrBefore = gpu->roundRobinSensors.size();
+    auto rc = create(params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    createNsmDebugToken(mockManager, interfaceName, objPath);
-
-    // Verify that unified debug token was created
-    EXPECT_GE(mockManager.debugTokenList.size(), 0);
+    // Unified debug token is polled round robin and listed in the manager
+    EXPECT_EQ(mockManager.debugTokenList.size(), 1u);
+    EXPECT_EQ(gpu->roundRobinSensors.size(), rrBefore + 1);
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore);
 }
 
-TEST_F(NsmDebugTokenObjectFactoryTest, testCreateNsmDebugTokenWithBothTypes)
+TEST_F(NsmDebugTokenObjectFactoryTest, testCreateDebugTokenWithBothTypes)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          interfaceName);
+    dbus::PropertyMap params = basicParams;
+    params["DebugTokenType"] = std::vector<std::string>{"NIC", "Unified"};
 
-    dbus::PropertyMap props = basicProperties;
-    props["DebugTokenType"] = std::vector<std::string>{"NIC", "Unified"};
-    propertyMap = props;
+    auto rc = create(params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    createNsmDebugToken(mockManager, interfaceName, objPath);
-
-    // Verify that both debug tokens were created
-    EXPECT_GT(gpu->staticSensors.size(), 0);
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore + 1);
+    EXPECT_EQ(mockManager.debugTokenList.size(), 1u);
 }
 
-TEST_F(NsmDebugTokenObjectFactoryTest,
-       testCreateNsmDebugTokenMissingChassisName)
+TEST_F(NsmDebugTokenObjectFactoryTest, testCreateDebugTokenMissingTokenType)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          interfaceName);
+    auto rc = create(basicParams);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    dbus::PropertyMap props = {
-        {"Name", std::string("DebugToken0")},
-        {"Type", std::string("NSM_DebugToken")},
-        {"UUID", gpuUuid},
-        {"DebugTokenType", std::vector<std::string>{"Unified"}},
-    };
-    propertyMap = props;
-
-    EXPECT_THROW_COROUTINE(
-        createNsmDebugToken(mockManager, interfaceName, objPath),
-        sdbusplus::exception::SdBusError);
+    // No DebugTokenType → nothing created
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore);
+    EXPECT_TRUE(mockManager.debugTokenList.empty());
 }
 
-TEST_F(NsmDebugTokenObjectFactoryTest,
-       testCreateNsmDebugTokenMissingDebugTokenType)
+TEST_F(NsmDebugTokenObjectFactoryTest, testCreateDebugTokenNullDevice)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          interfaceName);
-    propertyMap = basicProperties;
+    dbus::PropertyMap params = basicParams;
+    params["DebugTokenType"] = std::vector<std::string>{"NIC", "Unified"};
 
-    createNsmDebugToken(mockManager, interfaceName, objPath);
+    auto rc = create(params, /*withDevice=*/false);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
 
-    // Should handle gracefully without DebugTokenType
-}
-
-TEST_F(NsmDebugTokenObjectFactoryTest, testCreateNsmDebugTokenInvalidUUID)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          interfaceName);
-
-    uuid_t invalidUuid = "STATIC:99:0:NSM_DEVICE_INSTANCE_NUMBER:99";
-    dbus::PropertyMap props = {
-        {"Name", std::string("DebugToken0")},
-        {"Type", std::string("NSM_DebugToken")},
-        {"UUID", invalidUuid},
-        {"ChassisName", std::string("InvalidChassis")},
-        {"DebugTokenType", std::vector<std::string>{"Unified"}},
-    };
-    propertyMap = props;
-
-    // Should handle gracefully even with invalid UUID
-    createNsmDebugToken(mockManager, interfaceName, objPath);
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore);
+    EXPECT_TRUE(mockManager.debugTokenList.empty());
 }
 
 TEST_F(NsmDebugTokenObjectFactoryTest, testMultipleDebugTokens)
 {
-    std::string objPath1 = "/xyz/openbmc_project/inventory/system/debug_token1";
-    std::string objPath2 = "/xyz/openbmc_project/inventory/system/debug_token2";
+    dbus::PropertyMap params1 = basicParams;
+    params1["DebugTokenType"] = std::vector<std::string>{"Unified"};
 
-    auto& propertyMap1 = utils::MockDbusAsync::propertyMap(objPath1,
-                                                           interfaceName);
-    dbus::PropertyMap props1 = basicProperties;
-    props1["DebugTokenType"] = std::vector<std::string>{"Unified"};
-    propertyMap1 = props1;
+    dbus::PropertyMap params2 = basicParams;
+    params2["ChassisName"] = std::string("HGX_GPU_SXM_1");
+    params2["DebugTokenType"] = std::vector<std::string>{"NIC"};
 
-    auto& propertyMap2 = utils::MockDbusAsync::propertyMap(objPath2,
-                                                           interfaceName);
-    dbus::PropertyMap props2 = basicProperties;
-    props2["DebugTokenType"] = std::vector<std::string>{"NIC"};
-    propertyMap2 = props2;
-
-    createNsmDebugToken(mockManager, interfaceName, objPath1);
-    createNsmDebugToken(mockManager, interfaceName, objPath2);
+    auto rc1 = create(params1);
+    auto rc2 = create(params2);
+    EXPECT_EQ(rc1.data(), NSM_SUCCESS);
+    EXPECT_EQ(rc2.data(), NSM_SUCCESS);
 
     // Both should have been created
-    EXPECT_GT(gpu->staticSensors.size(), 0);
+    EXPECT_EQ(mockManager.debugTokenList.size(), 1u);
+    EXPECT_EQ(gpu->staticSensors.size(), staticBefore + 1);
 }
 
-// createNsmDebugToken: interface not registered at unique path →
-// coGetCachedBaseProperties returns error → co_return rc (early return //
-// at line 49 in nsmDebugTokenObjectFactory.cpp).
-TEST_F(NsmDebugTokenObjectFactoryTest,
-       CreateDebugToken_BasePropertiesFail_NoSensor)
+// DebugTokenDeviceType param with "Unified" token type
+TEST_F(NsmDebugTokenObjectFactoryTest, testCreateDebugTokenWithDeviceType)
 {
-    const std::string uniquePath = "/xyz/test/debugtoken/base_fail_unique";
-    // Register a DIFFERENT interface so the base interface is absent.
-    auto& other = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                    interfaceName + ".Sub");
-    other["Type"] = std::string("NSM_DebugToken");
+    dbus::PropertyMap params = basicParams;
+    params["DebugTokenType"] = std::vector<std::string>{"Unified"};
+    params["DebugTokenDeviceType"] = std::string("GPU");
 
-    const size_t before = gpu->staticSensors.size();
-    createNsmDebugToken(mockManager, interfaceName, uniquePath);
-    EXPECT_EQ(before, gpu->staticSensors.size());
+    auto rc = create(params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    EXPECT_EQ(mockManager.debugTokenList.size(), 1u);
 }
 
-// Covers the TRUE branch of
-// `if (allCurrentIfaceProperties.count("DebugTokenDeviceType"))` at line 74 //
-// in nsmDebugTokenObjectFactory.cpp when "Unified" token type
-// is requested.
-TEST_F(NsmDebugTokenObjectFactoryTest, testCreateNsmDebugTokenWithDeviceType)
-{
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/debug_token_devtype";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
-    dbus::PropertyMap props = basicProperties;
-    props["DebugTokenType"] = std::vector<std::string>{"Unified"};
-    props["DebugTokenDeviceType"] = std::string("GPU");
-    propertyMap = props;
-
-    createNsmDebugToken(mockManager, interfaceName, testPath);
-
-    EXPECT_GE(mockManager.debugTokenList.size(), 1);
-}
-
-// count("UUID") FALSE → uuid="" → getNsmDeviceFromStaticUUID("") throws
-TEST_F(NsmDebugTokenObjectFactoryTest, testCreateNsmDebugTokenMissingUUID)
-{
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/debug_token_no_uuid";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
-    // All fields present except UUID → count("UUID") FALSE → uuid="" →
-    // getNsmDeviceFromStaticUUID("") throws std::runtime_error
-    propertyMap = {
-        {"Name", std::string("DebugToken_NoUUID")},
-        {"Type", std::string("NSM_DebugToken")},
-        {"ChassisName", std::string("HGX_GPU_SXM_0")},
-        {"DebugTokenType", std::vector<std::string>{"NIC"}},
-    };
-    EXPECT_THROW_COROUTINE(
-        createNsmDebugToken(mockManager, interfaceName, testPath),
-        std::runtime_error);
-}
+#endif // ENABLE_DEBUG_TOKEN

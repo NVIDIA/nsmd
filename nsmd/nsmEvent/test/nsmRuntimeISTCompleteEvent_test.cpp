@@ -26,10 +26,8 @@
  *     which is intentionally not yet wired)
  *   - handle(): logging=false skips logEventAsync, still returns success
  *   - handle(): negative NvS24.8 temperatures round-trip without breaking
- *   - createNsmRuntimeISTCompleteEvent(): happy path, missing UUID,
+ *   - createRuntimeISTCompleteEventFeature(): happy path, no NsmDevice,
  *     Logging flag default-true
- *   - createNsmRuntimeISTCompleteEvent(): unknown UUID branch driven via
- *     NullReturnMockSensorManager in NsmRuntimeISTCompleteEventNullDeviceTest
  */
 
 #include "test/mockDBusHandler.hpp"
@@ -42,17 +40,11 @@ using namespace ::testing;
 
 #include "diagnostics.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmEvent/nsmRuntimeISTCompleteEvent.hpp"
 
 #include <cstring>
-
-namespace nsm
-{
-requester::Coroutine
-    createNsmRuntimeISTCompleteEvent(SensorManager& manager,
-                                     const std::string& interface,
-                                     const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -356,9 +348,8 @@ TEST(NsmRuntimeISTCompleteEvent, Handle_NegativeTemperatures_ReturnsSuccess)
                            NSM_RUNTIME_IST_COMPLETE_EVENT, msg, buf.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
-/*
 // =============================================================================
-// Factory tests (createNsmRuntimeISTCompleteEvent)
+// Factory tests (createRuntimeISTCompleteEventFeature)
 // =============================================================================
 
 struct NsmRuntimeISTCompleteEventFactoryTest :
@@ -366,10 +357,7 @@ struct NsmRuntimeISTCompleteEventFactoryTest :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_Event_Runtime_IST_Complete";
     const std::string name = "RIST_Test";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/test";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
 
     NsmDeviceTable devices;
@@ -379,7 +367,6 @@ struct NsmRuntimeISTCompleteEventFactoryTest :
     {
         gpu = std::dynamic_pointer_cast<MockNsmDevice>(
             mockManager.getNsmDeviceFromStaticUUID(gpuUuid));
-        EXPECT_EQ(1, devices.size());
         EXPECT_NE(gpu, nullptr);
     }
 
@@ -390,9 +377,6 @@ struct NsmRuntimeISTCompleteEventFactoryTest :
 
     dbus::PropertyMap basicProperties = {
         {"Name", name},
-        {"UUID", gpuUuid},
-        {"OriginOfCondition",
-         std::string("/xyz/openbmc_project/inventory/system/chassis/GPU_1")},
         {"MessageId", std::string("NvidiaDiagnostics.1.0.RuntimeISTComplete")},
         {"LoggingNamespace", std::string("GPU_RIST")},
         {"Resolution", std::string("Investigate firmware/RIST logs.")},
@@ -400,7 +384,6 @@ struct NsmRuntimeISTCompleteEventFactoryTest :
          std::vector<std::string>{
              "{GpuId}", "{Result}", "{StatusCode}", "{MaxTemperature:.2f}",
              "{AvgTemperature:.2f}", "{AppVersion}", "{Timestamp}"}},
-        {"Severity", std::string("Critical")},
         {"EventIds",
          std::vector<std::string>{"Runtime IST Complete Pass", "RIST_PASS_INFO",
                                   "Runtime IST Complete Fail",
@@ -408,99 +391,85 @@ struct NsmRuntimeISTCompleteEventFactoryTest :
         {"ImpactedComponent", std::string("GPU_1")},
         {"Logging", true},
     };
+
+    requester::Coroutine create(const dbus::PropertyMap& params,
+                                bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "GPU_1";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return features::createRuntimeISTCompleteEventFeature(mockManager, dev,
+                                                              params);
+    }
+
+    std::shared_ptr<NsmRuntimeISTCompleteEvent> lastEvent()
+    {
+        if (gpu->deviceEvents.empty())
+        {
+            return nullptr;
+        }
+        return std::dynamic_pointer_cast<NsmRuntimeISTCompleteEvent>(
+            gpu->deviceEvents.back());
+    }
 };
 
 TEST_F(NsmRuntimeISTCompleteEventFactoryTest, GoodTest_CreatesEvent)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = basicProperties;
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = create(basicProperties);
 
-    createNsmRuntimeISTCompleteEvent(mockManager, basicIntfName, objPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(gpu->deviceEvents.size(), before + 1);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->getName(), name);
+    EXPECT_EQ(event->getType(), "NSM_Event_Runtime_IST_Complete");
+    EXPECT_EQ(event->info.uuid, gpuUuid);
+    EXPECT_EQ(event->info.originOfCondition, "/redfish/v1/Chassis/GPU_1");
+    EXPECT_EQ(event->info.impactedComponent, "GPU_1");
+    EXPECT_EQ(event->info.errorId.size(), 4u);
+    EXPECT_TRUE(event->info.logging);
 }
 
-// Logging property absent -> factory's tryGetDbusProperty default of true
-// keeps the event creation working without logging being disabled.
+// Logging param absent -> creator default of true keeps logging enabled
 TEST_F(NsmRuntimeISTCompleteEventFactoryTest,
        MissingLoggingProperty_DefaultsToTrueAndCreates)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = basicProperties;
-    propertyMap.erase("Logging");
+    auto props = basicProperties;
+    props.erase("Logging");
+    auto rc = create(props);
 
-    createNsmRuntimeISTCompleteEvent(mockManager, basicIntfName, objPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_TRUE(event->info.logging);
 }
 
-// =============================================================================
-// Factory test for the !nsmDevice branch
-// =============================================================================
-// MockSensorManager auto-creates an NsmDevice for any well-formed STATIC UUID
-// (matching by parsed (deviceType, instanceNumber, deviceRole) only), so it
-// cannot drive the `if (!nsmDevice)` branch in
-// createNsmRuntimeISTCompleteEvent. NullReturnMockSensorManager always returns
-// nullptr, which is the established pattern in the repo for exercising this
-// path (see nsmNullDeviceBranch_test).
-struct NsmRuntimeISTCompleteEventNullDeviceTest :
-    public Test,
-    public utils::DBusTest
+TEST_F(NsmRuntimeISTCompleteEventFactoryTest, LoggingFalse_Honoured)
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_Event_Runtime_IST_Complete";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/test_null";
-    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
+    auto props = basicProperties;
+    props["Logging"] = false;
+    auto rc = create(props);
 
-    NsmDeviceTable devices;
-    NiceMock<NullReturnMockSensorManager> nullManager{devices};
-
-    NsmRuntimeISTCompleteEventNullDeviceTest()
-    {
-        sensorManagerInstance.reset(&nullManager);
-    }
-
-    ~NsmRuntimeISTCompleteEventNullDeviceTest()
-    {
-        sensorManagerInstance.release();
-    }
-};
-
-// UUID does not match any NsmDevice -> factory logs error and co_returns
-// NSM_ERROR. No NsmDevice is ever materialised, so the device table stays
-// empty.
-TEST_F(NsmRuntimeISTCompleteEventNullDeviceTest,
-       BadTest_UnknownUUID_NoEventCreated)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = {
-        {"Name", std::string("RIST_NullTest")},
-        {"UUID", gpuUuid},
-        {"OriginOfCondition",
-         std::string("/xyz/openbmc_project/inventory/system/chassis/GPU_1")},
-        {"MessageId", std::string("NvidiaDiagnostics.1.0.RuntimeISTComplete")},
-        {"LoggingNamespace", std::string("GPU_RIST")},
-        {"Resolution", std::string("Investigate firmware/RIST logs.")},
-        {"MessageArgs",
-         std::vector<std::string>{
-             "{GpuId}", "{Result}", "{StatusCode}", "{MaxTemperature:.2f}",
-             "{AvgTemperature:.2f}", "{AppVersion}", "{Timestamp}"}},
-        {"Severity", std::string("Critical")},
-        {"EventIds",
-         std::vector<std::string>{"Runtime IST Complete Pass", "RIST_PASS_INFO",
-                                  "Runtime IST Complete Fail",
-                                  "RIST_FAIL_CRITICAL"}},
-        {"ImpactedComponent", std::string("GPU_1")},
-        {"Logging", true},
-    };
-
-    createNsmRuntimeISTCompleteEvent(nullManager, basicIntfName, objPath);
-
-    EXPECT_TRUE(devices.empty());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_FALSE(event->info.logging);
 }
 
-*/
+// No NsmDevice in the context -> creator logs error and co_returns NSM_ERROR
+TEST_F(NsmRuntimeISTCompleteEventFactoryTest, BadTest_NoDevice_NoEventCreated)
+{
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = create(basicProperties, false);
+
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceEvents.size(), before);
+}

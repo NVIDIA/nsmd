@@ -4,28 +4,17 @@
  */
 
 /*
- * Factory branch coverage batch 6 for createNsmProcessorSensor:
+ * Branch coverage batch 6 for nsm::features::createProcessorAttributesFeature:
  *
- * Targets the FALSE side of compound conditions where the property IS
- * present but its bool value is false:
- *   count("MIGModeSupported") && std::get<bool>() == false
- *   count("PortDisableFutureSupported") && std::get<bool>() == false
- *   count("ECCModeSupported") && std::get<bool>() == false
- *   count("EDPpScalingFactorSupported") && std::get<bool>() == false
- *   count("PowerSmoothingSupported") && std::get<bool>() == false
- *   count("CpuOperatingConfigSupported") && std::get<bool>() == false
- *   count("MemCapacityUtilSupported") && std::get<bool>() == false
- *   count("TotalNvLinksCountSupported") && std::get<bool>() == false
- *   count("EGMModeSupported") && std::get<bool>() == false
- *   count("MNNVLTopologySupported") && std::get<bool>() == false
- *   count("MctpNsmOperationalStatusSupported") && std::get<bool>() == false
- *   count("GPUBasePowerLimitSupported") && std::get<bool>() == false
- *   count("GPUCopyCPUPowerLimitSupported") && std::get<bool>() == false
+ * Targets the FALSE side of every "*Supported" param that IS present but
+ * false (param<bool>(params, key).value_or(false) == false), e.g.
+ * MIGModeSupported, PortDisableFutureSupported, ECCModeSupported, ...,
+ * GPUCopyCPUPowerLimitSupported.
  *
  * Also covers:
- *   - NSM_Processor without Name/UUID/Type/InventoryObjPath (all absent)
- *   - NSM_Processor_Attributes with all Supported = false (no sub-sensors)
- *   - NSM_Processor_Attributes with first group true, second group false
+ *   - all Supported = false (no sub-sensors)
+ *   - first group true, second group false and vice versa
+ *   - LocationType without LocationCode and vice versa
  */
 
 #include "test/mockDBusHandler.hpp"
@@ -44,22 +33,19 @@ using namespace ::testing;
 #undef private
 #undef protected
 
-using namespace nsm;
+#include "features/creators.hpp"
+#include "features/feature.hpp"
+#include "nsmReconfigPermissions.hpp"
 
-namespace nsm
-{
-requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
-                                              const std::string& interface,
-                                              const std::string& objPath);
-} // namespace nsm
+#include <algorithm>
+
+using namespace nsm;
 
 struct NsmProcessorFactory6Test :
     public Test,
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_Processor";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:11";
 
     NsmDeviceTable devices;
@@ -77,41 +63,57 @@ struct NsmProcessorFactory6Test :
     {
         cleanupDeviceSensors(devices);
     }
+
+    /** @brief Run a processor feature creator for the GPU `name` on the mock
+     *  NsmDevice; the inventory object is accelerator/<name>
+     */
+    requester::Coroutine runFeature(nsm::features::CreatorFn create,
+                                    const std::string& name,
+                                    dbus::PropertyMap params = {})
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = name;
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.device = gpu;
+        params["Name"] = name;
+        return create(mockManager, dev, params);
+    }
+
+    /** @brief Number of sensors of type T in the queue */
+    template <typename T, typename Queue>
+    static size_t countOf(const Queue& queue)
+    {
+        return std::count_if(queue.begin(), queue.end(), [](const auto& s) {
+            return std::dynamic_pointer_cast<T>(s) != nullptr;
+        });
+    }
 };
 
 // ============================================================================
-// NSM_Processor_Attributes: ALL bool Supported properties present but FALSE
-// Each count() returns true but std::get<bool>() is false -> body skipped
+// ProcessorAttributes: ALL bool Supported properties present but FALSE
+// Each param is present but false -> body skipped
 // ============================================================================
 TEST_F(NsmProcessorFactory6Test, Attributes_AllSupportedFalse)
 {
-    const std::string path = processorsInventoryBasePath /
-                             std::string("GPU_F6_AllFalse");
-    auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    base["Name"] = std::string("GPU_F6_AllFalse");
-    base["UUID"] = gpuUuid;
-    base["InventoryObjPath"] = path;
-
-    auto& attr = utils::MockDbusAsync::propertyMap(
-        path, baseIntf + ".ProcessorAttributes");
-    attr["Type"] = std::string("NSM_Processor_Attributes");
-    attr["MIGModeSupported"] = false;
-    attr["PortDisableFutureSupported"] = false;
-    attr["ECCModeSupported"] = false;
-    attr["EDPpScalingFactorSupported"] = false;
-    attr["PowerSmoothingSupported"] = false;
-    attr["CpuOperatingConfigSupported"] = false;
-    attr["MemCapacityUtilSupported"] = false;
-    attr["TotalNvLinksCountSupported"] = false;
-    attr["EGMModeSupported"] = false;
-    attr["MNNVLTopologySupported"] = false;
-    attr["MctpNsmOperationalStatusSupported"] = false;
-    attr["GPUBasePowerLimitSupported"] = false;
-    attr["GPUCopyCPUPowerLimitSupported"] = false;
-
     const size_t rrBefore = gpu->roundRobinSensors.size();
-    createNsmProcessorSensor(mockManager, baseIntf + ".ProcessorAttributes",
-                             path);
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_AllFalse",
+                         {{"MIGModeSupported", false},
+                          {"PortDisableFutureSupported", false},
+                          {"ECCModeSupported", false},
+                          {"EDPpScalingFactorSupported", false},
+                          {"PowerSmoothingSupported", false},
+                          {"CpuOperatingConfigSupported", false},
+                          {"MemCapacityUtilSupported", false},
+                          {"TotalNvLinksCountSupported", false},
+                          {"EGMModeSupported", false},
+                          {"MNNVLTopologySupported", false},
+                          {"MctpNsmOperationalStatusSupported", false},
+                          {"GPUBasePowerLimitSupported", false},
+                          {"GPUCopyCPUPowerLimitSupported", false}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     // Only asset sensors created, no MIG/ECC/EDPp/PowerSmoothing etc.
     // The Attributes block always creates asset + inventory sensors
@@ -121,219 +123,147 @@ TEST_F(NsmProcessorFactory6Test, Attributes_AllSupportedFalse)
 }
 
 // ============================================================================
-// NSM_Processor_Attributes: first group TRUE, second group FALSE
+// ProcessorAttributes: first group TRUE, second group FALSE
 // Covers MIG/ECC/EDPp/PortDisable=true, rest=false
 // ============================================================================
 TEST_F(NsmProcessorFactory6Test, Attributes_FirstGroupTrue_SecondFalse)
 {
-    const std::string path = processorsInventoryBasePath /
-                             std::string("GPU_F6_Split");
-    auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    base["Name"] = std::string("GPU_F6_Split");
-    base["UUID"] = gpuUuid;
-    base["InventoryObjPath"] = path;
-
-    auto& attr = utils::MockDbusAsync::propertyMap(
-        path, baseIntf + ".ProcessorAttributes");
-    attr["Type"] = std::string("NSM_Processor_Attributes");
-    attr["MIGModeSupported"] = true;
-    attr["PortDisableFutureSupported"] = true;
-    attr["ECCModeSupported"] = true;
-    attr["EDPpScalingFactorSupported"] = true;
-    attr["PowerSmoothingSupported"] = false;
-    attr["CpuOperatingConfigSupported"] = false;
-    attr["MemCapacityUtilSupported"] = false;
-    attr["TotalNvLinksCountSupported"] = false;
-    attr["EGMModeSupported"] = false;
-    attr["MNNVLTopologySupported"] = false;
-    attr["MctpNsmOperationalStatusSupported"] = false;
-    attr["GPUBasePowerLimitSupported"] = false;
-    attr["GPUCopyCPUPowerLimitSupported"] = false;
-
-    createNsmProcessorSensor(mockManager, baseIntf + ".ProcessorAttributes",
-                             path);
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_Split",
+                         {{"MIGModeSupported", true},
+                          {"PortDisableFutureSupported", true},
+                          {"ECCModeSupported", true},
+                          {"EDPpScalingFactorSupported", true},
+                          {"PowerSmoothingSupported", false},
+                          {"CpuOperatingConfigSupported", false},
+                          {"MemCapacityUtilSupported", false},
+                          {"TotalNvLinksCountSupported", false},
+                          {"EGMModeSupported", false},
+                          {"MNNVLTopologySupported", false},
+                          {"MctpNsmOperationalStatusSupported", false},
+                          {"GPUBasePowerLimitSupported", false},
+                          {"GPUCopyCPUPowerLimitSupported", false}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     // MIG/ECC/EDPp/PortDisable sensors created; rest skipped
     EXPECT_GT(gpu->roundRobinSensors.size(), 0u);
 }
 
 // ============================================================================
-// NSM_Processor_Attributes: second group TRUE, first group FALSE
+// ProcessorAttributes: second group TRUE, first group FALSE
 // Covers CpuOp/MemCap/TotalNvLinks/EGM/MNNVL/GpuOpStatus/GPUBase/GPUCopy=true
 // ============================================================================
 TEST_F(NsmProcessorFactory6Test, Attributes_SecondGroupTrue_FirstFalse)
 {
-    const std::string path = processorsInventoryBasePath /
-                             std::string("GPU_F6_Split2");
-    auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    base["Name"] = std::string("GPU_F6_Split2");
-    base["UUID"] = gpuUuid;
-    base["InventoryObjPath"] = path;
-
-    auto& attr = utils::MockDbusAsync::propertyMap(
-        path, baseIntf + ".ProcessorAttributes");
-    attr["Type"] = std::string("NSM_Processor_Attributes");
-    attr["MIGModeSupported"] = false;
-    attr["PortDisableFutureSupported"] = false;
-    attr["ECCModeSupported"] = false;
-    attr["EDPpScalingFactorSupported"] = false;
-    attr["PowerSmoothingSupported"] = false;
-    attr["CpuOperatingConfigSupported"] = true;
-    attr["MemCapacityUtilSupported"] = true;
-    attr["TotalNvLinksCountSupported"] = true;
-    attr["EGMModeSupported"] = true;
-    attr["MNNVLTopologySupported"] = true;
-    attr["MctpNsmOperationalStatusSupported"] = true;
-    attr["GPUBasePowerLimitSupported"] = true;
-    attr["GPUCopyCPUPowerLimitSupported"] = true;
-
-    createNsmProcessorSensor(mockManager, baseIntf + ".ProcessorAttributes",
-                             path);
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_Split2",
+                         {{"MIGModeSupported", false},
+                          {"PortDisableFutureSupported", false},
+                          {"ECCModeSupported", false},
+                          {"EDPpScalingFactorSupported", false},
+                          {"PowerSmoothingSupported", false},
+                          {"CpuOperatingConfigSupported", true},
+                          {"MemCapacityUtilSupported", true},
+                          {"TotalNvLinksCountSupported", true},
+                          {"EGMModeSupported", true},
+                          {"MNNVLTopologySupported", true},
+                          {"MctpNsmOperationalStatusSupported", true},
+                          {"GPUBasePowerLimitSupported", true},
+                          {"GPUCopyCPUPowerLimitSupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     EXPECT_GT(gpu->roundRobinSensors.size(), 0u);
     EXPECT_GT(gpu->staticSensors.size(), 0u);
 }
 
 // ============================================================================
-// NSM_Processor_Attributes: PowerSmoothing=true only (all others absent)
+// ProcessorAttributes: PowerSmoothing=true only (all others absent)
 // Covers PowerSmoothingSupported TRUE with minimum config
 // ============================================================================
 TEST_F(NsmProcessorFactory6Test, Attributes_PowerSmoothingOnly)
 {
-    const std::string path = processorsInventoryBasePath /
-                             std::string("GPU_F6_PSOnly");
-    auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    base["Name"] = std::string("GPU_F6_PSOnly");
-    base["UUID"] = gpuUuid;
-    base["InventoryObjPath"] = path;
-
-    auto& attr = utils::MockDbusAsync::propertyMap(
-        path, baseIntf + ".ProcessorAttributes");
-    attr["Type"] = std::string("NSM_Processor_Attributes");
-    attr["PowerSmoothingSupported"] = true;
-
-    createNsmProcessorSensor(mockManager, baseIntf + ".ProcessorAttributes",
-                             path);
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_PSOnly", {{"PowerSmoothingSupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     // PowerSmoothing creates many device sensors
     EXPECT_GT(gpu->deviceSensors.size(), 0u);
 }
 
 // ============================================================================
-// NSM_Processor_Attributes: LocationType only (no LocationCode)
-// Covers: count("LocationType") TRUE, count("LocationCode") FALSE
+// ProcessorAttributes: LocationType only (no LocationCode)
+// Covers: LocationType present, LocationCode absent
 // ============================================================================
 TEST_F(NsmProcessorFactory6Test, Attributes_LocationTypeNoCode)
 {
-    const std::string path = processorsInventoryBasePath /
-                             std::string("GPU_F6_LocTypeOnly");
-    auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    base["Name"] = std::string("GPU_F6_LocTypeOnly");
-    base["UUID"] = gpuUuid;
-    base["InventoryObjPath"] = path;
-
-    auto& attr = utils::MockDbusAsync::propertyMap(
-        path, baseIntf + ".ProcessorAttributes");
-    attr["Type"] = std::string("NSM_Processor_Attributes");
-    attr["LocationType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes."
-        "Embedded");
-    // No LocationCode
-
-    createNsmProcessorSensor(mockManager, baseIntf + ".ProcessorAttributes",
-                             path);
-    EXPECT_GT(gpu->deviceSensors.size(), 0u);
+    auto rc = runFeature(
+        nsm::features::createProcessorAttributesFeature, "GPU_F6_LocTypeOnly",
+        {{"LocationType",
+          std::string(
+              "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes."
+              "Embedded")}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(countOf<NsmLocationIntfProcessor>(gpu->deviceSensors), 1u);
+    EXPECT_EQ(countOf<NsmLocationCodeIntfProcessor>(gpu->deviceSensors), 0u);
 }
 
 // ============================================================================
-// NSM_Processor_Attributes: LocationCode only (no LocationType)
-// Covers: count("LocationType") FALSE, count("LocationCode") TRUE
+// ProcessorAttributes: LocationCode only (no LocationType)
+// Covers: LocationType absent, LocationCode present
 // ============================================================================
 TEST_F(NsmProcessorFactory6Test, Attributes_LocationCodeNoType)
 {
-    const std::string path = processorsInventoryBasePath /
-                             std::string("GPU_F6_LocCodeOnly");
-    auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    base["Name"] = std::string("GPU_F6_LocCodeOnly");
-    base["UUID"] = gpuUuid;
-    base["InventoryObjPath"] = path;
-
-    auto& attr = utils::MockDbusAsync::propertyMap(
-        path, baseIntf + ".ProcessorAttributes");
-    attr["Type"] = std::string("NSM_Processor_Attributes");
-    // No LocationType
-    attr["LocationCode"] = std::string("GPU_Slot_1");
-
-    createNsmProcessorSensor(mockManager, baseIntf + ".ProcessorAttributes",
-                             path);
-    EXPECT_GT(gpu->deviceSensors.size(), 0u);
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_LocCodeOnly",
+                         {{"LocationCode", std::string("GPU_Slot_1")}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(countOf<NsmLocationIntfProcessor>(gpu->deviceSensors), 0u);
+    EXPECT_EQ(countOf<NsmLocationCodeIntfProcessor>(gpu->deviceSensors), 1u);
 }
 
 // ============================================================================
-// NSM_Processor_Attributes: GPUBasePowerLimit only TRUE (rest absent)
+// ProcessorAttributes: GPUBasePowerLimit only TRUE (rest absent)
 // ============================================================================
 TEST_F(NsmProcessorFactory6Test, Attributes_GPUBasePowerLimitOnly)
 {
-    const std::string path = processorsInventoryBasePath /
-                             std::string("GPU_F6_GPUBase");
-    auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    base["Name"] = std::string("GPU_F6_GPUBase");
-    base["UUID"] = gpuUuid;
-    base["InventoryObjPath"] = path;
-
-    auto& attr = utils::MockDbusAsync::propertyMap(
-        path, baseIntf + ".ProcessorAttributes");
-    attr["Type"] = std::string("NSM_Processor_Attributes");
-    attr["GPUBasePowerLimitSupported"] = true;
-
-    createNsmProcessorSensor(mockManager, baseIntf + ".ProcessorAttributes",
-                             path);
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_GPUBase",
+                         {{"GPUBasePowerLimitSupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->roundRobinSensors.size(), 0u);
 }
 
 // ============================================================================
-// NSM_Processor_Attributes: GPUCopyCPUPowerLimit only TRUE (rest absent)
+// ProcessorAttributes: GPUCopyCPUPowerLimit only TRUE (rest absent)
 // ============================================================================
 TEST_F(NsmProcessorFactory6Test, Attributes_GPUCopyCPUPowerLimitOnly)
 {
-    const std::string path = processorsInventoryBasePath /
-                             std::string("GPU_F6_GPUCopy");
-    auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    base["Name"] = std::string("GPU_F6_GPUCopy");
-    base["UUID"] = gpuUuid;
-    base["InventoryObjPath"] = path;
-
-    auto& attr = utils::MockDbusAsync::propertyMap(
-        path, baseIntf + ".ProcessorAttributes");
-    attr["Type"] = std::string("NSM_Processor_Attributes");
-    attr["GPUCopyCPUPowerLimitSupported"] = true;
-
-    createNsmProcessorSensor(mockManager, baseIntf + ".ProcessorAttributes",
-                             path);
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_GPUCopy",
+                         {{"GPUCopyCPUPowerLimitSupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->roundRobinSensors.size(), 0u);
 }
 
 // ============================================================================
-// NSM_Processor_Attributes: GPUBasePowerLimit=false, GPUCopyCPU=false
+// ProcessorAttributes: GPUBasePowerLimit=false, GPUCopyCPU=false
 // ============================================================================
 TEST_F(NsmProcessorFactory6Test, Attributes_GPUPowerLimitsBothFalse)
 {
-    const std::string path = processorsInventoryBasePath /
-                             std::string("GPU_F6_GPUBothFalse");
-    auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    base["Name"] = std::string("GPU_F6_GPUBothFalse");
-    base["UUID"] = gpuUuid;
-    base["InventoryObjPath"] = path;
-
-    auto& attr = utils::MockDbusAsync::propertyMap(
-        path, baseIntf + ".ProcessorAttributes");
-    attr["Type"] = std::string("NSM_Processor_Attributes");
-    attr["GPUBasePowerLimitSupported"] = false;
-    attr["GPUCopyCPUPowerLimitSupported"] = false;
-
     const size_t rrBefore = gpu->roundRobinSensors.size();
-    createNsmProcessorSensor(mockManager, baseIntf + ".ProcessorAttributes",
-                             path);
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_GPUBothFalse",
+                         {{"GPUBasePowerLimitSupported", false},
+                          {"GPUCopyCPUPowerLimitSupported", false}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     // No power limit sensors added
     EXPECT_EQ(gpu->roundRobinSensors.size(), rrBefore);
 }

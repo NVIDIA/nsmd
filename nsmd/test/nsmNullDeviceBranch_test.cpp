@@ -30,6 +30,7 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
 #include "nsmObjectFactory.hpp"
 
 #undef private
@@ -45,19 +46,13 @@ requester::Coroutine createControlGpuPower(SensorManager&, const std::string&,
                                            const std::string&);
 requester::Coroutine createPowerSubSystem(SensorManager&, const std::string&,
                                           const std::string&);
-requester::Coroutine createControlGpuClock(SensorManager&, const std::string&,
-                                           const std::string&);
 requester::Coroutine createNsmChassisLEDSensor(SensorManager&,
                                                const std::string&,
                                                const std::string&);
 
 // nsmPort
-requester::Coroutine createNsmZones(SensorManager&, const std::string&,
-                                    const std::string&);
 requester::Coroutine createNsmEndpoints(SensorManager&, const std::string&,
                                         const std::string&);
-requester::Coroutine createNsmPortSensor(SensorManager&, const std::string&,
-                                         const std::string&, bool);
 requester::Coroutine createNsmGpuPcieSensor(SensorManager&, const std::string&,
                                             const std::string&);
 requester::Coroutine createNsmFpgaPortSensor(SensorManager&, const std::string&,
@@ -65,24 +60,6 @@ requester::Coroutine createNsmFpgaPortSensor(SensorManager&, const std::string&,
 requester::Coroutine createPCIeRetimerChassisPCIeDevice(SensorManager&,
                                                         const std::string&,
                                                         const std::string&);
-
-// nsmFwSwInventory
-requester::Coroutine createGPUDriverSensor(SensorManager&, const std::string&,
-                                           const std::string&);
-
-// nsmEventConfig
-requester::Coroutine createNsmEventSetting(SensorManager&, const std::string&,
-                                           const std::string&);
-requester::Coroutine createNsmEventConfig(SensorManager&, const std::string&,
-                                          const std::string&);
-
-// nsmEvent
-requester::Coroutine createNsmXIDEvent(SensorManager&, const std::string&,
-                                       const std::string&);
-
-// nsmMemory
-requester::Coroutine createNsmMemorySensor(SensorManager&, const std::string&,
-                                           const std::string&);
 
 // nsmProcessor
 requester::Coroutine createNsmResetSensor(SensorManager&, const std::string&,
@@ -98,13 +75,7 @@ requester::Coroutine makeNsmAltitudePressure(SensorManager&, const std::string&,
 requester::Coroutine createNsmPCIeRetimerPorts(SensorManager&,
                                                const std::string&,
                                                const std::string&);
-requester::Coroutine createNsmMultiPCIeRetimerPorts(SensorManager&,
-                                                    const std::string&,
-                                                    const std::string&);
 
-// nsmChassis/nsmErot
-requester::Coroutine nsmErotCreateSensors(SensorManager&, const std::string&,
-                                          const std::string&);
 } // namespace nsm
 
 // ---------------------------------------------------------------------------
@@ -169,16 +140,6 @@ TEST_F(NullDeviceFixture, PowerSubSystem_NullDevice_ReturnsError)
     SUCCEED();
 }
 
-TEST_F(NullDeviceFixture, ControlGpuClock_NullDevice_ReturnsError)
-{
-    const std::string path = "/test/null/gpuclk";
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_GPUClockControl";
-    regMap(path, intf);
-    nsm::createControlGpuClock(nullManager, intf, path);
-    SUCCEED();
-}
-
 TEST_F(NullDeviceFixture, ChassisLED_NullDevice_ReturnsError)
 {
     // createNsmChassisLEDSensor calls coGetCachedBaseProperties with
@@ -193,20 +154,6 @@ TEST_F(NullDeviceFixture, ChassisLED_NullDevice_ReturnsError)
     SUCCEED();
 }
 
-// ---------------------------------------------------------------------------
-// nsmPort factories
-// ---------------------------------------------------------------------------
-
-TEST_F(NullDeviceFixture, NsmZones_NullDevice_ReturnsError)
-{
-    const std::string path = "/test/null/zone";
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_FabricsZone";
-    regMap(path, intf);
-    nsm::createNsmZones(nullManager, intf, path);
-    SUCCEED();
-}
-
 TEST_F(NullDeviceFixture, NsmEndpoints_NullDevice_ReturnsError)
 {
     const std::string path = "/test/null/ep";
@@ -214,15 +161,6 @@ TEST_F(NullDeviceFixture, NsmEndpoints_NullDevice_ReturnsError)
         "xyz.openbmc_project.Configuration.NSM_FabricsEndpoint";
     regMap(path, intf);
     nsm::createNsmEndpoints(nullManager, intf, path);
-    SUCCEED();
-}
-
-TEST_F(NullDeviceFixture, NsmPortSensor_NullDevice_ReturnsError)
-{
-    const std::string path = "/test/null/port";
-    const std::string intf = "xyz.openbmc_project.Configuration.NSM_NVlink";
-    regMap(path, intf);
-    nsm::createNsmPortSensor(nullManager, intf, path, false);
     SUCCEED();
 }
 
@@ -261,82 +199,6 @@ TEST_F(NullDeviceFixture, PCIeRetimerPCIeDevice_NullDevice_ReturnsError)
         "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_PCIeDevices";
     regMap(path, intf);
     nsm::createPCIeRetimerChassisPCIeDevice(nullManager, intf, path);
-    SUCCEED();
-}
-
-// ---------------------------------------------------------------------------
-// nsmFwSwInventory factories
-// ---------------------------------------------------------------------------
-
-TEST_F(NullDeviceFixture, GPUDriverSensor_NullDevice_ReturnsError)
-{
-    const std::string path = "/test/null/gpudrv";
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_GPUDriverInventory";
-    regMap(path, intf);
-    nsm::createGPUDriverSensor(nullManager, intf, path);
-    SUCCEED();
-}
-
-// ---------------------------------------------------------------------------
-// nsmEventConfig factories
-// ---------------------------------------------------------------------------
-
-TEST_F(NullDeviceFixture, NsmEventSetting_NullDevice_ReturnsError)
-{
-    // createNsmEventSetting uses hardcoded
-    // "xyz.openbmc_project.Configuration.NSM_EventSetting" for
-    // coGetAllDbusProperty
-    const std::string path = "/test/null/evtsetting";
-    const std::string hardcodedIntf =
-        "xyz.openbmc_project.Configuration.NSM_EventSetting";
-    const std::string intf = hardcodedIntf;
-    regMap(path, hardcodedIntf);
-    nsm::createNsmEventSetting(nullManager, intf, path);
-    SUCCEED();
-}
-
-TEST_F(NullDeviceFixture, NsmEventConfig_NullDevice_ReturnsError)
-{
-    // createNsmEventConfig calls coGetCachedBaseProperties with
-    // "xyz.openbmc_project.Configuration.NSM_EventConfig"
-    const std::string path = "/test/null/evtcfg";
-    const std::string baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_EventConfig";
-    const std::string intf = baseIntf;
-    regMap(path, baseIntf);
-    nsm::createNsmEventConfig(nullManager, intf, path);
-    SUCCEED();
-}
-
-// ---------------------------------------------------------------------------
-// nsmEvent factories
-// ---------------------------------------------------------------------------
-
-TEST_F(NullDeviceFixture, NsmXIDEvent_NullDevice_ReturnsError)
-{
-    const std::string path = "/test/null/xid";
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_XIDEventSetting";
-    regMap(path, intf);
-    nsm::createNsmXIDEvent(nullManager, intf, path);
-    SUCCEED();
-}
-
-// ---------------------------------------------------------------------------
-// nsmMemory factories
-// ---------------------------------------------------------------------------
-
-TEST_F(NullDeviceFixture, NsmMemorySensor_NullDevice_ReturnsError)
-{
-    // createNsmMemorySensor calls coGetCachedBaseProperties with
-    // MEMORY_INTERFACE = "xyz.openbmc_project.Configuration.NSM_Memory"
-    const std::string path = "/test/null/mem";
-    const std::string baseIntf = "xyz.openbmc_project.Configuration.NSM_Memory";
-    const std::string intf = "xyz.openbmc_project.Configuration.NSM_Memory_0";
-    regMap(path, baseIntf);
-    regMap(path, intf);
-    nsm::createNsmMemorySensor(nullManager, intf, path);
     SUCCEED();
 }
 
@@ -398,88 +260,43 @@ TEST_F(NullDeviceFixture, PCIeRetimerPorts_NullDevice_ReturnsError)
     SUCCEED();
 }
 
-TEST_F(NullDeviceFixture, MultiPCIeRetimerPorts_NullDevice_ReturnsError)
+// ---------------------------------------------------------------------------
+// Feature creators: a device record whose NsmDevice cannot be found
+// (DeviceContext::device == nullptr) fails the feature with NSM_ERROR before
+// any param is read or any object is created
+// ---------------------------------------------------------------------------
+
+TEST_F(NullDeviceFixture, FeatureCreators_NoNsmDevice_ReturnError)
 {
-    const std::string path = "/test/null/multi_retimer_ports";
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_MultiPCIeLink";
-    // Provide all required properties so getPropertyFromCollection doesn't
-    // throw
-    auto& pm = utils::MockDbusAsync::propertyMap(path, intf);
-    pm["Name"] = std::string("MultiNull");
-    pm["Priority"] = bool{false};
-    pm["Counts"] = std::vector<uint64_t>{0};
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/multiport/null/");
-    pm["UUID"] = std::string("STATIC:514:0:NSM_DEVICE_INSTANCE_NUMBER:0");
-    pm["PortType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.PortInfo."
-        "PortType.UpstreamPort");
-    pm["UpstreamPortNumbers"] = std::vector<uint64_t>{0};
-    nsm::createNsmMultiPCIeRetimerPorts(nullManager, intf, path);
-    // !nsmDevice branch taken → co_return NSM_ERROR
-    SUCCEED();
-}
+    struct Creator
+    {
+        const char* name;
+        nsm::features::CreatorFn create;
+    };
+    const Creator creators[] = {
+        {"RoT", nsm::features::createRoTFeature},
+        {"ClockLimit", nsm::features::createClockLimitFeature},
+        {"FabricsZone", nsm::features::createFabricsZoneFeature},
+        {"NVLink", nsm::features::createNVLinkFeature},
+        {"GPUSWInventory", nsm::features::createGPUSWInventoryFeature},
+        {"EventSetting", nsm::features::createEventSettingFeature},
+        {"EventConfig", nsm::features::createEventConfigFeature},
+        {"XIDEvent", nsm::features::createXIDEventFeature},
+        {"Memory", nsm::features::createMemoryFeature},
+        {"NumericCompositeSensor",
+         nsm::features::createNumericCompositeSensorFeature},
+    };
 
-// nsmErot.cpp L276-277: !device branch after getNsmDeviceFromStaticUUID
-// returns nullptr. Requires Type present, UUID present, SlotCount present
-// (to avoid the early co_return at L245-249 for "not a RoT chassis"). //
+    nsm::features::DeviceContext dev;
+    dev.name = "NullDevice";
+    dev.staticUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    ASSERT_EQ(dev.device, nullptr);
 
-TEST_F(NullDeviceFixture, ErotCreateSensors_NullDevice_ReturnsError)
-{
-    const std::string path = "/test/null/erot";
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_Chassis_RoT";
-    auto& pm = utils::MockDbusAsync::propertyMap(path, intf);
-    pm["Type"] = std::string("NSM_Chassis");
-    pm["Name"] = std::string("ErotNull");
-    pm["UUID"] = std::string("STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0");
-    pm["SlotCount"] = uint64_t(0);
-    // NullReturnMockSensorManager::getNsmDeviceFromStaticUUID returns nullptr
-    // → !device == true → L276 lg2::error, L277 co_return NSM_SW_ERROR //
-
-    nsm::nsmErotCreateSensors(nullManager, intf, path);
-    SUCCEED();
-}
-
-// nsmNumericSensorComposite.cpp L188-195: !nsmDevice branch in
-// CreateFPGATotalGPUPower (registered as
-// NSM_NumericCompositeSensor). NullReturnMockSensorManager returns nullptr
-// → !nsmDevice == true → lg2::error, co_return NSM_ERROR.
-// Must call via NsmObjectFactory because CreateFPGATotalGPUPower is static.
-TEST_F(NullDeviceFixture, CreateFPGATotalGPUPower_NullDevice_ReturnsError)
-{
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_NumericCompositeSensor";
-    const std::string path = "/test/null/fpga_total_gpu_power";
-    auto& pm = utils::MockDbusAsync::propertyMap(path, intf);
-    pm["Name"] = std::string("FPGATotalGPUPower_Null");
-    pm["UUID"] = std::string("STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0");
-    pm["SensorType"] = std::string("power");
-    pm["PhysicalContext"] = std::string("SystemBoard");
-    pm["Implementation"] = std::string("PhysicalSensor");
-    // NullReturnMockSensorManager::getNsmDeviceFromStaticUUID returns nullptr
-    // → !nsmDevice branch at L188 taken → co_return NSM_ERROR //
-
-    NsmObjectFactory::instance().createObjects(nullManager, intf, path);
-    SUCCEED();
-}
-
-// nsmPCIeRetimerFabricsDI.cpp L77-85: !nsmDevice branch in
-// createNSMPCIeRetimerFabrics. NullReturnMockSensorManager returns nullptr.
-// Must call via NsmObjectFactory because the factory is static.
-TEST_F(NullDeviceFixture, CreateNSMPCIeRetimerFabrics_NullDevice_ReturnsError)
-{
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Fabrics";
-    const std::string path = "/test/null/pcie_retimer_fabrics";
-    auto& pm = utils::MockDbusAsync::propertyMap(path, intf);
-    pm["Name"] = std::string("RetimerFabricsNull");
-    pm["UUID"] = std::string("STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0");
-    pm["FabricType"] = std::string("PCIe");
-    // NullReturnMockSensorManager::getNsmDeviceFromStaticUUID returns nullptr
-    // → !nsmDevice branch at L77 taken → co_return NSM_ERROR //
-
-    NsmObjectFactory::instance().createObjects(nullManager, intf, path);
-    SUCCEED();
+    for (const auto& creator : creators)
+    {
+        SCOPED_TRACE(creator.name);
+        auto rc = creator.create(nullManager, dev, {});
+        EXPECT_FALSE(rc.exception());
+        EXPECT_EQ(rc.data(), NSM_ERROR);
+    }
 }

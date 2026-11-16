@@ -17,11 +17,13 @@
 
 #pragma once
 
+#include "features/feature.hpp"
 #include "nsmDevice.hpp"
 #include "nsmNumericAggregator.hpp"
 #include "nsmNumericSensor.hpp"
 #include "nsmObjectFactory.hpp"
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -73,28 +75,24 @@ class NumericSensorBuilder : public NumericSensorAggregatorBuilder
 class NumericSensorFactory
 {
   public:
-    NumericSensorFactory(std::unique_ptr<NumericSensorBuilder> builder) :
-        builder(std::move(builder)) {};
-
-    CreationFunction getCreationFunction();
-
-    requester::Coroutine make(SensorManager& manager,
-                              const std::string& interface,
-                              const std::string& objPath);
-
     static void
         makeAggregatorAndAddSensor(NumericSensorAggregatorBuilder* builder,
                                    const NumericSensorInfo& info,
                                    std::shared_ptr<NsmNumericSensor> sensor,
                                    const uuid_t& uuid, NsmDevice* nsmDevice);
 
-    static void makePeakValueAndAdd(const std::string& interface,
-                                    const std::string& objPath,
-                                    const NumericSensorInfo& info,
-                                    const uuid_t& uuid, NsmDevice* nsmDevice);
+    /** @brief Sets chassis_association from the "chassis" association and
+     *  adds the primary_temperature_sensor association for Temp sensor 0
+     */
+    static void resolveAssociations(NumericSensorInfo& info);
 
-  private:
-    std::unique_ptr<NumericSensorBuilder> builder;
+    /** @brief Sensor info of a feature from its params and device: name,
+     *  common fields and associations; nullopt without a chassis association
+     */
+    static std::optional<NumericSensorInfo>
+        makeFeatureSensorInfo(const features::DeviceContext& dev,
+                              const dbus::PropertyMap& params,
+                              const std::string& type);
 };
 
 }; // namespace nsm

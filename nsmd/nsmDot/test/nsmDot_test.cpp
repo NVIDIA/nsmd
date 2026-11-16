@@ -22,15 +22,9 @@
 
 #include "libnsm/firmware-utils.h"
 
+#include "features/creators.hpp"
 #include "nsmDot.hpp"
 #include "test/mockSensorManager.hpp"
-
-namespace nsm
-{
-requester::Coroutine createNsmDot(SensorManager& manager,
-                                  const std::string& interface,
-                                  const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 using namespace ::testing;
@@ -1481,11 +1475,7 @@ struct NsmDotCreateTestFixture :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_DOT";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:25";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/chassis/HGX_DOT_test";
 
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
@@ -1501,53 +1491,70 @@ struct NsmDotCreateTestFixture :
     {
         cleanupDeviceSensors(devices);
     }
+
+    nsm::features::DeviceContext makeDev(bool withDevice = true)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_GPU_SXM_1";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return dev;
+    }
 };
 
 TEST_F(NsmDotCreateTestFixture, goodTestCreateDot)
 {
-    dbus::PropertyMap properties = {
+    dbus::PropertyMap params = {
         {"ChassisName", std::string("HGX_Chassis")},
-        {"UUID", gpuUuid},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    createNsmDot(mockManager, basicIntfName, objPath);
+    const size_t before = gpu->roundRobinSensors.size();
+    auto rc = nsm::features::createDotFeature(mockManager, makeDev(), params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
     // Should create NsmDotObject and NsmDotStatusObject
-    EXPECT_GE(gpu->staticSensors.size(), 1);
-    EXPECT_GE(gpu->roundRobinSensors.size(), 1);
+    EXPECT_EQ(gpu->roundRobinSensors.size(), before + 2);
+    std::shared_ptr<NsmDotObject> dot;
+    for (const auto& sensor : gpu->deviceSensors)
+    {
+        if (auto found = std::dynamic_pointer_cast<NsmDotObject>(sensor))
+        {
+            dot = found;
+            break;
+        }
+    }
+    ASSERT_NE(dot, nullptr);
+    // No BlobPathName → ChassisName fallback
+    EXPECT_EQ(dot->blobPathName_, "HGX_Chassis");
+    EXPECT_NE(dot->dotStatusSensor_, nullptr);
 }
 
-TEST_F(NsmDotCreateTestFixture, badTestMissingUUID)
+TEST_F(NsmDotCreateTestFixture, goodTestCreateDotWithBlobPathName)
 {
-    dbus::PropertyMap properties = {
-        {"ChassisName", std::string("HGX_Chassis")},
+    dbus::PropertyMap params = {
+        {"ChassisName", std::string("HGX_Chassis_Blob")},
+        {"BlobPathName", std::string("HGX_DOT_Blob")},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
+    auto rc = nsm::features::createDotFeature(mockManager, makeDev(), params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    EXPECT_THROW_COROUTINE(createNsmDot(mockManager, basicIntfName, objPath),
-                           std::runtime_error);
-}
-
-TEST_F(NsmDotCreateTestFixture, badTestInvalidUUID)
-{
-    dbus::PropertyMap properties = {
-        {"ChassisName", std::string("HGX_Chassis")},
-        {"UUID", std::string("INVALID:UUID:FORMAT")},
-    };
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    EXPECT_THROW_COROUTINE(createNsmDot(mockManager, basicIntfName, objPath),
-                           std::runtime_error);
+    std::shared_ptr<NsmDotObject> dot;
+    for (const auto& sensor : gpu->deviceSensors)
+    {
+        if (auto found = std::dynamic_pointer_cast<NsmDotObject>(sensor))
+        {
+            dot = found;
+            break;
+        }
+    }
+    ASSERT_NE(dot, nullptr);
+    EXPECT_EQ(dot->blobPathName_, "HGX_DOT_Blob");
 }
 
 TEST_F(NsmDotCreateTestFixture, testDotStatusObjectUpdate)
@@ -1705,40 +1712,18 @@ TEST_F(NsmDotCreateTestFixture, testDotStatusObjectUnexpectedStatus)
     EXPECT_EQ(dotActionIntf->dotState(), DotActionIntf::DOTStates::Disabled);
 }
 
-TEST_F(NsmDotCreateTestFixture, DISABLED_badTestCreateDotDeviceNotFound)
+TEST_F(NsmDotCreateTestFixture, badTestCreateDotDeviceNotFound)
 {
-    // Use a UUID that doesn't exist
-    uuid_t invalidUuid = "STATIC:99:99:NSM_DEVICE_INSTANCE_NUMBER:99";
-
-    dbus::PropertyMap properties = {
+    dbus::PropertyMap params = {
         {"ChassisName", std::string("NonExistentChassis")},
-        {"UUID", invalidUuid},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath + "_notfound",
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    // createNsmDot returns an error code when device not found (no throw)
-    auto rc =
-        createNsmDot(mockManager, basicIntfName, objPath + "_notfound").data();
-    EXPECT_NE(rc, NSM_SW_SUCCESS);
-}
-
-// createNsmDot: interface not registered → coGetCachedBaseProperties fails
-// → co_return rc (early return at line 1942 in nsmDot.cpp). //
-
-TEST_F(NsmDotCreateTestFixture, CreateDot_BasePropertiesFail_NoSensor)
-{
-    const std::string uniquePath = "/xyz/test/dot/base_fail_unique";
-    // Register a DIFFERENT interface so basicIntfName is absent.
-    auto& other = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                    basicIntfName + ".Sub");
-    other["ChassisName"] = std::string("HGX_Chassis");
-
-    const size_t before = gpu->staticSensors.size();
-    createNsmDot(mockManager, basicIntfName, uniquePath);
-    EXPECT_EQ(before, gpu->staticSensors.size());
+    // createDotFeature returns an error code when there is no device
+    const size_t before = gpu->roundRobinSensors.size();
+    auto rc = nsm::features::createDotFeature(mockManager, makeDev(false),
+                                              params);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+    EXPECT_EQ(gpu->roundRobinSensors.size(), before);
 }
 
 // =============================================================================

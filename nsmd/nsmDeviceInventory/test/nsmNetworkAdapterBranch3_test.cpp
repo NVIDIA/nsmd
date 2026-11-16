@@ -17,8 +17,8 @@
 
 /*
  * Unit tests for NsmNetworkAdapterProtectionOptionsMode (single class,
- * NSM Type 5 Device Mode Index 26) and its factory gate in
- * createNSMNetworkAdapter.
+ * NSM Type 5 Device Mode Index 26) and its feature gate in
+ * createNetworkAdapterFeature.
  */
 
 #include "test/commonMock.hpp"
@@ -35,17 +35,11 @@ using namespace ::testing;
 
 #include "libnsm/device-configuration.h"
 
+#include "features/creators.hpp"
 #include "nsmNetworkAdapter.hpp"
 
 #undef private
 #undef protected
-
-namespace nsm
-{
-requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -97,8 +91,6 @@ struct ProtectionOptionsModeV2Test :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_NetworkAdapter";
     const uuid_t deviceUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
     const std::string nicPath =
         "/xyz/openbmc_project/inventory/system/chassis/CX_0";
@@ -503,41 +495,44 @@ static size_t
     return count;
 }
 
-TEST_F(ProtectionOptionsModeV2Test, Factory_ModeSupported_SensorCreated)
+static features::DeviceContext
+    makeNicDev(const std::shared_ptr<MockNsmDevice>& device,
+               const uuid_t& deviceUuid)
 {
-    const std::string testPath = "/xyz/test/prot_v2_factory/mode_supported";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("CX_0");
-    pm["UUID"] = deviceUuid;
-    pm["Type"] = std::string("NSM_NetworkAdapter");
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/");
+    features::DeviceContext dev;
+    dev.name = "CX_0";
+    dev.kind = "cx_nic";
+    dev.staticUuid = deviceUuid;
+    dev.chassisPath = "/xyz/openbmc_project/inventory/system/chassis/CX_0";
+    dev.device = device;
+    return dev;
+}
 
+TEST_F(ProtectionOptionsModeV2Test, Feature_ModeSupported_SensorCreated)
+{
     // DeviceModesSupported: index 26 = 0 (supported, patchability 0)
     std::vector<int64_t> modes(27, DEVICE_MODE_NOT_SUPPORTED);
     modes[DEVICE_MODE_PROTECTION_OPTIONS_MODE] = 0;
-    pm["DeviceModesSupported"] = modes;
+    dbus::PropertyMap params{{"Name", std::string("CX_0")},
+                             {"DeviceModesSupported", modes}};
 
     ASSERT_EQ(countProtectionModeSensors(device), 0u);
-    createNSMNetworkAdapter(mockManager, intf, testPath);
+    auto rc = features::createNetworkAdapterFeature(
+        mockManager, makeNicDev(device, deviceUuid), params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(countProtectionModeSensors(device), 1u);
 }
 
-TEST_F(ProtectionOptionsModeV2Test, Factory_ModeNotSupported_NoSensorCreated)
+TEST_F(ProtectionOptionsModeV2Test, Feature_ModeNotSupported_NoSensorCreated)
 {
-    const std::string testPath = "/xyz/test/prot_v2_factory/mode_not_supported";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("CX_1");
-    pm["UUID"] = deviceUuid;
-    pm["Type"] = std::string("NSM_NetworkAdapter");
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/");
-
     // DeviceModesSupported: index 26 = -1 (not supported)
     std::vector<int64_t> modes(27, DEVICE_MODE_NOT_SUPPORTED);
-    pm["DeviceModesSupported"] = modes;
+    dbus::PropertyMap params{{"Name", std::string("CX_1")},
+                             {"DeviceModesSupported", modes}};
 
     const size_t before = countProtectionModeSensors(device);
-    createNSMNetworkAdapter(mockManager, intf, testPath);
+    auto rc = features::createNetworkAdapterFeature(
+        mockManager, makeNicDev(device, deviceUuid), params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_EQ(countProtectionModeSensors(device), before);
 }

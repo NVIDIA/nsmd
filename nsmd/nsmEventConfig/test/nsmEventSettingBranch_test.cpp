@@ -26,7 +26,7 @@
  *   setEventSubscription called
  * - NsmGetEventSetting::update: receiver_eid != localEid →
  *   setEventSubscription called
- * - createNsmEventSetting: invalid eventGenerationSetting → NSM_ERROR
+ * - createEventSettingFeature: invalid eventGenerationSetting → NSM_ERROR
  */
 
 #include "test/mockDBusHandler.hpp"
@@ -43,6 +43,8 @@ using namespace ::testing;
 #include "base.h"
 #include "device-capability-discovery.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmEventSetting.hpp"
 #include "test/commonMock.hpp"
 
@@ -268,58 +270,55 @@ TEST_F(NsmEventSettingBranchTest,
 }
 
 // ============================================================================
-// createNsmEventSetting: eventGenerationSetting > GLOBAL_EVENT_GENERATION...
-// → NSM_ERROR (line 249-256)
+// createEventSettingFeature: eventGenerationSetting >
+// GLOBAL_EVENT_GENERATION_ENABLE_PUSH → NSM_ERROR
 // ============================================================================
 
-namespace nsm
+static requester::Coroutine
+    createEventSetting(SensorManager& manager, const uuid_t& uuid,
+                       std::shared_ptr<NsmDevice> device,
+                       const dbus::PropertyMap& params)
 {
-requester::Coroutine createNsmEventSetting(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
+    features::DeviceContext dev;
+    dev.name = "GPU_SXM_1";
+    dev.kind = "gpu";
+    dev.staticUuid = uuid;
+    dev.platformPrefix = "HGX_";
+    dev.device = std::move(device);
+    return features::createEventSettingFeature(manager, dev, params);
+}
 
 TEST_F(NsmEventSettingBranchTest,
        Factory_InvalidEventGenerationSetting_ReturnsError)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_EventSetting";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/evtsetting_invalid_setting";
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        objPath, "xyz.openbmc_project.Configuration.NSM_EventSetting");
-    pm["Name"] = std::string("EvtSettingInvalid");
-    pm["UUID"] = gpuUuid;
     // EventGenerationSetting > GLOBAL_EVENT_GENERATION_ENABLE_PUSH (max valid
     // value = 2; set to 99 which is clearly invalid)
-    pm["EventGenerationSetting"] = uint64_t(99);
+    dbus::PropertyMap params = {
+        {"Name", std::string("EvtSettingInvalid")},
+        {"EventGenerationSetting", uint64_t(99)},
+    };
 
     const size_t before = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(createNsmEventSetting(mockManager, interface, objPath));
-    // No sensor added (factory returned NSM_ERROR before creating sensor)
+    auto rc = createEventSetting(mockManager, gpuUuid, gpu, params);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_FALSE(rc.exception());
+    // No sensor added (creator returned NSM_ERROR before creating sensor)
     EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
 // ============================================================================
-// createNsmEventSetting: device not found → NSM_ERROR (lines 240-247)
+// createEventSettingFeature: no NsmDevice in the context → NSM_ERROR
 // ============================================================================
 
 TEST_F(NsmEventSettingBranchTest, Factory_DeviceNotFound_ReturnsError)
 {
-    const std::string interface =
-        "xyz.openbmc_project.Configuration.NSM_EventSetting";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/evtsetting_nodev";
-
-    auto& pm = utils::MockDbusAsync::propertyMap(
-        objPath, "xyz.openbmc_project.Configuration.NSM_EventSetting");
-    pm["Name"] = std::string("EvtSettingNoDevice");
-    // Use a UUID that doesn't match any device
-    pm["UUID"] = uuid_t("STATIC:99:99:NSM_DEVICE_INSTANCE_NUMBER:99");
-    pm["EventGenerationSetting"] = uint64_t(0);
+    dbus::PropertyMap params = {
+        {"Name", std::string("EvtSettingNoDevice")},
+        {"EventGenerationSetting", uint64_t(0)},
+    };
 
     const size_t before = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(createNsmEventSetting(mockManager, interface, objPath));
+    auto rc = createEventSetting(mockManager, gpuUuid, nullptr, params);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
     EXPECT_EQ(gpu->deviceSensors.size(), before);
 }

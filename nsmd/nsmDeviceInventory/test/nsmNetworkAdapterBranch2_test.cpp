@@ -25,8 +25,7 @@
  * - NsmDeviceProtectionOptions: handleResponseMsg with cc != NSM_SUCCESS
  *   (error CC path where decode succeeds but cc indicates failure)
  * - NsmDeviceProtectionOptions: setProtectionOptions encode failure
- * - createNSMNetworkAdapter factory: with associations from D-Bus,
- *   missing InventoryObjPath FALSE branch
+ * - createNetworkAdapterFeature: with several parent chassis associations
  * - convertNsmdToDbusProtectionMode: verify all switch paths
  */
 
@@ -43,17 +42,11 @@ using namespace ::testing;
 
 #include "libnsm/device-configuration.h"
 
+#include "features/creators.hpp"
 #include "nsmNetworkAdapter.hpp"
 
 #undef private
 #undef protected
-
-namespace nsm
-{
-requester::Coroutine createNSMNetworkAdapter(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -66,8 +59,6 @@ struct NsmNetworkAdapterBranch2Test :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_NetworkAdapter";
     const uuid_t deviceUuid = "STATIC:514:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
@@ -171,61 +162,42 @@ TEST_F(NsmNetworkAdapterBranch2Test, DevProtection_HandleResp_NonZeroCC)
 }
 
 // ============================================================================
-// Factory: with associations from D-Bus (exercises coGetAssociations path)
+// Feature creator: two ParentChassisAssociationPaths → two associations
 // ============================================================================
 
-TEST_F(NsmNetworkAdapterBranch2Test, Factory_WithAssociations_SensorCreated)
+TEST_F(NsmNetworkAdapterBranch2Test, Feature_WithAssociations_SensorCreated)
 {
-    const std::string testPath = "/xyz/test/netadapter_br2/with_assoc";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("NetAdapter_BR2_Assoc");
-    pm["UUID"] = deviceUuid;
-    pm["Type"] = std::string("NSM_NetworkAdapter");
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/br2test/");
-
-    // Set up association service map
-    auto& serviceMap = utils::MockDbusAsync::serviceMap();
-    MapperServiceMap assocServiceMap = {
-        {{
-            "xyz.openbmc_project.NSM",
-            {intf + ".Associations"},
-        }},
-    };
-    serviceMap = assocServiceMap;
-
-    dbus::PropertyMap assocProperties = {
-        {"Forward", "chassis"},
-        {"Backward", "network_adapter"},
-        {"AbsolutePath", "/xyz/openbmc_project/inventory/system/chassis"},
-    };
-    auto& assocPm = utils::MockDbusAsync::propertyMap(testPath,
-                                                      intf + ".Associations");
-    assocPm = assocProperties;
+    features::DeviceContext dev;
+    dev.name = "HGX_CX_0";
+    dev.kind = "cx_nic";
+    dev.staticUuid = deviceUuid;
+    dev.chassisPath = "/xyz/openbmc_project/inventory/system/chassis/HGX_CX_0";
+    dev.device = device;
+    dbus::PropertyMap params{
+        {"Name", std::string("NetAdapter_BR2_Assoc")},
+        {"ParentChassisAssociationPaths",
+         std::vector<std::string>{"chassis/HGX_CX_0",
+                                  "chassis/HGX_Chassis_0"}}};
 
     const size_t before = device->deviceSensors.size();
-    createNSMNetworkAdapter(mockManager, intf, testPath);
-    EXPECT_GT(device->deviceSensors.size(), before);
-}
+    auto rc = features::createNetworkAdapterFeature(mockManager, dev, params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_GT(device->deviceSensors.size(), before);
 
-// ============================================================================
-// Factory: missing Type property (FALSE branch for count("Type"))
-// type="" -> sensor created with empty type
-// ============================================================================
-
-TEST_F(NsmNetworkAdapterBranch2Test, Factory_MissingType_EmptyType)
-{
-    const std::string testPath = "/xyz/test/netadapter_br2/no_type";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm["Name"] = std::string("NetAdapter_BR2_NoType");
-    pm["UUID"] = deviceUuid;
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/br2test/");
-    // Type intentionally omitted
-
-    const size_t before = device->deviceSensors.size();
-    createNSMNetworkAdapter(mockManager, intf, testPath);
-    EXPECT_GT(device->deviceSensors.size(), before);
+    std::shared_ptr<NsmNetworkAdapterDI> adapter;
+    for (const auto& sensor : device->deviceSensors)
+    {
+        if (auto found = std::dynamic_pointer_cast<NsmNetworkAdapterDI>(sensor))
+        {
+            adapter = found;
+            break;
+        }
+    }
+    ASSERT_NE(adapter, nullptr);
+    const auto& assocs = adapter->associationDefIntf->associations();
+    ASSERT_EQ(assocs.size(), 2u);
+    EXPECT_EQ(std::get<2>(assocs[1]),
+              "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0");
 }
 
 // ============================================================================

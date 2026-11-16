@@ -20,6 +20,7 @@
 #include "platform-environmental.h"
 
 #include "nsmNumericSensorFactory.hpp"
+#include "nsmNumericSensorFeatures.hpp"
 #include "nsmVoltageAggregator.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -111,10 +112,39 @@ class VoltageSensorFactory : public NumericSensorBuilder
     };
 };
 
-static NumericSensorFactory numericSensorFactory{
-    std::make_unique<VoltageSensorFactory>()};
-
-REGISTER_NSM_CREATION_FUNCTION(numericSensorFactory.getCreationFunction(),
-                               "xyz.openbmc_project.Configuration.NSM_Voltage")
-
 } // namespace nsm
+
+namespace nsm::features
+{
+
+requester::Coroutine
+    createVoltageFeature([[maybe_unused]] SensorManager& manager,
+                         const DeviceContext& dev,
+                         const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("Voltage feature of {NAME}: no NsmDevice", "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto featureInfo =
+        NumericSensorFactory::makeFeatureSensorInfo(dev, params, "NSM_Voltage");
+    if (!featureInfo)
+    {
+        co_return NSM_ERROR;
+    }
+    auto& info = *featureInfo;
+
+    VoltageSensorFactory builder;
+    auto sensor = builder.makeSensor({}, {}, utils::DBusHandler::getBus(),
+                                     info);
+    lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
+              "UUID", dev.staticUuid, "NAME", info.name, "TYPE", info.type);
+
+    NumericSensorFactory::makeAggregatorAndAddSensor(
+        &builder, info, sensor, dev.staticUuid, dev.device.get());
+    co_return NSM_SUCCESS;
+}
+
+} // namespace nsm::features

@@ -41,16 +41,11 @@ using namespace ::testing;
 #include "base.h"
 #include "libnsm/platform-environmental.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmLeakDetection.hpp"
 
 #include <xyz/openbmc_project/Common/error.hpp>
-
-namespace nsm
-{
-requester::Coroutine nsmLeakDetectionCreateSensors(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -474,42 +469,44 @@ TEST_F(NsmLeakDetectionBranch4Test, HandleResponseMsg_ZeroSensors_Success)
 }
 
 // ============================================================================
-// Factory: getSensorInterfaces fails for one sensor during patch registration
-// Exercises the `continue` branch in the factory loop (L748-753)
+// createLeakDetectionFeature: thresholds patch registered for every sensor
 // ============================================================================
 
-TEST_F(NsmLeakDetectionBranch4Test, Factory_GetSensorInterfacesFail_Continue)
+TEST_F(NsmLeakDetectionBranch4Test, Feature_ThresholdsPatchPerSensor)
 {
-    const std::string baseInterface =
-        "xyz.openbmc_project.Configuration.NSM_LeakDetection";
-    const std::string objPath = "/xyz/openbmc_project/config/leak_b4_gsif";
-    auto& propMap = utils::MockDbusAsync::propertyMap(objPath, baseInterface);
-    propMap["Name"] = std::string("LeakGSIF");
-    propMap["Type"] = std::string("NSM_LeakDetection");
-    propMap["UUID"] = fpgaUuid;
-    // SensorIdMap contains ID 99, which won't have interfaces after
-    // construction, but in reality the constructor creates them for every ID.
-    // To exercise the continue branch we'd need a sensor that fails
-    // getSensorInterfaces. Since that requires an ID not in the map,
-    // and the constructor creates all IDs, we test the full path with valid IDs
-    // and thresholds to ensure registration completes without error.
-    propMap["SensorIdMap"] = std::vector<uint64_t>{10, 11};
-    propMap["SensorNameMap"] = std::vector<std::string>{"sensor_b4_a",
-                                                        "sensor_b4_b"};
-    propMap["ChassisPath"] =
-        std::string("/xyz/openbmc_project/inventory/system/chassis/HGX_B4");
-    propMap["MinThresholdsmV"] = std::vector<uint64_t>{100, 110};
-    propMap["CriticalThresholdsmV"] = std::vector<uint64_t>{200, 210};
-    propMap["MaxThresholdsmV"] = std::vector<uint64_t>{300, 310};
-    propMap["MaxValue"] = double(5.0);
-    propMap["MinValue"] = double(0.0);
+    // Every ID of SensorIdMap gets interfaces from the NsmLeakDetection
+    // constructor, so the loop registers a thresholds patch for each sensor
+    // and the `continue` branch is not reachable through the feature.
+    dbus::PropertyMap params{
+        {"Name", std::string("LeakGSIF")},
+        {"ChassisName", std::string("HGX_B4")},
+        {"SensorIdMap", std::vector<uint64_t>{10, 11}},
+        {"SensorNameMap",
+         std::vector<std::string>{"sensor_b4_a", "sensor_b4_b"}},
+        {"MinThresholdsmV", std::vector<uint64_t>{100, 110}},
+        {"CriticalThresholdsmV", std::vector<uint64_t>{200, 210}},
+        {"MaxThresholdsmV", std::vector<uint64_t>{300, 310}},
+        {"MaxValue", double(5.0)},
+        {"MinValue", double(0.0)}};
 
-    nsmLeakDetectionCreateSensors(mockManager, baseInterface, objPath);
+    nsm::features::DeviceContext dev;
+    dev.name = "HGX_BASEBOARD";
+    dev.kind = "fpga";
+    dev.staticUuid = fpgaUuid;
+    dev.platformPrefix = "HGX_";
+    dev.device = fpga;
 
-    // NsmLeakDetection (roundRobin) + SetThresholds(static) +
-    // 2 ThresholdsPatch(static)
-    EXPECT_GE(fpga->roundRobinSensors.size(), 1u);
-    EXPECT_GE(fpga->deviceSensors.size(), 3u);
+    const size_t initialDevice = fpga->deviceSensors.size();
+    const size_t initialStatic = fpga->staticSensors.size();
+
+    auto rc = nsm::features::createLeakDetectionFeature(mockManager, dev,
+                                                        params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // SetThresholds + 2 ThresholdsPatch (static)
+    EXPECT_EQ(fpga->staticSensors.size(), initialStatic + 3);
+    // ... plus NsmLeakDetection
+    EXPECT_EQ(fpga->deviceSensors.size(), initialDevice + 4);
 }
 
 // ============================================================================

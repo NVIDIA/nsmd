@@ -36,6 +36,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmInterface.hpp"
 #include "nsmPCIeErrors.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
@@ -56,18 +58,6 @@ using TestPortLocationContextIntf =
 using TestPortLocationReferenceIntf =
     sdbusplus::server::object_t<sdbusplus::server::xyz::openbmc_project::
                                     inventory::decorator::LocationReference>;
-
-requester::Coroutine createNsmPortSensor(SensorManager& manager,
-                                         const std::string& interface,
-                                         const std::string& objPath,
-                                         bool enableNetworkPortAddresses);
-requester::Coroutine
-    createNsmPortSensorWithNetworkPortAddresses(SensorManager& manager,
-                                                const std::string& interface,
-                                                const std::string& objPath);
-requester::Coroutine createNsmPortSensorGeneric(SensorManager& manager,
-                                                const std::string& interface,
-                                                const std::string& objPath);
 } // namespace nsm
 
 // Helper to create NsmPortMetrics for reuse
@@ -2122,8 +2112,6 @@ struct NsmPortSensorCreateTestFixture :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_NVLink";
     const std::string objPath =
         "/xyz/openbmc_project/inventory/system/gpu/port_create";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:20";
@@ -2155,14 +2143,37 @@ struct NsmPortSensorCreateTestFixture :
         return false;
     }
 
+    /** @brief Run the NVLink feature on the mock device `uuid` names
+     *
+     * The DeviceContext carries the device and its NSM device type; params
+     * are the feature params (Name, Count, ParentObjPath, Priority, ...).
+     */
+    requester::Coroutine createNVLink(const uuid_t& uuid, uint8_t deviceType,
+                                      dbus::PropertyMap params,
+                                      bool networkPortAddresses = false)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_GPU_0";
+        dev.kind = "gpu";
+        dev.deviceType = deviceType;
+        dev.staticUuid = uuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = mockManager.getNsmDeviceFromStaticUUID(uuid);
+        if (networkPortAddresses)
+        {
+            params["NetworkPortAddressesEnabled"] = true;
+        }
+        return nsm::features::createNVLinkFeature(mockManager, dev, params);
+    }
+
     /** @brief Drive the event loop until the task finishes.
      *
-     * createNsmPortSensor yields between ports, so for a device with more
+     * createNVLinkFeature yields between ports, so for a device with more
      * than one port the loop has to run for construction to complete.
      * Bounded so a task that never finishes fails here instead of hanging.
      *
      * Every call must stay above the tests that discard a
-     * createNsmPortSensor result. Those leave a timer armed on the loop
+     * createNVLinkFeature result. Those leave a timer armed on the loop
      * pointing at a coroutine frame the temporary's destructor has already
      * freed; running the loop afterwards would dispatch it.
      */
@@ -2205,20 +2216,13 @@ TEST_F(NsmPortSensorCreateTestFixture, goodTestCreatePortSensor)
 
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(4)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu0")},
         {"Priority", false},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    auto result = createNsmPortSensor(mockManager, basicIntfName, objPath,
-                                      false);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
     runUntilDone(result);
 
     // Expect multiple sensors per port (Status, Characteristics, Metrics)
@@ -2229,9 +2233,7 @@ TEST_F(NsmPortSensorCreateTestFixture, rejectsPortCountOutsideUint8Range)
 {
     dbus::PropertyMap properties = {
         {"Name", std::string("Port")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t{1}},
-        {"DeviceType", uint64_t{NSM_DEV_ID_GPU}},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu0")},
         {"Priority", false},
@@ -2239,13 +2241,8 @@ TEST_F(NsmPortSensorCreateTestFixture, rejectsPortCountOutsideUint8Range)
     properties["Count"] = uint64_t{std::numeric_limits<uint8_t>::max()} +
                           uint64_t{1};
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
     const size_t initialSensorCount = gpu->deviceSensors.size();
-    auto result = createNsmPortSensor(mockManager, basicIntfName, objPath,
-                                      false);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
 
     EXPECT_EQ(result.data(), NSM_ERROR);
     EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount);
@@ -2256,9 +2253,7 @@ TEST_F(NsmPortSensorCreateTestFixture,
 {
     dbus::PropertyMap properties = {
         {"Name", std::string("Port")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t{2}},
-        {"DeviceType", uint64_t{NSM_DEV_ID_GPU}},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu0")},
         {"Priority", false},
@@ -2271,12 +2266,7 @@ TEST_F(NsmPortSensorCreateTestFixture,
                      "LocationReference.ReferenceAreas.Left")},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    auto result = createNsmPortSensor(mockManager, basicIntfName, objPath,
-                                      false);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
     runUntilDone(result);
 
     EXPECT_EQ(result.data(), NSM_SUCCESS);
@@ -2315,9 +2305,7 @@ TEST_F(NsmPortSensorCreateTestFixture, fallsBackForInvalidPortConfiguration)
 {
     dbus::PropertyMap properties = {
         {"Name", std::string("Port")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t{1}},
-        {"DeviceType", uint64_t{NSM_DEV_ID_GPU}},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu0")},
         {"PortNameMap", std::vector<std::string>{"Mapped_0", "Mapped_1"}},
@@ -2325,12 +2313,7 @@ TEST_F(NsmPortSensorCreateTestFixture, fallsBackForInvalidPortConfiguration)
         {"PortLocationReference", std::string("InvalidReferenceArea")},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    auto result = createNsmPortSensor(mockManager, basicIntfName, objPath,
-                                      false);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
     runUntilDone(result);
 
     EXPECT_EQ(result.data(), NSM_SUCCESS);
@@ -2338,25 +2321,27 @@ TEST_F(NsmPortSensorCreateTestFixture, fallsBackForInvalidPortConfiguration)
     EXPECT_FALSE(hasDeviceSensorNamed("Mapped_0"));
 }
 
-TEST_F(NsmPortSensorCreateTestFixture, badTestMissingUUID)
+// No NsmDevice in the DeviceContext: error, no ports created
+TEST_F(NsmPortSensorCreateTestFixture, badTestNoNsmDevice)
 {
-    using namespace nsm;
-
-    dbus::PropertyMap properties = {
+    dbus::PropertyMap params = {
         {"Name", std::string("NVLink")},
         {"Count", uint64_t(4)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu0")},
     };
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
+    const size_t initialSensorCount = gpu->deviceSensors.size();
+    nsm::features::DeviceContext dev;
+    dev.name = "HGX_GPU_0";
+    dev.kind = "gpu";
+    dev.deviceType = NSM_DEV_ID_GPU;
+    dev.staticUuid = gpuUuid;
+    auto result = nsm::features::createNVLinkFeature(mockManager, dev, params);
 
-    EXPECT_THROW_COROUTINE(
-        createNsmPortSensor(mockManager, basicIntfName, objPath, false),
-        std::runtime_error);
+    EXPECT_EQ(result.data(), NSM_ERROR);
+    EXPECT_FALSE(result.exception());
+    EXPECT_EQ(gpu->deviceSensors.size(), initialSensorCount);
 }
 
 TEST_F(NsmPortSensorCreateTestFixture, testPortStatusUpdate)
@@ -3050,36 +3035,28 @@ TEST(NsmPortMetrics, HandleResponseMsg_ErrorCC_CoversBranch)
     EXPECT_EQ(cc, NSM_ERROR);
 }
 
-// createNsmPortSensor with enableNetworkPortAddresses=true covers line 1790
+// createNVLinkFeature with enableNetworkPortAddresses=true covers line 1790
 // TRUE branch (adds NsmNetworkAddressAggregator sensor)
 TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_EnableNetworkAddresses)
 {
     using namespace nsm;
 
-    const std::string netAddrObjPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_net";
-
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink_Net")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu1")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(netAddrObjPath, basicIntfName);
-    pm = properties;
-
     size_t initialCount = gpu->deviceSensors.size();
-    createNsmPortSensor(mockManager, basicIntfName, netAddrObjPath, true);
+    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties, true);
 
     // Network address aggregator + port status + characteristics + metrics
     EXPECT_GT(gpu->deviceSensors.size(), initialCount);
 }
 
-// createNsmPortSensor with a PCIE_BRIDGE+CX8 device covers:
+// createNVLinkFeature with a PCIE_BRIDGE+CX8 device covers:
 //   - line 1818 FALSE branch (deviceType != NSM_DEV_ID_GPU, no Status/Char)
 //   - lines 1849-1858 TRUE branch (adds NsmGetPortECCCounters)
 //   - lines 1872-1881 TRUE branch (adds EthPortTelemetryAggregator)
@@ -3089,23 +3066,16 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX8)
 
     // n1 = (CX8_role=2 << 8) | PCIE_BRIDGE=2 = 514
     const uuid_t bridgeUuid = "STATIC:514:0:NSM_DEVICE_INSTANCE_NUMBER:1";
-    const std::string bridgeObjPath =
-        "/xyz/openbmc_project/inventory/system/cx80/port_cx8";
 
     dbus::PropertyMap properties = {
         {"Name", std::string("CX8Port")},
-        {"UUID", bridgeUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_PCIE_BRIDGE)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/cx80")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(bridgeObjPath, basicIntfName);
-    pm = properties;
-
-    createNsmPortSensor(mockManager, basicIntfName, bridgeObjPath, false);
+    createNVLink(bridgeUuid, NSM_DEV_ID_PCIE_BRIDGE, properties);
 
     auto bridgeDevice = std::dynamic_pointer_cast<MockNsmDevice>(
         mockManager.getNsmDeviceFromStaticUUID(bridgeUuid));
@@ -3114,7 +3084,7 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX8)
     EXPECT_GE(bridgeDevice->deviceSensors.size(), 3u);
 }
 
-// createNsmPortSensor with PCIE_BRIDGE+CX9 device covers:
+// createNVLinkFeature with PCIE_BRIDGE+CX9 device covers:
 //   - line 1851 TRUE branch: getDeviceRole() == CX9 is evaluated (CX8 FALSE,
 //     so short-circuit doesn't prevent CX9 check) and returns TRUE ->
 //     NsmGetPortECCCounters + EthPortTelemetryAggregator added
@@ -3127,23 +3097,16 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX9)
     // NSM_DEV_ID_PCIE_BRIDGE=2
     //          = 770
     const uuid_t cx9Uuid = "STATIC:770:0:NSM_DEVICE_INSTANCE_NUMBER:1";
-    const std::string cx9ObjPath =
-        "/xyz/openbmc_project/inventory/system/cx90/port_cx9";
 
     dbus::PropertyMap properties = {
         {"Name", std::string("CX9Port")},
-        {"UUID", cx9Uuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_PCIE_BRIDGE)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/cx90")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(cx9ObjPath, basicIntfName);
-    pm = properties;
-
-    createNsmPortSensor(mockManager, basicIntfName, cx9ObjPath, false);
+    createNVLink(cx9Uuid, NSM_DEV_ID_PCIE_BRIDGE, properties);
 
     auto cx9Device = std::dynamic_pointer_cast<MockNsmDevice>(
         mockManager.getNsmDeviceFromStaticUUID(cx9Uuid));
@@ -3153,7 +3116,7 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX9)
     EXPECT_GE(cx9Device->deviceSensors.size(), 3u);
 }
 
-// createNsmPortSensor with PCIE_BRIDGE+CX7 device covers:
+// createNVLinkFeature with PCIE_BRIDGE+CX7 device covers:
 //   - line 1851 FALSE branch: getDeviceRole() == CX9 is evaluated (CX8 FALSE)
 //     and returns FALSE -> NsmGetPortECCCounters NOT added
 //   - line 1874 FALSE branch: same, EthPortTelemetryAggregator NOT added
@@ -3165,23 +3128,16 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX7)
     // NSM_DEV_ID_PCIE_BRIDGE=2
     //          = 258
     const uuid_t cx7Uuid = "STATIC:258:0:NSM_DEVICE_INSTANCE_NUMBER:1";
-    const std::string cx7ObjPath =
-        "/xyz/openbmc_project/inventory/system/cx70/port_cx7";
 
     dbus::PropertyMap properties = {
         {"Name", std::string("CX7Port")},
-        {"UUID", cx7Uuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_PCIE_BRIDGE)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/cx70")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(cx7ObjPath, basicIntfName);
-    pm = properties;
-
-    createNsmPortSensor(mockManager, basicIntfName, cx7ObjPath, false);
+    createNVLink(cx7Uuid, NSM_DEV_ID_PCIE_BRIDGE, properties);
 
     auto cx7Device = std::dynamic_pointer_cast<MockNsmDevice>(
         mockManager.getNsmDeviceFromStaticUUID(cx7Uuid));
@@ -3192,30 +3148,21 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX7)
     EXPECT_GE(cx7Device->deviceSensors.size(), 1u);
 }
 
-// createNsmPortSensor with count=0 covers the loop body not executing
+// createNVLinkFeature with count=0 covers the loop body not executing
 TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_ZeroCount)
 {
     using namespace nsm;
 
-    const std::string zeroCountObjPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_zero";
-
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink_Zero")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(0)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu0")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(zeroCountObjPath,
-                                                 basicIntfName);
-    pm = properties;
-
     size_t initialCount = gpu->deviceSensors.size();
-    createNsmPortSensor(mockManager, basicIntfName, zeroCountObjPath, false);
+    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
 
     // count=0 -> loop body never executes -> no sensors added
     EXPECT_EQ(gpu->deviceSensors.size(), initialCount);
@@ -3226,24 +3173,16 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_SwitchDeviceType)
 {
     using namespace nsm;
 
-    const std::string switchObjPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_switch";
-
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink_Switch")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_SWITCH)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/switch0")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(switchObjPath, basicIntfName);
-    pm = properties;
-
     size_t initialCount = gpu->deviceSensors.size();
-    createNsmPortSensor(mockManager, basicIntfName, switchObjPath, false);
+    createNVLink(gpuUuid, NSM_DEV_ID_SWITCH, properties);
     // DeviceType=SWITCH -> getTopologyObjPath uses "SWITCH/" branch;
     // no Status/Characteristics sensors (deviceType != GPU)
     EXPECT_GE(gpu->deviceSensors.size(), initialCount);
@@ -3254,24 +3193,16 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_EROTDeviceType)
 {
     using namespace nsm;
 
-    const std::string erotObjPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_erot";
-
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink_EROT")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_EROT)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/erot0")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(erotObjPath, basicIntfName);
-    pm = properties;
-
     size_t initialCount = gpu->deviceSensors.size();
-    createNsmPortSensor(mockManager, basicIntfName, erotObjPath, false);
+    createNVLink(gpuUuid, NSM_DEV_ID_EROT, properties);
     // DeviceType=EROT -> getTopologyObjPath uses "EROT/" branch
     EXPECT_GE(gpu->deviceSensors.size(), initialCount);
 }
@@ -3281,24 +3212,16 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_CPUDeviceType)
 {
     using namespace nsm;
 
-    const std::string cpuObjPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_cpu";
-
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink_CPU")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_CPU)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/cpu0")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(cpuObjPath, basicIntfName);
-    pm = properties;
-
     size_t initialCount = gpu->deviceSensors.size();
-    createNsmPortSensor(mockManager, basicIntfName, cpuObjPath, false);
+    createNVLink(gpuUuid, NSM_DEV_ID_CPU, properties);
     // DeviceType=CPU -> getTopologyObjPath uses "CPU/" branch
     EXPECT_GE(gpu->deviceSensors.size(), initialCount);
 }
@@ -3308,27 +3231,19 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_UnknownDeviceType)
 {
     using namespace nsm;
 
-    const std::string unknownObjPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_unknown";
-    constexpr uint64_t unknownDeviceType = 99;
+    constexpr uint8_t unknownDeviceType = 99;
 
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink_Unknown")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", unknownDeviceType},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/unknown0")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(unknownObjPath, basicIntfName);
-    pm = properties;
-
     // Unknown deviceType -> getTopologyObjPath logs error and returns ""
     // factory still proceeds with empty topologyObjPath
-    EXPECT_NO_THROW(
-        createNsmPortSensor(mockManager, basicIntfName, unknownObjPath, false));
+    EXPECT_NO_THROW(createNVLink(gpuUuid, unknownDeviceType, properties));
 }
 
 // coGetTopologyData body (lines 61-112) covered by populating serviceMap with
@@ -3340,8 +3255,6 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_WithTopologyData)
 
     const std::string topoParentPath =
         "/xyz/openbmc_project/inventory/system/gpu_topo_test";
-    const std::string topoObjPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_topo_test";
     const std::string topoInterface =
         "xyz.openbmc_project.Configuration.NVLinkTopology.Topology0";
     // topologyObjPath computed by factory:
@@ -3368,17 +3281,12 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_WithTopologyData)
 
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLinkTopo")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath", topoParentPath},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(topoObjPath, basicIntfName);
-    pm = properties;
-
-    createNsmPortSensor(mockManager, basicIntfName, topoObjPath, false);
+    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
 
     // Cleanup static service map so it doesn't affect other tests
     sm.clear();
@@ -3399,8 +3307,6 @@ TEST_F(NsmPortSensorCreateTestFixture,
 
     const std::string topoParentPath =
         "/xyz/openbmc_project/inventory/system/gpu_topo_noopt";
-    const std::string topoObjPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_topo_noopt";
     const std::string topoInterface =
         "xyz.openbmc_project.Configuration.NVLinkTopology.Topology0";
     const std::string topologyObjPath =
@@ -3419,17 +3325,12 @@ TEST_F(NsmPortSensorCreateTestFixture,
 
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLinkTopoNoOpt")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath", topoParentPath},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(topoObjPath, basicIntfName);
-    pm = properties;
-
-    createNsmPortSensor(mockManager, basicIntfName, topoObjPath, false);
+    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
 
     sm.clear();
 }
@@ -3442,8 +3343,6 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_TopologyInvalidAssoc)
 
     const std::string topoParentPath =
         "/xyz/openbmc_project/inventory/system/gpu_topo_badassoc";
-    const std::string topoObjPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_topo_badassoc";
     const std::string topoInterface =
         "xyz.openbmc_project.Configuration.NVLinkTopology.Topology0";
     const std::string topologyObjPath =
@@ -3468,17 +3367,12 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_TopologyInvalidAssoc)
 
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLinkTopoInvalidAssoc")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath", topoParentPath},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(topoObjPath, basicIntfName);
-    pm = properties;
-
-    createNsmPortSensor(mockManager, basicIntfName, topoObjPath, false);
+    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
 
     sm.clear();
 }
@@ -3611,7 +3505,7 @@ TEST_F(NsmPortSensorCreateTestFixture,
 }
 
 // =============================================================================
-// FALSE-branch coverage: count() checks in createNsmPortSensor
+// FALSE-branch coverage: absent params of createNVLinkFeature
 // =============================================================================
 
 // Name absent -> name="" -> portName="_0" -> valid D-Bus path component
@@ -3620,26 +3514,16 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_MissingName_Succeeds)
 {
     using namespace nsm;
 
-    const std::string missingNamePath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_no_name";
-
     dbus::PropertyMap properties = {
         // "Name" intentionally omitted -> name="" -> count("Name") FALSE
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu0_noname")},
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(missingNamePath,
-                                                 basicIntfName);
-    pm = properties;
-
     const size_t initialCount = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(createNsmPortSensor(mockManager, basicIntfName,
-                                        missingNamePath, false));
+    EXPECT_NO_THROW(createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties));
     // portName="_0", objPath=parentObjPath+"/Ports/_0" -> valid -> sensors
     // added
     EXPECT_GT(gpu->deviceSensors.size(), initialCount);
@@ -3653,57 +3537,16 @@ TEST_F(NsmPortSensorCreateTestFixture,
 {
     using namespace nsm;
 
-    const std::string missingParentPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_no_parent";
-
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink_NoParent")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         // "ParentObjPath" intentionally omitted -> parentObjPath=""
         {"Priority", false},
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(missingParentPath,
-                                                 basicIntfName);
-    pm = properties;
-
     const size_t initialCount = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(createNsmPortSensor(mockManager, basicIntfName,
-                                        missingParentPath, false));
+    EXPECT_NO_THROW(createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties));
     // portObjPath="/Ports/NVLink_NoParent_0" -> valid -> sensors added
-    EXPECT_GT(gpu->deviceSensors.size(), initialCount);
-}
-
-// DeviceType absent -> deviceType=0 = NSM_DEV_ID_GPU -> GPU branch executes
-// count("DeviceType") FALSE branch taken (deviceType stays 0)
-TEST_F(NsmPortSensorCreateTestFixture,
-       createPortSensor_MissingDeviceType_DefaultsToGPU)
-{
-    using namespace nsm;
-
-    const std::string missingDTypePath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_no_dtype";
-
-    dbus::PropertyMap properties = {
-        {"Name", std::string("NVLink_NoDType")},
-        {"UUID", gpuUuid},
-        {"Count", uint64_t(1)},
-        // "DeviceType" intentionally omitted -> deviceType=0=NSM_DEV_ID_GPU
-        {"ParentObjPath",
-         std::string("/xyz/openbmc_project/inventory/system/gpu0_nodtype")},
-        {"Priority", false},
-    };
-
-    auto& pm = utils::MockDbusAsync::propertyMap(missingDTypePath,
-                                                 basicIntfName);
-    pm = properties;
-
-    const size_t initialCount = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(createNsmPortSensor(mockManager, basicIntfName,
-                                        missingDTypePath, false));
-    // deviceType=0=GPU -> Status+Characteristics+Metrics sensors added
     EXPECT_GT(gpu->deviceSensors.size(), initialCount);
 }
 
@@ -3713,26 +3556,17 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_MissingPriority_Success)
 {
     using namespace nsm;
 
-    const std::string noPriorityPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_no_priority";
-
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink_NoPrio")},
-        {"UUID", gpuUuid},
         {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu0_noprio")},
         // "Priority" intentionally omitted -> count("Priority") FALSE ->
         // priority=false
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(noPriorityPath, basicIntfName);
-    pm = properties;
-
     const size_t initialCount = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(
-        createNsmPortSensor(mockManager, basicIntfName, noPriorityPath, false));
+    EXPECT_NO_THROW(createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties));
     // priority defaults to false -> sensor added to deviceSensors (not
     // priority)
     EXPECT_GT(gpu->deviceSensors.size(), initialCount);
@@ -3892,96 +3726,18 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_MissingCount_NoSensors)
 {
     using namespace nsm;
 
-    const std::string noCountPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_no_count";
-
     dbus::PropertyMap properties = {
         {"Name", std::string("NVLink_NoCount")},
-        {"UUID", gpuUuid},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"ParentObjPath",
          std::string("/xyz/openbmc_project/inventory/system/gpu0_nocount")},
         {"Priority", false},
         // "Count" intentionally omitted -> count("Count") FALSE -> count=0
     };
 
-    auto& pm = utils::MockDbusAsync::propertyMap(noCountPath, basicIntfName);
-    pm = properties;
-
     const size_t initialCount = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(
-        createNsmPortSensor(mockManager, basicIntfName, noCountPath, false));
+    EXPECT_NO_THROW(createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties));
     // count=0 -> for loop never runs -> no port sensors added
     EXPECT_EQ(gpu->deviceSensors.size(), initialCount);
-}
-
-// =============================================================================
-// createNsmPortSensorWithNetworkPortAddresses and createNsmPortSensorGeneric
-// wrapper tests (static removed from nsmPort.cpp to allow forward declaration)
-// These thin wrappers call createNsmPortSensor with enableNetworkPortAddresses
-// set to true or false respectively.
-// =============================================================================
-
-// createNsmPortSensorWithNetworkPortAddresses calls createNsmPortSensor(true)
-// Covers lines 1927–1932 in nsmPort.cpp
-TEST_F(NsmPortSensorCreateTestFixture,
-       createPortSensorWithNetworkPortAddresses_CallsWithTrue)
-{
-    using namespace nsm;
-
-    const std::string netAddrWrapPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_netaddr_wrap";
-    const std::string netAddrIntf =
-        "xyz.openbmc_project.Configuration.NSM_NVLinkWithNetworkPortAddresses";
-
-    dbus::PropertyMap properties = {
-        {"Name", std::string("NVLink_NetAddrWrap")},
-        {"UUID", gpuUuid},
-        {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
-        {"ParentObjPath",
-         std::string("/xyz/openbmc_project/inventory/system/gpu0_netaddr")},
-        {"Priority", false},
-    };
-
-    auto& pm = utils::MockDbusAsync::propertyMap(netAddrWrapPath, netAddrIntf);
-    pm = properties;
-
-    const size_t before = gpu->deviceSensors.size();
-    createNsmPortSensorWithNetworkPortAddresses(mockManager, netAddrIntf,
-                                                netAddrWrapPath);
-    // enableNetworkPortAddresses=true -> NetworkPortAddresses sensor added
-    EXPECT_GT(gpu->deviceSensors.size(), before);
-}
-
-// createNsmPortSensorGeneric calls createNsmPortSensor(false)
-// Covers lines 1935–1941 in nsmPort.cpp
-TEST_F(NsmPortSensorCreateTestFixture, createPortSensorGeneric_CallsWithFalse)
-{
-    using namespace nsm;
-
-    const std::string genericWrapPath =
-        "/xyz/openbmc_project/inventory/system/gpu/port_generic_wrap";
-    const std::string genericIntf =
-        "xyz.openbmc_project.Configuration.NSM_NVLink";
-
-    dbus::PropertyMap properties = {
-        {"Name", std::string("NVLink_GenericWrap")},
-        {"UUID", gpuUuid},
-        {"Count", uint64_t(1)},
-        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
-        {"ParentObjPath",
-         std::string("/xyz/openbmc_project/inventory/system/gpu0_generic")},
-        {"Priority", false},
-    };
-
-    auto& pm = utils::MockDbusAsync::propertyMap(genericWrapPath, genericIntf);
-    pm = properties;
-
-    const size_t before = gpu->deviceSensors.size();
-    createNsmPortSensorGeneric(mockManager, genericIntf, genericWrapPath);
-    // enableNetworkPortAddresses=false -> no NetworkPortAddresses sensor
-    EXPECT_GT(gpu->deviceSensors.size(), before);
 }
 
 // ─── Branch coverage: rc==NSM_SW_SUCCESS && cc!=NSM_SUCCESS ─────────────────

@@ -19,9 +19,6 @@
  * Additional branch coverage tests for nsmMemory.cpp:
  *
  * Targets uncovered branches in:
- *   - createNsmMemorySensor factory: missing UUID, bad UUID, missing props
- *   - createNSMMemory: with all properties, ErrorCorrection + DeviceType
- *   - createNSMMemory: with Priority=true
  *   - NsmRowRemapState: genRequestMsg valid/invalid, handleResponseMsg all
  * flags
  *   - NsmRowRemappingCounts: genRequestMsg valid/invalid, handleResponseMsg
@@ -46,13 +43,6 @@ using namespace ::testing;
 #include "interfaceWrapper.hpp"
 #include "nsmMemory.hpp"
 
-namespace nsm
-{
-requester::Coroutine createNsmMemorySensor(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
-
 using namespace nsm;
 
 static auto& b3Bus = utils::DBusHandler::getBus();
@@ -69,12 +59,7 @@ class NsmMemoryBranch3Fixture :
     public SensorManagerTest
 {
   protected:
-    static constexpr const char* baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_Memory";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:60";
-    const std::string sensorName = "Memory_B3";
-    const std::string inventoryPath =
-        "/xyz/openbmc_project/inventory/system/b3/memory/";
 
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> gpu;
@@ -91,27 +76,6 @@ class NsmMemoryBranch3Fixture :
         cleanupDeviceSensors(devices);
     }
 
-    void setupBaseProperties(const std::string& path,
-                             dbus::PropertyMap extra = {})
-    {
-        auto& pm = utils::MockDbusAsync::propertyMap(path, baseIntf);
-        pm["Name"] = sensorName;
-        pm["UUID"] = gpuUuid;
-        pm["InventoryObjPath"] = inventoryPath;
-        for (auto& [k, v] : extra)
-        {
-            pm[k] = v;
-        }
-    }
-
-    void setupCurrentProperties(const std::string& path,
-                                const std::string& intf,
-                                dbus::PropertyMap props)
-    {
-        auto& pm = utils::MockDbusAsync::propertyMap(path, intf);
-        pm = props;
-    }
-
     static std::vector<uint8_t> decodeFail()
     {
         std::vector<uint8_t> buf(
@@ -120,41 +84,6 @@ class NsmMemoryBranch3Fixture :
         return buf;
     }
 };
-
-// ============================================================================
-// Factory: Missing UUID -> no device match -> error
-// ============================================================================
-TEST_F(NsmMemoryBranch3Fixture, Factory_BadUUID_NoDevice)
-{
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_Memory.MemoryAttributes";
-    const std::string path = "/test/memb3/bad_uuid";
-    auto& pm = utils::MockDbusAsync::propertyMap(path, baseIntf);
-    pm["Name"] = sensorName;
-    pm["UUID"] = std::string("STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:999");
-    pm["InventoryObjPath"] = inventoryPath;
-
-    auto& cpm = utils::MockDbusAsync::propertyMap(path, intf);
-    cpm["Type"] = std::string("NSM_Memory_Attributes");
-
-    createNsmMemorySensor(mockManager, intf, path);
-    // No crash expected, just returns error
-}
-
-// ============================================================================
-// Factory: unknown type -> no sensors created
-// ============================================================================
-TEST_F(NsmMemoryBranch3Fixture, Factory_UnknownType)
-{
-    const std::string path = "/test/memb3/unk_type";
-    setupBaseProperties(path, {{"Type", std::string("NSM_Unknown_Type")}});
-
-    const size_t before = gpu->deviceSensors.size() +
-                          gpu->roundRobinSensors.size();
-    createNsmMemorySensor(mockManager, baseIntf, path);
-    EXPECT_EQ(gpu->deviceSensors.size() + gpu->roundRobinSensors.size(),
-              before);
-}
 
 // ============================================================================
 // NsmRowRemapState: genRequestMsg valid

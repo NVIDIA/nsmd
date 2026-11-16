@@ -20,10 +20,13 @@
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmChassisFeatures.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 
+#include <format>
+#include <tuple>
 #include <unordered_map>
 
 namespace nsm
@@ -193,27 +196,102 @@ requester::Coroutine
     co_return NSM_SUCCESS;
 }
 
-requester::Coroutine
-    createNsmNVLinkMgmtNicChassisAssembly(SensorManager& manager,
-                                          const std::string& interface,
-                                          const std::string& objPath)
-{
-    co_await createNsmChassisAssembly(manager, interface, objPath,
-                                      "NSM_NVLinkMgmtNic_ChassisAssembly");
-    // coverity[missing_return]
-    co_return NSM_SUCCESS;
-}
-
 std::vector<std::string> nvSwitchChassisAssemblyInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_ChassisAssembly",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_ChassisAssembly.ChassisAttributes"};
 
-std::vector<std::string> nvLinkMgmtNicChassisAssemblyInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly.ChassisAttributes"};
-
 REGISTER_NSM_CREATION_FUNCTION(createNsmNVSwitchChassisAssembly,
                                nvSwitchChassisAssemblyInterfaces)
-REGISTER_NSM_CREATION_FUNCTION(createNsmNVLinkMgmtNicChassisAssembly,
-                               nvLinkMgmtNicChassisAssemblyInterfaces)
 } // namespace nsm
+
+namespace nsm::features
+{
+
+namespace
+{
+
+uint8_t createNVSwitchAndNicChassisAssembly(const DeviceContext& dev,
+                                            const dbus::PropertyMap& params,
+                                            const std::string& baseType)
+{
+    if (!dev.device)
+    {
+        lg2::error("{TYPE} feature of {NAME}: no NsmDevice", "TYPE", baseType,
+                   "NAME", dev.name);
+        return NSM_SW_ERROR;
+    }
+
+    // Everything that can fail is checked before the index is taken, so a
+    // failed assembly does not leave a gap or a partial object.
+    for (const char* key : {"Name", "PhysicalContext", "LocationType"})
+    {
+        auto it = params.find(key);
+        if (it != params.end() &&
+            !std::holds_alternative<std::string>(it->second))
+        {
+            lg2::error("{TYPE} of {NAME}: {KEY} must be a string", "TYPE",
+                       baseType, "NAME", dev.name, "KEY", key);
+            return NSM_SW_ERROR_DATA;
+        }
+    }
+    if (!params.contains("Name"))
+    {
+        lg2::error("{TYPE} of {NAME}: Name is required", "TYPE", baseType,
+                   "NAME", dev.name);
+        return NSM_SW_ERROR_DATA;
+    }
+    const bool hasArea = params.contains("PhysicalContext");
+    if (hasArea)
+    {
+        std::ignore = AreaIntf::convertPhysicalContextTypeFromString(
+            std::get<std::string>(params.at("PhysicalContext")));
+    }
+    const bool hasLocation = params.contains("LocationType");
+    if (hasLocation)
+    {
+        std::ignore = LocationIntf::convertLocationTypesFromString(
+            std::get<std::string>(params.at("LocationType")));
+    }
+
+    auto device = dev.device;
+    const auto& chassisName = dev.name;
+    const auto name = std::format("Assembly{}", dev.nextIndex("Assembly"));
+
+    lg2::debug("createNsmChassis: {NAME}, {TYPE}", "NAME", name.c_str(), "TYPE",
+               baseType.c_str());
+    auto assemblyObject =
+        std::make_shared<NsmNVSwitchAndNicChassisAssembly<AssemblyIntf>>(
+            chassisName, name, baseType);
+    device->addStaticSensor(assemblyObject);
+
+    // add revision
+    auto revisionObject = NsmNVSwitchAndNicChassisAssembly<RevisionIntf>(
+        chassisName, name, baseType);
+    auto versionSensor = std::make_shared<NsmInventoryProperty<RevisionIntf>>(
+        revisionObject, INFO_ROM_VERSION);
+    device->addStaticSensor(versionSensor);
+
+    createAssemblyHealth(device, chassisName, name, baseType);
+    createAssemblyAsset(device, chassisName, name, baseType, params);
+    if (hasArea)
+    {
+        createPhysicalContext(device, chassisName, name, baseType, params);
+    }
+    if (hasLocation)
+    {
+        createLocationType(device, chassisName, name, baseType, params);
+    }
+    return NSM_SW_SUCCESS;
+}
+
+} // namespace
+
+requester::Coroutine createNVLinkMgmtNicChassisAssemblyFeature(
+    [[maybe_unused]] SensorManager& manager, const DeviceContext& dev,
+    const dbus::PropertyMap& params)
+{
+    co_return createNVSwitchAndNicChassisAssembly(
+        dev, params, "NSM_NVLinkMgmtNic_ChassisAssembly");
+}
+
+} // namespace nsm::features

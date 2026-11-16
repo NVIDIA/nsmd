@@ -20,6 +20,8 @@
 #include "network-ports.h"
 
 #include "dBusAsyncUtils.hpp"
+#include "globals.hpp"
+#include "nsmEventFeatures.hpp"
 #include "sensorManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -141,96 +143,44 @@ int NsmThresholdEvent::handle(eid_t eid, NsmType /*type*/,
     return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine createNsmThresholdEvent(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
+
+requester::Coroutine
+    createThresholdEventFeature([[maybe_unused]] SensorManager& manager,
+                                const DeviceContext& dev,
+                                const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("Threshold Event feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
+    }
+
     NsmEventInfo info{};
+    info.uuid = dev.staticUuid;
 
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+    auto name = utils::makeDBusNameValid(
+        param<std::string>(params, "Name").value_or(""));
+    const std::string type = "NSM_Event_Threshold";
 
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        info.uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
+    info.originOfCondition = (redfishChassisBasePath / dev.name).string();
+    info.messageId = param<std::string>(params, "MessageId").value_or("");
+    info.loggingNamespace = utils::makeDBusNameValid(
+        param<std::string>(params, "LoggingNamespace").value_or(""));
+    info.resolution = param<std::string>(params, "Resolution").value_or("");
+    info.messageArgs = param<std::vector<std::string>>(params, "MessageArgs")
+                           .value_or(std::vector<std::string>{});
+    info.errorId = param<std::vector<std::string>>(params, "EventIds")
+                       .value_or(std::vector<std::string>{});
 
-    auto device = manager.getNsmDeviceFromStaticUUID(info.uuid);
-
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
-    {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    name = utils::makeDBusNameValid(name);
-
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-
-    if (allCurrentIfaceProperties.count("OriginOfCondition"))
-    {
-        info.originOfCondition = std::get<std::string>(
-            allCurrentIfaceProperties.at("OriginOfCondition"));
-    }
-
-    if (allCurrentIfaceProperties.count("MessageId"))
-    {
-        info.messageId =
-            std::get<std::string>(allCurrentIfaceProperties.at("MessageId"));
-    }
-
-    if (allCurrentIfaceProperties.count("LoggingNamespace"))
-    {
-        info.loggingNamespace = std::get<std::string>(
-            allCurrentIfaceProperties.at("LoggingNamespace"));
-    }
-    info.loggingNamespace = utils::makeDBusNameValid(info.loggingNamespace);
-
-    if (allCurrentIfaceProperties.count("Resolution"))
-    {
-        info.resolution =
-            std::get<std::string>(allCurrentIfaceProperties.at("Resolution"));
-    }
-
-    if (allCurrentIfaceProperties.count("MessageArgs"))
-    {
-        info.messageArgs = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("MessageArgs"));
-    }
-
-    if (allCurrentIfaceProperties.count("EventIds"))
-    {
-        info.errorId = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("EventIds"));
-    }
-
-    std::string severityStr{};
-    if (allCurrentIfaceProperties.count("Severity"))
-    {
-        severityStr =
-            std::get<std::string>(allCurrentIfaceProperties.at("Severity"));
-    }
-    // info.uuid = co_await utils::coGetDbusProperty<uuid_t>(
-    //     objPath.c_str(), "UUID", interface.c_str());
-    // auto name = co_await utils::coGetDbusProperty<std::string>(
-    //     objPath.c_str(), "Name", interface.c_str());
-    // info.originOfCondition = co_await utils::coGetDbusProperty<std::string>(
-    //     objPath.c_str(), "OriginOfCondition", interface.c_str());
-    // info.messageId = co_await utils::coGetDbusProperty<std::string>(
-    //     objPath.c_str(), "MessageId", interface.c_str());
-    // info.loggingNamespace = co_await utils::coGetDbusProperty<std::string>(
-    //     objPath.c_str(), "LoggingNamespace", interface.c_str());
-    // info.resolution = co_await utils::coGetDbusProperty<std::string>(
-    //     objPath.c_str(), "Resolution", interface.c_str());
-    // info.messageArgs =
-    //     co_await utils::coGetDbusProperty<std::vector<std::string>>(
-    //         objPath.c_str(), "MessageArgs", interface.c_str());
-    // auto severityStr = co_await utils::coGetDbusProperty<std::string>(
-    //     objPath.c_str(), "Severity", interface.c_str());
-
+    auto severityStr = param<std::string>(params, "Severity").value_or("");
     auto severityEnum = sdbusplus::common::xyz::openbmc_project::logging::
         Entry::convertStringToLevel("xyz.openbmc_project.Logging.Entry.Level." +
                                     severityStr);
-
     info.severity = severityEnum.value_or(Level::Critical);
 
     auto event = std::make_shared<NsmThresholdEvent>(name, type, info);
@@ -239,13 +189,9 @@ requester::Coroutine createNsmThresholdEvent(SensorManager& manager,
         "Created NSM Threshold Event : UUID={UUID}, Name={NAME}, Type={TYPE}",
         "UUID", info.uuid, "NAME", name, "TYPE", type);
 
-    device->addDeviceEvent(event, NSM_TYPE_NETWORK_PORT, NSM_THRESHOLD_EVENT);
-    // coverity[missing_return]
+    dev.device->addDeviceEvent(event, NSM_TYPE_NETWORK_PORT,
+                               NSM_THRESHOLD_EVENT);
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmThresholdEvent,
-    "xyz.openbmc_project.Configuration.NSM_Event_Threshold");
-
-} // namespace nsm
+} // namespace nsm::features

@@ -35,6 +35,8 @@
 #include "nsmCommon/sharedMemCommon.hpp"
 #endif
 
+#include "features/deviceCoordinator.hpp"
+
 #include <ranges>
 
 #ifdef LTTNG_TRACING
@@ -90,16 +92,16 @@ SensorManagerImpl::SensorManagerImpl(
     instanceIdDb(instanceIdDb), objServer(objServer), eidTable(eidTable),
     sockManager(sockManager), verbose(verbose)
 {
-    deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
-        event,
-        [this](sdeventplus::source::EventBase&) { this->scanInventory(); });
-    inventoryAddedSignal = std::make_unique<sdbusplus::bus::match_t>(
-        bus,
-        sdbusplus::bus::match::rules::interfacesAdded(
-            "/xyz/openbmc_project/inventory"),
-        [this](sdbusplus::message::message& msg) {
-        this->interfaceAddedHandler(msg);
-    });
+    // deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
+    //     event,
+    //     [this](sdeventplus::source::EventBase&) { this->scanInventory(); });
+    // inventoryAddedSignal = std::make_unique<sdbusplus::bus::match_t>(
+    //     bus,
+    //     sdbusplus::bus::match::rules::interfacesAdded(
+    //         "/xyz/openbmc_project/inventory"),
+    //     [this](sdbusplus::message::message& msg) {
+    //     this->interfaceAddedHandler(msg);
+    // });
 
 #ifdef NVIDIA_STANDBYTODC
     // helping with telemetry in standby power and transitions between standby
@@ -123,6 +125,15 @@ SensorManagerImpl::SensorManagerImpl(
         this->mctpReadinessSigHandler(msg);
     }));
     isMCTPReady();
+
+    // Only discovery path: the legacy NSM_* scan above is disabled, so
+    // NSM_WriteProtect and NSM_Poll_Ready records are not served.
+    deviceCoordinator = std::make_unique<features::DeviceCoordinator>(
+        *this, bus, event, [this]() {
+        newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
+            this->event,
+            [this](sdeventplus::source::EventBase&) { startPolling(); });
+    });
 }
 
 SensorManagerImpl::~SensorManagerImpl()
@@ -188,7 +199,18 @@ void SensorManagerImpl::interfaceAddedHandler(sdbusplus::message::message& msg)
     sdbusplus::object_path objPath;
     dbus::InterfaceMap interfaces;
 
-    msg.read(objPath, interfaces);
+    try
+    {
+        msg.read(objPath, interfaces);
+    }
+    catch (const std::exception& e)
+    {
+        // NSM_Telemetry and NSM_Policy records carry a{sv} properties, which
+        // dbus::InterfaceMap cannot decode; they are not legacy records.
+        lg2::debug("InterfacesAdded not decodable as legacy record: {ERROR}",
+                   "ERROR", e);
+        return;
+    }
     for (const auto& [interface, _] : interfaces)
     {
         if (NsmObjectFactory::instance().isSupported(interface))

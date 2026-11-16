@@ -16,7 +16,6 @@ tests = [
     'nsmRuntimeISTCompleteEvent_test',
     'nsmEventInfoBranch_test',
     'nsmEventBranch_test',
-    'nsmRediscoveryEventBranch_test',
     'nsmEventLogRecordV2_test',
 ]
 

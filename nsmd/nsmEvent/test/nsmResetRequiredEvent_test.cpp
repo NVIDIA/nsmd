@@ -38,8 +38,9 @@ using namespace ::testing;
 
 #include "platform-environmental.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmEvent/nsmResetRequiredEvent.hpp"
-#include "nsmObjectFactory.hpp"
 
 using namespace nsm;
 
@@ -220,7 +221,7 @@ TEST(NsmResetRequiredEvent, Handle_ValidEvent_ReturnsSuccess)
 }
 
 // =============================================================================
-// createNsmResetRequiredEvent factory tests
+// createResetRequiredEventFeature tests
 // =============================================================================
 
 struct NsmResetRequiredEventFactoryTest :
@@ -228,10 +229,6 @@ struct NsmResetRequiredEventFactoryTest :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string interfaceName =
-        "xyz.openbmc_project.Configuration.NSM_Event_Reset_Required";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/reset_required0";
     const std::string name = "ResetRequired_Test";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
 
@@ -252,15 +249,38 @@ struct NsmResetRequiredEventFactoryTest :
 
     dbus::PropertyMap basicProperties = {
         {"Name", name},
-        {"UUID", gpuUuid},
-        {"OriginOfCondition",
-         std::string("/xyz/openbmc_project/inventory/system/chassis/GPU_1")},
         {"MessageId", std::string("ResourceEvent.1.0.ResourceChanged")},
         {"LoggingNamespace", std::string("GPU_Reset")},
         {"Resolution", std::string("Reboot the system")},
         {"MessageArgs", std::vector<std::string>{"GPU_1"}},
         {"Severity", std::string("Critical")},
     };
+
+    requester::Coroutine create(const dbus::PropertyMap& params,
+                                bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "GPU_1";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return features::createResetRequiredEventFeature(mockManager, dev,
+                                                         params);
+    }
+
+    std::shared_ptr<NsmResetRequiredEvent> lastEvent()
+    {
+        if (gpu->deviceEvents.empty())
+        {
+            return nullptr;
+        }
+        return std::dynamic_pointer_cast<NsmResetRequiredEvent>(
+            gpu->deviceEvents.back());
+    }
 };
 
 // Full property map with valid UUID → event registered on device
@@ -306,72 +326,56 @@ TEST_F(NsmResetRequiredEventFactoryTest, Handle_EmittedPayloadUsesDeviceGuid)
 
 TEST_F(NsmResetRequiredEventFactoryTest, Factory_CreateEvent_Success)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          interfaceName);
-    propertyMap = basicProperties;
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = create(basicProperties);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               objPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(gpu->deviceEvents.size(), before + 1);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->getName(), name);
+    EXPECT_EQ(event->getType(), "NSM_Event_Reset_Required");
+    EXPECT_EQ(event->info.uuid, gpuUuid);
+    EXPECT_EQ(event->info.originOfCondition, "/redfish/v1/Chassis/GPU_1");
+    EXPECT_EQ(event->info.severity, Level::Critical);
 }
 
-// Missing UUID → empty string → parseStaticUuid fails → exception caught inside
-// createObjects → no event added (covers exception path of inner factory)
-TEST_F(NsmResetRequiredEventFactoryTest, Factory_MissingUUID_NoEvent)
+// No NsmDevice in the context → NSM_ERROR, no event added
+TEST_F(NsmResetRequiredEventFactoryTest, Factory_NoDevice_NoEvent)
 {
-    const std::string uniquePath =
-        "/xyz/openbmc_project/inventory/system/reset_no_uuid";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                          interfaceName);
-    dbus::PropertyMap props = basicProperties;
-    props.erase("UUID");
-    propertyMap = props;
-
     const size_t before = gpu->deviceEvents.size();
+    auto rc = create(basicProperties, false);
 
-    // createObjects catches the std::runtime_error from parseStaticUuid
-    // internally
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               uniquePath);
-
+    EXPECT_EQ(rc.data(), NSM_ERROR);
     EXPECT_EQ(before, gpu->deviceEvents.size());
 }
 
-// EventIds present → covers the "EventIds" branch (line 151-154)
+// EventIds present → stored in info.errorId
 TEST_F(NsmResetRequiredEventFactoryTest, Factory_CreateEvent_WithEventIds)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/reset_with_eventids";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
     dbus::PropertyMap props = basicProperties;
     props["EventIds"] = std::vector<std::string>{"ResetRequired", "RESET-001"};
-    propertyMap = props;
+    auto rc = create(props);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.errorId.size(), 2u);
 }
 
-// ImpactedComponent present → covers the "ImpactedComponent" branch (line
-// 156-160)
+// ImpactedComponent present → stored in info.impactedComponent
 TEST_F(NsmResetRequiredEventFactoryTest,
        Factory_CreateEvent_WithImpactedComponent)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/reset_with_impacted";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
     dbus::PropertyMap props = basicProperties;
     props["ImpactedComponent"] = std::string("GPU_Module_1");
-    propertyMap = props;
+    auto rc = create(props);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.impactedComponent, "GPU_Module_1");
 }
 
 // Severity=Warning → severityEnum.has_value() true → value_or returns actual
@@ -379,36 +383,27 @@ TEST_F(NsmResetRequiredEventFactoryTest,
 TEST_F(NsmResetRequiredEventFactoryTest,
        Factory_CreateEvent_WithSeverityWarning)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/reset_warning";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
     dbus::PropertyMap props = basicProperties;
     props["Severity"] = std::string("Warning");
-    propertyMap = props;
+    auto rc = create(props);
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.severity, Level::Warning);
 }
 
-// Only UUID and Name → all other optional property count() checks return 0
-// (FALSE branches) Missing Severity → severityEnum empty →
+// Only Name → all other params default; missing Severity →
 // value_or(Level::Critical) used
 TEST_F(NsmResetRequiredEventFactoryTest, Factory_CreateEvent_MinimalProperties)
 {
-    const std::string testPath =
-        "/xyz/openbmc_project/inventory/system/reset_minimal";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                          interfaceName);
-    propertyMap = {
-        {"Name", name},
-        {"UUID", gpuUuid},
-    };
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = create({{"Name", name}});
 
-    NsmObjectFactory::instance().createObjects(mockManager, interfaceName,
-                                               testPath);
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceEvents.size(), before + 1);
+    auto event = lastEvent();
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->info.severity, Level::Critical);
+    EXPECT_TRUE(event->info.impactedComponent.empty());
 }

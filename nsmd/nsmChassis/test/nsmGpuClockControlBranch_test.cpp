@@ -20,7 +20,6 @@
  * - NsmClearClockLimAsyncIntf: clearReqClockLimit postPatchIO/decode paths
  * - NsmChassisClockControl: genRequestMsg, handleResponseMsg,
  * setRangeClockLimits
- * - Factory: createControlGpuClock missing properties, invalid UUID
  */
 
 #include "test/mockDBusHandler.hpp"
@@ -36,13 +35,6 @@ using namespace ::testing;
 #include "test/commonMock.hpp"
 
 using namespace nsm;
-
-namespace nsm
-{
-requester::Coroutine createControlGpuClock(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
 
 // ============================================================================
 // Fixture
@@ -438,6 +430,5 @@ TEST_F(NsmGpuClockControlBranchTest, ClearReqClockLimit_Success)
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
 }
 
-// Factory tests omitted: createControlGpuClock requires valid D-Bus paths
-// for NsmChassisClockControl constructor (PhysicalContextType/ClockMode
-// enum conversion throws with empty strings).
+// Feature creator tests (createClockLimitFeature) are in
+// nsmGpuClockControl_test.cpp.

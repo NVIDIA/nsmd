@@ -22,7 +22,7 @@
  * - NsmInventoryProperty<NsmAssetIntf> genRequestMsg (encode fail, success)
  * - NsmInventoryProperty<NsmAssetIntf> handleResponseMsg
  *   (success, errorCC, decode fail)
- * - Factory with missing optional properties (PhysicalContext, LocationType)
+ * - createChassisAssemblyFeature: non-string attribute rejected
  * - AssemblyType branches: Device, Board, FRU, invalid default
  * - createChassisAssemblyAsset: Name present/absent in current props
  * - createChassisAssemblyAsset: AssemblyType present/absent in base props
@@ -37,6 +37,8 @@ using namespace ::testing;
 
 #include "base.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmChassisAssembly.hpp"
 #include "nsmInventoryProperty.hpp"
@@ -46,10 +48,6 @@ using namespace ::testing;
 
 namespace nsm
 {
-requester::Coroutine
-    nsmChassisAssemblyCreateSensors(SensorManager& manager,
-                                    const std::string& interface,
-                                    const std::string& objPath);
 void createChassisAssemblyArea(std::shared_ptr<NsmDevice> device,
                                const std::string& chassisName,
                                const std::string& name,
@@ -69,10 +67,6 @@ void createChassisAssemblyLocation(
 
 using namespace nsm;
 
-static const std::string kBaseIntf =
-    "xyz.openbmc_project.Configuration.NSM_ChassisAssembly";
-static const std::string kAttrIntf =
-    "xyz.openbmc_project.Configuration.NSM_ChassisAssembly.ChassisAttributes";
 static const uuid_t kGpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
 struct NsmChassisAssemblyBranch2Test :
@@ -347,194 +341,25 @@ TEST_F(NsmChassisAssemblyBranch2Test,
 }
 
 // ============================================================================
-// Factory function: nsmChassisAssemblyCreateSensors branch coverage
+// createChassisAssemblyFeature: type checks before any object is created
 // ============================================================================
 
-// Base properties fail -> early return
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_BasePropertiesFail)
+TEST_F(NsmChassisAssemblyBranch2Test, Feature_NonStringAssemblyType_Rejected)
 {
-    const std::string objPath = "/xyz/test/chassis_asm_b2/base_fail";
-    // Do NOT register base interface property map
-    auto& currMap = utils::MockDbusAsync::propertyMap(objPath, kAttrIntf);
-    currMap["Type"] = std::string("NSM_Chassis_Attributes");
+    nsm::features::DeviceContext dev;
+    dev.name = chassisName;
+    dev.kind = "gpu";
+    dev.staticUuid = kGpuUuid;
+    dev.platformPrefix = "HGX_";
+    dev.device = gpu;
+    dbus::PropertyMap params{{"Name", std::string("GPU_Assembly")},
+                             {"AssemblyType", uint64_t{1}}};
 
     const size_t before = gpu->staticSensors.size();
-    nsmChassisAssemblyCreateSensors(mockManager, kAttrIntf, objPath);
-    EXPECT_EQ(before, gpu->staticSensors.size());
-}
-
-// Missing ChassisName -> chassisName="" (FALSE branch at L160)
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_MissingChassisName)
-{
-    const std::string objPath = "/xyz/test/chassis_asm_b2/no_cname";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    // No "ChassisName" key
-    baseMap["Name"] = std::string("Assembly1");
-    baseMap["UUID"] = kGpuUuid;
-
-    auto& attrMap = utils::MockDbusAsync::propertyMap(objPath, kAttrIntf);
-    attrMap["Type"] = std::string("NSM_Chassis_Attributes");
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisAssemblyCreateSensors(mockManager, kAttrIntf, objPath);
-    EXPECT_GT(gpu->staticSensors.size(), before);
-}
-
-// Missing Name -> name="" (FALSE branch at L165)
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_MissingName_Throws)
-{
-    const std::string objPath = "/xyz/test/chassis_asm_b2/no_name";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    baseMap["ChassisName"] = chassisName;
-    baseMap["UUID"] = kGpuUuid;
-    // No "Name" key -> name="" -> D-Bus path ending with "/" is invalid
-
-    auto& attrMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    attrMap["Type"] = std::string("NSM_ChassisAssembly");
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisAssemblyCreateSensors(mockManager, kBaseIntf, objPath),
-        std::exception);
-}
-
-// Missing Type -> type="" -> neither branch matches -> no sensors
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_MissingType_NoSensors)
-{
-    const std::string objPath = "/xyz/test/chassis_asm_b2/no_type";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    baseMap["ChassisName"] = chassisName;
-    baseMap["Name"] = name;
-    baseMap["UUID"] = kGpuUuid;
-
-    auto& attrMap [[maybe_unused]] =
-        utils::MockDbusAsync::propertyMap(objPath, kAttrIntf);
-    // No "Type" key -> type=""
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisAssemblyCreateSensors(mockManager, kAttrIntf, objPath);
-    EXPECT_EQ(before, gpu->staticSensors.size());
-}
-
-// Missing UUID -> uuid="" -> parseStaticUuid throws
-#ifdef COVERAGE_DISABLE_COROUTINES
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_MissingUUID_Throws)
-{
-    const std::string objPath = "/xyz/test/chassis_asm_b2/no_uuid";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    baseMap["ChassisName"] = chassisName;
-    baseMap["Name"] = name;
-    // No "UUID" key
-
-    auto& attrMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    attrMap["Type"] = std::string("NSM_ChassisAssembly");
-
-    EXPECT_THROW_COROUTINE(
-        nsmChassisAssemblyCreateSensors(mockManager, kBaseIntf, objPath),
-        std::runtime_error);
-}
-#endif
-
-// type == "NSM_ChassisAssembly" -> creates AssemblyIntf sensor
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_TypeAssembly_CreatesSensor)
-{
-    const std::string objPath = "/xyz/test/chassis_asm_b2/type_assembly";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    baseMap["ChassisName"] = chassisName;
-    baseMap["Name"] = name;
-    baseMap["UUID"] = kGpuUuid;
-    // When interface == baseInterface, both reads use the same property map
-    baseMap["Type"] = std::string("NSM_ChassisAssembly");
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisAssemblyCreateSensors(mockManager, kBaseIntf, objPath);
-    EXPECT_EQ(gpu->staticSensors.size(), before + 1);
-}
-
-// type == "NSM_Chassis_Attributes" with all optional props
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_Attributes_AllOptional)
-{
-    const std::string objPath = "/xyz/test/chassis_asm_b2/attr_all";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    baseMap["ChassisName"] = chassisName;
-    baseMap["Name"] = name;
-    baseMap["UUID"] = kGpuUuid;
-    baseMap["AssemblyType"] = std::string("Device");
-
-    auto& attrMap = utils::MockDbusAsync::propertyMap(objPath, kAttrIntf);
-    attrMap["Type"] = std::string("NSM_Chassis_Attributes");
-    attrMap["PhysicalContext"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU");
-    attrMap["LocationType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes."
-        "Embedded");
-    attrMap["Name"] = std::string("GPU_Assembly");
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisAssemblyCreateSensors(mockManager, kAttrIntf, objPath);
-    // Asset(4) + Health(1) + Area(1) + Location(1) = 7
-    EXPECT_GE(gpu->staticSensors.size(), before + 7);
-}
-
-// type == "NSM_Chassis_Attributes" without PhysicalContext or LocationType
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_Attributes_NoOptional)
-{
-    const std::string objPath = "/xyz/test/chassis_asm_b2/attr_none";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    baseMap["ChassisName"] = chassisName;
-    baseMap["Name"] = name;
-    baseMap["UUID"] = kGpuUuid;
-    baseMap["AssemblyType"] = std::string("Board");
-
-    auto& attrMap = utils::MockDbusAsync::propertyMap(objPath, kAttrIntf);
-    attrMap["Type"] = std::string("NSM_Chassis_Attributes");
-    // No PhysicalContext -> FALSE branch at L193
-    // No LocationType -> FALSE branch at L198
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisAssemblyCreateSensors(mockManager, kAttrIntf, objPath);
-    // Asset(4) + Health(1) = 5, no Area or Location
-    EXPECT_EQ(gpu->staticSensors.size(), before + 5);
-}
-
-// type == "NSM_Chassis_Attributes" with only PhysicalContext (no LocationType)
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_Attributes_OnlyPhysicalContext)
-{
-    const std::string objPath = "/xyz/test/chassis_asm_b2/attr_phys_only";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    baseMap["ChassisName"] = chassisName;
-    baseMap["Name"] = name;
-    baseMap["UUID"] = kGpuUuid;
-
-    auto& attrMap = utils::MockDbusAsync::propertyMap(objPath, kAttrIntf);
-    attrMap["Type"] = std::string("NSM_Chassis_Attributes");
-    attrMap["PhysicalContext"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU");
-    // No LocationType
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisAssemblyCreateSensors(mockManager, kAttrIntf, objPath);
-    // Asset(4) + Health(1) + Area(1) = 6
-    EXPECT_EQ(gpu->staticSensors.size(), before + 6);
-}
-
-// type == "NSM_Chassis_Attributes" with only LocationType (no PhysicalContext)
-TEST_F(NsmChassisAssemblyBranch2Test, Factory_Attributes_OnlyLocationType)
-{
-    const std::string objPath = "/xyz/test/chassis_asm_b2/attr_loc_only";
-    auto& baseMap = utils::MockDbusAsync::propertyMap(objPath, kBaseIntf);
-    baseMap["ChassisName"] = chassisName;
-    baseMap["Name"] = name;
-    baseMap["UUID"] = kGpuUuid;
-
-    auto& attrMap = utils::MockDbusAsync::propertyMap(objPath, kAttrIntf);
-    attrMap["Type"] = std::string("NSM_Chassis_Attributes");
-    attrMap["LocationType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes."
-        "Embedded");
-    // No PhysicalContext
-
-    const size_t before = gpu->staticSensors.size();
-    nsmChassisAssemblyCreateSensors(mockManager, kAttrIntf, objPath);
-    // Asset(4) + Health(1) + Location(1) = 6
-    EXPECT_EQ(gpu->staticSensors.size(), before + 6);
+    auto rc = nsm::features::createChassisAssemblyFeature(mockManager, dev,
+                                                          params);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_DATA);
+    EXPECT_EQ(gpu->staticSensors.size(), before);
+    // The rejected assembly did not take an index
+    EXPECT_EQ(dev.nextIndex("Assembly"), 0u);
 }

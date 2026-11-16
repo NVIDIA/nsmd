@@ -26,9 +26,32 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace nsm
 {
+
+// Workload power profile names, indexed by NSM profile id
+inline const std::vector<std::string> workloadProfileIdMap = {
+    "UNKNOWN",
+    "UNKNOWN",
+    "UNKNOWN",
+    "MAX_P",
+    "MAX_Q_1",
+    "COMPUTE",
+    "MEMORY_BOUND",
+    "NETWORK_BOUND",
+    "BALANCED",
+    "HIGH_THROUGHPUT_INFERENCE",
+    "MEDIUM_THROUGHPUT_INFERENCE",
+    "LOW_LATENCY_INFERENCE",
+    "TRAINING",
+    "INFERENCE",
+    "MAX_Q_2",
+    "MAX_Q_3",
+    "HPC",
+    "LOW_PRIORITY_BACKGROUND"};
 
 class NsmWorkLoadProfileStatus;
 // Enable/Disable PowerProfiles

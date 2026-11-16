@@ -1,6 +1,9 @@
 #include "nsmPCIeRetimerFabricsDI.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "features/associations.hpp"
+#include "globals.hpp"
+#include "nsmDeviceInventoryFeatures.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -36,57 +39,35 @@ NsmPCIeRetimerFabricDI::NsmPCIeRetimerFabricDI(
         FabricIntf::convertFabricTypeFromString(fabricsType));
 }
 
-requester::Coroutine createNSMPCIeRetimerFabrics(SensorManager& manager,
-                                                 const std::string& interface,
-                                                 const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    auto& bus = utils::DBusHandler::getBus();
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
+requester::Coroutine
+    createPCIeRetimerFabricsFeature([[maybe_unused]] SensorManager& manager,
+                                    const DeviceContext& dev,
+                                    const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    uuid_t uuid{};
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-    std::string fabricType{};
-    if (allCurrentIfaceProperties.count("FabricType"))
-    {
-        fabricType =
-            std::get<std::string>(allCurrentIfaceProperties.at("FabricType"));
-    }
-
-    std::vector<utils::Association> associations{};
-    co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                      associations);
-
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-
-    if (!nsmDevice)
-    {
-        // cannot found a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of NSM_PCIeRetimer_Fabrics PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
+        lg2::error("PCIeRetimerFabrics feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
         co_return NSM_ERROR;
     }
+    auto& bus = utils::DBusHandler::getBus();
+    const std::string type = "NSM_PCIeRetimer_Fabrics";
+    auto name = param<std::string>(params, "Name").value_or("");
+    auto fabricType = param<std::string>(params, "FabricType").value_or("");
+
+    std::vector<utils::Association> associations{};
+    addAssociations(associations, params, "ChassisAssociationPaths", "chassis",
+                    "fabrics");
 
     auto retimerFabricsDi = std::make_shared<NsmPCIeRetimerFabricDI>(
         bus, name, associations, type, fabricType);
-    nsmDevice->addDeviceSensors(retimerFabricsDi);
-    // coverity[missing_return]
+    dev.device->addDeviceSensors(retimerFabricsDi);
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNSMPCIeRetimerFabrics,
-    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Fabrics")
-
-} // namespace nsm
+} // namespace nsm::features

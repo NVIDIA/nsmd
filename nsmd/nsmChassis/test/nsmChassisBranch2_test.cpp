@@ -47,6 +47,8 @@ using namespace ::testing;
 #include "base.h"
 #include "device-configuration.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmChassis.hpp"
 #include "nsmDebugInfo.hpp"
@@ -94,9 +96,6 @@ void createPowerState(std::shared_ptr<NsmDevice> device,
                       const std::string& name,
                       const dbus::PropertyMap& allCurrentIfaceProperties,
                       const dbus::PropertyMap& allBaseIfaceProperties);
-requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath);
 } // namespace nsm
 
 struct NsmChassisBranch2Test :
@@ -125,6 +124,23 @@ struct NsmChassisBranch2Test :
     ~NsmChassisBranch2Test()
     {
         cleanupDeviceSensors(devices);
+    }
+
+    /** @brief Run the chassis attributes feature of the device `devName` */
+    requester::Coroutine attributes(const std::string& devName,
+                                    uint8_t deviceType,
+                                    dbus::PropertyMap params)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = devName;
+        dev.kind = "gpu";
+        dev.deviceType = deviceType;
+        dev.staticUuid = deviceUuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = device;
+        params["Name"] = devName;
+        return nsm::features::createChassisAttributesFeature(mockManager, dev,
+                                                             params);
     }
 };
 
@@ -495,112 +511,49 @@ TEST_F(NsmChassisBranch2Test, NsmChassisDimensionUpdate_ReturnsSuccess)
 }
 
 // ============================================================================
-// Factory: NSM_Chassis type with DEVICE_UUID present → L645 TRUE branch
-// (already partly covered, but here we exercise the direct createPowerState
-// path to ensure DeviceType=BASEBOARD with InstanceNumber present)
+// Feature: WriteProtectSupported with DeviceType=BASEBOARD → createWriteProtect
+// succeeds
 // ============================================================================
 
-TEST_F(NsmChassisBranch2Test, Factory_PowerState_BaseboardWithInstanceNumber)
+TEST_F(NsmChassisBranch2Test, Feature_ChassisAttributes_WriteProtect_Baseboard)
 {
-    const std::string altName = "HGX_B2_PwrState_1";
-    const std::string altObjPath = std::string(chassisInventoryBasePath) + "/" +
-                                   altName;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(altObjPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = altName;
-    basePropertyMap["UUID"] = deviceUuid;
-    basePropertyMap["DeviceType"] = uint64_t(NSM_DEV_ID_BASEBOARD);
-    basePropertyMap["InstanceNumber"] = uint64_t(3);
-
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(
-        altObjPath, basicIntfName + ".PowerState");
-    propertyMap["Type"] = std::string("NSM_PowerState");
-    propertyMap["InventoryObjPaths"] =
-        std::vector<std::string>{altObjPath + "/sensor"};
-    propertyMap["Priority"] = bool(false);
-
-    EXPECT_NO_THROW(nsmChassisCreateSensors(
-        mockManager, basicIntfName + ".PowerState", altObjPath));
+    const size_t before = device->deviceSensors.size();
+    auto rc = attributes("HGX_B2_WP_1", NSM_DEV_ID_BASEBOARD,
+                         {{"WriteProtectSupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // SKU, Health and the write protect jumper
+    EXPECT_EQ(device->deviceSensors.size(), before + 3);
 }
 
 // ============================================================================
-// Factory: NSM_Chassis_Attributes with WriteProtectSupported=true and
-// DeviceType=BASEBOARD → createWriteProtect succeeds (L421-424 path)
-// ============================================================================
-
-TEST_F(NsmChassisBranch2Test, Factory_ChassisAttributes_WriteProtect_Baseboard)
-{
-    const std::string altName = "HGX_B2_WP_1";
-    const std::string altObjPath = std::string(chassisInventoryBasePath) + "/" +
-                                   altName;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(altObjPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = altName;
-    basePropertyMap["UUID"] = deviceUuid;
-    basePropertyMap["DeviceType"] = uint64_t(NSM_DEV_ID_BASEBOARD);
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        altObjPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["WriteProtectSupported"] = bool(true);
-
-    EXPECT_NO_THROW(nsmChassisCreateSensors(
-        mockManager, basicIntfName + ".ChassisAttributes", altObjPath));
-}
-
-// ============================================================================
-// Factory: NSM_Chassis_Attributes with ErrorInjectionSupported=true and
-// DeviceType=MCTP_BRIDGE → createErrorInjectionPayload calls
-// createNsmMCUErrorInjectionSensors (L438-442 path, L349 TRUE branch)
+// Feature: ErrorInjectionSupported with DeviceType=MCTP_BRIDGE →
+// createErrorInjectionPayload calls createNsmMCUErrorInjectionSensors
 // ============================================================================
 
 TEST_F(NsmChassisBranch2Test,
-       Factory_ChassisAttributes_ErrorInjection_MctpBridge)
+       Feature_ChassisAttributes_ErrorInjection_MctpBridge)
 {
-    const std::string altName = "HGX_B2_ErrInj_1";
-    const std::string altObjPath = std::string(chassisInventoryBasePath) + "/" +
-                                   altName;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(altObjPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = altName;
-    basePropertyMap["UUID"] = deviceUuid;
-    basePropertyMap["DeviceType"] = uint64_t(NSM_DEV_ID_MCTP_BRIDGE);
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        altObjPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["ErrorInjectionSupported"] = bool(true);
-
-    EXPECT_NO_THROW(nsmChassisCreateSensors(
-        mockManager, basicIntfName + ".ChassisAttributes", altObjPath));
+    const size_t before = device->deviceSensors.size();
+    auto rc = attributes("HGX_B2_ErrInj_1", NSM_DEV_ID_MCTP_BRIDGE,
+                         {{"ErrorInjectionSupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(device->deviceSensors.size(), before + 2);
 }
 
 // ============================================================================
-// Factory: NSM_Chassis_Attributes with AssetInformationAvailable=true and
-// Manufacturer present in interface props → createAsset with Manufacturer
-// TRUE branch at L74
+// Feature: AssetInformationAvailable=true with Manufacturer → createAsset with
+// Manufacturer TRUE branch
 // ============================================================================
 
-TEST_F(NsmChassisBranch2Test, Factory_ChassisAttributes_AssetWithManufacturer)
+TEST_F(NsmChassisBranch2Test, Feature_ChassisAttributes_AssetWithManufacturer)
 {
-    const std::string altName = "HGX_B2_AssetMfr_1";
-    const std::string altObjPath = std::string(chassisInventoryBasePath) + "/" +
-                                   altName;
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(altObjPath,
-                                                              basicIntfName);
-    basePropertyMap["Name"] = altName;
-    basePropertyMap["UUID"] = deviceUuid;
-
-    auto& propertyMapAttributes = utils::MockDbusAsync::propertyMap(
-        altObjPath, basicIntfName + ".ChassisAttributes");
-    propertyMapAttributes["Type"] = std::string("NSM_Chassis_Attributes");
-    propertyMapAttributes["AssetInformationAvailable"] = bool(true);
-    propertyMapAttributes["Manufacturer"] = std::string("TestManufacturer");
-
-    EXPECT_NO_THROW(nsmChassisCreateSensors(
-        mockManager, basicIntfName + ".ChassisAttributes", altObjPath));
+    const size_t before = device->deviceSensors.size();
+    auto rc = attributes("HGX_B2_AssetMfr_1", NSM_DEV_ID_GPU,
+                         {{"AssetInformationAvailable", true},
+                          {"Manufacturer", std::string("TestManufacturer")}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(device->deviceSensors.size(), before + 2);
 }

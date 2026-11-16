@@ -5,6 +5,7 @@ tests = [
     'overrideDecode_test',
     'policyStore_test',
     'featureDriver_test',
+    'deviceLists_test',
 ]
 
 foreach t : tests

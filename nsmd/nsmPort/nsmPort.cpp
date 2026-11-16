@@ -11,6 +11,8 @@
 #if defined(ENABLE_LLDP)
 #include "nsmLLDPLib/nsmLldpPort.hpp"
 #endif
+#include "nsmPortFeatures.hpp"
+#include "sensorManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
@@ -2685,418 +2687,6 @@ void NsmGetPortECCCounters::updateMetricOnSharedMemory()
 #endif
 }
 
-requester::Coroutine createNsmPortSensor(SensorManager& manager,
-                                         const std::string& interface,
-                                         const std::string& objPath,
-                                         bool enableNetworkPortAddresses)
-{
-    auto& bus = utils::DBusHandler::getBus();
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
-
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
-    {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    std::string parentObjPath{};
-    if (allCurrentIfaceProperties.count("ParentObjPath"))
-    {
-        parentObjPath = std::get<std::string>(
-            allCurrentIfaceProperties.at("ParentObjPath"));
-    }
-    bool priority{};
-    if (allCurrentIfaceProperties.count("Priority"))
-    {
-        priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
-    }
-    uint64_t count{};
-    if (allCurrentIfaceProperties.count("Count"))
-    {
-        count = std::get<uint64_t>(allCurrentIfaceProperties.at("Count"));
-    }
-    if (count > std::numeric_limits<uint8_t>::max())
-    {
-        lg2::error("Port Count exceeds supported uint8_t range: {COUNT}",
-                   "COUNT", count);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
-    }
-    uint64_t deviceType{};
-    if (allCurrentIfaceProperties.count("DeviceType"))
-    {
-        deviceType =
-            std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceType"));
-    }
-    uuid_t uuid{};
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-    // Optional per-platform override for FEC histogram support. When present it
-    // takes priority over the default device-type heuristic (irrespective of
-    // device type); when absent the previous behaviour is preserved.
-    std::optional<bool> supportFECHistogram;
-    if (allCurrentIfaceProperties.count("SupportFECHistogram"))
-    {
-        supportFECHistogram =
-            std::get<bool>(allCurrentIfaceProperties.at("SupportFECHistogram"));
-    }
-    std::vector<std::string> portNameMap{};
-    if (allCurrentIfaceProperties.count("PortNameMap"))
-    {
-        portNameMap = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("PortNameMap"));
-    }
-    if (!portNameMap.empty() && portNameMap.size() != count)
-    {
-        lg2::warning(
-            "Ignoring PortNameMap because its size does not match Count: {COUNT}",
-            "COUNT", count);
-        portNameMap.clear();
-    }
-    std::vector<std::string> portLocationCodeMap{};
-    if (allCurrentIfaceProperties.count("PortLocationCodeMap"))
-    {
-        portLocationCodeMap = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("PortLocationCodeMap"));
-    }
-    if (!portLocationCodeMap.empty() && portLocationCodeMap.size() != count)
-    {
-        lg2::warning(
-            "Ignoring PortLocationCodeMap because its size does not match Count: {COUNT}",
-            "COUNT", count);
-        portLocationCodeMap.clear();
-    }
-    std::string portLocationContext{};
-    if (allCurrentIfaceProperties.count("PortLocationContext"))
-    {
-        portLocationContext = std::get<std::string>(
-            allCurrentIfaceProperties.at("PortLocationContext"));
-    }
-    std::string portLocationReference{};
-    if (allCurrentIfaceProperties.count("PortLocationReference"))
-    {
-        portLocationReference = std::get<std::string>(
-            allCurrentIfaceProperties.at("PortLocationReference"));
-    }
-
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-    if (!nsmDevice)
-    {
-        // cannot find a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of NSM_NVlink PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
-    }
-
-#if defined(ENABLE_LLDP)
-    bool lldpPacketSupported = false;
-    auto lldpRc = co_await coIsLldpPacketSupported(uuid, lldpPacketSupported);
-    if (lldpRc != NSM_SUCCESS)
-    {
-        lg2::error(
-            "coIsLldpPacketSupported failed for port sensor creation: UUID={UUID}, NAME={NAME}, RC={RC}",
-            "UUID", uuid, "NAME", name, "RC", lldpRc);
-    }
-#endif
-
-    // get topology information from EM
-    std::string deviceName =
-        parentObjPath.substr(parentObjPath.find_last_of('/') + 1);
-    std::string topologyIntfSubStr =
-        "xyz.openbmc_project.Configuration.NVLinkTopology.Topology";
-    std::string topologyObjPath = getTopologyObjPath(deviceName, deviceType);
-    TopologyData deviceTopologies{};
-    co_await coGetTopologyData(topologyObjPath, topologyIntfSubStr,
-                               deviceTopologies);
-
-    // create nvlink [as per count and also they are 1-based]
-    for (uint64_t i = 0; i < count; i++)
-    {
-        uint8_t logicalPortNum = i + 1;
-        std::string portName = portNameMap.empty()
-                                   ? name + '_' + std::to_string(i)
-                                   : portNameMap[i];
-        std::string objPath = parentObjPath + "/Ports/" + portName;
-        std::string nodeGuidObjPath = objPath + "/Infiniband_Node_Guid";
-        std::string ethernetMacAddressObjPath = objPath +
-                                                "/Ethernet_MAC_Address";
-        std::string permanentMacAddressObjPath = objPath +
-                                                 "/Permanent_MAC_Address";
-        std::vector<utils::Association> associations;
-
-        auto deviceTopologyIt = deviceTopologies.find(objPath);
-        if (deviceTopologies.size() != 0 &&
-            deviceTopologyIt != deviceTopologies.end())
-        {
-            logicalPortNum = deviceTopologyIt->second.first;
-            associations = deviceTopologyIt->second.second;
-        }
-        else
-        {
-            lg2::debug(
-                "Topology information not found for object port number: {PNUM} and path: {OBJP}",
-                "PNUM", logicalPortNum, "OBJP", objPath);
-        }
-
-        std::string portLocationCode = portLocationCodeMap.empty()
-                                           ? std::string{}
-                                           : portLocationCodeMap[i];
-        if (!portLocationCode.empty() || !portLocationContext.empty() ||
-            !portLocationReference.empty())
-        {
-            auto location =
-                std::make_shared<NsmInterfaceProvider<PortLocationIntf>>(
-                    portName, type, dbus::Interfaces{objPath});
-            location->invoke(pdiMethod(locationType),
-                             PortLocationIntf::LocationTypes::Connector);
-            nsmDevice->addDeviceSensors(location);
-        }
-        if (!portLocationCode.empty())
-        {
-            auto locationCode =
-                std::make_shared<NsmInterfaceProvider<PortLocationCodeIntf>>(
-                    portName, type, dbus::Interfaces{objPath});
-            locationCode->invoke(pdiMethod(locationCode), portLocationCode);
-            nsmDevice->addDeviceSensors(locationCode);
-        }
-        if (!portLocationContext.empty())
-        {
-            auto locationContext =
-                std::make_shared<NsmInterfaceProvider<PortLocationContextIntf>>(
-                    portName, type, dbus::Interfaces{objPath});
-            locationContext->invoke(pdiMethod(locationContext),
-                                    portLocationContext);
-            nsmDevice->addDeviceSensors(locationContext);
-        }
-        if (!portLocationReference.empty())
-        {
-            try
-            {
-                auto locationReference = std::make_shared<
-                    NsmInterfaceProvider<PortLocationReferenceIntf>>(
-                    portName, type, dbus::Interfaces{objPath});
-                locationReference->invoke(
-                    pdiMethod(locationReference),
-                    PortLocationReferenceIntf::convertReferenceAreasFromString(
-                        portLocationReference));
-                nsmDevice->addDeviceSensors(locationReference);
-            }
-            catch (const sdbusplus::exception::InvalidEnumString&)
-            {
-                lg2::warning(
-                    "Ignoring invalid PortLocationReference: {LOCATION_REFERENCE}",
-                    "LOCATION_REFERENCE", portLocationReference);
-            }
-        }
-
-        if (enableNetworkPortAddresses)
-        {
-            associations.emplace_back("parent_device",
-                                      "network_device_functions",
-                                      parentObjPath.c_str());
-            associations.emplace_back("associated_infiniband_port_address",
-                                      "associated_port",
-                                      nodeGuidObjPath.c_str());
-            associations.emplace_back("associated_ethernet_port_address",
-                                      "associated_port",
-                                      ethernetMacAddressObjPath.c_str());
-            associations.emplace_back("associated_ethernet_port_address",
-                                      "associated_port",
-                                      permanentMacAddressObjPath.c_str());
-
-            auto aggregateNetworkAddressesSensor =
-                std::make_shared<NsmNetworkAddressAggregator>(
-                    bus, portName, type, objPath, nodeGuidObjPath,
-                    ethernetMacAddressObjPath, permanentMacAddressObjPath,
-                    static_cast<uint16_t>(logicalPortNum));
-            nsmDevice->addSensor(aggregateNetworkAddressesSensor, false);
-        }
-
-        auto iBPortIntf = std::make_shared<IBPortIntf>(bus, objPath.c_str());
-        auto portMetricsOem2Intf =
-            std::make_shared<PortMetricsOem2Intf>(bus, objPath.c_str());
-        auto portPacketCountersIntf =
-            std::make_shared<PortPacketCountersIntf>(bus, objPath.c_str());
-
-        // PortHealthMetrics applies to every NVLink port regardless of EM
-        // "Name". This factory serves only the NSM_NVLink EM types, so PCIe
-        // ports never reach here.
-        if (deviceType == NSM_DEV_ID_GPU || deviceType == NSM_DEV_ID_SWITCH)
-        {
-            std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
-
-            auto portHealthMetricsIntf =
-                std::make_shared<PortHealthMetricsIntf>(bus, objPath.c_str());
-
-            if (deviceType == NSM_DEV_ID_GPU)
-            {
-                portMetricsOem3Intf =
-                    std::make_shared<PortMetricsOem3Intf>(bus, objPath.c_str());
-
-                auto portStatusSensor = std::make_shared<NsmPortStatus>(
-                    bus, portName, logicalPortNum, type, portMetricsOem3Intf,
-                    objPath);
-                nsmDevice->addSensor(portStatusSensor, priority);
-            }
-
-            // Owns the Query Port Characteristics (0x42) fallback for devices
-            // that do not support 0x12, so no separate sensor is created.
-            auto portCharacteristicsV2Sensor =
-                std::make_shared<NsmPortCharacteristicsV2>(
-                    bus, portName, logicalPortNum, type, deviceType,
-                    portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
-                    objPath, nsmDevice);
-            nsmDevice->addSensor(portCharacteristicsV2Sensor, priority);
-        }
-
-        auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
-            bus, portName, logicalPortNum, type, deviceType, associations,
-            parentObjPath, objPath, iBPortIntf, portMetricsOem2Intf,
-            portPacketCountersIntf);
-        if (nsmDevice->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
-            (nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8 ||
-             nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 ||
-             nsmDevice->getDeviceRole() ==
-                 NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC))
-        {
-            auto portECCCountersSensor =
-                std::make_shared<NsmGetPortECCCounters>(
-                    bus, portName, type, objPath,
-                    static_cast<uint16_t>(logicalPortNum));
-            nsmDevice->addSensor(portECCCountersSensor, priority);
-        }
-
-        if (!portMetricsSensor)
-        {
-            lg2::error(
-                "Failed to create NSM Port Metric sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                objPath);
-        }
-        else
-        {
-            nsmDevice->addSensor(portMetricsSensor, priority);
-        }
-
-        if (nsmDevice->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
-            (nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8 ||
-             nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 ||
-             nsmDevice->getDeviceRole() ==
-                 NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC))
-        {
-            auto ethPortMetricsSensor =
-                std::make_shared<EthPortTelemetryAggregator>(
-                    bus, portName, static_cast<uint16_t>(logicalPortNum), type,
-                    objPath, portMetricsOem2Intf, portPacketCountersIntf);
-            nsmDevice->addSensor(ethPortMetricsSensor, priority);
-        }
-
-#if defined(ENABLE_LLDP)
-        if (lldpPacketSupported)
-        {
-            createLldpPacketSensorsForPort(
-                bus, nsmDevice, deviceName + '_' + portName, type, objPath,
-                static_cast<uint16_t>(logicalPortNum), priority);
-        }
-#endif
-
-#if defined(ENABLE_NETWORK_ADAPTER_RESET)
-        // "OpticalModuleResetSupported": true in the port EM config entry
-        // triggers per-port optical module reset (NSM cmd 0x06, Target=5).
-        // The EM config is the source of truth — gated solely on the config
-        // flag, no device-role check.
-        if (allCurrentIfaceProperties.count("OpticalModuleResetSupported") &&
-            std::get<bool>(
-                allCurrentIfaceProperties.at("OpticalModuleResetSupported")))
-        {
-            // port_index carries the local port index (1-based) as defined by
-            // the OOB Device Reset spec, so pass logicalPortNum (not the
-            // 0-based loop index i).
-            auto opticalResetSensor = std::make_shared<NsmOpticalModuleReset>(
-                bus, portName, type, objPath, nsmDevice,
-                static_cast<uint32_t>(logicalPortNum));
-            nsmDevice->addDeviceSensors(opticalResetSensor);
-        }
-#endif
-        // "OpticalModuleTelemetrySupported": true triggers per-port optical
-        // module telemetry collection (NSM cmd 0x14 group 0x09).
-        if (allCurrentIfaceProperties.count(
-                "OpticalModuleTelemetrySupported") &&
-            std::get<bool>(allCurrentIfaceProperties.at(
-                "OpticalModuleTelemetrySupported")))
-        {
-            auto opticalTelemetrySensor =
-                std::make_shared<NsmOpticalModuleTelemetry>(
-                    bus, portName, type, objPath,
-                    static_cast<uint16_t>(logicalPortNum));
-            nsmDevice->addSensor(opticalTelemetrySensor, priority);
-        }
-
-#ifdef NVIDIA_FEC_HISTOGRAM
-        // FEC histogram applicability:
-        //  - if the EM config override (SupportFECHistogram) is present, honour
-        //  its
-        //    value (true/false) irrespective of device type.
-        //  - otherwise fall back to the default behaviour of adding it for
-        //  every
-        //    non-PCIe-bridge device.
-        bool fecHistogramApplicable;
-        if (supportFECHistogram.has_value())
-        {
-            fecHistogramApplicable = supportFECHistogram.value();
-        }
-        else
-        {
-            fecHistogramApplicable = (deviceType != NSM_DEV_ID_PCIE_BRIDGE);
-        }
-
-        if (fecHistogramApplicable)
-        {
-            // add FEC histogram
-            std::string histoObjName = "FEC_0";
-            std::string histoDbusObjPath = objPath + "/Histograms/" +
-                                           histoObjName;
-
-            const uint32_t fecHistogramID = NSM_COMPOSITE_HISTOGRAM_ID_FEC;
-
-            auto fecHistoFormatIntf =
-                std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());
-            auto histoBucketDataIntf =
-                std::make_shared<BucketInfoIntf>(bus, histoDbusObjPath.c_str());
-            std::vector<std::tuple<std::string, std::string, std::string>>
-                associationsList;
-            associationsList.emplace_back("parent_port", "histograms", objPath);
-            auto getFECHistoFormatObject = std::make_shared<NsmHistogramFormat>(
-                bus, histoObjName, deviceName + "_FEC_Histogram",
-                fecHistoFormatIntf, histoBucketDataIntf, objPath,
-                associationsList, fecHistogramID, logicalPortNum);
-
-            auto getFECHistoDataObject = std::make_shared<NsmHistogramData>(
-                histoObjName, deviceName + "_FEC_Histogram", fecHistoFormatIntf,
-                histoBucketDataIntf, fecHistogramID, logicalPortNum);
-
-            nsmDevice->addStaticSensor(getFECHistoFormatObject);
-            nsmDevice->addSensor(getFECHistoDataObject, false);
-        }
-#endif
-
-        manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
-
-        // This loop builds every port on the device with no suspension
-        // point of its own, so the event loop cannot run until the last
-        // one is done. Yield per port to keep it responsive.
-        co_await common::Sleep(nsmDevice->getEvent(), 0, common::NonPriority);
-    }
-    // coverity[missing_return]
-    co_return NSM_SUCCESS;
-}
-
 NsmOpticalModuleTelemetry::NsmOpticalModuleTelemetry(
     sdbusplus::bus_t& bus, const std::string& portName, const std::string& type,
     const std::string& portObjPath, uint16_t portNumber) :
@@ -3338,27 +2928,354 @@ NsmOpticalModuleReset::NsmOpticalModuleReset(
 }
 #endif
 
-requester::Coroutine
-    createNsmPortSensorWithNetworkPortAddresses(SensorManager& manager,
-                                                const std::string& interface,
-                                                const std::string& objPath)
-{
-    auto rc = co_await createNsmPortSensor(manager, interface, objPath, true);
-    co_return rc;
-}
-
-requester::Coroutine createNsmPortSensorGeneric(SensorManager& manager,
-                                                const std::string& interface,
-                                                const std::string& objPath)
-{
-    auto rc = co_await createNsmPortSensor(manager, interface, objPath, false);
-    co_return rc;
-}
-
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmPortSensorWithNetworkPortAddresses,
-    "xyz.openbmc_project.Configuration.NSM_NVLinkWithNetworkPortAddresses")
-REGISTER_NSM_CREATION_FUNCTION(createNsmPortSensorGeneric,
-                               "xyz.openbmc_project.Configuration.NSM_NVLink")
-
 } // namespace nsm
+
+namespace nsm::features
+{
+
+requester::Coroutine createNVLinkFeature(SensorManager& manager,
+                                         const DeviceContext& dev,
+                                         const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("NVLink feature of {NAME}: no NsmDevice", "NAME", dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto& bus = utils::DBusHandler::getBus();
+    auto nsmDevice = dev.device;
+    const auto& uuid = dev.staticUuid;
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    auto parentObjPath =
+        param<std::string>(params, "ParentObjPath").value_or("");
+    auto priority = param<bool>(params, "Priority").value_or(false);
+    auto count = param<uint64_t>(params, "Count").value_or(0);
+    if (count > std::numeric_limits<uint8_t>::max())
+    {
+        lg2::error("Port Count exceeds supported uint8_t range: {COUNT}",
+                   "COUNT", count);
+        co_return NSM_ERROR;
+    }
+    uint64_t deviceType = dev.deviceType;
+    auto supportFECHistogram = param<bool>(params, "SupportFECHistogram");
+    auto portNameMap = param<std::vector<std::string>>(params, "PortNameMap")
+                           .value_or(std::vector<std::string>{});
+    if (!portNameMap.empty() && portNameMap.size() != count)
+    {
+        lg2::warning(
+            "Ignoring PortNameMap because its size does not match Count: {COUNT}",
+            "COUNT", count);
+        portNameMap.clear();
+    }
+    auto portLocationCodeMap =
+        param<std::vector<std::string>>(params, "PortLocationCodeMap")
+            .value_or(std::vector<std::string>{});
+    if (!portLocationCodeMap.empty() && portLocationCodeMap.size() != count)
+    {
+        lg2::warning(
+            "Ignoring PortLocationCodeMap because its size does not match Count: {COUNT}",
+            "COUNT", count);
+        portLocationCodeMap.clear();
+    }
+    auto portLocationContext =
+        param<std::string>(params, "PortLocationContext").value_or("");
+    auto portLocationReference =
+        param<std::string>(params, "PortLocationReference").value_or("");
+    [[maybe_unused]] auto opticalModuleResetSupported =
+        param<bool>(params, "OpticalModuleResetSupported").value_or(false);
+    auto opticalModuleTelemetrySupported =
+        param<bool>(params, "OpticalModuleTelemetrySupported").value_or(false);
+    auto enableNetworkPortAddresses =
+        param<bool>(params, "NetworkPortAddressesEnabled").value_or(false);
+
+    const std::string type = enableNetworkPortAddresses
+                                 ? "NSM_NVLinkWithNetworkPortAddresses"
+                                 : "NSM_NVLink";
+
+#if defined(ENABLE_LLDP)
+    bool lldpPacketSupported = false;
+    auto lldpRc = co_await coIsLldpPacketSupported(uuid, lldpPacketSupported);
+    if (lldpRc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "coIsLldpPacketSupported failed for port sensor creation: UUID={UUID}, NAME={NAME}, RC={RC}",
+            "UUID", uuid, "NAME", name, "RC", lldpRc);
+    }
+#endif
+
+    // get topology information from EM
+    std::string deviceName =
+        parentObjPath.substr(parentObjPath.find_last_of('/') + 1);
+    std::string topologyIntfSubStr =
+        "xyz.openbmc_project.Configuration.NVLinkTopology.Topology";
+    std::string topologyObjPath = getTopologyObjPath(deviceName, deviceType);
+    TopologyData deviceTopologies{};
+    co_await coGetTopologyData(topologyObjPath, topologyIntfSubStr,
+                               deviceTopologies);
+
+    // create nvlink [as per count and also they are 1-based]
+    for (uint64_t i = 0; i < count; i++)
+    {
+        uint8_t logicalPortNum = i + 1;
+        std::string portName = portNameMap.empty()
+                                   ? name + '_' + std::to_string(i)
+                                   : portNameMap[i];
+        std::string objPath = parentObjPath + "/Ports/" + portName;
+        std::string nodeGuidObjPath = objPath + "/Infiniband_Node_Guid";
+        std::string ethernetMacAddressObjPath = objPath +
+                                                "/Ethernet_MAC_Address";
+        std::string permanentMacAddressObjPath = objPath +
+                                                 "/Permanent_MAC_Address";
+        std::vector<utils::Association> associations;
+
+        auto deviceTopologyIt = deviceTopologies.find(objPath);
+        if (deviceTopologies.size() != 0 &&
+            deviceTopologyIt != deviceTopologies.end())
+        {
+            logicalPortNum = deviceTopologyIt->second.first;
+            associations = deviceTopologyIt->second.second;
+        }
+        else
+        {
+            lg2::debug(
+                "Topology information not found for object port number: {PNUM} and path: {OBJP}",
+                "PNUM", logicalPortNum, "OBJP", objPath);
+        }
+
+        std::string portLocationCode = portLocationCodeMap.empty()
+                                           ? std::string{}
+                                           : portLocationCodeMap[i];
+        if (!portLocationCode.empty() || !portLocationContext.empty() ||
+            !portLocationReference.empty())
+        {
+            auto location =
+                std::make_shared<NsmInterfaceProvider<PortLocationIntf>>(
+                    portName, type, dbus::Interfaces{objPath});
+            location->invoke(pdiMethod(locationType),
+                             PortLocationIntf::LocationTypes::Connector);
+            nsmDevice->addDeviceSensors(location);
+        }
+        if (!portLocationCode.empty())
+        {
+            auto locationCode =
+                std::make_shared<NsmInterfaceProvider<PortLocationCodeIntf>>(
+                    portName, type, dbus::Interfaces{objPath});
+            locationCode->invoke(pdiMethod(locationCode), portLocationCode);
+            nsmDevice->addDeviceSensors(locationCode);
+        }
+        if (!portLocationContext.empty())
+        {
+            auto locationContext =
+                std::make_shared<NsmInterfaceProvider<PortLocationContextIntf>>(
+                    portName, type, dbus::Interfaces{objPath});
+            locationContext->invoke(pdiMethod(locationContext),
+                                    portLocationContext);
+            nsmDevice->addDeviceSensors(locationContext);
+        }
+        if (!portLocationReference.empty())
+        {
+            try
+            {
+                auto locationReference = std::make_shared<
+                    NsmInterfaceProvider<PortLocationReferenceIntf>>(
+                    portName, type, dbus::Interfaces{objPath});
+                locationReference->invoke(
+                    pdiMethod(locationReference),
+                    PortLocationReferenceIntf::convertReferenceAreasFromString(
+                        portLocationReference));
+                nsmDevice->addDeviceSensors(locationReference);
+            }
+            catch (const sdbusplus::exception::InvalidEnumString&)
+            {
+                lg2::warning(
+                    "Ignoring invalid PortLocationReference: {LOCATION_REFERENCE}",
+                    "LOCATION_REFERENCE", portLocationReference);
+            }
+        }
+
+        if (enableNetworkPortAddresses)
+        {
+            associations.emplace_back("parent_device",
+                                      "network_device_functions",
+                                      parentObjPath.c_str());
+            associations.emplace_back("associated_infiniband_port_address",
+                                      "associated_port",
+                                      nodeGuidObjPath.c_str());
+            associations.emplace_back("associated_ethernet_port_address",
+                                      "associated_port",
+                                      ethernetMacAddressObjPath.c_str());
+            associations.emplace_back("associated_ethernet_port_address",
+                                      "associated_port",
+                                      permanentMacAddressObjPath.c_str());
+
+            auto aggregateNetworkAddressesSensor =
+                std::make_shared<NsmNetworkAddressAggregator>(
+                    bus, portName, type, objPath, nodeGuidObjPath,
+                    ethernetMacAddressObjPath, permanentMacAddressObjPath,
+                    static_cast<uint16_t>(logicalPortNum));
+            nsmDevice->addSensor(aggregateNetworkAddressesSensor, false);
+        }
+
+        auto iBPortIntf = std::make_shared<IBPortIntf>(bus, objPath.c_str());
+        auto portMetricsOem2Intf =
+            std::make_shared<PortMetricsOem2Intf>(bus, objPath.c_str());
+        auto portPacketCountersIntf =
+            std::make_shared<PortPacketCountersIntf>(bus, objPath.c_str());
+
+        // PortHealthMetrics applies to every NVLink port regardless of
+        // "Name".
+        if (deviceType == NSM_DEV_ID_GPU || deviceType == NSM_DEV_ID_SWITCH)
+        {
+            std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
+
+            auto portHealthMetricsIntf =
+                std::make_shared<PortHealthMetricsIntf>(bus, objPath.c_str());
+
+            if (deviceType == NSM_DEV_ID_GPU)
+            {
+                portMetricsOem3Intf =
+                    std::make_shared<PortMetricsOem3Intf>(bus, objPath.c_str());
+
+                auto portStatusSensor = std::make_shared<NsmPortStatus>(
+                    bus, portName, logicalPortNum, type, portMetricsOem3Intf,
+                    objPath);
+                nsmDevice->addSensor(portStatusSensor, priority);
+            }
+
+            // Owns the Query Port Characteristics (0x42) fallback for devices
+            // that do not support 0x12, so no separate sensor is created.
+            auto portCharacteristicsV2Sensor =
+                std::make_shared<NsmPortCharacteristicsV2>(
+                    bus, portName, logicalPortNum, type, deviceType,
+                    portMetricsOem3Intf, iBPortIntf, portHealthMetricsIntf,
+                    objPath, nsmDevice);
+            nsmDevice->addSensor(portCharacteristicsV2Sensor, priority);
+        }
+
+        auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
+            bus, portName, logicalPortNum, type, deviceType, associations,
+            parentObjPath, objPath, iBPortIntf, portMetricsOem2Intf,
+            portPacketCountersIntf);
+        if (nsmDevice->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
+            (nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8 ||
+             nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 ||
+             nsmDevice->getDeviceRole() ==
+                 NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC))
+        {
+            auto portECCCountersSensor =
+                std::make_shared<NsmGetPortECCCounters>(
+                    bus, portName, type, objPath,
+                    static_cast<uint16_t>(logicalPortNum));
+            nsmDevice->addSensor(portECCCountersSensor, priority);
+        }
+
+        if (!portMetricsSensor)
+        {
+            lg2::error(
+                "Failed to create NSM Port Metric sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
+                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
+                objPath);
+        }
+        else
+        {
+            nsmDevice->addSensor(portMetricsSensor, priority);
+        }
+
+        if (nsmDevice->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
+            (nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8 ||
+             nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 ||
+             nsmDevice->getDeviceRole() ==
+                 NSM_PCIE_BRIDGE_DEV_ROLE_CX_BLUEFIELD_NIC))
+        {
+            auto ethPortMetricsSensor =
+                std::make_shared<EthPortTelemetryAggregator>(
+                    bus, portName, static_cast<uint16_t>(logicalPortNum), type,
+                    objPath, portMetricsOem2Intf, portPacketCountersIntf);
+            nsmDevice->addSensor(ethPortMetricsSensor, priority);
+        }
+
+#if defined(ENABLE_LLDP)
+        if (lldpPacketSupported)
+        {
+            createLldpPacketSensorsForPort(
+                bus, nsmDevice, deviceName + '_' + portName, type, objPath,
+                static_cast<uint16_t>(logicalPortNum), priority);
+        }
+#endif
+
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+        // port_index is the 1-based local port index from the OOB Device
+        // Reset spec, not the 0-based loop index
+        if (opticalModuleResetSupported)
+        {
+            auto opticalResetSensor = std::make_shared<NsmOpticalModuleReset>(
+                bus, portName, type, objPath, nsmDevice,
+                static_cast<uint32_t>(logicalPortNum));
+            nsmDevice->addDeviceSensors(opticalResetSensor);
+        }
+#endif
+        if (opticalModuleTelemetrySupported)
+        {
+            auto opticalTelemetrySensor =
+                std::make_shared<NsmOpticalModuleTelemetry>(
+                    bus, portName, type, objPath,
+                    static_cast<uint16_t>(logicalPortNum));
+            nsmDevice->addSensor(opticalTelemetrySensor, priority);
+        }
+
+#ifdef NVIDIA_FEC_HISTOGRAM
+        // With SupportFECHistogram set, its value decides irrespective of
+        // device type; otherwise every non-PCIe-bridge device gets one
+        bool fecHistogramApplicable;
+        if (supportFECHistogram.has_value())
+        {
+            fecHistogramApplicable = supportFECHistogram.value();
+        }
+        else
+        {
+            fecHistogramApplicable = (deviceType != NSM_DEV_ID_PCIE_BRIDGE);
+        }
+
+        if (fecHistogramApplicable)
+        {
+            std::string histoObjName = "FEC_0";
+            std::string histoDbusObjPath = objPath + "/Histograms/" +
+                                           histoObjName;
+
+            const uint32_t fecHistogramID = NSM_COMPOSITE_HISTOGRAM_ID_FEC;
+
+            auto fecHistoFormatIntf =
+                std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());
+            auto histoBucketDataIntf =
+                std::make_shared<BucketInfoIntf>(bus, histoDbusObjPath.c_str());
+            std::vector<std::tuple<std::string, std::string, std::string>>
+                associationsList;
+            associationsList.emplace_back("parent_port", "histograms", objPath);
+            auto getFECHistoFormatObject = std::make_shared<NsmHistogramFormat>(
+                bus, histoObjName, deviceName + "_FEC_Histogram",
+                fecHistoFormatIntf, histoBucketDataIntf, objPath,
+                associationsList, fecHistogramID, logicalPortNum);
+
+            auto getFECHistoDataObject = std::make_shared<NsmHistogramData>(
+                histoObjName, deviceName + "_FEC_Histogram", fecHistoFormatIntf,
+                histoBucketDataIntf, fecHistogramID, logicalPortNum);
+
+            nsmDevice->addStaticSensor(getFECHistoFormatObject);
+            nsmDevice->addSensor(getFECHistoDataObject, false);
+        }
+#else
+        (void)supportFECHistogram;
+#endif
+
+        manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
+
+        // The loop has no suspension point of its own; yield per port to
+        // keep the event loop responsive.
+        co_await common::Sleep(nsmDevice->getEvent(), 0, common::NonPriority);
+    }
+    co_return NSM_SUCCESS;
+}
+
+} // namespace nsm::features

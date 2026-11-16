@@ -10,16 +10,19 @@
 #ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
 #endif
+#include "features/associations.hpp"
+#include "globals.hpp"
 #include "nsmDevice.hpp"
+#include "nsmInterface.hpp"
+#include "nsmMemoryFeatures.hpp"
 #include "nsmObjectFactory.hpp"
 
 #include <phosphor-logging/lg2.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationContext/server.hpp>
 
 #include <optional>
 #include <unordered_map>
 #include <vector>
-#define MEMORY_INTERFACE "xyz.openbmc_project.Configuration.NSM_Memory"
-
 namespace nsm
 {
 
@@ -877,82 +880,125 @@ void createMemoryMemCapacityUtil(std::shared_ptr<NsmDevice> nsmDevice,
     nsmDevice->addSensor(sensor, priority, isLongRunning);
 }
 
-requester::Coroutine createNsmMemorySensor(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
+
+static std::string memoryInventoryObjPath(const DeviceContext& dev)
+{
+    return (dimmInventoryBasePath / (deviceBaseName(dev) + "_DRAM_0")).string();
+}
+
+requester::Coroutine createMemoryFeature(SensorManager& manager,
+                                         const DeviceContext& dev,
+                                         const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        auto& bus = utils::DBusHandler::getBus();
-        dbus::PropertyMap allBaseIfaceProperties;
-        auto rc = co_await utils::coGetCachedBaseProperties(
-            objPath, MEMORY_INTERFACE, allBaseIfaceProperties);
-        if (rc != NSM_SUCCESS)
-        {
-            co_return rc;
-        }
-        auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-            utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
-
-        std::string name{};
-        if (allBaseIfaceProperties.count("Name"))
-        {
-            name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
-        }
-        uuid_t uuid{};
-        if (allBaseIfaceProperties.count("UUID"))
-        {
-            uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
-        }
-        std::string type{};
-        if (allCurrentIfaceProperties.count("Type"))
-        {
-            type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
-        }
-        std::string inventoryObjPath{};
-        if (allBaseIfaceProperties.count("InventoryObjPath"))
-        {
-            inventoryObjPath = std::get<std::string>(
-                allBaseIfaceProperties.at("InventoryObjPath"));
-        }
-
-        inventoryObjPath = inventoryObjPath + "_DRAM_0";
-        auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-        if (!nsmDevice)
-        {
-            // cannot found a nsmDevice for the sensor
-            lg2::error(
-                "The UUID of NSM_Processor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-                "UUID", uuid, "NAME", name, "TYPE", type);
-            // coverity[missing_return]
-            co_return NSM_ERROR;
-        }
-
-        if (type == "NSM_Memory")
-        {
-            std::vector<utils::Association> associations{};
-            co_await utils::coGetAssociations(
-                objPath, interface + ".Associations", associations);
-            createNSMMemory(nsmDevice, manager, bus, name, type,
-                            inventoryObjPath, allCurrentIfaceProperties,
-                            associations);
-        }
-        else if (type == "NSM_Memory_Attributes")
-        {
-            createMemoryRowRemapping(nsmDevice, bus, name, type,
-                                     inventoryObjPath);
-            createMemoryECCMode(nsmDevice, bus, name, type, inventoryObjPath);
-            createMemoryMemCapacityUtil(nsmDevice, name, type,
-                                        inventoryObjPath);
-        }
+        lg2::error("Memory feature of {NAME}: no NsmDevice", "NAME", dev.name);
+        co_return NSM_ERROR;
     }
-    // coverity[missing_return]
+
+    auto& bus = utils::DBusHandler::getBus();
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_Memory";
+    std::string inventoryObjPath = memoryInventoryObjPath(dev);
+
+    dbus::PropertyMap properties{};
+    if (auto errorCorrection = param<std::string>(params, "ErrorCorrection"))
+    {
+        properties.emplace("ErrorCorrection", *errorCorrection);
+    }
+    if (auto deviceType = param<std::string>(params, "DeviceType"))
+    {
+        properties.emplace("DeviceType", *deviceType);
+    }
+    if (auto priority = param<bool>(params, "Priority"))
+    {
+        properties.emplace("Priority", *priority);
+    }
+
+    std::vector<utils::Association> associations{};
+    addAssociations(associations, params, "ProcessorAssociationPaths",
+                    "parent_processor", "all_memory");
+    addAssociations(associations, params, "ParentChassisAssociationPaths",
+                    "parent_chassis", "all_memory");
+
+    createNSMMemory(dev.device, manager, bus, name, type, inventoryObjPath,
+                    properties, associations);
+
     co_return NSM_SUCCESS;
 }
 
-dbus::Interfaces memoryInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_Memory",
-    "xyz.openbmc_project.Configuration.NSM_Memory.MemoryAttributes"};
+requester::Coroutine
+    createMemoryAttributesFeature([[maybe_unused]] SensorManager& manager,
+                                  const DeviceContext& dev,
+                                  const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("MemoryAttributes feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
+    }
 
-REGISTER_NSM_CREATION_FUNCTION(createNsmMemorySensor, memoryInterfaces)
+    auto& bus = utils::DBusHandler::getBus();
 
-} // namespace nsm
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_Memory_Attributes";
+    std::string inventoryObjPath = memoryInventoryObjPath(dev);
+
+    createMemoryRowRemapping(dev.device, bus, name, type, inventoryObjPath);
+    createMemoryECCMode(dev.device, bus, name, type, inventoryObjPath);
+    createMemoryMemCapacityUtil(dev.device, name, type, inventoryObjPath);
+
+    co_return NSM_SUCCESS;
+}
+
+using LocationCodeIntfMemory =
+    sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                    Decorator::server::LocationCode>;
+using LocationContextIntfMemory =
+    sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                    Decorator::server::LocationContext>;
+
+requester::Coroutine
+    createMemoryLocationFeature([[maybe_unused]] SensorManager& manager,
+                                const DeviceContext& dev,
+                                const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("MemoryLocation feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
+    }
+
+    auto name = param<std::string>(params, "Name").value_or("");
+    std::string type = "NSM_Memory";
+    std::string inventoryObjPath = memoryInventoryObjPath(dev);
+
+    if (auto locationCode = param<std::string>(params, "LocationCode");
+        locationCode && !locationCode->empty())
+    {
+        auto sensor =
+            std::make_shared<NsmInterfaceProvider<LocationCodeIntfMemory>>(
+                name, type, dbus::Interfaces{inventoryObjPath});
+        sensor->invoke(pdiMethod(locationCode), *locationCode);
+        dev.device->addDeviceSensors(sensor);
+    }
+    if (auto context = param<std::string>(params, "LocationContext"))
+    {
+        auto sensor =
+            std::make_shared<NsmInterfaceProvider<LocationContextIntfMemory>>(
+                name, type, dbus::Interfaces{inventoryObjPath});
+        sensor->invoke(pdiMethod(locationContext), *context);
+        dev.device->addDeviceSensors(sensor);
+    }
+
+    co_return NSM_SUCCESS;
+}
+
+} // namespace nsm::features

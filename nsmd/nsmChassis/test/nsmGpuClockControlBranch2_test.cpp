@@ -20,7 +20,6 @@
 //   - clearClockLimit: AsyncOp path
 //   - doClearClockLimitOnDevice: wrapper coroutine
 //   - setRangeClockLimits: neither SettingMin nor SettingMax provided
-//   - Factory: createControlGpuClock with nsmDevice=null
 
 #include "test/mockDBusHandler.hpp"
 #include "test/mockSensorManager.hpp"
@@ -35,13 +34,6 @@ using namespace ::testing;
 #include "test/commonMock.hpp"
 
 using namespace nsm;
-
-namespace nsm
-{
-requester::Coroutine createControlGpuClock(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
 
 // ============================================================================
 // Fixture
@@ -200,7 +192,5 @@ TEST_F(NsmGpuClockControlBranch2Test,
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
 }
 
-// =========================================================================
-// Factory: createControlGpuClock with missing UUID (nsmDevice = null)
-// =========================================================================
-// Factory null device test removed: requires utils::DBusHandler::getInstance()
+// Null-device feature test (createClockLimitFeature) is in
+// nsmGpuClockControl_test.cpp.

@@ -25,11 +25,10 @@
  *                                            missing-pending-payload guard,
  *                                            error CC and decode failure
  *   NsmAdaptiveTGPMode::updateReading      - both PDI properties are set
- *   createReconfigPermissions              - the sensor is created only when
- *                                            "AdaptiveTGPMode" is advertised in
- *                                            the ReconfigPermissions Features
- *                                            list (PRC knob 25), and NOT from a
- *                                            dedicated EM config interface
+ *   createReconfigPermissionsFeature       - the sensor is created only when
+ *                                            "AdaptiveTGPMode" is an available
+ *                                            and not disabled knob (PRC knob
+ *                                            25)
  */
 
 #include "test/mockDBusHandler.hpp"
@@ -48,14 +47,12 @@ using namespace ::testing;
 #undef private
 #undef protected
 
-using namespace nsm;
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 
-namespace nsm
-{
-requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
-                                              const std::string& interface,
-                                              const std::string& objPath);
-} // namespace nsm
+#include <algorithm>
+
+using namespace nsm;
 
 // ============================================================================
 // Fixture
@@ -321,7 +318,7 @@ TEST_F(NsmAdaptiveTGPModeTest, UpdateReading_SetsBothProperties)
 }
 
 // ============================================================================
-// createReconfigPermissions gate (PRC knob 25)
+// createReconfigPermissionsFeature gate (PRC knob 25)
 // ============================================================================
 
 struct NsmAdaptiveTGPModeFactoryTest :
@@ -329,8 +326,6 @@ struct NsmAdaptiveTGPModeFactoryTest :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_Processor";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
@@ -348,80 +343,79 @@ struct NsmAdaptiveTGPModeFactoryTest :
         cleanupDeviceSensors(devices);
     }
 
-    void setupReconfig(const std::string& path,
-                       const std::vector<std::string>& features)
+    /** @brief Run the ReconfigPermissions feature of the device `name` */
+    requester::Coroutine
+        createReconfig(const std::string& name,
+                       const std::vector<std::string>& availableKnobs,
+                       const std::vector<std::string>& disabledKnobs = {})
     {
-        auto& base = utils::MockDbusAsync::propertyMap(path, baseIntf);
-        base["UUID"] = std::string(gpuUuid);
-        base["Name"] = path;
-        base["InventoryObjPath"] = path;
+        nsm::features::DeviceContext dev;
+        dev.name = name;
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = gpu;
+        dbus::PropertyMap params{{"Name", name},
+                                 {"AvailableKnobs", availableKnobs},
+                                 {"DisabledKnobs", disabledKnobs}};
+        return nsm::features::createReconfigPermissionsFeature(mockManager, dev,
+                                                               params);
+    }
 
-        auto& reconf = utils::MockDbusAsync::propertyMap(
-            path, baseIntf + ".ReconfigPermissions");
-        reconf["Type"] = std::string("NSM_ReconfigPermissions");
-        reconf["UUID"] = std::string(gpuUuid);
-        reconf["Name"] = path;
-        reconf["Features"] = features;
+    size_t adaptiveTGPModeSensorCount() const
+    {
+        return std::count_if(gpu->roundRobinSensors.begin(),
+                             gpu->roundRobinSensors.end(), [](const auto& s) {
+            return std::dynamic_pointer_cast<NsmAdaptiveTGPMode>(s) != nullptr;
+        });
     }
 };
 
-// "AdaptiveTGPMode" present in Features -> the sensor is created.
+// "AdaptiveTGPMode" among the available knobs -> the sensor is created.
 TEST_F(NsmAdaptiveTGPModeFactoryTest, Created_WhenFeatureAdvertised)
 {
-    const std::string path =
-        "/xyz/openbmc_project/inventory/system/processors/GPU_ATGP_ON";
-    setupReconfig(path, {"CCMode", "AdaptiveTGPMode"});
-
     const auto before = gpu->roundRobinSensors.size();
-    createNsmProcessorSensor(mockManager, baseIntf + ".ReconfigPermissions",
-                             path);
+    auto rc = createReconfig("HGX_GPU_ATGP_ON", {"CCMode", "AdaptiveTGPMode"});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    // One NsmReconfigPermissions per feature (2) plus the AdaptiveTGPMode
+    // One NsmReconfigPermissions per knob (2) plus the AdaptiveTGPMode
     // sensor itself.
-    EXPECT_GT(gpu->roundRobinSensors.size(), before + 2u - 1u);
-
-    bool found = false;
-    for (const auto& s : gpu->roundRobinSensors)
-    {
-        if (std::dynamic_pointer_cast<NsmAdaptiveTGPMode>(s) != nullptr)
-        {
-            found = true;
-            break;
-        }
-    }
-    EXPECT_TRUE(found);
+    EXPECT_EQ(gpu->roundRobinSensors.size(), before + 3u);
+    EXPECT_EQ(adaptiveTGPModeSensorCount(), 1u);
 }
 
-// "AdaptiveTGPMode" absent from Features -> the sensor is NOT created.
+// "AdaptiveTGPMode" absent from the knobs -> the sensor is NOT created.
 TEST_F(NsmAdaptiveTGPModeFactoryTest, NotCreated_WhenFeatureAbsent)
 {
-    const std::string path =
-        "/xyz/openbmc_project/inventory/system/processors/GPU_ATGP_OFF";
-    setupReconfig(path, {"CCMode", "ECCEnable"});
+    auto rc = createReconfig("HGX_GPU_ATGP_OFF", {"CCMode", "ECCEnable"});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    createNsmProcessorSensor(mockManager, baseIntf + ".ReconfigPermissions",
-                             path);
-
-    for (const auto& s : gpu->roundRobinSensors)
-    {
-        EXPECT_EQ(std::dynamic_pointer_cast<NsmAdaptiveTGPMode>(s), nullptr);
-    }
+    EXPECT_EQ(adaptiveTGPModeSensorCount(), 0u);
 }
 
-// Empty Features list -> the sensor is NOT created.
+// "AdaptiveTGPMode" available but disabled -> the sensor is NOT created.
+TEST_F(NsmAdaptiveTGPModeFactoryTest, NotCreated_WhenFeatureDisabled)
+{
+    auto rc = createReconfig("HGX_GPU_ATGP_DIS", {"CCMode", "AdaptiveTGPMode"},
+                             {"AdaptiveTGPMode"});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    EXPECT_EQ(adaptiveTGPModeSensorCount(), 0u);
+}
+
+// Empty knob list -> the sensor is NOT created.
 TEST_F(NsmAdaptiveTGPModeFactoryTest, NotCreated_WhenFeaturesEmpty)
 {
-    const std::string path =
-        "/xyz/openbmc_project/inventory/system/processors/GPU_ATGP_EMPTY";
-    setupReconfig(path, {});
+    const auto before = gpu->roundRobinSensors.size();
+    auto rc = createReconfig("HGX_GPU_ATGP_EMPTY", {});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
 
-    createNsmProcessorSensor(mockManager, baseIntf + ".ReconfigPermissions",
-                             path);
-
-    for (const auto& s : gpu->roundRobinSensors)
-    {
-        EXPECT_EQ(std::dynamic_pointer_cast<NsmAdaptiveTGPMode>(s), nullptr);
-    }
+    EXPECT_EQ(gpu->roundRobinSensors.size(), before);
+    EXPECT_EQ(adaptiveTGPModeSensorCount(), 0u);
 }
 
 // ============================================================================

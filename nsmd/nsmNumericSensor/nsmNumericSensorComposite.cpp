@@ -17,6 +17,7 @@
 
 #include "nsmNumericSensorComposite.hpp"
 
+#include "nsmNumericSensorFeatures.hpp"
 #include "nsmPower.hpp"
 #include "sensorManager.hpp"
 
@@ -112,112 +113,54 @@ void NsmNumericSensorComposite::updateCompositeReading(std::string childName,
     }
 }
 
-requester::Coroutine CreateFPGATotalGPUPower(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
+
+requester::Coroutine
+    createNumericCompositeSensorFeature(SensorManager& manager,
+                                        const DeviceContext& dev,
+                                        const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("Numeric composite sensor of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
+    }
     auto& bus = utils::DBusHandler::getBus();
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
-
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
-    {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    std::string sensorType{};
-    if (allCurrentIfaceProperties.count("SensorType"))
-    {
-        sensorType =
-            std::get<std::string>(allCurrentIfaceProperties.at("SensorType"));
-    }
-
-    uuid_t uuid{};
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-
-    std::vector<utils::Association> associations{};
-    co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                      associations);
-
-    std::string physicalContext{};
-    if (allCurrentIfaceProperties.count("PhysicalContext"))
-    {
-        physicalContext = std::get<std::string>(
-            allCurrentIfaceProperties.at("PhysicalContext"));
-    }
-    std::string implementation{};
-    if (allCurrentIfaceProperties.count("Implementation"))
-    {
-        implementation = std::get<std::string>(
-            allCurrentIfaceProperties.at("Implementation"));
-    }
-
-#ifdef NVIDIA_SHMEM
-    std::string chassis_association;
-    for (const auto& association : associations)
-    {
-        // Accept legacy "chassis" (bmcweb RelatedItem anchors on the chassis)
-        // and new "parent_chassis" (bmcweb RelatedItem falls through to
-        // System) so a platform can opt in to the System anchor by renaming
-        // its EM config without any nsmd change.
-        if (association.forward == "chassis" ||
-            association.forward == "parent_chassis")
-        {
-            chassis_association = association.absolutePath;
-            break;
-        }
-    }
-
-    if (chassis_association.empty())
-    {
-        lg2::error(
-            "Association Property of TotalPower Sensor PDI has no chassis association. "
-            "Name={NAME}, Type={TYPE}",
-            "NAME", name, "TYPE", type);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
-    }
-#endif
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-
-    if (!nsmDevice)
-    {
-        // cannot found a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of CreateFPGATotalGPUPower PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
-    }
-
-    auto nsmFPGATotalGPUPowerSensorPath = "/xyz/openbmc_project/sensors/" +
-                                          sensorType + "/" + name;
+    const auto name = std::get<std::string>(params.at("Name"));
+    const auto sensorType = std::get<std::string>(params.at("SensorType"));
+    const auto path = "/xyz/openbmc_project/sensors/" + sensorType + "/" + name;
+    const auto chassis = utils::makeDBusNameValid(
+        (chassisInventoryBasePath /
+         std::get<std::string>(params.at("ChassisName")))
+            .string());
+    // Members declare their own total_power links (e.g. the GPU Processor
+    // TotalPowerAssociationEnabled), so only the chassis link is here
+    std::vector<utils::Association> associations{
+        {"chassis", "all_sensors", chassis}};
 #ifdef NVIDIA_SHMEM
     auto shmemSensor = std::make_unique<NsmNumericSensorShmem>(
-        name, sensorType, chassis_association,
+        name, sensorType, chassis,
         std::make_unique<SMBPBIPowerSMBusSensorBytesConverter>());
 #endif
-    auto fpgaTotalGpuPower = std::make_shared<NsmNumericSensorComposite>(
-        bus, name, associations, type, nsmFPGATotalGPUPowerSensorPath,
-        physicalContext, implementation
+    const std::string type = "NSM_NumericCompositeSensor";
+    auto sensor = std::make_shared<NsmNumericSensorComposite>(
+        bus, name, associations, type, path,
+        std::get<std::string>(params.at("PhysicalContext")),
+        std::get<std::string>(params.at("Implementation"))
 #ifdef NVIDIA_SHMEM
-        ,
+            ,
         std::move(shmemSensor)
 #endif
     );
-    nsmDevice->addDeviceSensors(fpgaTotalGpuPower);
-    manager.objectPathToSensorMap[nsmFPGATotalGPUPowerSensorPath] =
-        fpgaTotalGpuPower;
-    // coverity[missing_return]
+    dev.device->addDeviceSensors(sensor);
+    manager.objectPathToSensorMap[path] = sensor;
+    lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
+              "UUID", dev.staticUuid, "NAME", name, "TYPE", type);
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    CreateFPGATotalGPUPower,
-    "xyz.openbmc_project.Configuration.NSM_NumericCompositeSensor")
-} // namespace nsm
+} // namespace nsm::features

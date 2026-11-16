@@ -31,6 +31,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmChassis/nsmAERError.hpp"
 #include "nsmChassis/nsmChassisPCIeDevice.hpp"
 #include "nsmChassis/nsmNVSwitchAndNVMgmtNICChassis.hpp"
@@ -46,14 +48,24 @@ namespace nsm
 requester::Coroutine createNsmNVSwitchChassis(SensorManager& manager,
                                               const std::string& interface,
                                               const std::string& objPath);
-requester::Coroutine createNsmNVLinkMgmtNicChassis(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath);
-requester::Coroutine
-    nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
-                                      const std::string& interface,
-                                      const std::string& objPath);
 } // namespace nsm
+
+/** @brief Run a feature creator for the device `devName` */
+static requester::Coroutine runFeature(nsm::features::CreatorFn creator,
+                                       SensorManager& manager,
+                                       const std::string& devName,
+                                       const uuid_t& uuid,
+                                       std::shared_ptr<NsmDevice> device,
+                                       const dbus::PropertyMap& params)
+{
+    nsm::features::DeviceContext dev;
+    dev.name = devName;
+    dev.kind = "test";
+    dev.staticUuid = uuid;
+    dev.platformPrefix = "HGX_";
+    dev.device = std::move(device);
+    return creator(manager, dev, params);
+}
 
 static auto& testBus = utils::DBusHandler::getBus();
 
@@ -330,30 +342,26 @@ TEST_F(NsmChassisHelperFuncTest,
     EXPECT_GE(gpuDev->deviceSensors.size(), 1u);
 }
 
-TEST_F(NsmChassisHelperFuncTest,
-       DISABLED_CreateNsmNVLinkMgmtNicChassis_BaseType_CreatesUuidSensor)
+TEST_F(NsmChassisHelperFuncTest, NVLinkMgmtNicChassisFeature_CreatesUuidSensor)
 {
-    // Arrange
-    std::string objPath =
-        "/xyz/openbmc_project/inventory/b12e/mgmtnic_chassis1";
-    std::string baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis";
+    const size_t before = cx8Dev->deviceSensors.size();
+    auto rc = runFeature(nsm::features::createNVLinkMgmtNicChassisFeature,
+                         mockManager, "HGX_NVLinkMgmtNic_Chassis_B12E", cx8Uuid,
+                         cx8Dev,
+                         {{"Name", std::string("NVLinkMgmtNic_Chassis_B12E")}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    EXPECT_EQ(cx8Dev->deviceSensors.size(), before + 1);
+}
 
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              baseIntf);
-    basePropertyMap["Name"] = std::string("NVLinkMgmtNic_Chassis_B12E");
-    basePropertyMap["UUID"] = cx8Uuid;
-
-    auto& ifacePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                               baseIntf);
-    ifacePropertyMap["Type"] = std::string("NSM_NVLinkMgmtNic_Chassis");
-    ifacePropertyMap["UUID"] = std::string("test-uuid-5678");
-
-    // Act
-    createNsmNVLinkMgmtNicChassis(mockManager, baseIntf, objPath);
-
-    // Assert
-    EXPECT_GE(cx8Dev->deviceSensors.size(), 1u);
+TEST_F(NsmChassisHelperFuncTest, NVLinkMgmtNicChassisFeature_NoDevice_Error)
+{
+    auto rc = runFeature(nsm::features::createNVLinkMgmtNicChassisFeature,
+                         mockManager, "HGX_NVLinkMgmtNic_Chassis_NoDev",
+                         cx8Uuid, nullptr,
+                         {{"Name", std::string("NVLinkMgmtNic_NoDev")}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
 }
 
 // ============================================================================
@@ -410,121 +418,92 @@ struct NsmChassisPCIeDeviceHelperTest :
 // SECTION 8: nsmChassisPCIeDevice.cpp -- factory function coverage
 // ============================================================================
 
-TEST_F(NsmChassisPCIeDeviceHelperTest,
-       DISABLED_Factory_NSMChassisPCIeDevice_CreatesUuidAndAssociations)
+TEST_F(NsmChassisPCIeDeviceHelperTest, Feature_UUIDAndAssociations)
 {
-    // Arrange
-    std::string objPath =
-        "/xyz/openbmc_project/inventory/b12e/pcie_dev_factory1";
-    std::string baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice";
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              baseIntf);
-    basePropertyMap["ChassisName"] = std::string("HGX_Chassis_Fac1");
-    basePropertyMap["Name"] = std::string("GPU_B12E_F1");
-    basePropertyMap["UUID"] = gpuUuid;
-
-    auto& ifacePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                               baseIntf);
-    ifacePropertyMap["Type"] = std::string("NSM_ChassisPCIeDevice");
-    ifacePropertyMap["DEVICE_UUID"] = std::string("device-uuid-f1");
-
-    // Act
-    nsmChassisPCIeDeviceCreateSensors(mockManager, baseIntf, objPath);
-
-    // Assert - should create UUID and association sensors
-    EXPECT_GE(gpuDev->deviceSensors.size(), 2u);
+    const size_t before = gpuDev->deviceSensors.size();
+    auto rc = runFeature(nsm::features::createChassisPCIeDeviceUUIDFeature,
+                         mockManager, "HGX_Chassis_Fac1", gpuUuid, gpuDev,
+                         {{"Name", std::string("GPU_B12E_F1")}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    rc = runFeature(
+        nsm::features::createChassisPCIeDeviceAssociationsFeature, mockManager,
+        "HGX_Chassis_Fac1", gpuUuid, gpuDev,
+        {{"Name", std::string("GPU_B12E_F1")},
+         {"ChassisAssociationPaths",
+          std::vector<std::string>{"chassis/HGX_Chassis_Fac1", ""}}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // UUID and associations
+    EXPECT_EQ(gpuDev->deviceSensors.size(), before + 2);
 }
 
-TEST_F(NsmChassisPCIeDeviceHelperTest,
-       Factory_NSMChassisAttributes_CreatesAssetAndHealth)
+TEST_F(NsmChassisPCIeDeviceHelperTest, Feature_NoAssociationTargets_NoObject)
 {
-    // Arrange
-    std::string objPath =
-        "/xyz/openbmc_project/inventory/b12e/pcie_dev_factory2";
-    std::string baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice";
-    std::string attrIntf = baseIntf + ".ChassisAttributes";
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              baseIntf);
-    basePropertyMap["ChassisName"] = std::string("HGX_Chassis_Fac2");
-    basePropertyMap["Name"] = std::string("GPU_B12E_F2");
-    basePropertyMap["UUID"] = gpuUuid;
-
-    auto& ifacePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                               attrIntf);
-    ifacePropertyMap["Type"] = std::string("NSM_Chassis_Attributes");
-
-    // Act
-    nsmChassisPCIeDeviceCreateSensors(mockManager, attrIntf, objPath);
-
-    // Assert - should create asset (3) + health (1) sensors
-    EXPECT_GE(gpuDev->deviceSensors.size(), 4u);
+    const size_t before = gpuDev->deviceSensors.size();
+    auto rc =
+        runFeature(nsm::features::createChassisPCIeDeviceAssociationsFeature,
+                   mockManager, "HGX_Chassis_Fac1b", gpuUuid, gpuDev,
+                   {{"Name", std::string("GPU_B12E_F1b")}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpuDev->deviceSensors.size(), before);
 }
 
-TEST_F(NsmChassisPCIeDeviceHelperTest,
-       Factory_NSMPCIeDevice_CreatesLinkSpeedAndFunctions)
+TEST_F(NsmChassisPCIeDeviceHelperTest, Feature_AssetAndHealth)
 {
-    // Arrange
-    std::string objPath =
-        "/xyz/openbmc_project/inventory/b12e/pcie_dev_factory3";
-    std::string baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice";
-    std::string pcieIntf = baseIntf + ".PCIeDevice";
-
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              baseIntf);
-    basePropertyMap["ChassisName"] = std::string("HGX_Chassis_Fac3");
-    basePropertyMap["Name"] = std::string("GPU_B12E_F3");
-    basePropertyMap["UUID"] = gpuUuid;
-
-    auto& ifacePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                               pcieIntf);
-    ifacePropertyMap["Type"] = std::string("NSM_PCIeDevice");
-    ifacePropertyMap["DeviceType"] = std::string(
-        "xyz.openbmc_project.Inventory.Item.PCIeDevice."
-        "DeviceTypes.SingleFunction");
-    ifacePropertyMap["Functions"] = std::vector<uint64_t>{0};
-
-    // Act
-    nsmChassisPCIeDeviceCreateSensors(mockManager, pcieIntf, objPath);
-
-    // Assert
-    EXPECT_GE(gpuDev->deviceSensors.size(), 2u);
+    const size_t before = gpuDev->deviceSensors.size();
+    const dbus::PropertyMap params{{"Name", std::string("GPU_B12E_F2")}};
+    auto rc = runFeature(nsm::features::createChassisPCIeDeviceAssetFeature,
+                         mockManager, "HGX_Chassis_Fac2", gpuUuid, gpuDev,
+                         params);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    rc = runFeature(nsm::features::createChassisPCIeDeviceHealthFeature,
+                    mockManager, "HGX_Chassis_Fac2", gpuUuid, gpuDev, params);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // asset (3) + health (1)
+    EXPECT_EQ(gpuDev->deviceSensors.size(), before + 4);
 }
 
-TEST_F(NsmChassisPCIeDeviceHelperTest,
-       Factory_NSMMultiPortPCIeDevice_CreatesMultiPortSensors)
+TEST_F(NsmChassisPCIeDeviceHelperTest, Feature_PCIeDevice_LinkSpeedAndFunctions)
 {
-    // Arrange
-    std::string objPath =
-        "/xyz/openbmc_project/inventory/b12e/pcie_dev_factory4";
-    std::string baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice";
-    std::string multiIntf = baseIntf + ".MultiPortPCIeDevice";
+    const size_t before = gpuDev->deviceSensors.size();
+    auto rc = runFeature(
+        nsm::features::createChassisPCIeDevicePCIeDeviceFeature, mockManager,
+        "HGX_Chassis_Fac3", gpuUuid, gpuDev,
+        {{"Name", std::string("GPU_B12E_F3")},
+         {"DeviceType", std::string("xyz.openbmc_project.Inventory.Item."
+                                    "PCIeDevice.DeviceTypes.SingleFunction")},
+         {"Functions", std::vector<uint64_t>{0}}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // link speed + function 0 (+ AER status when enabled)
+    EXPECT_GE(gpuDev->deviceSensors.size(), before + 2);
+}
 
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              baseIntf);
-    basePropertyMap["ChassisName"] = std::string("HGX_Chassis_Fac4");
-    basePropertyMap["Name"] = std::string("Retimer_B12E_F4");
-    basePropertyMap["UUID"] = retimerUuid;
-
-    auto& ifacePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                               multiIntf);
-    ifacePropertyMap["Type"] = std::string("NSM_MultiPortPCIeDevice");
-    ifacePropertyMap["DeviceType"] = std::string(
-        "xyz.openbmc_project.Inventory.Item.PCIeDevice."
-        "DeviceTypes.SingleFunction");
-    ifacePropertyMap["Functions"] = std::vector<uint64_t>{0};
-    ifacePropertyMap["UpstreamPortCount"] = static_cast<uint64_t>(1);
-
-    // Act
-    nsmChassisPCIeDeviceCreateSensors(mockManager, multiIntf, objPath);
-
-    // Assert - should create multiport PCIe device + retimer AER error
-    EXPECT_GE(retimerDev->deviceSensors.size(), 3u);
+TEST_F(NsmChassisPCIeDeviceHelperTest, Feature_MultiPortPCIeDeviceAndRetimerAER)
+{
+    const size_t before = retimerDev->deviceSensors.size();
+    auto rc = runFeature(
+        nsm::features::createChassisPCIeDeviceMultiPortPCIeDeviceFeature,
+        mockManager, "HGX_Chassis_Fac4", retimerUuid, retimerDev,
+        {{"Name", std::string("Retimer_B12E_F4")},
+         {"DeviceType", std::string("xyz.openbmc_project.Inventory.Item."
+                                    "PCIeDevice.DeviceTypes.SingleFunction")},
+         {"Functions", std::vector<uint64_t>{0}},
+         {"UpstreamPortCount", uint64_t(1)}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    rc = runFeature(
+        nsm::features::createChassisPCIeDeviceRetimerAERErrorStatusFeature,
+        mockManager, "HGX_Chassis_Fac4", retimerUuid, retimerDev,
+        {{"Name", std::string("Retimer_B12E_F4")}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // multiport PCIe device sensors + retimer AER error status
+    EXPECT_GE(retimerDev->deviceSensors.size(), before + 3);
 }
 
 // ============================================================================

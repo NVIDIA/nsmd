@@ -47,7 +47,6 @@ tests = [
     'nsmAERErrorAndChassisBranch_test',
     'nsmChassisBranch_test',
     'nsmChassisPCIeDeviceBranch_test',
-    'nsmErotBranch_test',
     'nsmClockOutputEnableState_test',
     'nsmGpuPresenceAndPowerStatus_test',
     'nsmGpuPresenceAndPowerStatusBranch_test',

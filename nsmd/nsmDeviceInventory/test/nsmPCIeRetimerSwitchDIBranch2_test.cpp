@@ -67,8 +67,6 @@ struct NsmPCIeRetimerSwitchDIBranch2Test :
 {
     const std::string retimerIntf =
         "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Switch";
-    const std::string multiPortIntf =
-        "xyz.openbmc_project.Configuration.NSM_MultiPortPCIeSwitchDevice";
     const uuid_t deviceUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
     const std::string invPath =
         "/xyz/openbmc_project/inventory/br2test/retimer2/";

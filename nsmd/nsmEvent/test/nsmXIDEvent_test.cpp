@@ -24,14 +24,9 @@ using namespace ::testing;
 
 #include "platform-environmental.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmXIDEvent.hpp"
-
-namespace nsm
-{
-requester::Coroutine createNsmXIDEvent(SensorManager& manager,
-                                       const std::string& interface,
-                                       const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -40,10 +35,7 @@ struct NsmXIDEventTest :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_Event_XID";
     const std::string name = "XIDEvent_Test";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/test";
 
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:1";
     // NSM DEVICE_GUID as published on the GPU chassis Common.UUID
@@ -68,9 +60,6 @@ struct NsmXIDEventTest :
 
     dbus::PropertyMap basicProperties = {
         {"Name", name},
-        {"UUID", gpuUuid},
-        {"OriginOfCondition",
-         std::string("/xyz/openbmc_project/inventory/system/chassis/GPU_1")},
         {"MessageId", std::string("NVIDIAGPUDiagnostics.1.0.XIDError")},
         {"LoggingNamespace", std::string("GPU_XID")},
         {"Resolution", std::string("Check GPU logs for more details")},
@@ -82,42 +71,53 @@ struct NsmXIDEventTest :
         {"EventIds", std::vector<std::string>{"XID_1", "XID_2"}},
         {"ImpactedComponent", std::string("GPU_1")},
     };
+
+    requester::Coroutine createXIDEvent(const dbus::PropertyMap& params,
+                                        bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "GPU_1";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return features::createXIDEventFeature(mockManager, dev, params);
+    }
 };
 
 TEST_F(NsmXIDEventTest, goodTestCreateXIDEvent)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = basicProperties;
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = createXIDEvent(basicProperties);
 
-    createNsmXIDEvent(mockManager, basicIntfName, objPath);
-
-    // Verify event was added to device (may create multiple events)
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(gpu->deviceEvents.size(), before + 1);
+    auto event =
+        std::dynamic_pointer_cast<NsmXIDEvent>(gpu->deviceEvents.back());
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->getName(), name);
+    EXPECT_EQ(event->getType(), "NSM_Event_XID");
+    EXPECT_EQ(event->info.uuid, gpuUuid);
+    // OriginOfCondition is derived from the device name, not the params
+    EXPECT_EQ(event->info.originOfCondition, "/redfish/v1/Chassis/GPU_1");
+    EXPECT_EQ(event->info.messageId, "NVIDIAGPUDiagnostics.1.0.XIDError");
+    EXPECT_EQ(event->info.loggingNamespace, "GPU_XID");
+    EXPECT_EQ(event->info.severity, Level::Critical);
+    EXPECT_EQ(event->info.errorId.size(), 2u);
+    EXPECT_EQ(event->info.impactedComponent, "GPU_1");
 }
 
-TEST_F(NsmXIDEventTest, badTestMissingUUID)
+TEST_F(NsmXIDEventTest, badTestNoDevice)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = basicProperties;
-    propertyMap.erase("UUID");
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = createXIDEvent(basicProperties, false);
 
-    EXPECT_THROW_COROUTINE(
-        createNsmXIDEvent(mockManager, basicIntfName, objPath),
-        std::runtime_error);
-}
-
-TEST_F(NsmXIDEventTest, badTestInvalidUUID)
-{
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = basicProperties;
-    propertyMap["UUID"] = "INVALID:UUID:FORMAT";
-
-    EXPECT_THROW_COROUTINE(
-        createNsmXIDEvent(mockManager, basicIntfName, objPath),
-        std::runtime_error);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceEvents.size(), before);
 }
 
 TEST_F(NsmXIDEventTest, testXIDEventConstructor)
@@ -356,13 +356,12 @@ TEST_F(NsmXIDEventTest, testWithDifferentSeverities)
         auto props = basicProperties;
         props["Severity"] = severityStr;
 
-        auto& propertyMap = utils::MockDbusAsync::propertyMap(
-            objPath + std::to_string((int)severityEnum), basicIntfName);
-        propertyMap = props;
-
-        // This should succeed for all valid severity levels
-        createNsmXIDEvent(mockManager, basicIntfName,
-                          objPath + std::to_string((int)severityEnum));
+        auto rc = createXIDEvent(props);
+        EXPECT_EQ(rc.data(), NSM_SUCCESS);
+        auto event =
+            std::dynamic_pointer_cast<NsmXIDEvent>(gpu->deviceEvents.back());
+        ASSERT_NE(event, nullptr);
+        EXPECT_EQ(event->info.severity, severityEnum);
     }
 }
 
@@ -371,13 +370,11 @@ TEST_F(NsmXIDEventTest, testEventWithEmptyMessageArgs)
     auto props = basicProperties;
     props["MessageArgs"] = std::vector<std::string>{};
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath + "_empty",
-                                                          basicIntfName);
-    propertyMap = props;
+    const size_t before = gpu->deviceEvents.size();
+    auto rc = createXIDEvent(props);
 
-    createNsmXIDEvent(mockManager, basicIntfName, objPath + "_empty");
-
-    EXPECT_GE(gpu->deviceEvents.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceEvents.size(), before + 1);
 }
 
 TEST_F(NsmXIDEventTest, testHandleXIDEventDecodeFailure)
@@ -629,26 +626,22 @@ TEST_F(NsmXIDEventTest, testHandleXIDEventWithErrorIdAndImpactedComponent)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
-// =============================================================================
-// FALSE-branch coverage: count() checks in createNsmXIDEvent
-// =============================================================================
-
-// Only UUID present → all 9 optional property count() checks return FALSE:
-//   Name, OriginOfCondition, MessageId, LoggingNamespace, Resolution,
-//   MessageArgs, Severity, EventIds, ImpactedComponent all absent →
-//   event created with empty/default values; severity=Level::Critical
-//   (via value_or since severityStr="" → convertStringToLevel returns nullopt)
+// Only Name set → every optional param falls back to its default and the
+// severity defaults to Level::Critical (convertStringToLevel("") → nullopt)
 TEST_F(NsmXIDEventTest, Factory_MinimalProperties_EventCreatedWithDefaults)
 {
-    const std::string uniquePath = "/xyz/test/xid/minimal_props";
-    auto& pm = utils::MockDbusAsync::propertyMap(uniquePath, basicIntfName);
-    // Only UUID → all other count() checks return 0 (FALSE branches)
-    pm["UUID"] = gpuUuid;
-
     const size_t before = gpu->deviceEvents.size();
-    createNsmXIDEvent(mockManager, basicIntfName, uniquePath);
-    // Event created with all-default optional fields
-    EXPECT_GT(gpu->deviceEvents.size(), before);
+    auto rc = createXIDEvent({{"Name", name}});
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(gpu->deviceEvents.size(), before + 1);
+    auto event =
+        std::dynamic_pointer_cast<NsmXIDEvent>(gpu->deviceEvents.back());
+    ASSERT_NE(event, nullptr);
+    EXPECT_TRUE(event->info.messageId.empty());
+    EXPECT_TRUE(event->info.messageArgs.empty());
+    EXPECT_TRUE(event->info.impactedComponent.empty());
+    EXPECT_EQ(event->info.severity, Level::Critical);
 }
 
 // Covers the FALSE branch of `if (!formattedMessageArgs.empty())` (line 100).

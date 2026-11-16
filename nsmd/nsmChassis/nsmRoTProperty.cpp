@@ -496,10 +496,39 @@ void NsmImageCopy::setImageCopyResult(std::shared_ptr<AsyncValueIntf> valueIntf,
     imageCopyRequestStatus(status);
 }
 
+static std::map<std::string, ComponentInfo>& activeSlotComponents()
+{
+    static std::map<std::string, ComponentInfo> components;
+    return components;
+}
+
+void registerActiveSlotComponent(const std::string& firmwareObjPath,
+                                 const ComponentInfo& componentInfo)
+{
+    activeSlotComponents().emplace(firmwareObjPath, componentInfo);
+}
+
+std::optional<ComponentInfo>
+    findActiveSlotComponent(const std::string& firmwareObjPath)
+{
+    auto it = activeSlotComponents().find(firmwareObjPath);
+    if (it == activeSlotComponents().end())
+    {
+        return std::nullopt;
+    }
+    return it->second;
+}
+
 requester::Coroutine
     NsmImageCopy::getActiveSlotComponentInfo(const std::string& objectPath,
                                              ComponentInfo& componentInfo)
 {
+    if (auto registered = findActiveSlotComponent(objectPath))
+    {
+        componentInfo = *registered;
+        co_return NSM_SW_SUCCESS;
+    }
+
     const std::string chassisPath =
         std::string("/xyz/openbmc_project/inventory/system/chassis");
 

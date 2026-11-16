@@ -17,8 +17,8 @@
 
 /*
  * Branch coverage for the three fecHistogramApplicable branches introduced
- * around supportFECHistogram in createNsmPortSensorGeneric
- * (nsmd/nsmPort/nsmPort.cpp, lines ~1960-1968):
+ * around supportFECHistogram in createNVLinkFeature
+ * (nsmd/nsmPort/nsmPort.cpp):
  *
  *   (1) supportFECHistogram present and true
  *         → fecHistogramApplicable = true  → FEC histogram sensors created
@@ -30,7 +30,7 @@
  * created
  *
  * NsmHistogramFormat is registered via addStaticSensor → staticSensors.
- * That is the only addStaticSensor call in createNsmPortSensorGeneric, so
+ * That is the only addStaticSensor call in createNVLinkFeature, so
  * staticSensors.size() unambiguously reflects whether the FEC histogram block
  * was entered.
  *
@@ -50,19 +50,14 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmPort.hpp"
 
 #undef private
 #undef protected
 
 using namespace nsm;
-
-namespace nsm
-{
-requester::Coroutine createNsmPortSensorGeneric(SensorManager& manager,
-                                                const std::string& interface,
-                                                const std::string& objPath);
-} // namespace nsm
 
 // ============================================================================
 // Fixture
@@ -72,9 +67,6 @@ struct NsmPortBranch7Test :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string portInterface =
-        "xyz.openbmc_project.Configuration.NSM_NVLink";
-
     NsmDeviceTable devices;
 
     NsmPortBranch7Test() : SensorManagerTest(devices) {}
@@ -86,7 +78,7 @@ struct NsmPortBranch7Test :
 
     /** @brief Drive the event loop until the task finishes.
      *
-     * createNsmPortSensorGeneric yields between ports, so the loop has to
+     * createNVLinkFeature yields between ports, so the loop has to
      * run for construction to complete. Bounded so a task that never
      * finishes fails here instead of hanging.
      */
@@ -100,33 +92,41 @@ struct NsmPortBranch7Test :
         ASSERT_TRUE(task.done());
     }
 
-    // Run the factory with Count=1 and the given configuration.
-    // supportFEC == nullopt means the "SupportFECHistogram" key is absent.
-    std::shared_ptr<MockNsmDevice> runFactory(const std::string& objPath,
-                                              const uuid_t& uuid,
-                                              uint64_t emDeviceType,
+    // Run the NVLink feature with Count=1 on the mock device `uuid` names;
+    // deviceType is the DeviceContext type the heuristic looks at.
+    // supportFEC == nullopt means the "SupportFECHistogram" param is absent.
+    std::shared_ptr<MockNsmDevice> runFactory(const uuid_t& uuid,
+                                              uint8_t deviceType,
                                               std::optional<bool> supportFEC)
     {
-        auto& propMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          portInterface);
-        propMap["Name"] = std::string("NVLink_FECTest");
-        propMap["UUID"] = uuid;
-        propMap["ParentObjPath"] =
-            std::string("/xyz/openbmc_project/inventory/system/FECTestDev");
-        propMap["Priority"] = false;
-        propMap["Count"] = uint64_t{1};
-        propMap["DeviceType"] = emDeviceType;
+        auto device = std::dynamic_pointer_cast<MockNsmDevice>(
+            mockManager.getNsmDeviceFromStaticUUID(uuid));
+
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_FECTestDev";
+        dev.kind = "gpu";
+        dev.deviceType = deviceType;
+        dev.staticUuid = uuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = device;
+
+        dbus::PropertyMap params{
+            {"Name", std::string("NVLink_FECTest")},
+            {"ParentObjPath",
+             std::string("/xyz/openbmc_project/inventory/system/FECTestDev")},
+            {"Priority", false},
+            {"Count", uint64_t{1}}};
         if (supportFEC.has_value())
         {
-            propMap["SupportFECHistogram"] = supportFEC.value();
+            params["SupportFECHistogram"] = supportFEC.value();
         }
 
-        auto task = createNsmPortSensorGeneric(mockManager, portInterface,
-                                               objPath);
+        auto task = nsm::features::createNVLinkFeature(mockManager, dev,
+                                                       params);
         runUntilDone(task);
+        EXPECT_EQ(task.data(), NSM_SUCCESS);
 
-        return std::dynamic_pointer_cast<MockNsmDevice>(
-            mockManager.getNsmDeviceFromStaticUUID(uuid));
+        return device;
     }
 };
 
@@ -134,7 +134,7 @@ struct NsmPortBranch7Test :
 
 // ============================================================================
 // Branch 1: supportFECHistogram present and true.
-// The EM config is set to DeviceType=NSM_DEV_ID_PCIE_BRIDGE — a type that
+// The DeviceContext deviceType is NSM_DEV_ID_PCIE_BRIDGE — a type that
 // the default heuristic would exclude — but the explicit
 // SupportFECHistogram=true overrides it, so fecHistogramApplicable=true and the
 // FEC histogram sensors are added.
@@ -145,10 +145,9 @@ TEST_F(NsmPortBranch7Test,
     // GPU UUID: MockNsmDevice::getDeviceType()==GPU keeps ECC/ETH sensors out,
     // leaving staticSensors as an unambiguous FEC-histogram indicator.
     const uuid_t uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:71";
-    const std::string objPath = "/xyz/openbmc_project/config/port_fec_b7_1";
 
-    auto dev = runFactory(objPath, uuid,
-                          /*emDeviceType=*/uint64_t{NSM_DEV_ID_PCIE_BRIDGE},
+    auto dev = runFactory(uuid,
+                          /*deviceType=*/NSM_DEV_ID_PCIE_BRIDGE,
                           /*supportFEC=*/true);
 
     ASSERT_NE(dev, nullptr);
@@ -160,7 +159,7 @@ TEST_F(NsmPortBranch7Test,
 
 // ============================================================================
 // Branch 2: supportFECHistogram present and false.
-// The EM config is set to DeviceType=NSM_DEV_ID_GPU — a type the default
+// The DeviceContext deviceType is NSM_DEV_ID_GPU — a type the default
 // heuristic would include — but SupportFECHistogram=false suppresses FEC,
 // so fecHistogramApplicable=false and no FEC histogram sensors are added.
 // ============================================================================
@@ -168,10 +167,9 @@ TEST_F(NsmPortBranch7Test,
        FecHistogram_SupportFalse_SuppressesFecOnNonPcieBridge)
 {
     const uuid_t uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:72";
-    const std::string objPath = "/xyz/openbmc_project/config/port_fec_b7_2";
 
-    auto dev = runFactory(objPath, uuid,
-                          /*emDeviceType=*/uint64_t{NSM_DEV_ID_GPU},
+    auto dev = runFactory(uuid,
+                          /*deviceType=*/NSM_DEV_ID_GPU,
                           /*supportFEC=*/false);
 
     ASSERT_NE(dev, nullptr);
@@ -182,18 +180,17 @@ TEST_F(NsmPortBranch7Test,
 // ============================================================================
 // Branch 3: supportFECHistogram absent — fallback heuristic.
 //   fecHistogramApplicable = (deviceType != NSM_DEV_ID_PCIE_BRIDGE)
-// DeviceType=NSM_DEV_ID_GPU (a non-PCIe-bridge value) makes the condition
+// deviceType=NSM_DEV_ID_GPU (a non-PCIe-bridge value) makes the condition
 // true, so FEC histogram sensors are created.
 // ============================================================================
 TEST_F(NsmPortBranch7Test,
        FecHistogram_SupportAbsent_FallbackNonPcieBridgeCreates)
 {
     const uuid_t uuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:73";
-    const std::string objPath = "/xyz/openbmc_project/config/port_fec_b7_3";
 
-    // SupportFECHistogram key absent; emDeviceType=GPU → heuristic yields true.
-    auto dev = runFactory(objPath, uuid,
-                          /*emDeviceType=*/uint64_t{NSM_DEV_ID_GPU},
+    // SupportFECHistogram key absent; deviceType=GPU → heuristic yields true.
+    auto dev = runFactory(uuid,
+                          /*deviceType=*/NSM_DEV_ID_GPU,
                           /*supportFEC=*/std::nullopt);
 
     ASSERT_NE(dev, nullptr);

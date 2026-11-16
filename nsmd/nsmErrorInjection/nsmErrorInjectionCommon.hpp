@@ -373,7 +373,8 @@ inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
         ErrorInjectionCapabilityIntf::Type::GPIOSpoofingErrors};
 
     if (deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA ||
-        deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_CX_SMA)
+        deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_CX_SMA ||
+        deviceRole == NSM_MCTP_BRIDGE_DEV_ROLE_BAY_C_SMA)
     {
         types.push_back(
             ErrorInjectionCapabilityIntf::Type::LeakDetectionErrors);

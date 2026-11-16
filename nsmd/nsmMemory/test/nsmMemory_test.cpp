@@ -25,15 +25,10 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "interfaceWrapper.hpp"
 #include "nsmMemory.hpp"
-
-namespace nsm
-{
-requester::Coroutine createNsmMemorySensor(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -535,9 +530,6 @@ struct NsmMemorySensorTestFixture :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_Memory";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/memory";
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:90";
 
     NsmDeviceTable devices;
@@ -554,42 +546,80 @@ struct NsmMemorySensorTestFixture :
     {
         cleanupDeviceSensors(devices);
     }
+
+    /** @brief Run a memory feature creator of the device "HGX_<baseName>";
+     *  its DIMM is dimm/<baseName>_DRAM_0, so each test uses its own name
+     */
+    requester::Coroutine runFeature(nsm::features::CreatorFn create,
+                                    const std::string& baseName,
+                                    const dbus::PropertyMap& params,
+                                    bool withDevice = true)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_" + baseName;
+        dev.kind = "gpu";
+        dev.deviceType = NSM_DEV_ID_GPU;
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return create(mockManager, dev, params);
+    }
+
+    /** @brief Memory feature params with valid ECC and DIMM device type */
+    static dbus::PropertyMap memoryParams(const std::string& name)
+    {
+        return {
+            {"Name", name},
+            {"ErrorCorrection",
+             std::string("xyz.openbmc_project.Inventory.Item.Dimm.Ecc.NoECC")},
+            {"DeviceType",
+             std::string("xyz.openbmc_project.Inventory.Item.Dimm."
+                         "DeviceType.DRAM")}};
+    }
+
+    size_t sensorCount() const
+    {
+        return gpu->deviceSensors.size() + gpu->staticSensors.size();
+    }
 };
 
 TEST_F(NsmMemorySensorTestFixture, goodTestCreateMemorySensor)
 {
-    dbus::PropertyMap properties = {
-        {"Name", std::string("Memory_Test")},
-        {"UUID", gpuUuid},
-        {"MemoryType", std::string("HBM")},
-        {"Count", uint64_t(8)},
-    };
+    const size_t initialCount = gpu->deviceSensors.size();
+    auto rc = runFeature(nsm::features::createMemoryFeature, "GPU_MemGood",
+                         memoryParams("Memory_Test"));
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = properties;
-
-    createNsmMemorySensor(mockManager, basicIntfName, objPath);
-
-    // Should create multiple sensors (RowRemapState, RowRemappingCounts, etc.)
-    EXPECT_GE(gpu->deviceSensors.size(), 1);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    // At least ErrorCorrection, DeviceType, Health, Location and Association
+    // device sensors, plus the polled clock and capacity sensors
+    EXPECT_GE(gpu->deviceSensors.size(), initialCount + 5);
 }
 
-TEST_F(NsmMemorySensorTestFixture, badTestMissingUUID)
+// No NsmDevice in the DeviceContext: every memory creator fails cleanly
+TEST_F(NsmMemorySensorTestFixture, badTestNoNsmDevice)
 {
-    dbus::PropertyMap properties = {
-        {"Name", std::string("Memory_NoUUID")},
-        {"MemoryType", std::string("HBM")},
-        {"Count", uint64_t(8)},
-    };
+    const size_t initialCount = sensorCount();
 
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath + "_nouuid",
-                                                          basicIntfName);
-    propertyMap = properties;
+    auto rc = runFeature(nsm::features::createMemoryFeature, "GPU_MemNoDev",
+                         memoryParams("Memory_NoDevice"), false);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
 
-    EXPECT_THROW_COROUTINE(
-        createNsmMemorySensor(mockManager, basicIntfName, objPath + "_nouuid"),
-        std::runtime_error);
+    rc = runFeature(nsm::features::createMemoryAttributesFeature,
+                    "GPU_MemNoDev", {{"Name", std::string("Memory_NoDevice")}},
+                    false);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+
+    rc = runFeature(nsm::features::createMemoryLocationFeature, "GPU_MemNoDev",
+                    {{"Name", std::string("Memory_NoDevice")},
+                     {"LocationCode", std::string("HBM_0")}},
+                    false);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+
+    EXPECT_EQ(sensorCount(), initialCount);
 }
 
 TEST_F(NsmMemorySensorTestFixture, testRowRemapStateUpdate)
@@ -690,27 +720,17 @@ TEST_F(NsmMemorySensorTestFixture, badTestRowRemapStateError)
 TEST_F(NsmMemorySensorTestFixture,
        testCreateMemorySensorWithMultipleMemoryDevices)
 {
+    const size_t initialCount = gpu->deviceSensors.size();
     for (size_t i = 0; i < 4; i++)
     {
-        std::string testPath = objPath + "_" + std::to_string(i);
-
-        dbus::PropertyMap properties = {
-            {"Name", std::string("Memory_") + std::to_string(i)},
-            {"UUID", gpuUuid},
-            {"MemoryType", std::string("HBM")},
-            {"Count", uint64_t(8)},
-        };
-
-        auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                              basicIntfName);
-        propertyMap = properties;
-
-        createNsmMemorySensor(mockManager, basicIntfName, testPath);
+        auto rc = runFeature(nsm::features::createMemoryFeature,
+                             "GPU_MemMulti_" + std::to_string(i),
+                             memoryParams("Memory_" + std::to_string(i)));
+        EXPECT_EQ(rc.data(), NSM_SUCCESS);
     }
 
-    // Should have created memory sensors (actual number depends on
-    // configuration)
-    EXPECT_GE(gpu->deviceSensors.size(), 1);
+    // Every memory device gets its own device sensors
+    EXPECT_GE(gpu->deviceSensors.size(), initialCount + 4 * 5);
 }
 
 // ============================================================================
@@ -867,81 +887,95 @@ TEST(nsmMemCurrClockFreq, HandleResponseMsg_ErrorCC_CoversBranch)
     EXPECT_EQ(rc, NSM_ERROR);
 }
 
-// Test createNsmMemorySensor with type "NSM_Memory" → calls createNSMMemory
+// createMemoryFeature → createNSMMemory
 TEST_F(NsmMemorySensorTestFixture, testCreateMemorySensorTypeNSMMemory)
 {
-    const std::string testPath = objPath + "_nsm_memory_type";
-
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, basicIntfName);
-    pm["Name"] = std::string("Memory_NsmMemory");
-    pm["UUID"] = gpuUuid;
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/nsm_test_mem_type1");
-    pm["Type"] = std::string("NSM_Memory");
-    pm["ErrorCorrection"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.Ecc.NoECC");
-    pm["DeviceType"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.DeviceType.DRAM");
-
-    size_t initialCount = gpu->deviceSensors.size() + gpu->staticSensors.size();
-    createNsmMemorySensor(mockManager, basicIntfName, testPath);
-    EXPECT_GT(gpu->deviceSensors.size() + gpu->staticSensors.size(),
-              initialCount);
+    size_t initialCount = sensorCount();
+    auto rc = runFeature(nsm::features::createMemoryFeature, "GPU_MemType1",
+                         memoryParams("Memory_NsmMemory"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(sensorCount(), initialCount);
 }
 
-// Test createNsmMemorySensor with type "NSM_Memory_Attributes" →
-// calls createMemoryRowRemapping, createMemoryECCMode,
-// createMemoryMemCapacityUtil
+// createMemoryAttributesFeature → createMemoryRowRemapping,
+// createMemoryECCMode, createMemoryMemCapacityUtil
 TEST_F(NsmMemorySensorTestFixture,
        testCreateMemorySensorTypeNSMMemoryAttributes)
 {
-    const std::string testPath = objPath + "_nsm_memory_attrs";
-
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, basicIntfName);
-    pm["Name"] = std::string("Memory_NsmMemoryAttrs");
-    pm["UUID"] = gpuUuid;
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/nsm_test_mem_attrs1");
-    pm["Type"] = std::string("NSM_Memory_Attributes");
-
     size_t initialCount = gpu->deviceSensors.size();
-    createNsmMemorySensor(mockManager, basicIntfName, testPath);
+    auto rc = runFeature(nsm::features::createMemoryAttributesFeature,
+                         "GPU_MemAttrs1",
+                         {{"Name", std::string("Memory_NsmMemoryAttrs")}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->deviceSensors.size(), initialCount);
 }
 
-// Test createNsmMemorySensor type "NSM_Memory" with Priority=true branch
+// createMemoryFeature with Priority=true
 TEST_F(NsmMemorySensorTestFixture, testCreateMemorySensorTypeNSMMemoryPriority)
 {
-    const std::string testPath = objPath + "_nsm_memory_prio";
+    auto params = memoryParams("Memory_NsmMemoryPrio");
+    params["Priority"] = true;
 
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, basicIntfName);
-    pm["Name"] = std::string("Memory_NsmMemoryPrio");
-    pm["UUID"] = gpuUuid;
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/nsm_test_mem_prio1");
-    pm["Type"] = std::string("NSM_Memory");
-    pm["ErrorCorrection"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.Ecc.NoECC");
-    pm["DeviceType"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.DeviceType.DRAM");
-    pm["Priority"] = bool(true);
-
-    size_t initialCount = gpu->deviceSensors.size() + gpu->staticSensors.size();
-    createNsmMemorySensor(mockManager, basicIntfName, testPath);
-    EXPECT_GT(gpu->deviceSensors.size() + gpu->staticSensors.size(),
-              initialCount);
+    size_t initialCount = sensorCount();
+    auto rc = runFeature(nsm::features::createMemoryFeature, "GPU_MemPrio1",
+                         params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(sensorCount(), initialCount);
 }
 
-// Test createNsmMemorySensor coGetCachedBaseProperties fail → early return
-TEST_F(NsmMemorySensorTestFixture, testCreateMemorySensorBasePropertiesFail)
+// ProcessorAssociationPaths / ParentChassisAssociationPaths become the
+// associations of the DIMM; empty entries are skipped
+TEST_F(NsmMemorySensorTestFixture, testCreateMemoryAssociations)
 {
-    const std::string testPath = objPath + "_no_base";
-    // No property map registered for this path → coGetCachedBaseProperties
-    // returns error → factory returns early without adding sensors
-    size_t initialCount = gpu->deviceSensors.size() + gpu->staticSensors.size();
-    createNsmMemorySensor(mockManager, basicIntfName, testPath);
-    EXPECT_EQ(gpu->deviceSensors.size() + gpu->staticSensors.size(),
-              initialCount);
+    auto params = memoryParams("Memory_Assoc");
+    params["ProcessorAssociationPaths"] =
+        std::vector<std::string>{"processors/GPU_MemAssoc", ""};
+    params["ParentChassisAssociationPaths"] =
+        std::vector<std::string>{"chassis/HGX_GPU_MemAssoc"};
+
+    auto rc = runFeature(nsm::features::createMemoryFeature, "GPU_MemAssoc",
+                         params);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+
+    std::shared_ptr<NsmMemoryAssociation> association;
+    for (const auto& sensor : gpu->deviceSensors)
+    {
+        if (auto a = std::dynamic_pointer_cast<NsmMemoryAssociation>(sensor))
+        {
+            association = a;
+        }
+    }
+    ASSERT_NE(association, nullptr);
+    using Tuple = std::tuple<std::string, std::string, std::string>;
+    EXPECT_EQ(
+        association->associationDef->associations(),
+        (std::vector<Tuple>{
+            {"parent_processor", "all_memory",
+             "/xyz/openbmc_project/inventory/system/processors/GPU_MemAssoc"},
+            {"parent_chassis", "all_memory",
+             "/xyz/openbmc_project/inventory/system/chassis/"
+             "HGX_GPU_MemAssoc"}}));
+}
+
+// createMemoryLocationFeature: LocationCode and LocationContext decorators
+TEST_F(NsmMemorySensorTestFixture, testCreateMemoryLocation)
+{
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = runFeature(nsm::features::createMemoryLocationFeature,
+                         "GPU_MemLoc",
+                         {{"Name", std::string("Memory_Loc")},
+                          {"LocationCode", std::string("HBM_0")},
+                          {"LocationContext", std::string("GPU_0")}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), before + 2);
+
+    // An empty LocationCode is not published
+    rc = runFeature(nsm::features::createMemoryLocationFeature,
+                    "GPU_MemLocEmpty",
+                    {{"Name", std::string("Memory_LocEmpty")},
+                     {"LocationCode", std::string("")}});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), before + 2);
 }
 
 // =============================================================================
@@ -1109,134 +1143,54 @@ TEST_F(NsmMemorySensorTestFixture, NsmMaxMemoryClockLimit_Update_BadCC)
 }
 
 // =============================================================================
-// FALSE-branch coverage: count() checks in createNsmMemorySensor
+// FALSE-branch coverage: absent params of the memory feature creators
 // =============================================================================
 
-// Type absent → count("Type") FALSE → type="" → none of the type-switch
-// branches match → no sensor created, no exception
-TEST_F(NsmMemorySensorTestFixture, Factory_MissingType_NoSensor)
-{
-    const std::string testPath = objPath + "_missing_type";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, basicIntfName);
-    pm["Name"] = std::string("Memory_NoType");
-    pm["UUID"] = gpuUuid;
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/nsm_test_notype");
-    // "Type" intentionally omitted → type="" → no type branch matches
-
-    size_t initialCount = gpu->deviceSensors.size() + gpu->staticSensors.size();
-    createNsmMemorySensor(mockManager, basicIntfName, testPath);
-    EXPECT_EQ(gpu->deviceSensors.size() + gpu->staticSensors.size(),
-              initialCount);
-}
-
-// InventoryObjPath absent → count("InventoryObjPath") FALSE →
-// inventoryObjPath="" → inventoryObjPath = "" + "_DRAM_0" = "_DRAM_0" →
-// relative D-Bus path → factory has no try/catch → propagates
-TEST_F(NsmMemorySensorTestFixture, Factory_MissingInventoryObjPath_Throws)
-{
-    const std::string testPath = objPath + "_missing_invpath";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, basicIntfName);
-    pm["Name"] = std::string("Memory_NoInvPath");
-    pm["UUID"] = gpuUuid;
-    // "InventoryObjPath" intentionally omitted → inventoryObjPath="" →
-    // path="_DRAM_0" (relative) → getInterfaceOnObjectPath throws
-    pm["Type"] = std::string("NSM_Memory");
-    pm["ErrorCorrection"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.Ecc.NoECC");
-    pm["DeviceType"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.DeviceType.DRAM");
-
-    EXPECT_THROW_COROUTINE(
-        createNsmMemorySensor(mockManager, basicIntfName, testPath),
-        std::exception);
-}
-
-// ErrorCorrection absent → count("ErrorCorrection") FALSE → correctionType="" →
-// NsmMemoryErrorCorrection ctor converts "" to enum → InvalidEnumString thrown
-// → factory has no try/catch → propagates
+// ErrorCorrection absent → correctionType="" → NsmMemoryErrorCorrection ctor
+// converts "" to enum → InvalidEnumString thrown → creator does not catch it
 TEST_F(NsmMemorySensorTestFixture,
        Factory_NSMMemory_MissingErrorCorrection_Throws)
 {
-    const std::string testPath = objPath + "_missing_errcorr";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, basicIntfName);
-    pm["Name"] = std::string("Memory_NoErrCorr");
-    pm["UUID"] = gpuUuid;
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/nsm_test_no_errcorr");
-    pm["Type"] = std::string("NSM_Memory");
-    // "ErrorCorrection" intentionally omitted → correctionType="" → throws
-    pm["DeviceType"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.DeviceType.DRAM");
+    auto params = memoryParams("Memory_NoErrCorr");
+    params.erase("ErrorCorrection");
 
-    EXPECT_THROW_COROUTINE(
-        createNsmMemorySensor(mockManager, basicIntfName, testPath),
-        std::exception);
+    EXPECT_THROW_COROUTINE(runFeature(nsm::features::createMemoryFeature,
+                                      "GPU_MemNoErrCorr", params),
+                           std::exception);
 }
 
-// DeviceType absent → count("DeviceType") FALSE → deviceType="" →
-// NsmMemoryDeviceType ctor converts "" to enum → InvalidEnumString thrown
-// → factory has no try/catch → propagates
+// DeviceType absent → deviceType="" → NsmMemoryDeviceType ctor converts ""
+// to enum → InvalidEnumString thrown → creator does not catch it
 TEST_F(NsmMemorySensorTestFixture, Factory_NSMMemory_MissingDeviceType_Throws)
 {
-    const std::string testPath = objPath + "_missing_devtype";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, basicIntfName);
-    pm["Name"] = std::string("Memory_NoDevType");
-    pm["UUID"] = gpuUuid;
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/nsm_test_no_devtype");
-    pm["Type"] = std::string("NSM_Memory");
-    pm["ErrorCorrection"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.Ecc.NoECC");
-    // "DeviceType" intentionally omitted → deviceType="" → throws
+    auto params = memoryParams("Memory_NoDevType");
+    params.erase("DeviceType");
 
-    EXPECT_THROW_COROUTINE(
-        createNsmMemorySensor(mockManager, basicIntfName, testPath),
-        std::exception);
+    EXPECT_THROW_COROUTINE(runFeature(nsm::features::createMemoryFeature,
+                                      "GPU_MemNoDevType", params),
+                           std::exception);
 }
 
-// count("Priority") FALSE in createNSMMemory (line 732): "Priority" absent →
-// priority stays false (default) → currClockFreqSensor added with
+// "Priority" absent → priority stays false → currClockFreqSensor added with
 // priority=false.
 TEST_F(NsmMemorySensorTestFixture, Factory_NSMMemory_PriorityAbsent_FalseBranch)
 {
-    const std::string testPath = objPath + "_nsm_memory_no_prio";
-
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, basicIntfName);
-    pm["Name"] = std::string("Memory_NoPriority");
-    pm["UUID"] = gpuUuid;
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/nsm_test_no_prio");
-    pm["Type"] = std::string("NSM_Memory");
-    pm["ErrorCorrection"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.Ecc.NoECC");
-    pm["DeviceType"] =
-        std::string("xyz.openbmc_project.Inventory.Item.Dimm.DeviceType.DRAM");
-    // "Priority" intentionally absent → L732 FALSE → priority stays false
-
-    size_t initialCount = gpu->deviceSensors.size() + gpu->staticSensors.size();
-    createNsmMemorySensor(mockManager, basicIntfName, testPath);
-    EXPECT_GT(gpu->deviceSensors.size() + gpu->staticSensors.size(),
-              initialCount);
+    size_t initialCount = sensorCount();
+    auto rc = runFeature(nsm::features::createMemoryFeature, "GPU_MemNoPrio",
+                         memoryParams("Memory_NoPriority"));
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(sensorCount(), initialCount);
 }
 
-// count("Name") FALSE in outer factory (line 822): "Name" absent → name="" →
-// type="NSM_Memory_Attributes" so createMemoryRowRemapping etc. are called
-// with empty name → sensors created (inventoryObjPath path is still valid).
+// "Name" absent → name="" → createMemoryRowRemapping etc. are called with
+// an empty name → sensors created (the DIMM path is still valid).
 TEST_F(NsmMemorySensorTestFixture, Factory_MissingName_MemAttrsCreated)
 {
-    const std::string testPath = objPath + "_missing_name";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, basicIntfName);
-    // "Name" intentionally omitted → name=""
-    pm["UUID"] = gpuUuid;
-    pm["InventoryObjPath"] =
-        std::string("/xyz/openbmc_project/inventory/nsm_test_no_name");
-    pm["Type"] = std::string("NSM_Memory_Attributes");
-
-    size_t initialCount = gpu->deviceSensors.size() + gpu->staticSensors.size();
-    createNsmMemorySensor(mockManager, basicIntfName, testPath);
-    EXPECT_GT(gpu->deviceSensors.size() + gpu->staticSensors.size(),
-              initialCount);
+    size_t initialCount = sensorCount();
+    auto rc = runFeature(nsm::features::createMemoryAttributesFeature,
+                         "GPU_MemAttrsNoName", {});
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(sensorCount(), initialCount);
 }
 
 // Exercises getInterfaceOnObjectPath<DimmIntf> else-branch

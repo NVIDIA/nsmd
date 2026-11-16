@@ -176,6 +176,10 @@ endif
 if get_option('enable-debug-token').enabled() and not cx8_features
     add_project_arguments('-DENABLE_DEBUG_TOKEN', language: ['cpp', 'c'])
 endif
+if get_option('enable-dot').enabled()
+    add_project_arguments('-DENABLE_DOT', language: ['cpp', 'c'])
+endif
+
 if get_option('nvidia-manager-ready-csm').enabled()
     add_project_arguments(
         '-DNVIDIA_MANAGER_READY_CSM',

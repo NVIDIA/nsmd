@@ -28,6 +28,8 @@ using namespace ::testing;
 
 #include "base.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmDeviceInventory/nsmPCIeRetimerSwitchDI.hpp"
 #include "nsmObjectFactory.hpp"
 
@@ -251,8 +253,6 @@ struct NsmPCIeRetimerSwitchFactoryTest :
 {
     const std::string pcrSwitchInterface =
         "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Switch";
-    const std::string multiPortInterface =
-        "xyz.openbmc_project.Configuration.NSM_MultiPortPCIeSwitchDevice";
     const std::string basePath =
         "/xyz/openbmc_project/inventory/system/retimer_sw_factory";
     // Unique UUID to avoid collision with other tests
@@ -276,15 +276,16 @@ struct NsmPCIeRetimerSwitchFactoryTest :
     }
 };
 
-// Verify factory functions are registered at startup
+// Verify the factory function is registered at startup
+// (NSM_MultiPortPCIeSwitchDevice is now created by the
+// createMultiPortPCIeSwitchDeviceFeature feature creator, not the factory)
 // DISABLED: SIOF — _register_0 (__attribute__((constructor))) runs before
 // pcieRetimerSwitchInterfaces is initialized → registers with empty interface
 // list → isSupported() returns false. Cannot fix without modifying source.
 TEST_F(NsmPCIeRetimerSwitchFactoryTest,
-       DISABLED_FactoryRegistration_BothInterfacesRegistered)
+       DISABLED_FactoryRegistration_InterfaceRegistered)
 {
     EXPECT_TRUE(NsmObjectFactory::instance().isSupported(pcrSwitchInterface));
-    EXPECT_TRUE(NsmObjectFactory::instance().isSupported(multiPortInterface));
 }
 
 // NSM_PCIeRetimer_Switch type → success: covers factory body lines 307-340
@@ -307,23 +308,90 @@ TEST_F(NsmPCIeRetimerSwitchFactoryTest,
     EXPECT_GT(gpu->deviceSensors.size(), before);
 }
 
-// NSM_MultiPortPCIeSwitchDevice type → success: covers factory body lines
-// 341-356 DISABLED: same SIOF — multiPortInterface also not registered
-TEST_F(NsmPCIeRetimerSwitchFactoryTest,
-       DISABLED_MultiPortPCIeSwitchDevice_Success_SensorCreated)
+// createMultiPortPCIeSwitchDeviceFeature: multiport switch inventory from
+// the feature params
+static requester::Coroutine
+    createMultiPortSwitch(SensorManager& manager,
+                          std::shared_ptr<NsmDevice> device, const uuid_t& uuid,
+                          const dbus::PropertyMap& params)
 {
-    const std::string testPath = basePath + "/mp0";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, multiPortInterface);
-    pm["Name"] = std::string("MultiPortSwitch0");
-    pm["UUID"] = retimerUuid;
-    pm["InventoryObjPath"] = invPath;
-    pm["DeviceInstance"] = uint64_t(1);
+    nsm::features::DeviceContext dev;
+    dev.name = "HGX_PCIeRetimer_0";
+    dev.kind = "pcieretimer";
+    dev.staticUuid = uuid;
+    dev.platformPrefix = "HGX_";
+    dev.device = std::move(device);
+    return nsm::features::createMultiPortPCIeSwitchDeviceFeature(manager, dev,
+                                                                 params);
+}
+
+TEST_F(NsmPCIeRetimerSwitchFactoryTest,
+       MultiPortPCIeSwitchDeviceFeature_Success_SensorCreated)
+{
+    dbus::PropertyMap params{
+        {"Name", std::string("MultiPortSwitch0")},
+        {"FabricName", std::string("HGX_PCIeRetimerTopology_0")},
+        {"DeviceInstance", uint64_t(1)},
+        {"ParentChassisAssociationPaths",
+         std::vector<std::string>{"chassis/HGX_PCIeRetimer_0"}},
+        {"FabricAssociationPaths",
+         std::vector<std::string>{"fabrics/HGX_PCIeRetimerTopology_0", ""}}};
 
     const size_t before = gpu->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, multiPortInterface,
-                                               testPath);
+    auto rc = createMultiPortSwitch(mockManager, gpu, retimerUuid, params);
 
-    EXPECT_GT(gpu->deviceSensors.size(), before);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    ASSERT_EQ(gpu->deviceSensors.size(), before + 1);
+    auto switchDi = std::dynamic_pointer_cast<NsmPCIeRetimerSwitchDI>(
+        gpu->deviceSensors.back());
+    ASSERT_NE(switchDi, nullptr);
+    EXPECT_EQ(switchDi->getName(), "MultiPortSwitch0");
+    EXPECT_EQ(switchDi->getType(), "NSM_MultiPortPCIeSwitchDevice");
+    // Empty association entries give no link
+    auto associations = switchDi->associationDefIntf->associations();
+    ASSERT_EQ(associations.size(), 2);
+    EXPECT_EQ(std::get<0>(associations[0]), "parent_chassis");
+    EXPECT_EQ(std::get<1>(associations[0]), "all_switches");
+    EXPECT_EQ(std::get<2>(associations[0]),
+              "/xyz/openbmc_project/inventory/system/chassis/"
+              "HGX_PCIeRetimer_0");
+    EXPECT_EQ(std::get<0>(associations[1]), "fabrics");
+    EXPECT_EQ(std::get<2>(associations[1]),
+              "/xyz/openbmc_project/inventory/system/fabrics/"
+              "HGX_PCIeRetimerTopology_0");
+}
+
+TEST_F(NsmPCIeRetimerSwitchFactoryTest,
+       MultiPortPCIeSwitchDeviceFeature_NoAssociations)
+{
+    dbus::PropertyMap params{
+        {"Name", std::string("MultiPortSwitch1")},
+        {"FabricName", std::string("HGX_PCIeRetimerTopology_0")}};
+
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = createMultiPortSwitch(mockManager, gpu, retimerUuid, params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_EQ(gpu->deviceSensors.size(), before + 1);
+    auto switchDi = std::dynamic_pointer_cast<NsmPCIeRetimerSwitchDI>(
+        gpu->deviceSensors.back());
+    ASSERT_NE(switchDi, nullptr);
+    EXPECT_TRUE(switchDi->associationDefIntf->associations().empty());
+}
+
+TEST_F(NsmPCIeRetimerSwitchFactoryTest,
+       MultiPortPCIeSwitchDeviceFeature_NoNsmDevice_Error)
+{
+    dbus::PropertyMap params{
+        {"Name", std::string("MultiPortSwitch2")},
+        {"FabricName", std::string("HGX_PCIeRetimerTopology_0")}};
+
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = createMultiPortSwitch(mockManager, nullptr, retimerUuid, params);
+
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
 // FALSE branch for count("Name"): empty name → D-Bus path with trailing slash

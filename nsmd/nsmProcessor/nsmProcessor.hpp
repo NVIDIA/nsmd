@@ -68,7 +68,9 @@
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationContext/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Replaceable/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
@@ -216,6 +218,12 @@ class NsmLocationCodeIntfProcessor : public NsmObject
   private:
     std::unique_ptr<LocationCodeIntfProcessor> locationCodeIntf;
 };
+
+using LocationContextIntfProcessor =
+    sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                    Decorator::server::LocationContext>;
+using ReplaceableIntfProcessor = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Replaceable>;
 
 using MigModeIntf =
     sdbusplus::server::object_t<sdbusplus::com::nvidia::server::MigMode>;

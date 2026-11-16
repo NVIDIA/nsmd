@@ -20,6 +20,8 @@
 #include "platform-environmental.h"
 
 #include "dBusAsyncUtils.hpp"
+#include "globals.hpp"
+#include "nsmEventFeatures.hpp"
 #include "sensorManager.hpp"
 
 #include <fmt/args.h>
@@ -97,104 +99,61 @@ int NsmResetRequiredEvent::handle(eid_t eid, NsmType /*type*/,
     return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine createNsmResetRequiredEvent(SensorManager& manager,
-                                                 const std::string& interface,
-                                                 const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    NsmEventInfo info{};
 
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
-
-    if (allCurrentIfaceProperties.count("UUID"))
+requester::Coroutine
+    createResetRequiredEventFeature([[maybe_unused]] SensorManager& manager,
+                                    const DeviceContext& dev,
+                                    const dbus::PropertyMap& params)
+{
+    if (!dev.device)
     {
-        info.uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-    std::string name{};
-    if (allCurrentIfaceProperties.count("Name"))
-    {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    name = utils::makeDBusNameValid(name);
-
-    auto type = interface.substr(interface.find_last_of('.') + 1);
-
-    if (allCurrentIfaceProperties.count("OriginOfCondition"))
-    {
-        info.originOfCondition = std::get<std::string>(
-            allCurrentIfaceProperties.at("OriginOfCondition"));
-    }
-    if (allCurrentIfaceProperties.count("MessageId"))
-    {
-        info.messageId =
-            std::get<std::string>(allCurrentIfaceProperties.at("MessageId"));
-    }
-    if (allCurrentIfaceProperties.count("LoggingNamespace"))
-    {
-        info.loggingNamespace = std::get<std::string>(
-            allCurrentIfaceProperties.at("LoggingNamespace"));
-    }
-    info.loggingNamespace = utils::makeDBusNameValid(info.loggingNamespace);
-
-    if (allCurrentIfaceProperties.count("Resolution"))
-    {
-        info.resolution =
-            std::get<std::string>(allCurrentIfaceProperties.at("Resolution"));
-    }
-    if (allCurrentIfaceProperties.count("MessageArgs"))
-    {
-        info.messageArgs = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("MessageArgs"));
-    }
-    std::string severityStr{};
-    if (allCurrentIfaceProperties.count("Severity"))
-    {
-        severityStr =
-            std::get<std::string>(allCurrentIfaceProperties.at("Severity"));
-    }
-    if (allCurrentIfaceProperties.count("EventIds"))
-    {
-        info.errorId = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("EventIds"));
-    }
-    if (allCurrentIfaceProperties.count("ImpactedComponent"))
-    {
-        info.impactedComponent = std::get<std::string>(
-            allCurrentIfaceProperties.at("ImpactedComponent"));
-    }
-
-    auto severityEnum = sdbusplus::common::xyz::openbmc_project::logging::
-        Entry::convertStringToLevel("xyz.openbmc_project.Logging.Entry.Level." +
-                                    severityStr);
-
-    info.severity = severityEnum.value_or(Level::Critical);
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(info.uuid);
-
-    if (!nsmDevice)
-    {
-        lg2::error(
-            "The UUID of Reset Required Event PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", info.uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
+        lg2::error("Reset Required Event feature of {NAME}: no NsmDevice",
+                   "NAME", dev.name);
         co_return NSM_ERROR;
     }
 
+    NsmEventInfo info{};
+    info.uuid = dev.staticUuid;
+
+    auto name = utils::makeDBusNameValid(
+        param<std::string>(params, "Name").value_or(""));
+    const std::string type = "NSM_Event_Reset_Required";
+
+    info.originOfCondition = (redfishChassisBasePath / dev.name).string();
+    info.messageId = param<std::string>(params, "MessageId").value_or("");
+    info.loggingNamespace = utils::makeDBusNameValid(
+        param<std::string>(params, "LoggingNamespace").value_or(""));
+    info.resolution = param<std::string>(params, "Resolution").value_or("");
+    info.messageArgs = param<std::vector<std::string>>(params, "MessageArgs")
+                           .value_or(std::vector<std::string>{});
+    info.errorId = param<std::vector<std::string>>(params, "EventIds")
+                       .value_or(std::vector<std::string>{});
+    if (auto impactedComponent = param<std::string>(params,
+                                                    "ImpactedComponent"))
+    {
+        info.impactedComponent = *impactedComponent;
+    }
+
+    auto severityStr = param<std::string>(params, "Severity").value_or("");
+    auto severityEnum = sdbusplus::common::xyz::openbmc_project::logging::
+        Entry::convertStringToLevel("xyz.openbmc_project.Logging.Entry.Level." +
+                                    severityStr);
+    info.severity = severityEnum.value_or(Level::Critical);
+
     auto event = std::make_shared<NsmResetRequiredEvent>(name, type, info,
-                                                         nsmDevice);
+                                                         dev.device);
 
     lg2::info(
         "Created NSM Reset Required Event : UUID={UUID}, Name={NAME}, Type={TYPE}",
         "UUID", info.uuid, "NAME", name, "TYPE", type);
 
-    nsmDevice->addDeviceEvent(event, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
-                              NSM_RESET_REQUIRED_EVENT);
-    // coverity[missing_return]
+    dev.device->addDeviceEvent(event, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                               NSM_RESET_REQUIRED_EVENT);
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmResetRequiredEvent,
-    "xyz.openbmc_project.Configuration.NSM_Event_Reset_Required");
-
-} // namespace nsm
+} // namespace nsm::features

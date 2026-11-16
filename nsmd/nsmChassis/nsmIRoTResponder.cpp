@@ -22,13 +22,19 @@
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "features/associations.hpp"
+#include "globals.hpp"
+#include "nsmApSkuIdIntf.hpp"
 #include "nsmAssetIntf.hpp"
+#include "nsmChassisFeatures.hpp"
 #include "nsmCommon.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
+#include "sensorManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
+#include <xyz/openbmc_project/MCTP/UUID/server.hpp>
 
 #include <format>
 #include <sstream>
@@ -246,104 +252,186 @@ void createIRoTResponderFieldReplaceable(
     device->addStaticSensor(replaceableObject);
 }
 
-requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
-                                            const std::string& interface,
-                                            const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    std::string baseType = "NSM_ChassisIRoTResponder";
-    std::string baseInterface = "xyz.openbmc_project.Configuration." + baseType;
 
-    dbus::PropertyMap allBaseIfaceProperties;
-    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
-                                                        allBaseIfaceProperties);
-    if (rc != NSM_SUCCESS)
+namespace
+{
+const std::string iRoTResponderType = "NSM_ChassisIRoTResponder";
+using MctpUuidIntf = object_t<MCTP::server::UUID>;
+
+std::string iRoTResponderName(const dbus::PropertyMap& params)
+{
+    return param<std::string>(params, "Name").value_or("");
+}
+} // namespace
+
+requester::Coroutine
+    createIRoTChassisTypeFeature([[maybe_unused]] SensorManager& manager,
+                                 const DeviceContext& dev,
+                                 const dbus::PropertyMap& params)
+{
+    if (!params.count("ChassisType"))
     {
-        co_return rc;
+        co_return NSM_SUCCESS;
     }
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+    auto name = iRoTResponderName(params);
+    auto properties = params;
+    createIRoTResponderChassis(dev.device, name, iRoTResponderType, properties);
+    co_return NSM_SUCCESS;
+}
 
-    std::string name{};
-    if (allBaseIfaceProperties.count("Name"))
+requester::Coroutine
+    createIRoTLocationTypeFeature([[maybe_unused]] SensorManager& manager,
+                                  const DeviceContext& dev,
+                                  const dbus::PropertyMap& params)
+{
+    if (!params.count("LocationType"))
     {
-        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+        co_return NSM_SUCCESS;
     }
-    std::string type{};
-    if (allCurrentIfaceProperties.count("Type"))
+    auto name = iRoTResponderName(params);
+    auto properties = params;
+    createIRoTResponderLocation(dev.device, name, iRoTResponderType,
+                                properties);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createIRoTLocationContextFeature([[maybe_unused]] SensorManager& manager,
+                                     const DeviceContext& dev,
+                                     const dbus::PropertyMap& params)
+{
+    if (!params.count("LocationContext"))
     {
-        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+        co_return NSM_SUCCESS;
     }
-    uuid_t uuid{};
-    if (allBaseIfaceProperties.count("UUID"))
+    auto name = iRoTResponderName(params);
+    auto properties = params;
+    createIRoTResponderLocationContext(dev.device, name, iRoTResponderType,
+                                       properties);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createIRoTAssociationsFeature([[maybe_unused]] SensorManager& manager,
+                                  const DeviceContext& dev,
+                                  const dbus::PropertyMap& params)
+{
+    auto name = iRoTResponderName(params);
+    std::vector<utils::Association> associations;
+    addAssociations(associations, params, "ParentChassisAssociationPaths",
+                    "parent_chassis", "all_chassis");
+    // Components protected by this RoT
+    addAssociations(associations, params, "RoTInventoryAssociationPaths",
+                    "inventory", "associated_ROT");
+    addAssociations(associations, params, "InventoryChassisAssociationPaths",
+                    "inventory_chassis", "associated_chassis");
+    if (associations.empty())
     {
-        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+        co_return NSM_SUCCESS;
     }
 
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
+    auto associationsObject =
+        std::make_shared<NsmIRoTResponder<AssociationDefinitionsIntf>>(
+            name, iRoTResponderType);
+    associationsObject->invoke(pdiMethod(associations),
+                               utils::getAssociations(associations));
+    dev.device->addStaticSensor(associationsObject);
+    co_return NSM_SUCCESS;
+}
 
-    if (type == baseType)
+requester::Coroutine
+    createIRoTAssetFeature([[maybe_unused]] SensorManager& manager,
+                           const DeviceContext& dev,
+                           const dbus::PropertyMap& params)
+{
+    auto name = iRoTResponderName(params);
+    dbus::PropertyMap properties;
+    if (auto assetName = param<std::string>(params, "AssetName"))
     {
-        lg2::debug("IRoTResponder: {NAME}, {TYPE}", "NAME", name.c_str(),
-                   "TYPE", type.c_str());
-        auto uuidObject =
-            std::make_shared<NsmIRoTResponder<UuidIntf>>(name, baseType);
-        uuid_t uuid{};
-        if (allCurrentIfaceProperties.count("UUID"))
-        {
-            uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-        }
-
-        uuidObject->invoke(pdiMethod(uuid), uuid);
-        device->addStaticSensor(uuidObject);
-
-        std::vector<utils::Association> associations{};
-        co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                          associations);
-        auto associationsObject =
-            std::make_shared<NsmIRoTResponder<AssociationDefinitionsIntf>>(
-                name, baseType);
-        associationsObject->invoke(pdiMethod(associations),
-                                   utils::getAssociations(associations));
-        device->addStaticSensor(associationsObject);
+        properties.emplace("Name", *assetName);
     }
-    else if (type == "NSM_Chassis_Attributes")
+    createIRoTResponderAsset(dev.device, name, iRoTResponderType, properties);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createIRoTHealthFeature([[maybe_unused]] SensorManager& manager,
+                            const DeviceContext& dev,
+                            const dbus::PropertyMap& params)
+{
+    auto name = iRoTResponderName(params);
+    createIRoTResponderHealth(dev.device, name, iRoTResponderType);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createIRoTLocationCodeFeature([[maybe_unused]] SensorManager& manager,
+                                  const DeviceContext& dev,
+                                  const dbus::PropertyMap& params)
+{
+    if (!params.count("LocationCode"))
     {
-        createIRoTResponderAsset(device, name, baseType,
-                                 allCurrentIfaceProperties);
-        createIRoTResponderHealth(device, name, baseType);
-        if (allCurrentIfaceProperties.count("LocationType"))
-        {
-            createIRoTResponderLocation(device, name, baseType,
-                                        allCurrentIfaceProperties);
-        }
-        if (allCurrentIfaceProperties.count("ChassisType"))
-        {
-            createIRoTResponderChassis(device, name, baseType,
-                                       allCurrentIfaceProperties);
-        }
-        if (allCurrentIfaceProperties.count("LocationCode"))
-        {
-            createIRoTResponderLocationCode(device, name, baseType,
-                                            allCurrentIfaceProperties);
-        }
-        if (allCurrentIfaceProperties.count("LocationContext"))
-        {
-            createIRoTResponderLocationContext(device, name, baseType,
-                                               allCurrentIfaceProperties);
-        }
-        if (allCurrentIfaceProperties.count("FieldReplaceable"))
-        {
-            createIRoTResponderFieldReplaceable(device, name, baseType,
-                                                allCurrentIfaceProperties);
-        }
+        co_return NSM_SUCCESS;
+    }
+    auto name = iRoTResponderName(params);
+    auto properties = params;
+    createIRoTResponderLocationCode(dev.device, name, iRoTResponderType,
+                                    properties);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createIRoTFieldReplaceableFeature([[maybe_unused]] SensorManager& manager,
+                                      const DeviceContext& dev,
+                                      const dbus::PropertyMap& params)
+{
+    if (!params.count("FieldReplaceable"))
+    {
+        co_return NSM_SUCCESS;
+    }
+    auto name = iRoTResponderName(params);
+    auto properties = params;
+    createIRoTResponderFieldReplaceable(dev.device, name, iRoTResponderType,
+                                        properties);
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine
+    createIRoTSPDMResponderFeature([[maybe_unused]] SensorManager& manager,
+                                   const DeviceContext& dev,
+                                   const dbus::PropertyMap& params)
+{
+    auto name = iRoTResponderName(params);
+    auto uuidObject =
+        std::make_shared<NsmIRoTResponder<UuidIntf>>(name, iRoTResponderType);
+    uuidObject->invoke(pdiMethod(uuid), dev.staticUuid);
+    dev.device->addStaticSensor(uuidObject);
+    // spdmd matches the MCTP endpoint on MCTP.UUID before Common.UUID
+    if (param<bool>(params, "MctpUuidEnabled").value_or(false))
+    {
+        auto mctpUuid = std::make_shared<NsmIRoTResponder<MctpUuidIntf>>(
+            name, iRoTResponderType);
+        mctpUuid->invoke(pdiMethod(uuid), dev.device->getUuid());
+        dev.device->addStaticSensor(mctpUuid);
     }
     co_return NSM_SUCCESS;
 }
 
-std::vector<std::string> IRoTResponderInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder",
-    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.ChassisAttributes"};
+requester::Coroutine
+    createIRoTSKUFeature([[maybe_unused]] SensorManager& manager,
+                         const DeviceContext& dev,
+                         const dbus::PropertyMap& params)
+{
+    auto name = iRoTResponderName(params);
+    // Seeded ""; written by another producer (pldm EC SKU)
+    dev.device->addStaticSensor(
+        std::make_shared<NsmIRoTResponder<NsmApSkuIdIntf>>(name,
+                                                           iRoTResponderType));
+    co_return NSM_SUCCESS;
+}
 
-REGISTER_NSM_CREATION_FUNCTION(createNsmIRoTResponder, IRoTResponderInterfaces)
-
-} // namespace nsm
+} // namespace nsm::features

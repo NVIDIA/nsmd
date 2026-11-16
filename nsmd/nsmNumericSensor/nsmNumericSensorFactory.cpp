@@ -17,6 +17,8 @@
 
 #include "nsmNumericSensorFactory.hpp"
 
+#include "features/associations.hpp"
+#include "globals.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPeakPower.hpp"
@@ -26,120 +28,15 @@
 #include <phosphor-logging/lg2.hpp>
 #ifdef NVIDIA_SHMEM
 #include <telemetry_mrd_producer.hpp>
+
+#include <algorithm>
 #endif
 
 namespace nsm
 {
 
-CreationFunction NumericSensorFactory::getCreationFunction()
+void NumericSensorFactory::resolveAssociations(NumericSensorInfo& info)
 {
-    return std::bind_front(&NumericSensorFactory::make, this);
-}
-
-requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
-                                                const std::string& interface,
-                                                const std::string& objPath)
-
-{
-    auto& bus = utils::DBusHandler::getBus();
-
-    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
-        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
-
-    uuid_t uuid{};
-    if (allCurrentIfaceProperties.count("UUID"))
-    {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-
-    NumericSensorInfo info{};
-
-    if (allCurrentIfaceProperties.count("Name"))
-    {
-        info.name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-    }
-    info.name = utils::makeDBusNameValid(info.name);
-
-    info.type = interface.substr(interface.find_last_of('.') + 1);
-
-    if (allCurrentIfaceProperties.count("SensorId"))
-    {
-        info.sensorId =
-            std::get<uint64_t>(allCurrentIfaceProperties.at("SensorId"));
-    }
-
-    if (allCurrentIfaceProperties.count("Priority"))
-    {
-        info.priority =
-            std::get<bool>(allCurrentIfaceProperties.at("Priority"));
-    }
-
-    if (allCurrentIfaceProperties.count("Aggregated"))
-    {
-        info.aggregated =
-            std::get<bool>(allCurrentIfaceProperties.at("Aggregated"));
-    }
-
-    if (allCurrentIfaceProperties.count("PhysicalContext"))
-    {
-        info.physicalContext = std::get<std::string>(
-            allCurrentIfaceProperties.at("PhysicalContext"));
-    }
-
-    try
-    {
-        info.implementation = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "Implementation", interface.c_str()));
-    }
-    catch (const std::exception& e)
-    {}
-
-    try
-    {
-        info.maxAllowableValue = utils::DBusHandler().getDbusProperty<double>(
-            objPath.c_str(), "MaxAllowableOperatingValue", interface.c_str());
-    }
-    catch (const std::exception& e)
-    {}
-
-    try
-    {
-        info.maxValue = utils::DBusHandler().getDbusProperty<double>(
-            objPath.c_str(), "MaxValue", interface.c_str());
-    }
-    catch (const std::exception& e)
-    {}
-
-    try
-    {
-        info.minValue = utils::DBusHandler().getDbusProperty<double>(
-            objPath.c_str(), "MinValue", interface.c_str());
-    }
-    catch (const std::exception& e)
-    {}
-
-    try
-    {
-        info.readingBasis = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "ReadingBasis", interface.c_str()));
-    }
-    catch (const std::exception& e)
-    {}
-
-    try
-    {
-        info.description = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "Description", interface.c_str()));
-    }
-    catch (const std::exception& e)
-    {}
-
-    co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                      info.associations);
-
     for (const auto& association : info.associations)
     {
         if (association.forward == "chassis")
@@ -173,94 +70,77 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
                       "NAME", info.name);
         }
     }
+}
+
+std::optional<NumericSensorInfo> NumericSensorFactory::makeFeatureSensorInfo(
+    const features::DeviceContext& dev, const dbus::PropertyMap& params,
+    const std::string& type)
+{
+    using features::param;
+
+    NumericSensorInfo info{};
+    info.name =
+        utils::makeDBusNameValid(std::get<std::string>(params.at("Name")));
+    info.type = type;
+    info.sensorId = param<uint64_t>(params, "SensorId").value_or(0);
+    info.priority = param<bool>(params, "Priority").value_or(false);
+    info.aggregated = param<bool>(params, "Aggregated").value_or(false);
+    info.physicalContext =
+        param<std::string>(params, "PhysicalContext").value_or("");
+    if (auto value = param<std::string>(params, "Implementation"))
+    {
+        info.implementation = std::make_unique<std::string>(*value);
+    }
+    if (auto value = param<double>(params, "MaxAllowableOperatingValue"))
+    {
+        info.maxAllowableValue = *value;
+    }
+    if (auto value = param<double>(params, "MaxValue"))
+    {
+        info.maxValue = *value;
+    }
+    if (auto value = param<double>(params, "MinValue"))
+    {
+        info.minValue = *value;
+    }
+    if (auto value = param<std::string>(params, "ReadingBasis"))
+    {
+        info.readingBasis = std::make_unique<std::string>(*value);
+    }
+    if (auto value = param<std::string>(params, "Description"))
+    {
+        info.description = std::make_unique<std::string>(*value);
+    }
+
+    // The first entry is the main chassis (chassis_association)
+    features::addAssociations(info.associations, params,
+                              "ChassisAssociationPaths", "chassis",
+                              "all_sensors");
+    features::addAssociations(info.associations, params,
+                              "ProcessorAssociationPaths", "processor",
+                              "all_sensors");
+    features::addAssociations(info.associations, params,
+                              "MemoryAssociationPaths", "memory",
+                              "all_sensors");
+    resolveAssociations(info);
 
     if (info.chassis_association.empty())
     {
-        lg2::error(
-            "Association Property of Numeric Sensor PDI has no chassis association. "
-            "Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-            "NAME", info.name, "TYPE", info.type, "OBJPATH", objPath);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
+        lg2::error("Feature sensor of {NAME} has no chassis association. "
+                   "Name={SENSOR}, Type={TYPE}",
+                   "NAME", dev.name, "SENSOR", info.name, "TYPE", type);
+        return std::nullopt;
     }
-
-    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
-
-    if (!nsmDevice)
+    if (param<bool>(params, "PrimaryTemperatureAssociationEnabled")
+            .value_or(false) &&
+        std::ranges::none_of(info.associations, [](const auto& assoc) {
+        return assoc.backward == "primary_temperature_sensor";
+    }))
     {
-        // cannot found a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of Numeric Sensor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", info.name, "TYPE", info.type);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
+        info.associations.push_back({"chassis", "primary_temperature_sensor",
+                                     info.chassis_association});
     }
-
-    auto sensor = builder->makeSensor(interface, objPath, bus, info);
-    lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
-              "UUID", uuid, "NAME", info.name, "TYPE", info.type);
-
-    makeAggregatorAndAddSensor(builder.get(), info, sensor, uuid,
-                               nsmDevice.get());
-
-    try
-    {
-        makePeakValueAndAdd(interface, objPath, info, uuid, nsmDevice.get());
-    }
-    catch (const std::exception& e)
-    {}
-
-    co_await NsmThresholdFactory{manager, interface, objPath,
-                                 sensor,  info,      uuid}
-        .make();
-    // coverity[missing_return]
-    co_return NSM_SUCCESS;
-}
-
-void NumericSensorFactory::makePeakValueAndAdd(const std::string& interface,
-                                               const std::string& objPath,
-                                               const NumericSensorInfo& info,
-                                               const uuid_t& uuid,
-                                               NsmDevice* nsmDevice)
-{
-    auto& bus = utils::DBusHandler::getBus();
-
-    const auto peakValueInterface = interface + ".PeakValue";
-
-    NumericSensorInfo peakValueInfo{};
-
-    peakValueInfo.name = info.name;
-
-    peakValueInfo.type = info.type + "_PeakValue";
-
-    peakValueInfo.sensorId = utils::DBusHandler().getDbusProperty<uint64_t>(
-        objPath.c_str(), "SensorId", peakValueInterface.c_str());
-
-    peakValueInfo.priority = utils::DBusHandler().getDbusProperty<bool>(
-        objPath.c_str(), "Priority", peakValueInterface.c_str());
-
-    peakValueInfo.aggregated = utils::DBusHandler().getDbusProperty<bool>(
-        objPath.c_str(), "Aggregated", peakValueInterface.c_str());
-
-    if (info.type == "NSM_Power")
-    {
-        PeakPowerSensorBuilder builder;
-
-        auto sensor = builder.makeSensor(peakValueInterface, objPath, bus,
-                                         peakValueInfo);
-        lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
-                  "UUID", uuid, "NAME", peakValueInfo.name, "TYPE",
-                  peakValueInfo.type);
-
-        makeAggregatorAndAddSensor(&builder, peakValueInfo, sensor, uuid,
-                                   nsmDevice);
-    }
-    else
-    {
-        lg2::error(
-            "The Numeric Sensor Type {TYPE} does not support Reading Peak Value : UUID={UUID}, Name={NAME}",
-            "UUID", uuid, "NAME", info.name, "TYPE", info.type);
-    }
+    return info;
 }
 
 void NumericSensorFactory::makeAggregatorAndAddSensor(

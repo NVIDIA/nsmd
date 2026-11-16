@@ -24,6 +24,7 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
 #include "nsmNetworkAdapter.hpp"
 
 using namespace nsm;
@@ -432,19 +433,14 @@ TEST_F(NsmProtectionOptionsSetTest,
 }
 
 // =============================================================================
-// createNSMNetworkAdapter factory branch coverage
-// (exercised via NsmObjectFactory dispatch — static linkage workaround)
+// createNetworkAdapterFeature coverage
 // =============================================================================
-
-#include "nsmObjectFactory.hpp"
 
 struct NsmNetworkAdapterFactoryTest :
     public ::testing::Test,
     public utils::DBusTest,
     public SensorManagerTest
 {
-    const std::string intf =
-        "xyz.openbmc_project.Configuration.NSM_NetworkAdapter";
     const uuid_t deviceUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NsmDeviceTable devices;
@@ -462,85 +458,45 @@ struct NsmNetworkAdapterFactoryTest :
         cleanupDeviceSensors(devices);
     }
 
-    dbus::PropertyMap basicProperties = {
+    nsm::features::DeviceContext makeDev()
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = "HGX_CX_0";
+        dev.kind = "cx_nic";
+        dev.staticUuid = deviceUuid;
+        dev.platformPrefix = "HGX_";
+        dev.chassisPath =
+            "/xyz/openbmc_project/inventory/system/chassis/HGX_CX_0";
+        dev.device = device;
+        return dev;
+    }
+
+    dbus::PropertyMap basicParams = {
         {"Name", std::string("NetworkAdapter_0")},
-        {"UUID", deviceUuid},
-        {"Type", std::string("NSM_NetworkAdapter")},
-        {"InventoryObjPath",
-         std::string("/xyz/openbmc_project/inventory/system/")},
     };
 };
 
-// All four properties present → all TRUE branches → sensor created and added
-TEST_F(NsmNetworkAdapterFactoryTest, Factory_AllProperties_SensorCreated)
+// Name present → NsmNetworkAdapterDI created and added
+TEST_F(NsmNetworkAdapterFactoryTest, Feature_AllParams_SensorCreated)
 {
-    const std::string testPath = "/xyz/test/netadapter/all_props";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm = basicProperties;
-
     const size_t before = device->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
-    EXPECT_GT(device->deviceSensors.size(), before);
+    auto rc = nsm::features::createNetworkAdapterFeature(mockManager, makeDev(),
+                                                         basicParams);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    ASSERT_GT(device->deviceSensors.size(), before);
+    EXPECT_NE(std::dynamic_pointer_cast<NsmNetworkAdapterDI>(
+                  device->deviceSensors[before]),
+              nullptr);
 }
 
-// Missing UUID → FALSE branch for count("UUID") → uuid="" →
-// getNsmDeviceFromStaticUUID("") calls parseStaticUuid which throws →
-// caught by createObjects → no sensor added
-TEST_F(NsmNetworkAdapterFactoryTest, Factory_MissingUUID_NoSensor)
+// Missing Name → name="" → D-Bus path ends with "/" → sdbusplus throws →
+// no sensor added
+TEST_F(NsmNetworkAdapterFactoryTest, Feature_MissingName_NoSensor)
 {
-    const std::string testPath = "/xyz/test/netadapter/no_uuid";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm = basicProperties;
-    pm.erase("UUID"); // uuid="" → parseStaticUuid throws
-
     const size_t before = device->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
-    EXPECT_EQ(before, device->deviceSensors.size());
-}
-
-// Missing Type → FALSE branch for count("Type") → type="" →
-// NsmNetworkAdapterDI created with empty type (still valid) → sensor added
-TEST_F(NsmNetworkAdapterFactoryTest, Factory_MissingType_SensorCreated)
-{
-    const std::string testPath = "/xyz/test/netadapter/no_type";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm = basicProperties;
-    pm["Name"] = std::string("NetworkAdapter_NoType"); // unique name
-    pm.erase("Type"); // type="" → sensor still created
-
-    const size_t before = device->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
-    EXPECT_GT(device->deviceSensors.size(), before);
-}
-
-// Missing Name → FALSE branch for count("Name") → name="" →
-// NsmNetworkAdapterDI path = inventoryObjPath + "" = trailing slash →
-// sdbusplus throws invalid D-Bus path → no sensor added
-TEST_F(NsmNetworkAdapterFactoryTest, Factory_MissingName_NoSensor)
-{
-    const std::string testPath = "/xyz/test/netadapter/no_name";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm = basicProperties;
-    pm.erase("Name"); // name="" → D-Bus path ends with "/" → throws
-
-    const size_t before = device->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
-    EXPECT_EQ(before, device->deviceSensors.size());
-}
-
-// Missing InventoryObjPath → FALSE branch for count("InventoryObjPath") →
-// inventoryObjPath="" → D-Bus path = "" + name (no leading "/") →
-// sdbusplus throws invalid D-Bus path → no sensor added
-TEST_F(NsmNetworkAdapterFactoryTest, Factory_MissingInventoryObjPath_NoSensor)
-{
-    const std::string testPath = "/xyz/test/netadapter/no_invpath";
-    auto& pm = utils::MockDbusAsync::propertyMap(testPath, intf);
-    pm = basicProperties;
-    pm.erase(
-        "InventoryObjPath"); // inventoryObjPath="" → no leading "/" → throws
-
-    const size_t before = device->deviceSensors.size();
-    NsmObjectFactory::instance().createObjects(mockManager, intf, testPath);
+    EXPECT_THROW_COROUTINE(nsm::features::createNetworkAdapterFeature(
+                               mockManager, makeDev(), dbus::PropertyMap{}),
+                           std::exception);
     EXPECT_EQ(before, device->deviceSensors.size());
 }
 

@@ -25,14 +25,9 @@ using namespace ::testing;
 #include "base.h"
 #include "device-capability-discovery.h"
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmEventConfig.hpp"
-
-namespace nsm
-{
-requester::Coroutine createNsmEventConfig(SensorManager& manager,
-                                          const std::string& interface,
-                                          const std::string& objPath);
-} // namespace nsm
 
 using namespace nsm;
 
@@ -43,10 +38,7 @@ struct NsmEventConfigTest :
 {
     eid_t eid = 0;
     uint8_t instanceId = 0;
-    const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_EventConfig";
     const std::string name = "EventConfig_Test";
-    const std::string objPath = "/xyz/openbmc_project/inventory/system/test";
 
     const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
 
@@ -69,98 +61,82 @@ struct NsmEventConfigTest :
 
     dbus::PropertyMap basicProperties = {
         {"Name", name},
-        {"UUID", gpuUuid},
         {"MessageType", uint64_t(NSM_TYPE_PLATFORM_ENVIRONMENTAL)},
         {"SubscribedEventIDs", std::vector<uint64_t>{1, 2, 3}},
     };
+
+    requester::Coroutine createEventConfig(const dbus::PropertyMap& params,
+                                           bool withDevice = true)
+    {
+        features::DeviceContext dev;
+        dev.name = "GPU_SXM_4";
+        dev.kind = "gpu";
+        dev.staticUuid = gpuUuid;
+        dev.platformPrefix = "HGX_";
+        if (withDevice)
+        {
+            dev.device = gpu;
+        }
+        return features::createEventConfigFeature(mockManager, dev, params);
+    }
 };
 
 TEST_F(NsmEventConfigTest, goodTestCreateEventConfig)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = basicProperties;
+    const size_t before = gpu->deviceSensors.size();
+    const size_t refreshBefore = gpu->capabilityRefreshSensors.size();
+    auto rc = createEventConfig(basicProperties);
 
-    createNsmEventConfig(mockManager, basicIntfName, objPath);
-
-    EXPECT_GE(gpu->deviceSensors.size(),
-              2); // NsmEventConfig + NsmGetEventConfig (may have more)
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    // NsmEventConfig + NsmGetEventConfig
+    EXPECT_EQ(gpu->deviceSensors.size(), before + 2);
+    EXPECT_EQ(gpu->capabilityRefreshSensors.size(), refreshBefore + 1);
 }
 
-TEST_F(NsmEventConfigTest, badTestMissingUUID)
+TEST_F(NsmEventConfigTest, badTestNoDevice)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = basicProperties;
-    propertyMap.erase("UUID");
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = createEventConfig(basicProperties, false);
 
-    EXPECT_THROW_COROUTINE(
-        createNsmEventConfig(mockManager, basicIntfName, objPath),
-        std::runtime_error);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
-TEST_F(NsmEventConfigTest, badTestInvalidUUID)
+// "Name" is mandatory for the feature creator: params.at("Name") throws
+TEST_F(NsmEventConfigTest, Factory_MissingName_Throws)
 {
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                          basicIntfName);
-    propertyMap = basicProperties;
-    propertyMap["UUID"] = "INVALID:UUID:FORMAT";
-
-    EXPECT_THROW_COROUTINE(
-        createNsmEventConfig(mockManager, basicIntfName, objPath),
-        std::runtime_error);
-}
-
-// Missing "Name" → FALSE branch for count("Name") → name="" used;
-// sensor IS still created with empty name
-TEST_F(NsmEventConfigTest, Factory_MissingName_SensorCreated)
-{
-    const std::string uniquePath =
-        "/xyz/openbmc_project/inventory/system/eventconfig_noname";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                          basicIntfName);
     dbus::PropertyMap props = basicProperties;
     props.erase("Name");
-    propertyMap = props;
 
     const size_t before = gpu->deviceSensors.size();
-    createNsmEventConfig(mockManager, basicIntfName, uniquePath);
-    EXPECT_GT(gpu->deviceSensors.size(), before);
+    EXPECT_THROW_COROUTINE(createEventConfig(props), std::out_of_range);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
 }
 
-// Missing "MessageType" → FALSE branch for count("MessageType") →
-// default 0 used; sensor IS still created
+// Missing "MessageType" → default 0 used; sensor IS still created
 TEST_F(NsmEventConfigTest, Factory_MissingMessageType_SensorCreated)
 {
-    const std::string uniquePath =
-        "/xyz/openbmc_project/inventory/system/eventconfig_nomsgtype";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                          basicIntfName);
     dbus::PropertyMap props = basicProperties;
     props["Name"] = std::string("EventConfig_NoMsgType"); // unique name
     props.erase("MessageType");
-    propertyMap = props;
 
     const size_t before = gpu->deviceSensors.size();
-    createNsmEventConfig(mockManager, basicIntfName, uniquePath);
+    auto rc = createEventConfig(props);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->deviceSensors.size(), before);
 }
 
-// Missing "SubscribedEventIDs" → FALSE branch for count("SubscribedEventIDs")
-// → empty vector used; sensor IS still created
+// Missing "SubscribedEventIDs" → empty vector used; sensor IS still created
 TEST_F(NsmEventConfigTest, Factory_MissingSubscribedEventIDs_SensorCreated)
 {
-    const std::string uniquePath =
-        "/xyz/openbmc_project/inventory/system/eventconfig_nosubevents";
-    auto& propertyMap = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                          basicIntfName);
     dbus::PropertyMap props = basicProperties;
     props["Name"] = std::string("EventConfig_NoSubEvents"); // unique name
     props.erase("SubscribedEventIDs");
-    propertyMap = props;
 
     const size_t before = gpu->deviceSensors.size();
-    createNsmEventConfig(mockManager, basicIntfName, uniquePath);
+    auto rc = createEventConfig(props);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(gpu->deviceSensors.size(), before);
 }
 
@@ -395,13 +371,11 @@ TEST_F(NsmEventConfigTest, testMultipleEventTypes)
 
     for (size_t i = 0; i < messageTypes.size(); i++)
     {
-        std::string testPath = objPath + "_" + std::to_string(i);
-        auto& propertyMap = utils::MockDbusAsync::propertyMap(testPath,
-                                                              basicIntfName);
-        propertyMap = basicProperties;
-        propertyMap["MessageType"] = uint64_t(messageTypes[i]);
+        auto props = basicProperties;
+        props["MessageType"] = uint64_t(messageTypes[i]);
 
-        createNsmEventConfig(mockManager, basicIntfName, testPath);
+        auto rc = createEventConfig(props);
+        EXPECT_EQ(rc.data(), NSM_SUCCESS);
     }
 
     // Should have created 2 sensors per type (EventConfig + GetEventConfig)
@@ -660,22 +634,6 @@ TEST_F(NsmEventConfigTest, ConfigureEventAck_SensorIOError)
     EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(NSM_ERROR));
     eventConfig.configureEventAcknowledgement(
         gpu, NSM_TYPE_PLATFORM_ENVIRONMENTAL, eventConfig.ackEventMask);
-}
-
-// createNsmEventConfig: base interface not registered at unique path →
-// coGetCachedBaseProperties returns error → co_return rc (early return //
-// at line 303 in nsmEventConfig.cpp).
-TEST_F(NsmEventConfigTest, CreateEventConfig_BasePropertiesFail_NoSensor)
-{
-    const std::string uniquePath = "/xyz/test/eventcfg/base_fail_unique";
-    // Register a sub-interface only; leave basicIntfName absent.
-    auto& other = utils::MockDbusAsync::propertyMap(uniquePath,
-                                                    basicIntfName + ".Sub");
-    other["Type"] = std::string("NSM_EventConfig");
-
-    const size_t before = gpu->deviceSensors.size();
-    createNsmEventConfig(mockManager, basicIntfName, uniquePath);
-    EXPECT_EQ(before, gpu->deviceSensors.size());
 }
 
 // NsmEventConfig::update(): setCurrentEventSources returns

@@ -27,6 +27,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "features/creators.hpp"
+#include "features/feature.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmNVSwitchAndNVMgmtNICChassis.hpp"
 
@@ -34,14 +36,6 @@ using namespace ::testing;
 #undef protected
 
 using namespace nsm;
-
-// Forward declarations for factory functions
-namespace nsm
-{
-requester::Coroutine createNsmNVLinkMgmtNicChassis(SensorManager& manager,
-                                                   const std::string& interface,
-                                                   const std::string& objPath);
-} // namespace nsm
 
 // ============================================================================
 // nsmNVSwitchAndNVMgmtNICChassis.cpp - factory helper functions
@@ -58,10 +52,7 @@ struct NsmNVSwitchChassisFactoryTest :
     // combined = (NSM_PCIE_BRIDGE_DEV_ROLE_CX8 << 8) | NSM_DEV_ID_PCIE_BRIDGE
     //          = (2 << 8) | 2 = 514
     const uuid_t cx8Uuid = "STATIC:514:0:NSM_DEVICE_INSTANCE_NUMBER:0";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/chassis/NVLinkMgmtNic0";
-    const std::string baseIntf =
-        "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis";
+    const std::string chassisName = "NVLinkMgmtNic0";
 
     NsmDeviceTable devices;
     std::shared_ptr<MockNsmDevice> cx8Dev;
@@ -80,29 +71,34 @@ struct NsmNVSwitchChassisFactoryTest :
     {
         cleanupDeviceSensors(devices);
     }
+
+    /** @brief Run the NVLinkMgmtNic chassis attributes feature on the CX8 */
+    requester::Coroutine createAttributes(dbus::PropertyMap params)
+    {
+        nsm::features::DeviceContext dev;
+        dev.name = chassisName;
+        dev.kind = "cx_nic";
+        dev.staticUuid = cx8Uuid;
+        dev.platformPrefix = "HGX_";
+        dev.device = cx8Dev;
+        params["Name"] = chassisName;
+        return nsm::features::createNVLinkMgmtNicChassisAttributesFeature(
+            mockManager, dev, params);
+    }
 };
 
 TEST_F(NsmNVSwitchChassisFactoryTest,
        CreateNsmChassis_CX8Attributes_CreatesAssetTagAndVersion)
 {
-    // Arrange - set up base interface properties
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              baseIntf);
-    basePropertyMap["Name"] = std::string("NVLinkMgmtNic0");
-    basePropertyMap["UUID"] = cx8Uuid;
-
-    // Set up attributes interface
-    std::string attrIntf = baseIntf + ".ChassisAttributes";
-    auto& propMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
-    propMap["Type"] = std::string("NSM_Chassis_Attributes");
-
     // Act
-    createNsmNVLinkMgmtNicChassis(mockManager, attrIntf, objPath);
+    const size_t before = cx8Dev->staticSensors.size();
+    auto rc = createAttributes({});
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
 
     // Assert - CX8 device gets: 3 asset sensors + 1 SKU + 1 health
-    //          + 1 assetTag + 1 version = 7 static + 1 msgTypes
+    //          + 1 assetTag + 1 version = 7 static
     // AssetTag and ChassisVersion should be created for CX8 devices
-    EXPECT_GE(cx8Dev->deviceSensors.size(), 2u);
+    EXPECT_EQ(cx8Dev->staticSensors.size(), before + 7);
 
     // Verify we have inventory property sensors for asset tag and version
     bool foundAssetTag = false;
@@ -131,31 +127,22 @@ TEST_F(NsmNVSwitchChassisFactoryTest,
 TEST_F(NsmNVSwitchChassisFactoryTest,
        CreateNsmChassis_CX8WithAllOptional_AllSensorsCreated)
 {
-    // Arrange
-    auto& basePropertyMap = utils::MockDbusAsync::propertyMap(objPath,
-                                                              baseIntf);
-    basePropertyMap["Name"] = std::string("NVLinkMgmtNic0");
-    basePropertyMap["UUID"] = cx8Uuid;
-
-    std::string attrIntf = baseIntf + ".ChassisAttributes";
-    auto& propMap = utils::MockDbusAsync::propertyMap(objPath, attrIntf);
-    propMap["Type"] = std::string("NSM_Chassis_Attributes");
-    propMap["ChassisType"] = std::string(
-        "xyz.openbmc_project.Inventory.Item.Chassis."
-        "ChassisType.Module");
-    propMap["LocationType"] = std::string(
-        "xyz.openbmc_project.Inventory.Decorator.Location."
-        "LocationTypes.Embedded");
-    propMap["LocationCode"] = std::string("NVLinkMgmtNic_Slot0");
-    propMap["PrettyNameForChassis"] = std::string("NVLink Management NIC 0");
-
     // Act
-    createNsmNVLinkMgmtNicChassis(mockManager, attrIntf, objPath);
+    const size_t before = cx8Dev->staticSensors.size();
+    auto rc = createAttributes(
+        {{"ChassisType", std::string("xyz.openbmc_project.Inventory.Item."
+                                     "Chassis.ChassisType.Module")},
+         {"LocationType", std::string("xyz.openbmc_project.Inventory."
+                                      "Decorator.Location.LocationTypes."
+                                      "Embedded")},
+         {"LocationCode", std::string("NVLinkMgmtNic_Slot0")},
+         {"PrettyNameForChassis", std::string("NVLink Management NIC 0")}});
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
 
     // Assert - CX8 path: asset(3) + SKU(1) + health(1) + chassisType(1)
     //   + locationType(1) + locationCode(1) + prettyName(1)
-    //   + assetTag(1) + version(1) + msgTypes(1) = 12
-    EXPECT_GE(cx8Dev->deviceSensors.size(), 5u);
+    //   + assetTag(1) + version(1) = 11 static
+    EXPECT_EQ(cx8Dev->staticSensors.size(), before + 11);
 }
 
 // Test AssetTagIntf template instantiation directly

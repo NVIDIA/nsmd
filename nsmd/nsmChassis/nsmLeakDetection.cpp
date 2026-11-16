@@ -22,7 +22,9 @@
 
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "globals.hpp"
 #include "interfaceWrapper.hpp"
+#include "nsmChassisFeatures.hpp"
 #include "nsmObjectFactory.hpp"
 #include "sensorManager.hpp"
 
@@ -717,87 +719,58 @@ requester::Coroutine
     co_return cc ? cc : rc;
 }
 
-requester::Coroutine
-    nsmLeakDetectionCreateSensors(SensorManager& manager,
-                                  [[maybe_unused]] const std::string& interface,
-                                  const std::string& objPath)
+} // namespace nsm
+
+namespace nsm::features
 {
-    std::string baseInterface =
-        "xyz.openbmc_project.Configuration.NSM_LeakDetection";
+
+requester::Coroutine
+    createLeakDetectionFeature([[maybe_unused]] SensorManager& manager,
+                               const DeviceContext& dev,
+                               const dbus::PropertyMap& params)
+{
+    if (!dev.device)
+    {
+        lg2::error("LeakDetection feature of {NAME}: no NsmDevice", "NAME",
+                   dev.name);
+        co_return NSM_ERROR;
+    }
+
     auto& bus = utils::DBusHandler::getBus();
-    std::string name{};
-    std::string type{};
-    uuid_t uuid{};
-    std::vector<uint64_t> sensorIdMap{};
-    std::vector<std::string> sensorNameMap{};
-    std::vector<std::string> physicalContextMap{};
-    std::string chassisPath{};
-    std::vector<uint64_t> minThresholds{};
-    std::vector<uint64_t> criticalThresholds{};
-    std::vector<uint64_t> maxThresholds{};
-    double maxValue = std::numeric_limits<double>::infinity();
-    double minValue = -std::numeric_limits<double>::infinity();
-
-    dbus::PropertyMap allCurrentIfaceProperties =
-        co_await utils::coGetAllDbusProperty(utils::entityManagerServiceStr,
-                                             objPath, baseInterface);
-    if (allCurrentIfaceProperties.count("Name"))
+    const std::string type = "NSM_LeakDetection";
+    std::string name = param<std::string>(params, "Name").value_or("");
+    auto chassisName = param<std::string>(params, "ChassisName");
+    auto boardName = param<std::string>(params, "BoardName");
+    std::string chassisPath;
+    if (boardName && !boardName->empty())
     {
-        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        chassisPath = (boardInventoryBasePath / *boardName).string();
     }
-    if (allCurrentIfaceProperties.count("Type"))
+    else if (chassisName && !chassisName->empty())
     {
-        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+        chassisPath = (chassisInventoryBasePath / *chassisName).string();
     }
-    if (allCurrentIfaceProperties.count("UUID"))
+    else
     {
-        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
-    }
-    if (allCurrentIfaceProperties.count("SensorIdMap"))
-    {
-        sensorIdMap = std::get<std::vector<uint64_t>>(
-            allCurrentIfaceProperties.at("SensorIdMap"));
-    }
-    if (allCurrentIfaceProperties.count("SensorNameMap"))
-    {
-        sensorNameMap = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("SensorNameMap"));
-    }
-    if (allCurrentIfaceProperties.count("PhysicalContextMap"))
-    {
-        physicalContextMap = std::get<std::vector<std::string>>(
-            allCurrentIfaceProperties.at("PhysicalContextMap"));
-    }
-    if (allCurrentIfaceProperties.count("ChassisPath"))
-    {
-        chassisPath =
-            std::get<std::string>(allCurrentIfaceProperties.at("ChassisPath"));
-    }
-    if (allCurrentIfaceProperties.count("MinThresholdsmV"))
-    {
-        minThresholds = std::get<std::vector<uint64_t>>(
-            allCurrentIfaceProperties.at("MinThresholdsmV"));
-    }
-    if (allCurrentIfaceProperties.count("CriticalThresholdsmV"))
-    {
-        criticalThresholds = std::get<std::vector<uint64_t>>(
-            allCurrentIfaceProperties.at("CriticalThresholdsmV"));
-    }
-    if (allCurrentIfaceProperties.count("MaxThresholdsmV"))
-    {
-        maxThresholds = std::get<std::vector<uint64_t>>(
-            allCurrentIfaceProperties.at("MaxThresholdsmV"));
-    }
-    if (allCurrentIfaceProperties.count("MaxValue"))
-    {
-        maxValue = std::get<double>(allCurrentIfaceProperties.at("MaxValue"));
-    }
-    if (allCurrentIfaceProperties.count("MinValue"))
-    {
-        minValue = std::get<double>(allCurrentIfaceProperties.at("MinValue"));
+        lg2::error(
+            "LeakDetection feature of {NAME}: no ChassisName or BoardName",
+            "NAME", dev.name);
+        co_return NSM_ERROR;
     }
 
-    // Validate array sizes: SensorNameMap must always match SensorIdMap
+    auto sensorIdMap = arrayParam<uint64_t>(params, "SensorIdMap");
+    auto sensorNameMap = arrayParam<std::string>(params, "SensorNameMap");
+    auto physicalContextMap = arrayParam<std::string>(params,
+                                                      "PhysicalContextMap");
+    auto minThresholds = arrayParam<uint64_t>(params, "MinThresholdsmV");
+    auto criticalThresholds = arrayParam<uint64_t>(params,
+                                                   "CriticalThresholdsmV");
+    auto maxThresholds = arrayParam<uint64_t>(params, "MaxThresholdsmV");
+    double maxValue = param<double>(params, "MaxValue")
+                          .value_or(std::numeric_limits<double>::infinity());
+    double minValue = param<double>(params, "MinValue")
+                          .value_or(-std::numeric_limits<double>::infinity());
+
     if (sensorNameMap.size() != sensorIdMap.size())
     {
         lg2::error(
@@ -807,12 +780,9 @@ requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    // If thresholds are provided, all three must be present and match sensor
-    // count
-    bool thresholdsGiven =
-        allCurrentIfaceProperties.count("MinThresholdsmV") &&
-        allCurrentIfaceProperties.count("CriticalThresholdsmV") &&
-        allCurrentIfaceProperties.count("MaxThresholdsmV");
+    bool thresholdsGiven = params.contains("MinThresholdsmV") &&
+                           params.contains("CriticalThresholdsmV") &&
+                           params.contains("MaxThresholdsmV");
     if (thresholdsGiven && (minThresholds.size() != sensorIdMap.size() ||
                             criticalThresholds.size() != sensorIdMap.size() ||
                             maxThresholds.size() != sensorIdMap.size()))
@@ -825,17 +795,8 @@ requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    if (!device)
-    {
-        lg2::error(
-            "Failed to get NSM device for LeakDetection: UUID={UUID}, Name={NAME}",
-            "UUID", uuid, "NAME", name);
-        co_return NSM_ERROR;
-    }
+    auto device = dev.device;
 
-    // Create NsmSetLeakDetectionThresholds for initial threshold setup only
-    // when thresholds are provided in config
     if (thresholdsGiven)
     {
         auto setThresholdsSensor =
@@ -845,19 +806,14 @@ requester::Coroutine
         device->addStaticSensor(setThresholdsSensor);
     }
 
-    // Create NsmLeakDetection sensor with all interfaces
     auto leakDetectorInfoObject = std::make_shared<NsmLeakDetection>(
         name, type, bus, sensorIdMap, sensorNameMap, chassisPath, maxValue,
         minValue, physicalContextMap);
     device->addSensor(leakDetectorInfoObject, true);
 
-    // Create NsmLeakDetectionThresholdsPatch for each sensor for runtime
-    // threshold patching. Register async set operations on the sensor's voltage
-    // object path.
     for (auto [sensorId, sensorName] :
          std::views::zip(sensorIdMap, sensorNameMap))
     {
-        // Get sensor interfaces from NsmLeakDetection
         auto interfaces = leakDetectorInfoObject->getSensorInterfaces(
             static_cast<uint8_t>(sensorId));
         if (!interfaces)
@@ -869,13 +825,11 @@ requester::Coroutine
 
         auto& [sensorValueIntf, thresholdIntf] = *interfaces;
 
-        // Create NsmLeakDetectionThresholdsPatch for this sensor
         auto thresholdsPatchObject =
             std::make_shared<NsmLeakDetectionThresholdsPatch>(
                 static_cast<uint8_t>(sensorId), sensorValueIntf, thresholdIntf);
         device->addStaticSensor(thresholdsPatchObject);
 
-        // Register async set operations on the sensor's voltage object path
         std::string sensorObjPath = "/xyz/openbmc_project/sensors/voltage/" +
                                     sensorName;
 
@@ -885,7 +839,6 @@ requester::Coroutine
                       thresholdsPatchObject, std::placeholders::_1,
                       std::placeholders::_2, std::placeholders::_3);
 
-        // Register for MinThreshold
         AsyncOperationManager::getInstance()
             ->getDispatcher(sensorObjPath)
             ->addAsyncSetOperation(
@@ -893,7 +846,6 @@ requester::Coroutine
                 AsyncSetOperationInfo{setLeakDetectionThresholdsPatchHandler,
                                       thresholdsPatchObject, device});
 
-        // Register for CriticalThreshold
         AsyncOperationManager::getInstance()
             ->getDispatcher(sensorObjPath)
             ->addAsyncSetOperation(
@@ -901,7 +853,6 @@ requester::Coroutine
                 AsyncSetOperationInfo{setLeakDetectionThresholdsPatchHandler,
                                       thresholdsPatchObject, device});
 
-        // Register for MaxThreshold
         AsyncOperationManager::getInstance()
             ->getDispatcher(sensorObjPath)
             ->addAsyncSetOperation(
@@ -913,7 +864,4 @@ requester::Coroutine
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    nsmLeakDetectionCreateSensors,
-    "xyz.openbmc_project.Configuration.NSM_LeakDetection")
-} // namespace nsm
+} // namespace nsm::features
