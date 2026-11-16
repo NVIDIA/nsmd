@@ -216,6 +216,67 @@ static std::vector<uint8_t>
     return buf;
 }
 
+struct CutShortV2Resp
+{
+    std::vector<uint8_t> bytes;
+    size_t reportedLen = 0;
+};
+
+static constexpr size_t sampleHdrLen = offsetof(nsm_aggregate_resp_sample,
+                                                data);
+static constexpr size_t cutInData = sampleHdrLen + sizeof(uint32_t) - 1;
+static constexpr size_t cutInHeader = sampleHdrLen - 1;
+
+static CutShortV2Resp
+    makeCutShortV2Resp(int (*encodeResp)(uint8_t, uint8_t, uint16_t, nsm_msg*),
+                       const std::vector<std::pair<uint8_t, uint32_t>>& samples,
+                       size_t bytesOfSecond, bool exactBuffer = false)
+{
+    CutShortV2Resp resp;
+    resp.bytes.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp));
+    encodeResp(0, NSM_SUCCESS, samples.size(),
+               reinterpret_cast<nsm_msg*>(resp.bytes.data()));
+    for (size_t i = 0; i < samples.size(); i++)
+    {
+        uint8_t data[sizeof(uint32_t)] = {};
+        encodeUint32LE(data, samples[i].second);
+        uint8_t sample[sizeof(nsm_aggregate_resp_sample) + sizeof(data)] = {};
+        size_t sampleLen = 0;
+        encode_aggregate_resp_sample(
+            samples[i].first, true, data, sizeof(data),
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample), &sampleLen);
+        resp.bytes.insert(resp.bytes.end(), sample, sample + sampleLen);
+        if (i == 0)
+        {
+            resp.reportedLen = resp.bytes.size() + bytesOfSecond;
+        }
+    }
+    // A walk that goes on after a cut header returns the same error for most
+    // bytes it finds, so only that case keeps the samples past reportedLen.
+    // With exactBuffer it ends at reportedLen as well, so that a read past the
+    // response is caught by ASan or valgrind.
+    if (bytesOfSecond >= sampleHdrLen || exactBuffer)
+    {
+        resp.bytes = std::vector<uint8_t>(
+            resp.bytes.begin(), resp.bytes.begin() + resp.reportedLen);
+    }
+    return resp;
+}
+
+static auto respondCutShort(const CutShortV2Resp& resp)
+{
+    auto bytes = std::make_shared<std::vector<uint8_t>>(resp.bytes);
+    return [bytes, len = resp.reportedLen](
+               eid_t, Request&, std::shared_ptr<const nsm_msg>& responseMsg,
+               size_t& responseLen) -> requester::Coroutine {
+        responseMsg = std::shared_ptr<const nsm_msg>(
+            bytes, reinterpret_cast<const nsm_msg*>(bytes->data()));
+        responseLen = len;
+        // coverity[missing_return]
+        co_return NSM_SW_SUCCESS;
+    };
+}
+
 // =============================================================================
 // Fixture
 // =============================================================================
@@ -395,6 +456,77 @@ TEST_F(PwrSmoothV2Branch2Test,
     auto msg = reinterpret_cast<const nsm_msg*>(resp.data());
     auto rc = sensor.handleResponseMsg(msg, resp.size());
     EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+// =============================================================================
+// NsmPowerSmoothingV2::handleResponseMsg - V2 path, response ends in a sample
+// =============================================================================
+
+TEST_F(PwrSmoothV2Branch2Test,
+       PwrSmoothingV2_HandleResp_SampleLongerThanResponse_StopsDecoding)
+{
+    std::string name = "PSV2";
+    std::string type = "NSM";
+    std::string path = parentPath;
+    auto featIntf = makeFeatIntf();
+    NsmPowerSmoothingV2 sensor(name, type, path, featIntf, gpu);
+
+    enableFeatInfoV2(gpu);
+    auto resp = makeCutShortV2Resp(encode_get_powersmoothing_featinfo_v2_resp,
+                                   {{FEATURE_FLAG_TAG, 0x01},
+                                    {CURRENT_TMP_SETTING_TAG, 0},
+                                    {FEATURE_FLAG_TAG, 0x02}},
+                                   cutInData);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = sensor.handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    EXPECT_TRUE(featIntf->PowerSmoothingIntf::featureSupported());
+    EXPECT_FALSE(featIntf->PowerSmoothingIntf::powerSmoothingEnabled());
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       PwrSmoothingV2_HandleResp_TruncatedSampleHeader_StopsDecoding)
+{
+    std::string name = "PSV2";
+    std::string type = "NSM";
+    std::string path = parentPath;
+    auto featIntf = makeFeatIntf();
+    NsmPowerSmoothingV2 sensor(name, type, path, featIntf, gpu);
+
+    enableFeatInfoV2(gpu);
+    auto resp = makeCutShortV2Resp(encode_get_powersmoothing_featinfo_v2_resp,
+                                   {{FEATURE_FLAG_TAG, 0x01},
+                                    {CURRENT_TMP_SETTING_TAG, 0},
+                                    {FEATURE_FLAG_TAG, 0x02}},
+                                   cutInHeader);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = sensor.handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    EXPECT_TRUE(featIntf->PowerSmoothingIntf::featureSupported());
+    EXPECT_FALSE(featIntf->PowerSmoothingIntf::powerSmoothingEnabled());
+}
+
+TEST_F(
+    PwrSmoothV2Branch2Test,
+    PwrSmoothingV2_HandleResp_TruncatedSampleHeader_ExactBuffer_StopsDecoding)
+{
+    std::string name = "PSV2";
+    std::string type = "NSM";
+    std::string path = parentPath;
+    auto featIntf = makeFeatIntf();
+    NsmPowerSmoothingV2 sensor(name, type, path, featIntf, gpu);
+
+    enableFeatInfoV2(gpu);
+    auto resp = makeCutShortV2Resp(encode_get_powersmoothing_featinfo_v2_resp,
+                                   {{FEATURE_FLAG_TAG, 0x01},
+                                    {CURRENT_TMP_SETTING_TAG, 0},
+                                    {FEATURE_FLAG_TAG, 0x02}},
+                                   cutInHeader, true);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = sensor.handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    EXPECT_TRUE(featIntf->PowerSmoothingIntf::featureSupported());
+    EXPECT_FALSE(featIntf->PowerSmoothingIntf::powerSmoothingEnabled());
 }
 
 // =============================================================================
@@ -687,6 +819,60 @@ TEST_F(PwrSmoothV2Branch2Test, CurProfileV2_HandleResp_NotSupported_FallsBackV1)
     auto msg = reinterpret_cast<const nsm_msg*>(resp.data());
     auto rc = sensor->handleResponseMsg(msg, resp.size());
     EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       CurProfileV2_HandleResp_SampleLongerThanResponse_StopsDecoding)
+{
+    auto sensor = makeCurProfileSensor();
+    enableCurProfileV2(gpu);
+    auto resp = makeCutShortV2Resp(encode_get_current_profile_info_v2_resp,
+                                   {{CURRENT_RAMPUP_RATE_TAG, 5000},
+                                    {CURRENT_RAMPDOWN_RATE_TAG, 7000},
+                                    {CURRENT_RAMPDOWN_RATE_TAG, 7000}},
+                                   cutInData);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = sensor->handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    auto intf = sensor->getPwrSmoothingCurProfileIntf();
+    EXPECT_DOUBLE_EQ(intf->CurrentPowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(intf->CurrentPowerProfileIntf::rampDownRate(), 7.0);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       CurProfileV2_HandleResp_TruncatedSampleHeader_StopsDecoding)
+{
+    auto sensor = makeCurProfileSensor();
+    enableCurProfileV2(gpu);
+    auto resp = makeCutShortV2Resp(encode_get_current_profile_info_v2_resp,
+                                   {{CURRENT_RAMPUP_RATE_TAG, 5000},
+                                    {CURRENT_RAMPDOWN_RATE_TAG, 7000},
+                                    {CURRENT_RAMPDOWN_RATE_TAG, 7000}},
+                                   cutInHeader);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = sensor->handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    auto intf = sensor->getPwrSmoothingCurProfileIntf();
+    EXPECT_DOUBLE_EQ(intf->CurrentPowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(intf->CurrentPowerProfileIntf::rampDownRate(), 7.0);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       CurProfileV2_HandleResp_TruncatedSampleHeader_ExactBuffer_StopsDecoding)
+{
+    auto sensor = makeCurProfileSensor();
+    enableCurProfileV2(gpu);
+    auto resp = makeCutShortV2Resp(encode_get_current_profile_info_v2_resp,
+                                   {{CURRENT_RAMPUP_RATE_TAG, 5000},
+                                    {CURRENT_RAMPDOWN_RATE_TAG, 7000},
+                                    {CURRENT_RAMPDOWN_RATE_TAG, 7000}},
+                                   cutInHeader, true);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = sensor->handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    auto intf = sensor->getPwrSmoothingCurProfileIntf();
+    EXPECT_DOUBLE_EQ(intf->CurrentPowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(intf->CurrentPowerProfileIntf::rampDownRate(), 7.0);
 }
 
 // =============================================================================
@@ -1068,6 +1254,64 @@ TEST_F(PwrSmoothV2Branch2Test,
     EXPECT_NE(rc, NSM_SW_SUCCESS);
 }
 
+TEST_F(PwrSmoothV2Branch2Test,
+       AdminOverrideV2_HandleResp_SampleLongerThanResponse_StopsDecoding)
+{
+    auto sensor = makeAdminOverrideSensor();
+    enableAdminOverrideV2(gpu);
+    auto resp =
+        makeCutShortV2Resp(encode_get_admin_override_profile_info_v2_resp,
+                           {{ADMIN_OVERRIDE_PROFILE_RAMPUP_RATE_TAG, 5000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000}},
+                           cutInData);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = sensor->handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    auto intf = sensor->getAdminProfileIntf();
+    EXPECT_DOUBLE_EQ(intf->AdminPowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(intf->AdminPowerProfileIntf::rampDownRate(), 7.0);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       AdminOverrideV2_HandleResp_TruncatedSampleHeader_StopsDecoding)
+{
+    auto sensor = makeAdminOverrideSensor();
+    enableAdminOverrideV2(gpu);
+    auto resp =
+        makeCutShortV2Resp(encode_get_admin_override_profile_info_v2_resp,
+                           {{ADMIN_OVERRIDE_PROFILE_RAMPUP_RATE_TAG, 5000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000}},
+                           cutInHeader);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = sensor->handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    auto intf = sensor->getAdminProfileIntf();
+    EXPECT_DOUBLE_EQ(intf->AdminPowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(intf->AdminPowerProfileIntf::rampDownRate(), 7.0);
+}
+
+TEST_F(
+    PwrSmoothV2Branch2Test,
+    AdminOverrideV2_HandleResp_TruncatedSampleHeader_ExactBuffer_StopsDecoding)
+{
+    auto sensor = makeAdminOverrideSensor();
+    enableAdminOverrideV2(gpu);
+    auto resp =
+        makeCutShortV2Resp(encode_get_admin_override_profile_info_v2_resp,
+                           {{ADMIN_OVERRIDE_PROFILE_RAMPUP_RATE_TAG, 5000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000}},
+                           cutInHeader, true);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = sensor->handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    auto intf = sensor->getAdminProfileIntf();
+    EXPECT_DOUBLE_EQ(intf->AdminPowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(intf->AdminPowerProfileIntf::rampDownRate(), 7.0);
+}
+
 // =============================================================================
 // NsmPowerSmoothingAdminOverrideV2::handleSample - all tags + decode-fail
 // =============================================================================
@@ -1376,6 +1620,63 @@ TEST_F(PwrSmoothV2Branch2Test, CollectionV2_HandleResp_NotSupported_FallsBackV1)
     auto msg = reinterpret_cast<const nsm_msg*>(resp.data());
     auto rc = collection->handleResponseMsg(msg, resp.size());
     EXPECT_NE(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       CollectionV2_HandleResp_SampleLongerThanResponse_StopsDecoding)
+{
+    auto collection = makeCollection();
+    enablePresetProfileV2(gpu);
+    auto resp = makeCutShortV2Resp(
+        encode_get_preset_profile_info_v2_resp,
+        {{(PRESET_PROFILE_RAMPUP_RATE_TAG << 3) | 0, 5000},
+         {(PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3) | 1, 7000},
+         {(PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3) | 2, 7000}},
+        cutInData);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = collection->handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    EXPECT_TRUE(collection->hasProfileId(0));
+    EXPECT_FALSE(collection->hasProfileId(1));
+    EXPECT_FALSE(collection->hasProfileId(2));
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       CollectionV2_HandleResp_TruncatedSampleHeader_StopsDecoding)
+{
+    auto collection = makeCollection();
+    enablePresetProfileV2(gpu);
+    auto resp = makeCutShortV2Resp(
+        encode_get_preset_profile_info_v2_resp,
+        {{(PRESET_PROFILE_RAMPUP_RATE_TAG << 3) | 0, 5000},
+         {(PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3) | 1, 7000},
+         {(PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3) | 2, 7000}},
+        cutInHeader);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = collection->handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    EXPECT_TRUE(collection->hasProfileId(0));
+    EXPECT_FALSE(collection->hasProfileId(1));
+    EXPECT_FALSE(collection->hasProfileId(2));
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       CollectionV2_HandleResp_TruncatedSampleHeader_ExactBuffer_StopsDecoding)
+{
+    auto collection = makeCollection();
+    enablePresetProfileV2(gpu);
+    auto resp = makeCutShortV2Resp(
+        encode_get_preset_profile_info_v2_resp,
+        {{(PRESET_PROFILE_RAMPUP_RATE_TAG << 3) | 0, 5000},
+         {(PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3) | 1, 7000},
+         {(PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3) | 2, 7000}},
+        cutInHeader, true);
+    auto msg = reinterpret_cast<const nsm_msg*>(resp.bytes.data());
+    auto rc = collection->handleResponseMsg(msg, resp.reportedLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    EXPECT_TRUE(collection->hasProfileId(0));
+    EXPECT_FALSE(collection->hasProfileId(1));
+    EXPECT_FALSE(collection->hasProfileId(2));
 }
 
 // =============================================================================
@@ -2732,6 +3033,60 @@ TEST_F(PwrSmoothV2Branch2Test, FeatIntfV2_GetPwrSmoothingControlsV2_DecodeFail)
     featIntf->getPwrSmoothingControlsFromDeviceV2(gpu);
 }
 
+TEST_F(PwrSmoothV2Branch2Test,
+       FeatIntfV2_GetPwrSmoothingControlsV2_SampleLongerThanResponse)
+{
+    auto featIntf = makeFeatIntf();
+    auto resp = makeCutShortV2Resp(encode_get_powersmoothing_featinfo_v2_resp,
+                                   {{FEATURE_FLAG_TAG, 0x01},
+                                    {CURRENT_TMP_SETTING_TAG, 0},
+                                    {FEATURE_FLAG_TAG, 0x02}},
+                                   cutInData);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(respondCutShort(resp));
+
+    auto rc = featIntf->getPwrSmoothingControlsFromDeviceV2(gpu);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_DATA);
+    EXPECT_TRUE(featIntf->PowerSmoothingIntf::featureSupported());
+    EXPECT_FALSE(featIntf->PowerSmoothingIntf::powerSmoothingEnabled());
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       FeatIntfV2_GetPwrSmoothingControlsV2_TruncatedSampleHeader)
+{
+    auto featIntf = makeFeatIntf();
+    auto resp = makeCutShortV2Resp(encode_get_powersmoothing_featinfo_v2_resp,
+                                   {{FEATURE_FLAG_TAG, 0x01},
+                                    {CURRENT_TMP_SETTING_TAG, 0},
+                                    {FEATURE_FLAG_TAG, 0x02}},
+                                   cutInHeader);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(respondCutShort(resp));
+
+    auto rc = featIntf->getPwrSmoothingControlsFromDeviceV2(gpu);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_LENGTH);
+    EXPECT_TRUE(featIntf->PowerSmoothingIntf::featureSupported());
+    EXPECT_FALSE(featIntf->PowerSmoothingIntf::powerSmoothingEnabled());
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       FeatIntfV2_GetPwrSmoothingControlsV2_TruncatedSampleHeader_ExactBuffer)
+{
+    auto featIntf = makeFeatIntf();
+    auto resp = makeCutShortV2Resp(encode_get_powersmoothing_featinfo_v2_resp,
+                                   {{FEATURE_FLAG_TAG, 0x01},
+                                    {CURRENT_TMP_SETTING_TAG, 0},
+                                    {FEATURE_FLAG_TAG, 0x02}},
+                                   cutInHeader, true);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(respondCutShort(resp));
+
+    auto rc = featIntf->getPwrSmoothingControlsFromDeviceV2(gpu);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_LENGTH);
+    EXPECT_TRUE(featIntf->PowerSmoothingIntf::featureSupported());
+    EXPECT_FALSE(featIntf->PowerSmoothingIntf::powerSmoothingEnabled());
+}
+
 // getAdminProfileFromDeviceV2: decode fails (error CC)
 TEST_F(PwrSmoothV2Branch2Test, AdminIntfV2_GetAdminProfileV2_DecodeFail)
 {
@@ -2741,6 +3096,63 @@ TEST_F(PwrSmoothV2Branch2Test, AdminIntfV2_GetAdminProfileV2_DecodeFail)
         .WillOnce(mockPostPatchIO(makeAdminOverrideV2Resp(NSM_ERROR)));
 
     adminIntf->getAdminProfileFromDeviceV2(gpu);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       AdminIntfV2_GetAdminProfileV2_SampleLongerThanResponse)
+{
+    auto adminIntf = makeAdminIntf();
+    auto resp =
+        makeCutShortV2Resp(encode_get_admin_override_profile_info_v2_resp,
+                           {{ADMIN_OVERRIDE_PROFILE_RAMPUP_RATE_TAG, 5000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000}},
+                           cutInData);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(respondCutShort(resp));
+
+    auto rc = adminIntf->getAdminProfileFromDeviceV2(gpu);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_DATA);
+    EXPECT_DOUBLE_EQ(adminIntf->AdminPowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(adminIntf->AdminPowerProfileIntf::rampDownRate(), 7.0);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       AdminIntfV2_GetAdminProfileV2_TruncatedSampleHeader)
+{
+    auto adminIntf = makeAdminIntf();
+    auto resp =
+        makeCutShortV2Resp(encode_get_admin_override_profile_info_v2_resp,
+                           {{ADMIN_OVERRIDE_PROFILE_RAMPUP_RATE_TAG, 5000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000}},
+                           cutInHeader);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(respondCutShort(resp));
+
+    auto rc = adminIntf->getAdminProfileFromDeviceV2(gpu);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_LENGTH);
+    EXPECT_DOUBLE_EQ(adminIntf->AdminPowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(adminIntf->AdminPowerProfileIntf::rampDownRate(), 7.0);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       AdminIntfV2_GetAdminProfileV2_TruncatedSampleHeader_ExactBuffer)
+{
+    auto adminIntf = makeAdminIntf();
+    auto resp =
+        makeCutShortV2Resp(encode_get_admin_override_profile_info_v2_resp,
+                           {{ADMIN_OVERRIDE_PROFILE_RAMPUP_RATE_TAG, 5000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000},
+                            {ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG, 7000}},
+                           cutInHeader, true);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(respondCutShort(resp));
+
+    auto rc = adminIntf->getAdminProfileFromDeviceV2(gpu);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_LENGTH);
+    EXPECT_DOUBLE_EQ(adminIntf->AdminPowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(adminIntf->AdminPowerProfileIntf::rampDownRate(), 7.0);
 }
 
 // getProfileInfoFromDeviceV2: postPatchIO fail
@@ -2765,4 +3177,64 @@ TEST_F(PwrSmoothV2Branch2Test, PowerProfileV2_GetProfileInfoV2_DecodeFail)
         .WillOnce(mockPostPatchIO(makePresetProfileV2Resp(NSM_ERROR)));
 
     profileIntf->getProfileInfoFromDeviceV2(gpu);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       PowerProfileV2_GetProfileInfoV2_SampleLongerThanResponse)
+{
+    auto profileIntf =
+        std::make_shared<OemPowerProfileIntfV2>(bus(), parentPath, 0, gpu);
+    auto resp =
+        makeCutShortV2Resp(encode_get_preset_profile_info_v2_resp,
+                           {{PRESET_PROFILE_RAMPUP_RATE_TAG << 3, 5000},
+                            {PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3, 7000},
+                            {PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3, 7000}},
+                           cutInData);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(respondCutShort(resp));
+
+    auto rc = profileIntf->getProfileInfoFromDeviceV2(gpu);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_DATA);
+    EXPECT_DOUBLE_EQ(profileIntf->PowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(profileIntf->PowerProfileIntf::rampDownRate(), 7.0);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       PowerProfileV2_GetProfileInfoV2_TruncatedSampleHeader)
+{
+    auto profileIntf =
+        std::make_shared<OemPowerProfileIntfV2>(bus(), parentPath, 0, gpu);
+    auto resp =
+        makeCutShortV2Resp(encode_get_preset_profile_info_v2_resp,
+                           {{PRESET_PROFILE_RAMPUP_RATE_TAG << 3, 5000},
+                            {PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3, 7000},
+                            {PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3, 7000}},
+                           cutInHeader);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(respondCutShort(resp));
+
+    auto rc = profileIntf->getProfileInfoFromDeviceV2(gpu);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_LENGTH);
+    EXPECT_DOUBLE_EQ(profileIntf->PowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(profileIntf->PowerProfileIntf::rampDownRate(), 7.0);
+}
+
+TEST_F(PwrSmoothV2Branch2Test,
+       PowerProfileV2_GetProfileInfoV2_TruncatedSampleHeader_ExactBuffer)
+{
+    auto profileIntf =
+        std::make_shared<OemPowerProfileIntfV2>(bus(), parentPath, 0, gpu);
+    auto resp =
+        makeCutShortV2Resp(encode_get_preset_profile_info_v2_resp,
+                           {{PRESET_PROFILE_RAMPUP_RATE_TAG << 3, 5000},
+                            {PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3, 7000},
+                            {PRESET_PROFILE_RAMPDOWN_RATE_TAG << 3, 7000}},
+                           cutInHeader, true);
+
+    EXPECT_CALL(*gpu, postPatchIO(_, _, _, _)).WillOnce(respondCutShort(resp));
+
+    auto rc = profileIntf->getProfileInfoFromDeviceV2(gpu);
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR_LENGTH);
+    EXPECT_DOUBLE_EQ(profileIntf->PowerProfileIntf::rampUpRate(), 5.0);
+    EXPECT_NE(profileIntf->PowerProfileIntf::rampDownRate(), 7.0);
 }

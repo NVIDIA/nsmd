@@ -426,10 +426,16 @@ class NsmPowerSmoothingV2 : public NsmPowerSmoothing
 
         while (telemetry_count--)
         {
-            uint8_t tag;
-            bool valid;
+            uint8_t tag = 0;
+            bool valid = false;
             const uint8_t* data;
             size_t data_len;
+
+            if (consumed_len == 0 || consumed_len > responseLen)
+            {
+                rc = NSM_SW_ERROR_LENGTH;
+                break;
+            }
 
             responseLen -= consumed_len;
             response_data += consumed_len;
@@ -448,7 +454,8 @@ class NsmPowerSmoothingV2 : public NsmPowerSmoothing
                     "Tag={TAG}, rc={RC}, valid_bit={VALID}",
                     "TAG", tag, "RC", rc, "VALID", valid);
 
-                continue;
+                // The next sample boundary is unknown after a failed decode.
+                break;
             }
 
             rc = handleSample(TelemetrySample{
@@ -841,10 +848,16 @@ class NsmCurrentPowerSmoothingProfileV2 : public NsmCurrentPowerSmoothingProfile
 
         while (telemetry_count--)
         {
-            uint8_t tag;
-            bool valid;
+            uint8_t tag = 0;
+            bool valid = false;
             const uint8_t* data;
             size_t data_len;
+
+            if (consumed_len == 0 || consumed_len > responseLen)
+            {
+                rc = NSM_SW_ERROR_LENGTH;
+                break;
+            }
 
             responseLen -= consumed_len;
             response_data += consumed_len;
@@ -863,7 +876,8 @@ class NsmCurrentPowerSmoothingProfileV2 : public NsmCurrentPowerSmoothingProfile
                     "Tag={TAG}, rc={RC}, valid_bit={VALID}",
                     "TAG", tag, "RC", rc, "VALID", valid);
 
-                continue;
+                // The next sample boundary is unknown after a failed decode.
+                break;
             }
 
             rc = handleSample(TelemetrySample{
@@ -1188,10 +1202,16 @@ class NsmPowerSmoothingAdminOverrideV2 : public NsmPowerSmoothingAdminOverride
 
         while (telemetry_count--)
         {
-            uint8_t tag;
-            bool valid;
+            uint8_t tag = 0;
+            bool valid = false;
             const uint8_t* data;
             size_t data_len;
+
+            if (consumed_len == 0 || consumed_len > responseLen)
+            {
+                rc = NSM_SW_ERROR_LENGTH;
+                break;
+            }
 
             responseLen -= consumed_len;
             response_data += consumed_len;
@@ -1210,7 +1230,8 @@ class NsmPowerSmoothingAdminOverrideV2 : public NsmPowerSmoothingAdminOverride
                     "Tag={TAG}, rc={RC}, valid_bit={VALID}",
                     "TAG", tag, "RC", rc, "VALID", valid);
 
-                continue;
+                // The next sample boundary is unknown after a failed decode.
+                break;
             }
 
             rc = handleSample(TelemetrySample{
@@ -1635,10 +1656,16 @@ class NsmPowerProfileCollectionV2 : public NsmPowerProfileCollection
 
         while (telemetry_count--)
         {
-            uint8_t tag;
-            bool valid;
+            uint8_t tag = 0;
+            bool valid = false;
             const uint8_t* data;
             size_t data_len;
+
+            if (consumed_len == 0 || consumed_len > responseLen)
+            {
+                rc = NSM_SW_ERROR_LENGTH;
+                break;
+            }
 
             responseLen -= consumed_len;
             response_data += consumed_len;
@@ -1657,7 +1684,8 @@ class NsmPowerProfileCollectionV2 : public NsmPowerProfileCollection
                     "Tag={TAG}, rc={VALID}",
                     "TAG", tag, "RC", rc, "VALID", valid);
 
-                continue;
+                // The next sample boundary is unknown after a failed decode.
+                break;
             }
 
             rc = handleSample(TelemetrySample{
