@@ -6,6 +6,7 @@ tests = [
     'policyStore_test',
     'featureDriver_test',
     'deviceLists_test',
+    'associations_test',
 ]
 
 foreach t : tests

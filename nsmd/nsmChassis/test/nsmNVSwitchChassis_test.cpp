@@ -258,6 +258,35 @@ TEST_F(NsmNVLinkMgmtNicChassisTest, goodTestCreateNVLinkMgmtNicChassis)
     EXPECT_EQ(chassisUuid->invoke(pdiMethod(uuid)), nicUuid);
 }
 
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
+// DeviceResetSupported creates one reset object per Redfish reset type
+TEST_F(NsmNVLinkMgmtNicChassisTest, goodTestDeviceResetSupportedCreatesObjects)
+{
+    auto ctx = nicContext(name, nicUuid, nic);
+
+    const size_t before = nic->deviceSensors.size();
+    auto rc = nsm::features::createNVLinkMgmtNicChassisFeature(
+        mockManager, ctx, {{"Name", name}, {"DeviceResetSupported", true}});
+
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    // The chassis UUID sensor plus one reset object per Redfish reset type
+    EXPECT_EQ(nic->deviceSensors.size(), before + 1 + 5);
+}
+
+TEST_F(NsmNVLinkMgmtNicChassisTest, goodTestDeviceResetNotSupportedCreatesNone)
+{
+    auto ctx = nicContext(name, nicUuid, nic);
+
+    const size_t before = nic->deviceSensors.size();
+    auto rc = nsm::features::createNVLinkMgmtNicChassisFeature(
+        mockManager, ctx, {{"Name", name}, {"DeviceResetSupported", false}});
+
+    EXPECT_EQ(rc.data(), NSM_SW_SUCCESS);
+    // Only the chassis UUID sensor
+    EXPECT_EQ(nic->deviceSensors.size(), before + 1);
+}
+#endif
+
 TEST_F(NsmNVLinkMgmtNicChassisTest, testCreateWithAllAttributes)
 {
     dbus::PropertyMap baseProperties = {

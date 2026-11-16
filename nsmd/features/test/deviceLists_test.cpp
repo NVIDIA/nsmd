@@ -256,3 +256,45 @@ TEST(DeviceListsTest, ListsAreBuiltFreshEveryTime)
     a[0].enabled = false;
     EXPECT_TRUE(b[0].enabled);
 }
+
+TEST(DeviceListsTest, IRoT_SkuSlotParams_HaveOneEntryPerSlot)
+{
+    auto features = irotFeatures();
+    const Feature* slots = nullptr;
+    for (const auto& feature : features)
+    {
+        if (feature.params.contains("SlotSkuInventoryPath"))
+        {
+            slots = &feature;
+        }
+    }
+    ASSERT_NE(slots, nullptr);
+
+    auto sizeOf = [&](const char* key) {
+        const auto& value = slots->params.at(key).value;
+        if (const auto* u = std::get_if<std::vector<uint64_t>>(&value))
+        {
+            return u->size();
+        }
+        return std::get<std::vector<std::string>>(value).size();
+    };
+    const auto slotCount = sizeOf("SlotSkuInventoryPath");
+    EXPECT_EQ(sizeOf("SlotReportSkuWithNsm"), slotCount);
+    EXPECT_EQ(sizeOf("SlotUpdateSkuEnabled"), slotCount);
+    EXPECT_EQ(sizeOf("SlotIsRoT"), slotCount);
+}
+
+TEST(DeviceListsTest, ErotLists_DoNotDeclareDuplicateParamsAcrossFeatures)
+{
+    for (const auto& build : {vrBmcErotFeatures, vrHmcErotFeatures})
+    {
+        for (const auto& feature : build())
+        {
+            for (const auto& [key, param] : feature.params)
+            {
+                EXPECT_FALSE(feature.optional.contains(key))
+                    << feature.id << "." << key;
+            }
+        }
+    }
+}

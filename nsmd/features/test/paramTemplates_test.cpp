@@ -17,6 +17,11 @@
 
 #include "features/paramTemplates.hpp"
 
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
 #include <gtest/gtest.h>
 
 using namespace nsm::features;
@@ -342,4 +347,49 @@ TEST(ParamTemplatesTest, OptVar_MissingDoesNotMaskRequiredFailure)
                                  {"Req", var<uint64_t>("{AlsoNope}")}});
     EXPECT_FALSE(r.params.has_value());
     EXPECT_NE(r.error.find("Req not set"), std::string::npos) << r.error;
+}
+
+TEST(ParamTemplatesTest, Text_EveryIntegerVariableType_ConvertedToText)
+{
+    auto dev = makeDev();
+    dev.variables["U8"] = uint8_t{8};
+    dev.variables["I16"] = int16_t{-16};
+    dev.variables["U16"] = uint16_t{16};
+    dev.variables["I32"] = int32_t{-32};
+    dev.variables["U32"] = uint32_t{32};
+    dev.variables["I64"] = int64_t{-64};
+    dev.variables["U64"] = uint64_t{64};
+
+    auto r = resolve(
+        dev, {{"A", ParamValue{"{U8},{I16},{U16},{I32},{U32},{I64},{U64}"s}}});
+
+    ASSERT_TRUE(r.params.has_value()) << r.error;
+    EXPECT_EQ(text(r, "A"), "8,-16,16,-32,32,-64,64");
+}
+
+TEST(ParamTemplatesTest, Text_NonTextVariableTypes_CannotBeUsedInText)
+{
+    using AssocList =
+        std::vector<std::tuple<std::string, std::string, std::string>>;
+
+    const std::vector<std::pair<std::string, dbus::Value>> variables{
+        {"Real", dbus::Value{2.5}},
+        {"Bytes", dbus::Value{std::vector<uint8_t>{1, 2}}},
+        {"Fd", dbus::Value{std::in_place_type<sdbusplus::message::unix_fd>}},
+        {"Unsigneds", dbus::Value{std::vector<uint64_t>{1}}},
+        {"Signeds", dbus::Value{std::vector<int64_t>{1}}},
+        {"Assocs", dbus::Value{AssocList{}}},
+    };
+
+    for (const auto& [name, value] : variables)
+    {
+        auto dev = makeDev();
+        dev.variables[name] = value;
+
+        auto r = resolve(dev, {{"A", ParamValue{"x{" + name + "}"}}});
+
+        EXPECT_FALSE(r.params.has_value()) << name;
+        EXPECT_NE(r.error.find("cannot be used in text"), std::string::npos)
+            << name << ": " << r.error;
+    }
 }

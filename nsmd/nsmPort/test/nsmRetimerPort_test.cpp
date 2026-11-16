@@ -3696,6 +3696,25 @@ TEST_F(NsmPCIeRetimerPortsFactoryFixture,
     EXPECT_EQ(retimer->deviceSensors.size(), before);
 }
 
+// ParentDeviceAssociationsEnabled adds the parent_device association to the
+// discovered ports; the feature is still created and no association is needed
+// when it is off
+TEST_F(NsmPCIeRetimerPortsFactoryFixture,
+       MultiFeature_ParentDeviceAssociations_OnAndOff)
+{
+    for (bool enabled : {true, false})
+    {
+        auto params = multiPortParams(enabled ? "Switch_AssocOn"
+                                              : "Switch_AssocOff");
+        params["ParentDeviceAssociationsEnabled"] = enabled;
+
+        auto rc = createMultiPCIeLink(params, retimer);
+
+        EXPECT_EQ(rc.data(), NSM_SUCCESS) << enabled;
+        EXPECT_FALSE(rc.exception()) << enabled;
+    }
+}
+
 // CX9 device → getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX9 →
 // includeInboundCounters=true → NsmPCIeECCGroup10 created with inbound counters
 TEST_F(NsmPCIeRetimerPortsFactoryFixture,

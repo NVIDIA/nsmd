@@ -17,6 +17,11 @@
 
 #include "features/overrides/overrideApply.hpp"
 
+#include <string>
+#include <tuple>
+#include <variant>
+#include <vector>
+
 #include <gtest/gtest.h>
 
 using namespace nsm::features;
@@ -423,4 +428,120 @@ TEST(ValueToStringTest, UnsupportedType_Unprintable)
     using Triple = std::tuple<std::string, std::string, std::string>;
     EXPECT_EQ(valueToString(dbus::Value{std::vector<Triple>{}}),
               "<unprintable>");
+}
+
+namespace
+{
+
+using AssocList =
+    std::vector<std::tuple<std::string, std::string, std::string>>;
+
+/** @brief One small value of every alternative of dbus::Value, by index */
+std::vector<dbus::Value> oneOfEveryType()
+{
+    std::vector<dbus::Value> values;
+    values.emplace_back(std::in_place_type<bool>, true);
+    values.emplace_back(std::in_place_type<uint8_t>, uint8_t{1});
+    values.emplace_back(std::in_place_type<int16_t>, int16_t{1});
+    values.emplace_back(std::in_place_type<uint16_t>, uint16_t{1});
+    values.emplace_back(std::in_place_type<int32_t>, int32_t{1});
+    values.emplace_back(std::in_place_type<uint32_t>, uint32_t{1});
+    values.emplace_back(std::in_place_type<int64_t>, int64_t{1});
+    values.emplace_back(std::in_place_type<uint64_t>, uint64_t{1});
+    values.emplace_back(std::in_place_type<double>, 2.5);
+    values.emplace_back(std::in_place_type<std::string>, "s");
+    values.emplace_back(std::in_place_type<std::vector<uint8_t>>,
+                        std::vector<uint8_t>{1, 2});
+    values.emplace_back(std::in_place_type<sdbusplus::message::unix_fd>);
+    values.emplace_back(std::in_place_type<std::vector<std::string>>,
+                        std::vector<std::string>{"a", "b"});
+    values.emplace_back(std::in_place_type<std::vector<uint64_t>>,
+                        std::vector<uint64_t>{1, 2});
+    values.emplace_back(std::in_place_type<std::vector<int64_t>>,
+                        std::vector<int64_t>{1, 2});
+    values.emplace_back(std::in_place_type<AssocList>, AssocList{});
+    return values;
+}
+
+bool isIntegerIndex(size_t index)
+{
+    // uint8, int16, uint16, int32, uint32, int64, uint64 (not bool)
+    return index >= 1 && index <= 7;
+}
+
+bool isIntegerVectorIndex(size_t index)
+{
+    // vector<uint8_t>, vector<uint64_t>, vector<int64_t>
+    return index == 10 || index == 13 || index == 14;
+}
+
+} // namespace
+
+TEST(OverrideApplyTest, Normalize_EveryTypePair_FollowsTheConversionRules)
+{
+    const auto values = oneOfEveryType();
+    ASSERT_EQ(values.size(), std::variant_size_v<dbus::Value>);
+
+    for (size_t t = 0; t < values.size(); ++t)
+    {
+        for (size_t v = 0; v < values.size(); ++v)
+        {
+            auto out = normalize(values[t], values[v]);
+
+            const bool expected = t == v || (t == 8 && isIntegerIndex(v)) ||
+                                  (isIntegerIndex(t) && isIntegerIndex(v)) ||
+                                  (isIntegerVectorIndex(t) &&
+                                   isIntegerVectorIndex(v));
+            EXPECT_EQ(out.has_value(), expected)
+                << "target index " << t << ", value index " << v;
+            if (out)
+            {
+                // The result always has the type of the target
+                EXPECT_EQ(out->index(), t)
+                    << "target index " << t << ", value index " << v;
+            }
+        }
+    }
+}
+
+TEST(OverrideApplyTest, ValueToString_EveryType)
+{
+    const auto values = oneOfEveryType();
+    ASSERT_EQ(values.size(), std::variant_size_v<dbus::Value>);
+
+    EXPECT_EQ(valueToString(values[0]), "true");
+    EXPECT_EQ(valueToString(dbus::Value{false}), "false");
+    for (size_t i = 1; i <= 7; ++i)
+    {
+        EXPECT_EQ(valueToString(values[i]), "1") << "index " << i;
+    }
+    EXPECT_EQ(valueToString(values[8]), "2.5");
+    EXPECT_EQ(valueToString(values[9]), "s");
+    EXPECT_EQ(valueToString(values[10]), "[1,2]");
+    EXPECT_EQ(valueToString(values[11]), "<unprintable>");
+    EXPECT_EQ(valueToString(values[12]), "[a,b]");
+    EXPECT_EQ(valueToString(values[13]), "[1,2]");
+    EXPECT_EQ(valueToString(values[14]), "[1,2]");
+    EXPECT_EQ(valueToString(values[15]), "<unprintable>");
+}
+
+TEST(OverrideApplyTest, ValueToString_EmptyVectors)
+{
+    EXPECT_EQ(valueToString(dbus::Value{std::vector<std::string>{}}), "[]");
+    EXPECT_EQ(valueToString(dbus::Value{std::vector<uint64_t>{}}), "[]");
+}
+
+TEST(OverrideApplyTest, Normalize_VectorElementOutOfRange_Rejected)
+{
+    // vector<uint8_t> target, vector<int64_t> value with an element that
+    // does not fit
+    auto out = normalize(dbus::Value{std::vector<uint8_t>{0}},
+                         dbus::Value{std::vector<int64_t>{1, 300}});
+    EXPECT_FALSE(out.has_value());
+
+    out = normalize(dbus::Value{std::vector<uint8_t>{0}},
+                    dbus::Value{std::vector<int64_t>{1, 200}});
+    ASSERT_TRUE(out.has_value());
+    EXPECT_EQ(std::get<std::vector<uint8_t>>(*out),
+              (std::vector<uint8_t>{1, 200}));
 }

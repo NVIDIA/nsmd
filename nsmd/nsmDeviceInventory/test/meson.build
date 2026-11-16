@@ -18,6 +18,7 @@ tests = [
     'nsmPCIeRetimerFabricsDIBranch_test',
     'nsmSwitchBranch6_test',
     'nsmSwitchPowerProfile_test',
+    'nsmNetworkAdapterDeviceMode_test',
 ]
 
 foreach t : tests

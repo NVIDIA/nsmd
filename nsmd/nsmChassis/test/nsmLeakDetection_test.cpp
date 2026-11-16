@@ -2413,3 +2413,52 @@ TEST_F(NsmLeakDetectionCreateTest, CreateSensors_MaxValueMinValue_BothCovered)
     EXPECT_EQ(rc.data(), NSM_SUCCESS);
     EXPECT_GT(sensorCount(), initialTotal);
 }
+
+// PhysicalContextMap entry per sensor: the detector is created
+TEST_F(NsmLeakDetectionCreateTest, goodTestCreateWithPhysicalContextMap)
+{
+    auto params = leakParams("LeakDetContext", {1, 2},
+                             {"LeakDetContext_S1", "LeakDetContext_S2"});
+    params["PhysicalContextMap"] = std::vector<std::string>{"Board", "Board"};
+
+    const size_t initialTotal = sensorCount();
+
+    auto rc = createLeak(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_GT(sensorCount(), initialTotal);
+}
+
+// An entry that is no PhysicalContextType falls back to the default and the
+// detector is still created
+TEST_F(NsmLeakDetectionCreateTest, goodTestCreateWithInvalidPhysicalContext)
+{
+    auto params = leakParams("LeakDetBadContext", {1},
+                             {"LeakDetBadContext_S1"});
+    params["PhysicalContextMap"] = std::vector<std::string>{"NotAContextType"};
+
+    const size_t initialTotal = sensorCount();
+
+    auto rc = createLeak(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_GT(sensorCount(), initialTotal);
+}
+
+// Fewer PhysicalContextMap entries than sensors: the rest use the default
+TEST_F(NsmLeakDetectionCreateTest, goodTestCreateWithShortPhysicalContextMap)
+{
+    auto params =
+        leakParams("LeakDetShortContext", {1, 2},
+                   {"LeakDetShortContext_S1", "LeakDetShortContext_S2"});
+    params["PhysicalContextMap"] = std::vector<std::string>{"Board"};
+
+    const size_t initialTotal = sensorCount();
+
+    auto rc = createLeak(params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(sensorCount(), initialTotal);
+}

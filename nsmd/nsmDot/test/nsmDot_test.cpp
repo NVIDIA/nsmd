@@ -24,6 +24,7 @@
 
 #include "features/creators.hpp"
 #include "nsmDot.hpp"
+#include "nsmDotBlob.hpp"
 #include "test/mockSensorManager.hpp"
 
 using namespace nsm;
@@ -1927,4 +1928,54 @@ TEST_F(NsmDotTest, OverrideAsyncHandler_HybridScheme_Success)
 
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+}
+
+TEST_F(NsmDotCreateTestFixture, goodTestCreateDotBlobAddsStaticSensor)
+{
+    dbus::PropertyMap params = {
+        {"PathName", std::string("HGX_DOT_BlobFeature")},
+    };
+
+    const size_t before = gpu->staticSensors.size();
+    auto rc = nsm::features::createDotBlobFeature(mockManager, makeDev(),
+                                                  params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(gpu->staticSensors.size(), before + 1);
+}
+
+TEST_F(NsmDotCreateTestFixture, badTestCreateDotBlobMissingPathName)
+{
+    const size_t before = gpu->staticSensors.size();
+    auto rc = nsm::features::createDotBlobFeature(mockManager, makeDev(), {});
+
+    EXPECT_EQ(rc.data(), NSM_ERR_INVALID_DATA);
+    EXPECT_EQ(gpu->staticSensors.size(), before);
+}
+
+TEST_F(NsmDotCreateTestFixture, badTestCreateDotBlobEmptyPathName)
+{
+    dbus::PropertyMap params = {{"PathName", std::string("")}};
+
+    const size_t before = gpu->staticSensors.size();
+    auto rc = nsm::features::createDotBlobFeature(mockManager, makeDev(),
+                                                  params);
+
+    EXPECT_EQ(rc.data(), NSM_ERR_INVALID_DATA);
+    EXPECT_EQ(gpu->staticSensors.size(), before);
+}
+
+TEST_F(NsmDotCreateTestFixture, badTestCreateDotBlobDeviceNotFound)
+{
+    dbus::PropertyMap params = {
+        {"PathName", std::string("HGX_DOT_BlobNoDevice")},
+    };
+
+    const size_t before = gpu->staticSensors.size();
+    auto rc = nsm::features::createDotBlobFeature(mockManager, makeDev(false),
+                                                  params);
+
+    EXPECT_EQ(rc.data(), NSM_SW_ERROR);
+    EXPECT_EQ(gpu->staticSensors.size(), before);
 }

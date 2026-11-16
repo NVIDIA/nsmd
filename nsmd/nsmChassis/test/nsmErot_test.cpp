@@ -1165,3 +1165,67 @@ TEST_F(NsmErotTest, badTestCreateRoTSkuInventoryPathLengthMismatch)
     EXPECT_EQ(rc.data(), NSM_ERROR);
     EXPECT_EQ(fpga->deviceSensors.size(), before);
 }
+
+TEST_F(NsmErotTest, goodTestCreateFWComponentTypeCreatesNothing)
+{
+    nsm::features::DeviceContext dev;
+    dev.name = "HGX_RoT_BASEBOARD_FwType";
+    dev.kind = "erot";
+    dev.staticUuid = fpgaUuid;
+    dev.device = fpga;
+
+    const size_t sensorsBefore = fpga->deviceSensors.size();
+    const size_t roundRobinBefore = fpga->roundRobinSensors.size();
+    auto rc = nsm::features::createFWComponentTypeFeature(
+        mockManager, dev,
+        {{"Name", std::string("AP")}, {"ComponentType", std::string("AP")}});
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(fpga->deviceSensors.size(), sensorsBefore);
+    EXPECT_EQ(fpga->roundRobinSensors.size(), roundRobinBefore);
+}
+
+TEST_F(NsmErotTest, goodTestCreateFWComponentTypeWithoutParamsStillSucceeds)
+{
+    nsm::features::DeviceContext dev;
+    dev.name = "HGX_RoT_BASEBOARD_FwTypeNoParams";
+    dev.kind = "erot";
+
+    auto rc = nsm::features::createFWComponentTypeFeature(mockManager, dev, {});
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+}
+
+TEST_F(NsmErotTest, goodTestCreateRoTImageCopyStateEnabledOnECSlot)
+{
+    const std::string name = "HGX_RoT_BASEBOARD_ImageCopyState";
+    auto params = slotParams({{.fwType = "EC",
+                               .chassisName = name,
+                               .classification = 2,
+                               .identifier = 2}});
+    params["ImageCopyStateEnabled"] = true;
+
+    const size_t before = fpga->deviceSensors.size();
+    auto rc = createRoT(name, params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    // EC sensors plus the image copy state sensor
+    EXPECT_GE(fpga->deviceSensors.size(), before + 5);
+    EXPECT_FALSE(fpga->imageCopyStateSensor.expired());
+}
+
+TEST_F(NsmErotTest, goodTestCreateRoTImageCopyStateDisabledByDefault)
+{
+    const std::string name = "HGX_RoT_BASEBOARD_ImageCopyStateOff";
+    auto params = slotParams({{.fwType = "EC",
+                               .chassisName = name,
+                               .classification = 2,
+                               .identifier = 2}});
+
+    auto rc = createRoT(name, params);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_TRUE(fpga->imageCopyStateSensor.expired());
+}

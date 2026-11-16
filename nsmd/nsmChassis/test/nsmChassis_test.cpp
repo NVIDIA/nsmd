@@ -702,6 +702,65 @@ TEST_F(NsmChassisTest,
     EXPECT_GT(hpmSma->deviceSensors.size(), before + 2);
 }
 
+/** @brief Chassis attributes of an MCTP bridge device of the given role with
+ *  SoCPowerSmoothingSupported set; the sensors added by the feature are the
+ *  difference of the round-robin queue
+ */
+#define SOC_SMOOTHING_ATTRIBUTES(deviceUuid, expectedRole, supported)          \
+    auto bridge = std::dynamic_pointer_cast<MockNsmDevice>(                    \
+        mockManager.getNsmDeviceFromStaticUUID(deviceUuid));                   \
+    ASSERT_NE(nullptr, bridge);                                                \
+    ASSERT_EQ(expectedRole, bridge->getDeviceRole());                          \
+    const size_t roundRobinBefore = bridge->roundRobinSensors.size();          \
+    auto rc = createAttributes(bridge,                                         \
+                               {{"SoCPowerSmoothingSupported", supported}},    \
+                               NSM_DEV_ID_MCTP_BRIDGE);                        \
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);                                         \
+    EXPECT_FALSE(rc.exception())
+
+TEST_F(NsmChassisTest, goodTestSoCPowerSmoothingForHpmSma)
+{
+    SOC_SMOOTHING_ATTRIBUTES("STATIC:773:0:NSM_DEVICE_INSTANCE_NUMBER:0",
+                             NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA, true);
+
+    EXPECT_GT(bridge->roundRobinSensors.size(), roundRobinBefore);
+}
+
+TEST_F(NsmChassisTest, goodTestSoCPowerSmoothingForSxmSma)
+{
+    SOC_SMOOTHING_ATTRIBUTES("STATIC:261:0:NSM_DEVICE_INSTANCE_NUMBER:0",
+                             NSM_MCTP_BRIDGE_DEV_ROLE_SXM_SMA, true);
+
+    EXPECT_GT(bridge->roundRobinSensors.size(), roundRobinBefore);
+}
+
+TEST_F(NsmChassisTest, goodTestSoCPowerSmoothingNotCreatedForOtherBridgeRole)
+{
+    // Role 0 (no SMA role): the flag is set but the device is not an SMA
+    SOC_SMOOTHING_ATTRIBUTES("STATIC:5:0:NSM_DEVICE_INSTANCE_NUMBER:0",
+                             NSM_DEV_ROLE_RESERVED, true);
+
+    EXPECT_EQ(bridge->roundRobinSensors.size(), roundRobinBefore);
+}
+
+TEST_F(NsmChassisTest, goodTestSoCPowerSmoothingNotCreatedWhenFlagFalse)
+{
+    SOC_SMOOTHING_ATTRIBUTES("STATIC:773:0:NSM_DEVICE_INSTANCE_NUMBER:0",
+                             NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA, false);
+
+    EXPECT_EQ(bridge->roundRobinSensors.size(), roundRobinBefore);
+}
+
+TEST_F(NsmChassisTest, goodTestSoCPowerSmoothingNotCreatedForGpuDevice)
+{
+    const size_t roundRobinBefore = gpu->roundRobinSensors.size();
+
+    auto rc = createAttributes(gpu, {{"SoCPowerSmoothingSupported", true}});
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->roundRobinSensors.size(), roundRobinBefore);
+}
+
 TEST_F(NsmChassisTest, badTestErrorInjectionNotCreatedForGpuDevice)
 {
     const size_t staticBefore = gpu->staticSensors.size();

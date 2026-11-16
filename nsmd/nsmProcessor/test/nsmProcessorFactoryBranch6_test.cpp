@@ -267,3 +267,76 @@ TEST_F(NsmProcessorFactory6Test, Attributes_GPUPowerLimitsBothFalse)
     // No power limit sensors added
     EXPECT_EQ(gpu->roundRobinSensors.size(), rrBefore);
 }
+
+// ============================================================================
+// ProcessorAttributes: GPUCopySwitchPowerLimit only TRUE (rest absent)
+// ============================================================================
+TEST_F(NsmProcessorFactory6Test, Attributes_GPUCopySwitchPowerLimitOnly)
+{
+    const size_t rrBefore = gpu->roundRobinSensors.size();
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_GPUCopySwitch",
+                         {{"GPUCopySwitchPowerLimitSupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(gpu->roundRobinSensors.size(), rrBefore);
+}
+
+TEST_F(NsmProcessorFactory6Test, Attributes_GPUCopySwitchPowerLimitFalse)
+{
+    const size_t rrBefore = gpu->roundRobinSensors.size();
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_GPUCopySwitchFalse",
+                         {{"GPUCopySwitchPowerLimitSupported", false}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->roundRobinSensors.size(), rrBefore);
+}
+
+// ============================================================================
+// ProcessorAttributes: SoCPowerSmoothingSupported (GPU flavour)
+// ============================================================================
+TEST_F(NsmProcessorFactory6Test, Attributes_SoCPowerSmoothingTrue)
+{
+    const size_t rrBefore = gpu->roundRobinSensors.size();
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_SoCSmoothing",
+                         {{"SoCPowerSmoothingSupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_GT(gpu->roundRobinSensors.size(), rrBefore);
+}
+
+TEST_F(NsmProcessorFactory6Test, Attributes_SoCPowerSmoothingFalse)
+{
+    const size_t rrBefore = gpu->roundRobinSensors.size();
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_SoCSmoothingFalse",
+                         {{"SoCPowerSmoothingSupported", false}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->roundRobinSensors.size(), rrBefore);
+}
+
+// ============================================================================
+// ProcessorAttributes: CPEREventSupported registers the CPER device event
+// ============================================================================
+TEST_F(NsmProcessorFactory6Test, Attributes_CPEREventTrue_AddsDeviceEvent)
+{
+    const size_t eventsBefore = gpu->deviceEvents.size();
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_CPER", {{"CPEREventSupported", true}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceEvents.size(), eventsBefore + 1);
+}
+
+TEST_F(NsmProcessorFactory6Test, Attributes_CPEREventFalse_NoDeviceEvent)
+{
+    const size_t eventsBefore = gpu->deviceEvents.size();
+    auto rc = runFeature(nsm::features::createProcessorAttributesFeature,
+                         "GPU_F6_CPERFalse", {{"CPEREventSupported", false}});
+    EXPECT_FALSE(rc.exception());
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceEvents.size(), eventsBefore);
+}

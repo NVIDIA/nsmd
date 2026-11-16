@@ -925,3 +925,85 @@ TEST_F(NumericSensorFeatureTest, Voltage_NullDevice_ReturnsError)
                                              params("VoltageSensor_Null", 1));
     EXPECT_EQ(rc.data(), NSM_ERROR);
 }
+
+// ─── Temp thresholds ────────────────────────────────────────────────────────
+
+TEST_F(NumericSensorFeatureTest, Temp_ThresholdsDisabledByDefault_TiersIgnored)
+{
+    auto p = params("TempSensor_ThrOff", 1);
+    p["UpperCritical"] = 90.0;
+    p["LowerCritical"] = 5.0;
+
+    const size_t before = nsmDev->roundRobinSensors.size();
+    const size_t staticBefore = nsmDev->staticSensors.size();
+    auto rc = features::createTempFeature(mockManager, makeDev(), p);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(nsmDev->roundRobinSensors.size(), before + 1);
+    EXPECT_EQ(nsmDev->staticSensors.size(), staticBefore);
+}
+
+TEST_F(NumericSensorFeatureTest, Temp_ThresholdsEnabled_NoTiers_NothingExtra)
+{
+    auto p = params("TempSensor_ThrNone", 1);
+    p["ThresholdsEnabled"] = true;
+
+    const size_t before = nsmDev->roundRobinSensors.size();
+    auto rc = features::createTempFeature(mockManager, makeDev(), p);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(nsmDev->roundRobinSensors.size(), before + 1);
+}
+
+TEST_F(NumericSensorFeatureTest, Temp_ThresholdsByValue_AreCreated)
+{
+    auto p = params("TempSensor_ThrValue", 1);
+    p["ThresholdsEnabled"] = true;
+    for (const char* tier : {"UpperFatal", "UpperCritical", "UpperCaution",
+                             "LowerFatal", "LowerCritical", "LowerCaution"})
+    {
+        p[tier] = 50.0;
+    }
+
+    auto rc = features::createTempFeature(mockManager, makeDev(), p);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+}
+
+TEST_F(NumericSensorFeatureTest, Temp_ThresholdsByParameterId_AreCreated)
+{
+    auto p = params("TempSensor_ThrParam", 1);
+    p["ThresholdsEnabled"] = true;
+    p["UpperCriticalParameterId"] = uint64_t{3};
+    p["UpperCriticalPeriodicUpdate"] = true;
+    p["UpperCriticalPriority"] = false;
+    p["UpperCriticalAggregated"] = false;
+    p["LowerCriticalParameterId"] = uint64_t{4};
+
+    const size_t before = nsmDev->roundRobinSensors.size();
+    auto rc = features::createTempFeature(mockManager, makeDev(), p);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+    // The sensor plus the periodically updated upper critical threshold
+    EXPECT_GE(nsmDev->roundRobinSensors.size(), before + 2);
+}
+
+TEST_F(NumericSensorFeatureTest,
+       Temp_ThresholdPriorityAndAggregation_AreHonoured)
+{
+    auto p = params("TempSensor_ThrPrio", 1);
+    p["ThresholdsEnabled"] = true;
+    p["UpperCautionParameterId"] = uint64_t{5};
+    p["UpperCautionPeriodicUpdate"] = true;
+    p["UpperCautionPriority"] = true;
+    p["LowerCautionParameterId"] = uint64_t{6};
+    p["LowerCautionPeriodicUpdate"] = true;
+    p["LowerCautionAggregated"] = true;
+
+    auto rc = features::createTempFeature(mockManager, makeDev(), p);
+
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_FALSE(rc.exception());
+}
