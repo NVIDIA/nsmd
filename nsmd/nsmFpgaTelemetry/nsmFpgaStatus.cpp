@@ -25,13 +25,7 @@ static std::map<uuid_t, std::shared_ptr<NsmFpgaStatus>>& registry()
 NsmFpgaStatus::NsmFpgaStatus(const std::string& name,
                              const std::string& inventoryPath) :
     NsmObject(name, "NSM_FpgaStatus"), inventoryPath(inventoryPath)
-{
-    auto& bus = utils::DBusHandler::getBus();
-    operationalStatusIntf =
-        std::make_unique<FpgaOperationalStatusIntf>(bus, inventoryPath.c_str());
-    healthIntf = std::make_unique<FpgaHealthIntf>(bus, inventoryPath.c_str());
-    publish();
-}
+{}
 
 bool NsmFpgaStatus::enabled() const
 {
@@ -94,6 +88,20 @@ void NsmFpgaStatus::publish()
     using StateType = FpgaOperationalStatusIntf::StateType;
     using HealthType = FpgaHealthIntf::HealthType;
 
+    // Never discovered over MCTP: State and Health stay with the inventory
+    if (!operationalStatusIntf)
+    {
+        if (!online)
+        {
+            return;
+        }
+        auto& bus = utils::DBusHandler::getBus();
+        operationalStatusIntf = std::make_unique<FpgaOperationalStatusIntf>(
+            bus, inventoryPath.c_str());
+        healthIntf = std::make_unique<FpgaHealthIntf>(bus,
+                                                      inventoryPath.c_str());
+    }
+
     StateType state = StateType::UnavailableOffline;
     HealthType health = HealthType::OK;
     if (writeFault)
@@ -107,11 +115,13 @@ void NsmFpgaStatus::publish()
     }
     else if (online)
     {
-        health = HealthType::Critical;
+        // Reachable with an unsupported register ABI: running, no telemetry
+        state = StateType::Enabled;
+        health = HealthType::Warning;
     }
 
     operationalStatusIntf->state(state);
-    operationalStatusIntf->functional(enabled());
+    operationalStatusIntf->functional(online && !writeFault);
     healthIntf->health(health);
 }
 

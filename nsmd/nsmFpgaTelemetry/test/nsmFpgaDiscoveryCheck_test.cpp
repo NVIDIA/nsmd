@@ -119,19 +119,57 @@ TEST_F(NsmFpgaDiscoveryCheckTest, StatusGatesEnabled)
     EXPECT_FALSE(status->enabled());
     EXPECT_EQ(status->operationalStatusIntf->state(),
               FpgaOperationalStatusIntf::StateType::Fault);
+    EXPECT_FALSE(status->operationalStatusIntf->functional());
     EXPECT_EQ(status->healthIntf->health(),
               FpgaHealthIntf::HealthType::Critical);
 }
 
-TEST_F(NsmFpgaDiscoveryCheckTest, StatusOfflineIsUnavailable)
+TEST_F(NsmFpgaDiscoveryCheckTest, StatusAbiMismatchIsEnabledWarning)
+{
+    auto status = makeStatus();
+    status->setOnline(true);
+    status->setTypeCheck(true);
+    status->setDigestCheck(false);
+    EXPECT_FALSE(status->enabled());
+    EXPECT_EQ(status->operationalStatusIntf->state(),
+              FpgaOperationalStatusIntf::StateType::Enabled);
+    EXPECT_TRUE(status->operationalStatusIntf->functional());
+    EXPECT_EQ(status->healthIntf->health(),
+              FpgaHealthIntf::HealthType::Warning);
+    status->setDigestCheck(true);
+    EXPECT_TRUE(status->enabled());
+    EXPECT_EQ(status->healthIntf->health(), FpgaHealthIntf::HealthType::OK);
+    status->setTypeCheck(false);
+    EXPECT_FALSE(status->enabled());
+    EXPECT_EQ(status->healthIntf->health(),
+              FpgaHealthIntf::HealthType::Warning);
+}
+
+TEST_F(NsmFpgaDiscoveryCheckTest, StatusUnpublishedUntilDiscovered)
 {
     auto status = makeStatus();
     status->setTypeCheck(true);
     status->setDigestCheck(true);
     status->setOnline(false);
     EXPECT_FALSE(status->enabled());
+    EXPECT_EQ(status->operationalStatusIntf, nullptr);
+    EXPECT_EQ(status->healthIntf, nullptr);
+}
+
+TEST_F(NsmFpgaDiscoveryCheckTest, StatusOfflineAfterDiscoveryIsUnavailable)
+{
+    auto status = makeStatus();
+    status->setTypeCheck(true);
+    status->setDigestCheck(true);
+    status->setOnline(true);
+    EXPECT_EQ(status->operationalStatusIntf->state(),
+              FpgaOperationalStatusIntf::StateType::Enabled);
+    status->setOnline(false);
+    EXPECT_FALSE(status->enabled());
     EXPECT_EQ(status->operationalStatusIntf->state(),
               FpgaOperationalStatusIntf::StateType::UnavailableOffline);
+    EXPECT_FALSE(status->operationalStatusIntf->functional());
+    EXPECT_EQ(status->healthIntf->health(), FpgaHealthIntf::HealthType::OK);
 }
 
 TEST_F(NsmFpgaDiscoveryCheckTest, RegistryReturnsOneStatusPerUuid)
