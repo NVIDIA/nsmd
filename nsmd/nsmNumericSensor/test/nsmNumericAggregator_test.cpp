@@ -128,10 +128,9 @@ TEST(nsmSensorAggregator, GoodTest)
 
 // handleResponseMsg – decode_aggregate_resp_sample() failure path (line 71).
 // When telemetryCount=1 but the buffer has no sample payload, the decode
-// of the sample fails → the `continue` branch is taken and the loop ends
-// without calling handleSample(). Overall return is NSM_SW_SUCCESS because
-// returnValue is never set (we just skip bad samples).
-TEST(nsmSensorAggregator, DecodeSampleFails_ContinueBranchTaken_ReturnSuccess)
+// of the sample fails → the loop ends without calling handleSample() and
+// the decode error is returned.
+TEST(nsmSensorAggregator, DecodeSampleFails_ReturnsDecodeError)
 {
     MockNsmSensorAggregator aggregator{"BadSample",
                                        "GetSensorReadingAggregate"};
@@ -145,12 +144,11 @@ TEST(nsmSensorAggregator, DecodeSampleFails_ContinueBranchTaken_ReturnSuccess)
     // No sample data appended → responseLen after header consumption is 0
     // → decode_aggregate_resp_sample will return NSM_SW_ERROR_LENGTH
 
-    // handleSample must NOT be called (bad sample is skipped via continue)
     EXPECT_CALL(aggregator, handleSample).Times(0);
 
     auto rc = aggregator.handleResponseMsg(
         reinterpret_cast<nsm_msg*>(response.data()), response.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 // handleResponseMsg – handleSample() returns error for first sample.

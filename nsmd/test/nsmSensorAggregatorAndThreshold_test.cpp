@@ -22,7 +22,7 @@
  *   1. nsmd/nsmSensorAggregator.cpp
  *      - Constructor (lines 26-31): NsmSensorAggregator(name, type)
  *      - handleResponseMsg decode_aggregate_resp_sample failure path
- *        (lines 73,76-77,79): error log + continue when sample decode fails
+ *        (lines 73,76-77,79): error log + break when sample decode fails
  *      - handleResponseMsg handleSample failure path (line 86): returnValue
  *        updated when handleSample returns error
  *   2. nsmd/nsmSensors/nsmInventoryProperty.cpp
@@ -115,6 +115,30 @@ static std::vector<uint8_t> buildAggregateRespWithOneByteSample(uint8_t tag,
     return buf;
 }
 
+static std::vector<uint8_t> buildAggregateRespTwoSamples(size_t bytesCut)
+{
+    const size_t headerSize = sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+    const uint8_t sampleData[4] = {0x01, 0x02, 0x03, 0x04};
+    const size_t sampleSize = sizeof(nsm_aggregate_resp_sample) - 1 +
+                              sizeof(sampleData);
+
+    std::vector<uint8_t> buf(headerSize + 2 * sampleSize, 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_aggregate_resp(0, 0x01, NSM_SUCCESS, 2, msg);
+
+    for (uint8_t tag = 1; tag <= 2; ++tag)
+    {
+        auto samplePtr = reinterpret_cast<nsm_aggregate_resp_sample*>(
+            buf.data() + headerSize + (tag - 1) * sampleSize);
+        size_t sampleLen = 0;
+        encode_aggregate_resp_sample(tag, true, sampleData, sizeof(sampleData),
+                                     samplePtr, &sampleLen);
+    }
+
+    // Copy so that no spare capacity is left behind the shortened response.
+    return std::vector<uint8_t>(buf.begin(), buf.end() - bytesCut);
+}
+
 // ============================================================================
 // Part 1: NsmSensorAggregator constructor (lines 26-31)
 // ============================================================================
@@ -142,15 +166,14 @@ TEST(NsmSensorAggregatorTest, Constructor_SampleTagsReserved)
 
 // ============================================================================
 // Part 2: handleResponseMsg - decode_aggregate_resp_sample failure
-//         (lines 73,76-77,79: error log + continue)
+//         (lines 73,76-77,79: error log + break)
 // ============================================================================
 
-TEST(NsmSensorAggregatorTest,
-     HandleResponseMsg_SampleDecodeFails_ReturnsSuccess)
+TEST(NsmSensorAggregatorTest, HandleResponseMsg_SampleDecodeFails_ReturnsError)
 {
     // Arrange: telemetryCount=1 but buffer has no sample bytes.
     // decode_aggregate_resp_sample will see responseLen=0 and return
-    // NSM_SW_ERROR_LENGTH, triggering the error log + continue path.
+    // NSM_SW_ERROR_LENGTH, triggering the error log + break path.
     NsmThresholdAggregator agg("AggDecFail", "NSM_ThermalParam", false);
     auto buf = buildAggregateRespHeaderOnly(1);
 
@@ -158,21 +181,12 @@ TEST(NsmSensorAggregatorTest,
     auto rc = agg.handleResponseMsg(
         reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
 
-    // Assert: error in sample is logged but overall returnValue stays SUCCESS
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
-// DISABLED: When telemetryCount > 1 and decode_aggregate_resp_sample fails
-// (line 79: continue), the production code reuses the stale consumedLen from
-// the aggregate header decode. On the next loop iteration, responseLen wraps
-// to SIZE_MAX and responseData goes out of bounds.  This is a production code
-// bug; the test triggers a heap-buffer-overflow under ASan.
-// See FAILING_TESTS.md for details.
 TEST(NsmSensorAggregatorTest,
-     DISABLED_HandleResponseMsg_MultipleSamplesFail_ReturnsSuccess)
+     HandleResponseMsg_CountExceedsSamples_ReturnsError)
 {
-    // Same as above but telemetryCount=3 so the loop iterates 3 times,
-    // each time triggering the decode failure + continue path.
     NsmThresholdAggregator agg("AggMultiFail", "NSM_ThermalParam", false);
     auto buf = buildAggregateRespHeaderOnly(3);
 
@@ -180,7 +194,36 @@ TEST(NsmSensorAggregatorTest,
     auto rc = agg.handleResponseMsg(
         reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
 
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    EXPECT_TRUE(agg.sampleTags.empty());
+}
+
+TEST(NsmSensorAggregatorTest,
+     HandleResponseMsg_SampleLongerThanResponse_ReturnsError)
+{
+    const size_t lastDataByte = 1;
+    NsmThresholdAggregator agg("AggLongSample", "NSM_ThermalParam", false);
+    auto buf = buildAggregateRespTwoSamples(lastDataByte);
+
+    auto rc = agg.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    EXPECT_EQ(agg.sampleTags, std::vector<uint8_t>{1});
+}
+
+TEST(NsmSensorAggregatorTest,
+     HandleResponseMsg_TruncatedSampleHeader_ReturnsError)
+{
+    const size_t wholeSampleData = 4;
+    NsmThresholdAggregator agg("AggShortHeader", "NSM_ThermalParam", false);
+    auto buf = buildAggregateRespTwoSamples(wholeSampleData);
+
+    auto rc = agg.handleResponseMsg(
+        reinterpret_cast<const nsm_msg*>(buf.data()), buf.size());
+
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    EXPECT_EQ(agg.sampleTags, std::vector<uint8_t>{1});
 }
 
 // ============================================================================

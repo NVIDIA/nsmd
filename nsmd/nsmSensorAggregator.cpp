@@ -62,6 +62,12 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
         const uint8_t* data = nullptr;
         size_t dataLen = 0;
 
+        if (consumedLen == 0 || consumedLen > responseLen)
+        {
+            returnValue = NSM_SW_ERROR_LENGTH;
+            break;
+        }
+
         responseLen -= consumedLen;
         responseData += consumedLen;
 
@@ -83,7 +89,9 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
                     "VALID", valid);
             }
 
-            continue;
+            // The next sample boundary is unknown after a failed decode.
+            returnValue = rc;
+            break;
         }
         sampleTags.push_back(tag);
         rc = handleSample(
