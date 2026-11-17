@@ -2812,8 +2812,8 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventLength)
 				     &eventState, &payload);
 	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
 	EXPECT_EQ(0, eventState);
-	// portNumber was copied, but rest not
-	EXPECT_EQ(expected.portNumber, payload.portNumber);
+	// Rejected before copying, so the payload must stay untouched
+	EXPECT_EQ(0, payload.portNumber);
 	EXPECT_EQ(0, payload.reserved1);
 	EXPECT_EQ(0, payload.port_rcv_errors_threshold);
 	EXPECT_EQ(0, payload.port_xmit_discard_threshold);
@@ -2823,6 +2823,38 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventLength)
 	EXPECT_EQ(0, payload.effective_ber_threshold);
 	EXPECT_EQ(0, payload.estimated_effective_ber_threshold);
 	EXPECT_EQ(0, payload.reserved2);
+}
+
+TEST_F(PortsHealthEventDecode, testOversizedPayloadDoesNotOverflow)
+{
+	// Declare and supply more data than nsm_health_event_payload can hold.
+	// Guard bytes placed right after the payload must remain untouched.
+	constexpr size_t oversize = 255;
+	constexpr uint8_t guardByte = 0xA5;
+	struct {
+		nsm_health_event_payload payload;
+		uint8_t guard[oversize];
+	} dest;
+	memset(&dest, 0, sizeof(dest.payload));
+	memset(dest.guard, guardByte, sizeof(dest.guard));
+
+	std::vector<uint8_t> msgBuf(
+	    sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN + oversize, 0x41);
+	auto msg = reinterpret_cast<nsm_msg *>(msgBuf.data());
+	auto rc = encode_nsm_event(
+	    0, NSM_TYPE_NETWORK_PORT, true, NSM_EVENT_VERSION,
+	    NSM_THRESHOLD_EVENT, NSM_GENERAL_EVENT_CLASS, 0, oversize,
+	    std::vector<uint8_t>(oversize, 0x41).data(), msg);
+	ASSERT_EQ(NSM_SW_SUCCESS, rc);
+
+	uint16_t eventState = 0;
+	rc = decode_nsm_health_event(msg, msgBuf.size(), &eventState,
+				     &dest.payload);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+	for (auto b : dest.guard) {
+		ASSERT_EQ(guardByte, b);
+	}
+	EXPECT_EQ(0, dest.payload.portNumber);
 }
 
 TEST_F(PortsHealthEventDecode, testBadDecodeEventNull)

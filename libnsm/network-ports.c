@@ -1677,14 +1677,20 @@ int decode_nsm_health_event(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_NULL;
 	}
 	uint8_t data_size = 0;
-	int result = decode_nsm_event_with_data(
-	    msg, msg_len, NSM_THRESHOLD_EVENT, NSM_GENERAL_EVENT_CLASS,
-	    event_state, &data_size, (uint8_t *)payload);
-	if (result == NSM_SW_SUCCESS &&
-	    data_size != sizeof(struct nsm_health_event_payload)) {
+	// Validate the device-declared payload size before copying anything
+	// into the fixed-size destination.
+	int result =
+	    decode_nsm_event(msg, msg_len, NSM_THRESHOLD_EVENT,
+			     NSM_GENERAL_EVENT_CLASS, event_state, &data_size);
+	if (result != NSM_SW_SUCCESS) {
+		return result;
+	}
+	if (data_size != sizeof(struct nsm_health_event_payload)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
-	return result;
+	const struct nsm_event *event = (const struct nsm_event *)msg->payload;
+	memcpy(payload, event->data, sizeof(struct nsm_health_event_payload));
+	return NSM_SW_SUCCESS;
 }
 
 int encode_get_switch_isolation_mode_req(uint8_t instance, struct nsm_msg *msg)

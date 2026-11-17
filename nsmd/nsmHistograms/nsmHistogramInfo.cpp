@@ -270,6 +270,24 @@ uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
+        // Validate the response before publishing any property so a rejected
+        // response leaves the previous format and bucket list consistent.
+        uint32_t calculatedSize = 0;
+        if (!checkSizeOfBucketArrayIsValid(
+                total_bucket_offset_size, metaData.num_of_buckets,
+                metaData.bucket_data_type, calculatedSize))
+        {
+            if (shouldLog("checkSizeOfBucketArrayIsValid",
+                          total_bucket_offset_size != calculatedSize))
+            {
+                LG2_ERROR(
+                    "checkSizeOfBucketArrayIsValid failure, totalSize: {TOTAL}, calculated: {CALCULATED}",
+                    "TOTAL", total_bucket_offset_size, "CALCULATED",
+                    calculatedSize);
+            }
+            return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
         formatIntf->numOfBuckets(
             static_cast<uint64_t>(metaData.num_of_buckets));
         formatIntf->minSamplingTime(
@@ -293,22 +311,6 @@ uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
             default:
                 formatIntf->unitOfMeasure(BucketUnits::Others);
                 break;
-        }
-
-        uint32_t calculatedSize = 0;
-        if (!checkSizeOfBucketArrayIsValid(
-                total_bucket_offset_size, metaData.num_of_buckets,
-                metaData.bucket_data_type, calculatedSize))
-        {
-            if (shouldLog("checkSizeOfBucketArrayIsValid",
-                          total_bucket_offset_size != calculatedSize))
-            {
-                LG2_ERROR(
-                    "checkSizeOfBucketArrayIsValid failure, totalSize: {TOTAL}, calculated: {CALCULATED}",
-                    "TOTAL", total_bucket_offset_size, "CALCULATED",
-                    calculatedSize);
-            }
-            return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         std::vector<std::tuple<std::string, std::string, std::string>>
@@ -519,6 +521,15 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
         }
         std::vector<std::tuple<uint16_t, std::tuple<double, double, double>>>
             bucketData = bucketInfoIntf->bucketData();
+        if (bucketData.size() != number_of_buckets)
+        {
+            LG2_ERROR(
+                "Histogram bucket count mismatch, stored: {STORED}, received: {RECEIVED}",
+                "STORED", bucketData.size(), "RECEIVED", number_of_buckets);
+            publishDataStatus(DataStates::ProtocolError,
+                              NSM_SW_ERROR_COMMAND_FAIL, cc, reasonCode);
+            return NSM_SW_ERROR_COMMAND_FAIL;
+        }
         bucket_data.resize(total_bucket_data_size);
         for (size_t i = 0; i < number_of_buckets; i++)
         {
