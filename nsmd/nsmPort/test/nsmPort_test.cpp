@@ -2172,10 +2172,9 @@ struct NsmPortSensorCreateTestFixture :
      * than one port the loop has to run for construction to complete.
      * Bounded so a task that never finishes fails here instead of hanging.
      *
-     * Every call must stay above the tests that discard a
-     * createNVLinkFeature result. Those leave a timer armed on the loop
-     * pointing at a coroutine frame the temporary's destructor has already
-     * freed; running the loop afterwards would dispatch it.
+     * Every createNVLinkFeature task must be driven to completion: a task
+     * destroyed while suspended leaves a timer armed on the shared default
+     * loop pointing at its freed frame.
      */
     void runUntilDone(const requester::Coroutine& task) const
     {
@@ -3050,7 +3049,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_EnableNetworkAddresses)
     };
 
     size_t initialCount = gpu->deviceSensors.size();
-    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties, true);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties, true);
+    runUntilDone(result);
 
     // Network address aggregator + port status + characteristics + metrics
     EXPECT_GT(gpu->deviceSensors.size(), initialCount);
@@ -3075,7 +3075,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX8)
         {"Priority", false},
     };
 
-    createNVLink(bridgeUuid, NSM_DEV_ID_PCIE_BRIDGE, properties);
+    auto result = createNVLink(bridgeUuid, NSM_DEV_ID_PCIE_BRIDGE, properties);
+    runUntilDone(result);
 
     auto bridgeDevice = std::dynamic_pointer_cast<MockNsmDevice>(
         mockManager.getNsmDeviceFromStaticUUID(bridgeUuid));
@@ -3106,7 +3107,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX9)
         {"Priority", false},
     };
 
-    createNVLink(cx9Uuid, NSM_DEV_ID_PCIE_BRIDGE, properties);
+    auto result = createNVLink(cx9Uuid, NSM_DEV_ID_PCIE_BRIDGE, properties);
+    runUntilDone(result);
 
     auto cx9Device = std::dynamic_pointer_cast<MockNsmDevice>(
         mockManager.getNsmDeviceFromStaticUUID(cx9Uuid));
@@ -3137,7 +3139,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_PCIEBridge_CX7)
         {"Priority", false},
     };
 
-    createNVLink(cx7Uuid, NSM_DEV_ID_PCIE_BRIDGE, properties);
+    auto result = createNVLink(cx7Uuid, NSM_DEV_ID_PCIE_BRIDGE, properties);
+    runUntilDone(result);
 
     auto cx7Device = std::dynamic_pointer_cast<MockNsmDevice>(
         mockManager.getNsmDeviceFromStaticUUID(cx7Uuid));
@@ -3162,7 +3165,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_ZeroCount)
     };
 
     size_t initialCount = gpu->deviceSensors.size();
-    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    runUntilDone(result);
 
     // count=0 -> loop body never executes -> no sensors added
     EXPECT_EQ(gpu->deviceSensors.size(), initialCount);
@@ -3182,7 +3186,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_SwitchDeviceType)
     };
 
     size_t initialCount = gpu->deviceSensors.size();
-    createNVLink(gpuUuid, NSM_DEV_ID_SWITCH, properties);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_SWITCH, properties);
+    runUntilDone(result);
     // DeviceType=SWITCH -> getTopologyObjPath uses "SWITCH/" branch;
     // no Status/Characteristics sensors (deviceType != GPU)
     EXPECT_GE(gpu->deviceSensors.size(), initialCount);
@@ -3202,7 +3207,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_EROTDeviceType)
     };
 
     size_t initialCount = gpu->deviceSensors.size();
-    createNVLink(gpuUuid, NSM_DEV_ID_EROT, properties);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_EROT, properties);
+    runUntilDone(result);
     // DeviceType=EROT -> getTopologyObjPath uses "EROT/" branch
     EXPECT_GE(gpu->deviceSensors.size(), initialCount);
 }
@@ -3221,7 +3227,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_CPUDeviceType)
     };
 
     size_t initialCount = gpu->deviceSensors.size();
-    createNVLink(gpuUuid, NSM_DEV_ID_CPU, properties);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_CPU, properties);
+    runUntilDone(result);
     // DeviceType=CPU -> getTopologyObjPath uses "CPU/" branch
     EXPECT_GE(gpu->deviceSensors.size(), initialCount);
 }
@@ -3243,7 +3250,9 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_UnknownDeviceType)
 
     // Unknown deviceType -> getTopologyObjPath logs error and returns ""
     // factory still proceeds with empty topologyObjPath
-    EXPECT_NO_THROW(createNVLink(gpuUuid, unknownDeviceType, properties));
+    auto result = createNVLink(gpuUuid, unknownDeviceType, properties);
+    runUntilDone(result);
+    EXPECT_FALSE(result.exception());
 }
 
 // coGetTopologyData body (lines 61-112) covered by populating serviceMap with
@@ -3286,7 +3295,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_WithTopologyData)
         {"Priority", false},
     };
 
-    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    runUntilDone(result);
 
     // Cleanup static service map so it doesn't affect other tests
     sm.clear();
@@ -3330,7 +3340,8 @@ TEST_F(NsmPortSensorCreateTestFixture,
         {"Priority", false},
     };
 
-    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    runUntilDone(result);
 
     sm.clear();
 }
@@ -3372,7 +3383,8 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_TopologyInvalidAssoc)
         {"Priority", false},
     };
 
-    createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    runUntilDone(result);
 
     sm.clear();
 }
@@ -3523,7 +3535,9 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_MissingName_Succeeds)
     };
 
     const size_t initialCount = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties));
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    runUntilDone(result);
+    EXPECT_FALSE(result.exception());
     // portName="_0", objPath=parentObjPath+"/Ports/_0" -> valid -> sensors
     // added
     EXPECT_GT(gpu->deviceSensors.size(), initialCount);
@@ -3545,7 +3559,9 @@ TEST_F(NsmPortSensorCreateTestFixture,
     };
 
     const size_t initialCount = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties));
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    runUntilDone(result);
+    EXPECT_FALSE(result.exception());
     // portObjPath="/Ports/NVLink_NoParent_0" -> valid -> sensors added
     EXPECT_GT(gpu->deviceSensors.size(), initialCount);
 }
@@ -3566,7 +3582,9 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_MissingPriority_Success)
     };
 
     const size_t initialCount = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties));
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    runUntilDone(result);
+    EXPECT_FALSE(result.exception());
     // priority defaults to false -> sensor added to deviceSensors (not
     // priority)
     EXPECT_GT(gpu->deviceSensors.size(), initialCount);
@@ -3735,7 +3753,9 @@ TEST_F(NsmPortSensorCreateTestFixture, createPortSensor_MissingCount_NoSensors)
     };
 
     const size_t initialCount = gpu->deviceSensors.size();
-    EXPECT_NO_THROW(createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties));
+    auto result = createNVLink(gpuUuid, NSM_DEV_ID_GPU, properties);
+    runUntilDone(result);
+    EXPECT_FALSE(result.exception());
     // count=0 -> for loop never runs -> no port sensors added
     EXPECT_EQ(gpu->deviceSensors.size(), initialCount);
 }

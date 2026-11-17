@@ -26,8 +26,8 @@
 namespace nsm::features
 {
 
-/** @brief Features of a VR BMC ERoT, in creation order */
-inline FeatureList vrBmcErotFeatures()
+/** @brief Features of a VR HMC ERoT, in creation order */
+inline FeatureList hmcErotFeatures()
 {
     using namespace std::string_literals;
 
@@ -39,11 +39,11 @@ inline FeatureList vrBmcErotFeatures()
         {.id = "RoT",
          .create = createRoTFeature,
          .params = {
-             {"Name", "{deviceBase}"s},
+             {"Name", "{device}"s},
              {"ImageCopyEnabled", true},
              {"ImageCopyPolicyEnabled", true},
              {"SlotChassisName",
-              std::vector<std::string>{"{deviceBase}", "{deviceBase}",
+              std::vector<std::string>{"{device}", "{device}",
                                        "{parentChassisName}",
                                        "{parentChassisName}"}},
              {"SlotFirmwareType",
@@ -55,8 +55,11 @@ inline FeatureList vrBmcErotFeatures()
              {"SlotComponentIdentifier",
               std::vector<uint64_t>{65280, 65280, 16, 16}},
              {"SlotComponentIndex", std::vector<uint64_t>{0, 0, 0, 0}},
-             {"SlotSoftwareNameFromChassis", true},
-             {"PlatformPrefix", ""s}}});
+             {"SlotSoftwareName",
+              std::vector<std::string>{"{platformPrefix}FW_{deviceBase}",
+                                       "{platformPrefix}FW_{deviceBase}",
+                                       "{platformPrefix}FW_BMC_{instance}",
+                                       "{platformPrefix}FW_BMC_{instance}"}}}});
 
     // Firmware component types: no nsmd consumer found, placeholders
     features.push_back({.id = "FWComponentTypeAP",
@@ -67,58 +70,63 @@ inline FeatureList vrBmcErotFeatures()
                         .params = {{"Name", "EC"s}, {"ComponentType", "EC"s}}});
 
     // Interfaces published by EM on the entity today, all on
-    // chassis/{deviceBase}
+    // chassis/<device>
     // UUID object; its update adds SPDMResponder once the device UUID is read
     features.push_back({.id = "IRoTSPDMResponder",
                         .create = createIRoTSPDMResponderFeature,
-                        .params = {{"Name", "{deviceBase}"s}}});
+                        .params = {{"Name", "{device}"s}}});
+    // Not in the legacy EM record: the ERoT protects its ParentChassis (the
+    // HMC, <platformPrefix>BMC_0)
     features.push_back(
         {.id = "IRoTAssociations",
          .create = createIRoTAssociationsFeature,
-         .params = {{"Name", "{deviceBase}"s},
+         .params = {{"Name", "{device}"s},
                     {"ParentChassisAssociationPaths",
                      std::vector<std::string>{"{parentChassis}"}},
                     {"RoTInventoryAssociationPaths",
                      std::vector<std::string>{"{parentChassis}"}},
                     {"InventoryChassisAssociationPaths",
-                     std::vector<std::string>{"chassis/{deviceBase}"}}}});
-    features.push_back({.id = "IRoTAsset",
-                        .create = createIRoTAssetFeature,
-                        .params = {{"Name", "{deviceBase}"s}}});
+                     std::vector<std::string>{"chassis/{device}"}}}});
+    features.push_back(
+        {.id = "IRoTAsset",
+         .create = createIRoTAssetFeature,
+         .params = {{"Name", "{device}"s},
+                    {"AssetName", "{parentChassisName} ERoT"s}}});
     features.push_back({.id = "IRoTHealth",
                         .create = createIRoTHealthFeature,
-                        .params = {{"Name", "{deviceBase}"s}}});
-    // Decorator.SKU written by pldm (EC SKU)
+                        .params = {{"Name", "{device}"s}}});
+    // Decorator.SKU written by pldm (EC SKU, PLDMDeviceInventory
+    // CreateInventoryPath)
     features.push_back({.id = "IRoTSKU",
                         .create = createIRoTSKUFeature,
-                        .params = {{"Name", "{deviceBase}"s}}});
+                        .params = {{"Name", "{device}"s}}});
     features.push_back(
         {.id = "IRoTLocationType",
          .create = createIRoTLocationTypeFeature,
          .params = {
-             {"Name", "{deviceBase}"s},
+             {"Name", "{device}"s},
              {"LocationType",
               "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"s}}});
     features.push_back(
         {.id = "IRoTLocationCode",
          .create = createIRoTLocationCodeFeature,
-         .params = {{"Name", "{deviceBase}"s},
+         .params = {{"Name", "{device}"s},
                     {"LocationCode", optVar<std::string>("{LocationCode}")}}});
     features.push_back(
         {.id = "IRoTLocationContext",
          .create = createIRoTLocationContextFeature,
          .params = {
-             {"Name", "{deviceBase}"s},
+             {"Name", "{device}"s},
              {"LocationContext", optVar<std::string>("{LocationContext}")}}});
     features.push_back(
         {.id = "IRoTFieldReplaceable",
          .create = createIRoTFieldReplaceableFeature,
-         .params = {{"Name", "{deviceBase}"s}, {"FieldReplaceable", false}}});
+         .params = {{"Name", "{device}"s}, {"FieldReplaceable", false}}});
     features.push_back(
         {.id = "IRoTChassisType",
          .create = createIRoTChassisTypeFeature,
          .params = {
-             {"Name", "{deviceBase}"s},
+             {"Name", "{device}"s},
              {"ChassisType",
               "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Component"s}}});
 
@@ -126,7 +134,7 @@ inline FeatureList vrBmcErotFeatures()
     features.push_back(
         {.id = "DebugToken",
          .create = createDebugTokenFeature,
-         .params = {{"ChassisName", "{deviceBase}"s},
+         .params = {{"ChassisName", "{device}"s},
                     {"DebugTokenType", std::vector<std::string>{"Unified"}},
                     {"DebugTokenDeviceType", "ERoT"s}}});
 #endif

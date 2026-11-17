@@ -302,6 +302,8 @@ bool NsmGetEventConfig::validateEventIds(
 namespace nsm::features
 {
 
+constexpr uint64_t MAX_EVENT_ID = EVENT_SOURCES_LENGTH * 8 - 1;
+
 requester::Coroutine
     createEventConfigFeature([[maybe_unused]] SensorManager& manager,
                              const DeviceContext& dev,
@@ -319,6 +321,17 @@ requester::Coroutine
     auto subscribedEventIds = param<std::vector<uint64_t>>(params,
                                                            "SubscribedEventIDs")
                                   .value_or(std::vector<uint64_t>{});
+
+    for (auto id : subscribedEventIds)
+    {
+        if (id > MAX_EVENT_ID)
+        {
+            lg2::error(
+                "EventConfig feature of {NAME}: event ID {ID} exceeds max {MAX}",
+                "NAME", dev.name, "ID", id, "MAX", MAX_EVENT_ID);
+            co_return NSM_ERROR;
+        }
+    }
 
     const std::string type = "NSM_EventConfig";
     std::vector<uint64_t> ackIds{};

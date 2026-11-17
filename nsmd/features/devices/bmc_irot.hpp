@@ -51,8 +51,8 @@ inline FeatureList irotFeatures()
              {"SlotChassisName",
               std::vector<std::string>{
                   "{parentChassisName}", "{parentChassisName}",
-                  "{PlatformPrefix}BMC_Caliptra_{instance}",
-                  "{PlatformPrefix}BMC_Caliptra_{instance}"}},
+                  "{platformPrefix}BMC_Caliptra_{instance}",
+                  "{platformPrefix}BMC_Caliptra_{instance}"}},
              {"SlotFirmwareType",
               std::vector<std::string>{"AP", "AP", "AP", "AP"}},
              {"SlotType", std::vector<std::string>{"Active", "InActive",
@@ -69,8 +69,7 @@ inline FeatureList irotFeatures()
              {"SlotSkuInventoryPath",
               std::vector<std::string>{"{parentChassis}", "", "", ""}},
              {"SlotComponentIndex", std::vector<uint64_t>{0, 0, 0, 0}},
-             {"SlotSoftwareNameFromChassis", true},
-             {"PlatformPrefix", optVar<std::string>("{PlatformPrefix}")}}});
+             {"SlotSoftwareNameFromChassis", true}}});
 
     // Firmware component types: no nsmd consumer found, placeholders
     features.push_back({.id = "FWComponentTypeAP",

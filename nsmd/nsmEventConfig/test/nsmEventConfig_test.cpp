@@ -140,6 +140,31 @@ TEST_F(NsmEventConfigTest, Factory_MissingSubscribedEventIDs_SensorCreated)
     EXPECT_GT(gpu->deviceSensors.size(), before);
 }
 
+TEST_F(NsmEventConfigTest, Factory_EventIdOutOfRange_Rejected)
+{
+    dbus::PropertyMap props = basicProperties;
+    props["SubscribedEventIDs"] = std::vector<uint64_t>{1, 64};
+
+    const size_t before = gpu->deviceSensors.size();
+    const size_t refreshBefore = gpu->capabilityRefreshSensors.size();
+    auto rc = createEventConfig(props);
+    EXPECT_EQ(rc.data(), NSM_ERROR);
+    EXPECT_EQ(gpu->deviceSensors.size(), before);
+    EXPECT_EQ(gpu->capabilityRefreshSensors.size(), refreshBefore);
+}
+
+TEST_F(NsmEventConfigTest, Factory_MaxEventId_SensorCreated)
+{
+    dbus::PropertyMap props = basicProperties;
+    props["Name"] = std::string("EventConfig_MaxId");
+    props["SubscribedEventIDs"] = std::vector<uint64_t>{0, 63};
+
+    const size_t before = gpu->deviceSensors.size();
+    auto rc = createEventConfig(props);
+    EXPECT_EQ(rc.data(), NSM_SUCCESS);
+    EXPECT_EQ(gpu->deviceSensors.size(), before + 2);
+}
+
 TEST_F(NsmEventConfigTest, testNsmEventConfigUpdate)
 {
     std::vector<uint64_t> srcEventIds = {1, 2, 3};

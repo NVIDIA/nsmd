@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-#include "features/devices/Bluefield_SMA.hpp"
 #include "features/devices/baseboard.hpp"
 #include "features/devices/bluefield.hpp"
+#include "features/devices/bluefield_sma.hpp"
+#include "features/devices/bmc_erot.hpp"
 #include "features/devices/bmc_hpm_sma.hpp"
 #include "features/devices/bmc_irot.hpp"
 #include "features/devices/cpu.hpp"
@@ -25,12 +26,11 @@
 #include "features/devices/cx_nic.hpp"
 #include "features/devices/cx_sma.hpp"
 #include "features/devices/gpu.hpp"
-#include "features/devices/gpuSxm.hpp"
 #include "features/devices/gpu_sma.hpp"
+#include "features/devices/gpu_sxm.hpp"
+#include "features/devices/hmc_erot.hpp"
 #include "features/devices/hmc_hpm_sma.hpp"
 #include "features/devices/nvswitch.hpp"
-#include "features/devices/vr_bmc_erot.hpp"
-#include "features/devices/vr_hmc_erot.hpp"
 #include "features/paramTemplates.hpp"
 
 #include <algorithm>
@@ -73,8 +73,8 @@ const std::vector<NamedList>& allLists()
         {"gpu_sma", gpuSmaFeatures, false},
         {"hmc_hpm_sma", hmcHpmSmaFeatures, false},
         {"bmc_hpm_sma", bmcHpmSmaFeatures, false},
-        {"hmc_erot", vrHmcErotFeatures, false},
-        {"bmc_erot", vrBmcErotFeatures, false},
+        {"hmc_erot", hmcErotFeatures, false},
+        {"bmc_erot", bmcErotFeatures, false},
     };
     return lists;
 }
@@ -286,7 +286,7 @@ TEST(DeviceListsTest, IRoT_SkuSlotParams_HaveOneEntryPerSlot)
 
 TEST(DeviceListsTest, ErotLists_DoNotDeclareDuplicateParamsAcrossFeatures)
 {
-    for (const auto& build : {vrBmcErotFeatures, vrHmcErotFeatures})
+    for (const auto& build : {bmcErotFeatures, hmcErotFeatures})
     {
         for (const auto& feature : build())
         {

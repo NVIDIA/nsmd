@@ -20,9 +20,10 @@
 #include "libnsm/base.h"
 
 #include "common/globals.hpp"
-#include "devices/Bluefield_SMA.hpp"
 #include "devices/baseboard.hpp"
 #include "devices/bluefield.hpp"
+#include "devices/bluefield_sma.hpp"
+#include "devices/bmc_erot.hpp"
 #include "devices/bmc_hpm_sma.hpp"
 #include "devices/bmc_irot.hpp"
 #include "devices/cpu.hpp"
@@ -30,12 +31,11 @@
 #include "devices/cx_nic.hpp"
 #include "devices/cx_sma.hpp"
 #include "devices/gpu.hpp"
-#include "devices/gpuSxm.hpp"
 #include "devices/gpu_sma.hpp"
+#include "devices/gpu_sxm.hpp"
+#include "devices/hmc_erot.hpp"
 #include "devices/hmc_hpm_sma.hpp"
 #include "devices/nvswitch.hpp"
-#include "devices/vr_bmc_erot.hpp"
-#include "devices/vr_hmc_erot.hpp"
 #include "featureDriver.hpp"
 #include "overrides/overrideApply.hpp"
 #include "sensorManager.hpp"
@@ -98,8 +98,8 @@ const std::unordered_map<std::string_view, KindInfo> deviceKinds = {
     {"bmc_hpm_sma",
      {bmcHpmSmaFeatures, NSM_DEV_ID_MCTP_BRIDGE,
       NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA}},
-    {"hmc_erot", {vrHmcErotFeatures, NSM_DEV_ID_EROT, NSM_DEV_ROLE_RESERVED}},
-    {"bmc_erot", {vrBmcErotFeatures, NSM_DEV_ID_EROT, NSM_DEV_ROLE_RESERVED}},
+    {"hmc_erot", {hmcErotFeatures, NSM_DEV_ID_EROT, NSM_DEV_ROLE_RESERVED}},
+    {"bmc_erot", {bmcErotFeatures, NSM_DEV_ID_EROT, NSM_DEV_ROLE_RESERVED}},
 };
 
 /** @brief Whether a param of the list reads token, as a var() binding or as
