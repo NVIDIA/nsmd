@@ -1693,6 +1693,7 @@ int decode_aggregate_resp_sample(const struct nsm_aggregate_resp_sample *sample,
 	}
 
 	if (msg_len < sizeof(struct nsm_aggregate_resp_sample)) {
+		*consumed_len = 0;
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -1709,6 +1710,7 @@ int decode_aggregate_resp_sample(const struct nsm_aggregate_resp_sample *sample,
 	*data = sample->data;
 
 	if (msg_len < *consumed_len) {
+		*consumed_len = 0;
 		return NSM_SW_ERROR_DATA;
 	}
 

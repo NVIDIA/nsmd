@@ -2188,6 +2188,7 @@ int encode_aggregate_resp_sample(uint8_t tag, bool valid, const uint8_t *data,
  *  @param[in] sample    - telemetry sample of an aggregate response message
  *  @param[in] msg_len - Length of a message
  *  @param[out] consumed_len - consumed number of bytes of message
+ *                             (0 if the sample does not fit in msg_len)
  *  @param[out] tag - pointer to tag of telemetry sample
  *  @param[out] valid - pointer to valid bit of telemetry sample
  *  @param[out] data - pointer to telemetry sample data

@@ -5920,6 +5920,68 @@ TEST_F(XIDEventDecode, testBadDecodeResponseDataLength)
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
+namespace
+{
+void decodeAggregateRespSamplePrefixes(size_t data_size, uint8_t len_encoding)
+{
+	const std::vector<uint8_t> input(data_size, 0xA5);
+	std::vector<uint8_t> sampleBuf(sizeof(nsm_aggregate_resp_sample) - 1 +
+				       data_size);
+	auto sample =
+	    reinterpret_cast<nsm_aggregate_resp_sample *>(sampleBuf.data());
+	size_t sample_len = 0;
+
+	auto rc =
+	    encode_aggregate_resp_sample(1, true, input.data(), input.size(),
+					 sample, &sample_len, len_encoding);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(sample_len, sampleBuf.size());
+
+	const size_t unwritten = sample_len + 1;
+	for (size_t msg_len = 0; msg_len <= sample_len; msg_len++) {
+		// Exactly msg_len bytes, so that a read past them is an error.
+		auto msg = std::make_unique<uint8_t[]>(msg_len);
+		memcpy(msg.get(), sampleBuf.data(), msg_len);
+		size_t consumed_len = unwritten;
+		uint8_t tag = 0;
+		bool valid = false;
+		const uint8_t *data = nullptr;
+		size_t data_len = 0;
+
+		rc = decode_aggregate_resp_sample(
+		    reinterpret_cast<const nsm_aggregate_resp_sample *>(
+			msg.get()),
+		    msg_len, &consumed_len, &tag, &valid, &data, &data_len);
+
+		if (msg_len == sample_len) {
+			EXPECT_EQ(rc, NSM_SW_SUCCESS);
+			EXPECT_EQ(consumed_len, sample_len);
+		} else {
+			EXPECT_EQ(rc,
+				  msg_len < sizeof(nsm_aggregate_resp_sample)
+				      ? NSM_SW_ERROR_LENGTH
+				      : NSM_SW_ERROR_DATA)
+			    << "msg_len " << msg_len;
+			EXPECT_EQ(consumed_len, 0u) << "msg_len " << msg_len;
+		}
+	}
+}
+} // namespace
+
+TEST(decodeAggregateRespSample, testTruncatedCompactSampleConsumesNothing)
+{
+	const size_t largest = 1 << NSM_AGGREGATE_MAX_SAMPLE_SIZE_AS_POWER_OF_2;
+
+	decodeAggregateRespSamplePrefixes(largest, 0);
+}
+
+TEST(decodeAggregateRespSample, testTruncatedByteLengthSampleConsumesNothing)
+{
+	const size_t largest = 7;
+
+	decodeAggregateRespSamplePrefixes(largest, 1);
+}
+
 TEST(queryAggregateGPMMetrics, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(
