@@ -346,11 +346,11 @@ TEST(NsmGetSupportedGPMMetricsBranch3,
 
 // ============================================================================
 // NsmGPMPerInstance::handleResponseMsg – decode_aggregate_resp_sample fail
-// Covers: if (rc != NSM_SW_SUCCESS) TRUE branch (L693-700) → continue
+// Covers: if (rc != NSM_SW_SUCCESS) TRUE branch inside while loop → break
+// The handler stops at the failed sample and returns the decode error
 // ============================================================================
 
-TEST(NsmGPMPerInstanceBranch3,
-     DISABLED_HandleResponseMsg_DecodeSampleFail_ContinuesLoop)
+TEST(NsmGPMPerInstanceBranch3, HandleResponseMsg_DecodeSampleFail_StopsLoop)
 {
     auto updator = std::make_shared<MockMetricPerInstanceUpdatorB3>();
     auto perInstance = makePerInstanceB3("decode_sample_fail", updator);
@@ -368,7 +368,7 @@ TEST(NsmGPMPerInstanceBranch3,
     payload->telemetry_count = 1;
 
     auto rc = perInstance->handleResponseMsg(responseMsg, buf.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 // ============================================================================

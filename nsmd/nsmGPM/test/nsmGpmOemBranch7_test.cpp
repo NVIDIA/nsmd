@@ -555,7 +555,7 @@ TEST(NsmGpmOemBranch7, SplitInstanceBitfield_MultipleChunks)
 
 // ============================================================================
 // NsmGPMPerInstance::handleResponseMsg: decode_aggregate_resp_sample fail
-// with rc != 0 (continue path at line 700)
+// with rc != 0 (break path)
 // ============================================================================
 
 TEST(NsmGpmOemBranch7, NsmGPMPerInstance_HandleResponse_SampleDecodeFail)
@@ -588,7 +588,7 @@ TEST(NsmGpmOemBranch7, NsmGPMPerInstance_HandleResponse_SampleDecodeFail)
 
     auto rc = sensor.handleResponseMsg(responseMsg, response.size());
     // First sample decodes OK, second fails -> updateMetric still called
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 // ============================================================================

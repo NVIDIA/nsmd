@@ -285,6 +285,159 @@ TEST_F(NsmGPMPerInstanceTest, testHandleResponsePartialInstances)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
+TEST_F(NsmGPMPerInstanceTest,
+       HandleResponseMsg_SampleLongerThanResponse_StopsDecoding)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    const std::vector<bitfield8_t> instanceBitfield{{.byte = 0x03}};
+
+    NsmGPMPerInstance perInstance("GPM_PerInst_LongSample", "GPMPerInstance", 2,
+                                  0, 0, 10, instanceBitfield,
+                                  GPMMetricsUnit::PERCENTAGE, updator);
+
+    EXPECT_CALL(*updator, updateMetric(ElementsAre(1.0))).Times(1);
+
+    const size_t data_len = 4;
+    const size_t sample_len = sizeof(nsm_aggregate_resp_sample) - 1 + data_len;
+    std::vector<uint8_t> responseBuffer(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp) + sample_len +
+        sizeof(nsm_aggregate_resp_sample));
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 3;
+
+    auto sample_ptr = reinterpret_cast<uint8_t*>(payload + 1);
+
+    auto sample0 = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+    sample0->tag = 0;
+    sample0->valid = 1;
+    sample0->length = std::log2(data_len);
+    uint32_t value = 256;
+    memcpy(sample0->data, &value, data_len);
+    sample_ptr += sample_len;
+
+    // Declares 128 data bytes with only one left
+    auto sample1 = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+    sample1->tag = 1;
+    sample1->valid = 1;
+    sample1->length = 7;
+
+    auto rc = perInstance.handleResponseMsg(responseMsg, responseBuffer.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST_F(NsmGPMPerInstanceTest,
+       HandleResponseMsg_TruncatedSampleHeader_StopsDecoding)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    const std::vector<bitfield8_t> instanceBitfield{{.byte = 0x03}};
+
+    NsmGPMPerInstance perInstance("GPM_PerInst_CutHeader", "GPMPerInstance", 2,
+                                  0, 0, 10, instanceBitfield,
+                                  GPMMetricsUnit::PERCENTAGE, updator);
+
+    EXPECT_CALL(*updator, updateMetric(ElementsAre(1.0))).Times(1);
+
+    const size_t data_len = 4;
+    const size_t sample_len = sizeof(nsm_aggregate_resp_sample) - 1 + data_len;
+    // One complete sample followed by the first byte of another
+    const size_t responseLen = sizeof(nsm_msg_hdr) +
+                               sizeof(nsm_aggregate_resp) + sample_len + 1;
+    std::vector<uint8_t> responseBuffer(responseLen);
+    // A read past the response would decode these bytes and report them
+    responseBuffer.resize(responseLen + 256, 0x05);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 3;
+
+    auto sample_ptr = reinterpret_cast<uint8_t*>(payload + 1);
+
+    auto sample0 = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+    sample0->tag = 0;
+    sample0->valid = 1;
+    sample0->length = std::log2(data_len);
+    uint32_t value = 256;
+    memcpy(sample0->data, &value, data_len);
+    sample_ptr += sample_len;
+
+    *sample_ptr = 1;
+
+    auto rc = perInstance.handleResponseMsg(responseMsg, responseLen);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST_F(NsmGPMPerInstanceTest,
+       HandleResponseMsg_TruncatedSampleHeader_ExactBuffer_StopsDecoding)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    const std::vector<bitfield8_t> instanceBitfield{{.byte = 0x03}};
+
+    NsmGPMPerInstance perInstance("GPM_PerInst_CutExact", "GPMPerInstance", 2,
+                                  0, 0, 10, instanceBitfield,
+                                  GPMMetricsUnit::PERCENTAGE, updator);
+
+    EXPECT_CALL(*updator, updateMetric(ElementsAre(1.0))).Times(1);
+
+    const size_t data_len = 4;
+    const size_t sample_len = sizeof(nsm_aggregate_resp_sample) - 1 + data_len;
+    // One complete sample followed by the first byte of another. The buffer
+    // ends at the response, so a read past it is caught by ASan or valgrind.
+    std::vector<uint8_t> responseBuffer(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp) + sample_len + 1);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 3;
+
+    auto sample_ptr = reinterpret_cast<uint8_t*>(payload + 1);
+
+    auto sample0 = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+    sample0->tag = 0;
+    sample0->valid = 1;
+    sample0->length = std::log2(data_len);
+    uint32_t value = 256;
+    memcpy(sample0->data, &value, data_len);
+    sample_ptr += sample_len;
+
+    *sample_ptr = 1;
+
+    auto rc = perInstance.handleResponseMsg(responseMsg, responseBuffer.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST_F(NsmGPMPerInstanceTest,
+       HandleResponseMsg_CountWithoutSamples_StopsDecoding)
+{
+    auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
+
+    const std::vector<bitfield8_t> instanceBitfield{{.byte = 0x03}};
+
+    NsmGPMPerInstance perInstance("GPM_PerInst_NoSamples", "GPMPerInstance", 2,
+                                  0, 0, 10, instanceBitfield,
+                                  GPMMetricsUnit::PERCENTAGE, updator);
+
+    EXPECT_CALL(*updator, updateMetric(IsEmpty())).Times(1);
+
+    std::vector<uint8_t> responseBuffer(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_aggregate_resp));
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 2;
+
+    auto rc = perInstance.handleResponseMsg(responseMsg, responseBuffer.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
 // ============================================================================
 // addSensor<T> instantiation coverage
 // ============================================================================

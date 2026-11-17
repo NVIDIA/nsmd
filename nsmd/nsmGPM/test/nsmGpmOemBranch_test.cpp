@@ -269,11 +269,11 @@ TEST_F(NsmGPMPerInstanceBranchTest,
 
 // ============================================================================
 // NsmGPMPerInstance::handleResponseMsg – sample decode failure
-// Covers: if (rc != NSM_SW_SUCCESS) TRUE branch inside while loop → continue
+// Covers: if (rc != NSM_SW_SUCCESS) TRUE branch inside while loop → break
 // ============================================================================
 
 TEST_F(NsmGPMPerInstanceBranchTest,
-       HandleResponseMsg_SampleDecodeFail_ContinuesLoop)
+       HandleResponseMsg_SampleDecodeFail_StopsLoop)
 {
     auto updator = std::make_shared<MockMetricPerInstanceUpdatorBranch>();
     auto perInstance = makePerInstance("sample_fail", updator);
@@ -297,11 +297,10 @@ TEST_F(NsmGPMPerInstanceBranchTest,
     responseBuffer[sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp) + 1] = 0x02;
 
     // decode_aggregate_resp_sample returns ERROR_DATA after setting valid/tag →
-    // continue
+    // break
     auto rc = perInstance->handleResponseMsg(responseMsg,
                                              responseBuffer.size());
-    // returnValue stays NSM_SW_SUCCESS (the continue doesn't set it)
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
 // ============================================================================

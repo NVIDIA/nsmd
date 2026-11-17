@@ -268,8 +268,8 @@ TEST(NsmGPMPerInstanceBranch2, HandleResponseMsg_DecodeSuccess_StoresValue)
         buf.data() + sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp));
     sample->tag = 2;
     sample->valid = 1;
-    // length field encodes log2(data_len): 8 bytes → log2(8)=3
-    sample->length = 3;
+    // length field encodes log2(data_len): 4 bytes → log2(4)=2
+    sample->length = 2;
     std::memcpy(sample->data, pctData.data(), pctDataLen);
 
     auto rc = sensor->handleResponseMsg(responseMsg, buf.size());
