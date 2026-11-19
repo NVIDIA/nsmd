@@ -626,19 +626,22 @@ void NsmPortCharacteristics::emitHealthStateChangeEvent(
                         ? Level::Warning
                         : Level::Informational;
 
-    logEventAsync("NvidiaMessageRegistry.1.0.NVLinkPortHealthStateChanged",
-                  severity,
-                  {{"REDFISH_MESSAGE_ID",
-                    "NvidiaMessageRegistry.1.0.NVLinkPortHealthStateChanged"},
-                   {"REDFISH_MESSAGE_ARGS",
-                    portName + "," + newStateStr + "," + triggerStr},
-                   // NSM RF-event convention: the affected port travels in
-                   // OriginOfCondition (bmcweb renders the Redfish port URI);
-                   // %1 is the friendly port name, not the D-Bus object path.
-                   {"REDFISH_ORIGIN_OF_CONDITION", objPath},
-                   {"PREVIOUS_STATE", prevStateStr},
-                   {"NEW_STATE", newStateStr},
-                   {"ATTENTION_TRIGGER", triggerStr}});
+    auto loggingTask = logEventAsync(
+        "NvidiaMessageRegistry.1.0.NVLinkPortHealthStateChanged", severity,
+        {{"REDFISH_MESSAGE_ID",
+          "NvidiaMessageRegistry.1.0.NVLinkPortHealthStateChanged"},
+         {"REDFISH_MESSAGE_ARGS",
+          portName + "," + newStateStr + "," + triggerStr},
+         // NSM RF-event convention: the affected port travels in
+         // OriginOfCondition (bmcweb renders the Redfish port URI);
+         // %1 is the friendly port name, not the D-Bus object path.
+         {"REDFISH_ORIGIN_OF_CONDITION", objPath},
+         {"PREVIOUS_STATE", prevStateStr},
+         {"NEW_STATE", newStateStr},
+         {"ATTENTION_TRIGGER", triggerStr}});
+    // Fire-and-forget: a temporary Coroutine would destroy the suspended
+    // frame while its D-Bus callback is still pending.
+    loggingTask.detach();
 }
 
 void NsmPortCharacteristics::updateLinkDownCode(const uint32_t linkDownCode)
