@@ -798,13 +798,14 @@ uint8_t NsmSwitchPowerCappingMode::handleResponseMsg(
         PowerCapMode currentResolved = (*current == PowerCapMode::Default)
                                            ? PowerCapMode::Enabled
                                            : *current;
-        powerCappingModeIntf->currentMode(currentResolved);
 
         if (pendingModeLength != 0 &&
             pendingModeLength != POWER_CAPPING_MODE_DATA_SIZE)
         {
             return NSM_SW_ERROR_LENGTH;
         }
+        // No pending override from device; keep Settings in sync.
+        PowerCapMode pendingResolved = currentResolved;
         if (pendingModeLength == POWER_CAPPING_MODE_DATA_SIZE)
         {
             auto pending = toPowerCapModeFromGet(pendingMode);
@@ -812,18 +813,35 @@ uint8_t NsmSwitchPowerCappingMode::handleResponseMsg(
             {
                 return NSM_SW_ERROR_DATA;
             }
-            PowerCapMode pendingResolved = (*pending == PowerCapMode::Default)
-                                               ? PowerCapMode::Enabled
-                                               : *pending;
-            powerCappingModeIntf->pendingMode(pendingResolved);
+            pendingResolved = (*pending == PowerCapMode::Default)
+                                  ? PowerCapMode::Enabled
+                                  : *pending;
         }
-        else
-        {
-            // No pending override from device; keep Settings in sync.
-            powerCappingModeIntf->pendingMode(currentResolved);
-        }
+        publish(currentResolved, pendingResolved);
     }
     return cc ? cc : rc;
+}
+
+void NsmSwitchPowerCappingMode::publish(PowerCapMode current,
+                                        PowerCapMode pending)
+{
+    if (powerCappingModeIntf)
+    {
+        powerCappingModeIntf->currentMode(current);
+        powerCappingModeIntf->pendingMode(pending);
+        return;
+    }
+    powerCappingModeIntf = std::make_unique<PowerCappingModeIntf>(
+        bus, objPath.c_str(), PowerCappingModeIntf::action::defer_emit);
+    powerCappingModeIntf->currentMode(current, true);
+    powerCappingModeIntf->pendingMode(pending, true);
+    powerCappingModeIntf->isModeConfigurable(true, true);
+    powerCappingModeIntf->emit_object_added();
+}
+
+void NsmSwitchPowerCappingMode::handleOfflineState()
+{
+    powerCappingModeIntf.reset();
 }
 
 requester::Coroutine NsmSwitchPowerCappingMode::setPowerCappingMode(
@@ -859,7 +877,7 @@ requester::Coroutine NsmSwitchPowerCappingMode::setPowerCappingMode(
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    if (!powerCappingModeIntf->isModeConfigurable())
+    if (powerCappingModeIntf && !powerCappingModeIntf->isModeConfigurable())
     {
         *status = AsyncOperationStatusType::Unavailable;
         throw sdbusplus::error::xyz::openbmc_project::common::NotAllowed{};
@@ -911,8 +929,11 @@ requester::Coroutine NsmSwitchPowerCappingMode::setPowerCappingMode(
     }
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
-        powerCappingModeIntf->pendingMode(
-            mode == PowerCapMode::Default ? PowerCapMode::Enabled : mode);
+        if (powerCappingModeIntf)
+        {
+            powerCappingModeIntf->pendingMode(
+                mode == PowerCapMode::Default ? PowerCapMode::Enabled : mode);
+        }
     }
     else
     {
@@ -942,13 +963,8 @@ inline void createNsmSwitchPowerCappingMode(std::shared_ptr<NsmDevice> device,
     }
     powerCappingModeAssociationIntf->associations(associationsList);
 
-    auto powerCappingModeIntf =
-        std::make_shared<PowerCappingModeIntf>(bus, dbusObjPath.c_str());
-    powerCappingModeIntf->currentMode(PowerCapMode::Enabled);
-    powerCappingModeIntf->pendingMode(PowerCapMode::Enabled);
-    powerCappingModeIntf->isModeConfigurable(true);
     auto nvSwitchPowerCappingMode = std::make_shared<NsmSwitchPowerCappingMode>(
-        name, type, powerCappingModeIntf,
+        name, type, bus, dbusObjPath,
         std::move(powerCappingModeAssociationIntf));
     device->addSensor(nvSwitchPowerCappingMode, false);
 

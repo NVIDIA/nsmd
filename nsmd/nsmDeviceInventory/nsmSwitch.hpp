@@ -177,15 +177,19 @@ class NsmSwitchL1PredictionMode : public NsmSensor
     bool asyncPatchInProgress{false};
 };
 
-/** @brief Power-capping mode using NSM Type 5 Device Mode index 27. */
+/** @brief Power-capping mode using NSM Type 5 Device Mode index 27.
+ *
+ *  The PowerCappingMode interface exists only while its values come from the
+ *  device: it is added on the first successful Get Device Mode and removed
+ *  when the device goes offline. */
 class NsmSwitchPowerCappingMode : public NsmSensor
 {
   public:
     NsmSwitchPowerCappingMode(
-        const std::string& name, const std::string& type,
-        std::shared_ptr<PowerCappingModeIntf> powerCappingModeIntf,
+        const std::string& name, const std::string& type, sdbusplus::bus_t& bus,
+        const std::string& objPath,
         std::shared_ptr<AssociationDefinitionsInft> associationDefIntf) :
-        NsmSensor(name, type), powerCappingModeIntf(powerCappingModeIntf),
+        NsmSensor(name, type), bus(bus), objPath(objPath),
         associationDefIntf(associationDefIntf)
     {}
 
@@ -193,14 +197,26 @@ class NsmSwitchPowerCappingMode : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void handleOfflineState() override;
 
     requester::Coroutine
         setPowerCappingMode(const AsyncSetOperationValueType& value,
                             [[maybe_unused]] AsyncOperationStatusType* status,
                             std::shared_ptr<NsmDevice> device);
 
+    /** @brief The published interface, or nullptr while not on D-Bus. */
+    PowerCappingModeIntf* dbusInterface() const
+    {
+        return powerCappingModeIntf.get();
+    }
+
   private:
-    std::shared_ptr<PowerCappingModeIntf> powerCappingModeIntf;
+    /** @brief Publish the modes, adding the interface on the first call. */
+    void publish(PowerCapMode current, PowerCapMode pending);
+
+    sdbusplus::bus_t& bus;
+    std::string objPath;
+    std::unique_ptr<PowerCappingModeIntf> powerCappingModeIntf;
     std::shared_ptr<AssociationDefinitionsInft> associationDefIntf;
 };
 

@@ -938,18 +938,52 @@ TEST_F(NsmSwitchFactoryBranchTest, SetL1PredictionMode_DecodeFail_WriteFailure)
     EXPECT_EQ(status, AsyncOperationStatusType::WriteFailure);
 }
 
+// Get Device Mode (index 27) reply; pending is omitted when not given.
+static std::vector<uint8_t>
+    encodePowerCappingModeResp(uint8_t current,
+                               std::optional<uint8_t> pending = std::nullopt)
+{
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
+            POWER_CAPPING_MODE_DATA_SIZE * 2,
+        0);
+    uint8_t pendingMode = pending.value_or(0);
+    EXPECT_EQ(NSM_SW_SUCCESS,
+              encode_get_device_mode_settings_v2_resp(
+                  0, NSM_SUCCESS, ERR_NULL, &current,
+                  POWER_CAPPING_MODE_DATA_SIZE,
+                  pending ? &pendingMode : nullptr,
+                  pending ? POWER_CAPPING_MODE_DATA_SIZE : 0,
+                  reinterpret_cast<nsm_msg*>(responseMsg.data())));
+    if (!pending)
+    {
+        responseMsg.resize(responseMsg.size() - POWER_CAPPING_MODE_DATA_SIZE);
+    }
+    return responseMsg;
+}
+
+static void readPowerCappingMode(NsmSwitchPowerCappingMode& sensor,
+                                 uint8_t current,
+                                 std::optional<uint8_t> pending = std::nullopt)
+{
+    auto response = encodePowerCappingModeResp(current, pending);
+    ASSERT_EQ(NSM_SW_SUCCESS, sensor.handleResponseMsg(
+                                  reinterpret_cast<nsm_msg*>(response.data()),
+                                  response.size()));
+    ASSERT_NE(nullptr, sensor.dbusInterface());
+}
+
 // ============================================================================
 // NsmSwitchPowerCappingMode::genRequestMsg encode fail
 // ============================================================================
 TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_GenRequestMsg_EncodeFail)
 {
     static auto& testBus = utils::DBusHandler::getBus();
-    auto powerCapIntf = std::make_shared<PowerCappingModeIntf>(
-        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_genreq_fail");
     auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
         testBus, "/xyz/openbmc_project/inventory/fabr/pcap_genreq_fail");
-    NsmSwitchPowerCappingMode sensor("Pcap_genreq", "NSM_NVSwitch",
-                                     powerCapIntf, assocIntf);
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_genreq", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_genreq_fail", assocIntf);
 
     auto request = sensor.genRequestMsg(12, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(request.has_value());
@@ -961,12 +995,11 @@ TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_GenRequestMsg_EncodeFail)
 TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_HandleResponse_AllModes)
 {
     static auto& testBus = utils::DBusHandler::getBus();
-    auto powerCapIntf = std::make_shared<PowerCappingModeIntf>(
-        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_all_modes");
     auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
         testBus, "/xyz/openbmc_project/inventory/fabr/pcap_all_modes");
-    NsmSwitchPowerCappingMode sensor("Pcap_modes", "NSM_NVSwitch", powerCapIntf,
-                                     assocIntf);
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_modes", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_all_modes", assocIntf);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
@@ -981,10 +1014,14 @@ TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_HandleResponse_AllModes)
         &pendingMode, POWER_CAPPING_MODE_DATA_SIZE, response);
     ASSERT_EQ(rc, NSM_SW_SUCCESS);
 
+    EXPECT_EQ(nullptr, sensor.dbusInterface());
     rc = sensor.handleResponseMsg(response, responseMsg.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    auto* powerCapIntf = sensor.dbusInterface();
+    ASSERT_NE(nullptr, powerCapIntf);
     EXPECT_EQ(powerCapIntf->currentMode(), PowerCapMode::Enabled);
     EXPECT_EQ(powerCapIntf->pendingMode(), PowerCapMode::Disabled);
+    EXPECT_TRUE(powerCapIntf->isModeConfigurable());
 }
 
 // ============================================================================
@@ -994,12 +1031,11 @@ TEST_F(NsmSwitchFactoryBranchTest,
        PowerCappingMode_HandleResponse_DefaultWireResolved)
 {
     static auto& testBus = utils::DBusHandler::getBus();
-    auto powerCapIntf = std::make_shared<PowerCappingModeIntf>(
-        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_default_wire");
     auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
         testBus, "/xyz/openbmc_project/inventory/fabr/pcap_default_wire");
-    NsmSwitchPowerCappingMode sensor("Pcap_defwire", "NSM_NVSwitch",
-                                     powerCapIntf, assocIntf);
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_defwire", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_default_wire", assocIntf);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
@@ -1016,6 +1052,8 @@ TEST_F(NsmSwitchFactoryBranchTest,
 
     rc = sensor.handleResponseMsg(response, responseMsg.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    auto* powerCapIntf = sensor.dbusInterface();
+    ASSERT_NE(nullptr, powerCapIntf);
     EXPECT_EQ(powerCapIntf->currentMode(), PowerCapMode::Enabled);
     EXPECT_EQ(powerCapIntf->pendingMode(), PowerCapMode::Enabled);
 }
@@ -1026,12 +1064,11 @@ TEST_F(NsmSwitchFactoryBranchTest,
 TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_HandleResponse_InvalidMode)
 {
     static auto& testBus = utils::DBusHandler::getBus();
-    auto powerCapIntf = std::make_shared<PowerCappingModeIntf>(
-        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_invalid_mode");
     auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
         testBus, "/xyz/openbmc_project/inventory/fabr/pcap_invalid_mode");
-    NsmSwitchPowerCappingMode sensor("Pcap_invalid", "NSM_NVSwitch",
-                                     powerCapIntf, assocIntf);
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_invalid", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_invalid_mode", assocIntf);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
@@ -1047,6 +1084,7 @@ TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_HandleResponse_InvalidMode)
 
     rc = sensor.handleResponseMsg(response, responseMsg.size());
     EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+    EXPECT_EQ(nullptr, sensor.dbusInterface());
 }
 
 // ============================================================================
@@ -1057,13 +1095,13 @@ TEST_F(NsmSwitchFactoryBranchTest,
        SetPowerCappingMode_NotConfigurable_NotAllowed)
 {
     static auto& testBus = utils::DBusHandler::getBus();
-    auto powerCapIntf = std::make_shared<PowerCappingModeIntf>(
-        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_not_cfg");
     auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
         testBus, "/xyz/openbmc_project/inventory/fabr/pcap_not_cfg");
-    powerCapIntf->isModeConfigurable(false);
-    NsmSwitchPowerCappingMode sensor("Pcap_nocfg", "NSM_NVSwitch", powerCapIntf,
-                                     assocIntf);
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_nocfg", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_not_cfg", assocIntf);
+    readPowerCappingMode(sensor, NSM_POWER_CAPPING_MODE_ENABLED);
+    sensor.dbusInterface()->isModeConfigurable(false);
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
     AsyncSetOperationValueType value =
@@ -1082,14 +1120,12 @@ TEST_F(NsmSwitchFactoryBranchTest,
 TEST_F(NsmSwitchFactoryBranchTest, SetPowerCappingMode_Default_Success)
 {
     static auto& testBus = utils::DBusHandler::getBus();
-    auto powerCapIntf = std::make_shared<PowerCappingModeIntf>(
-        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_set_default");
     auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
         testBus, "/xyz/openbmc_project/inventory/fabr/pcap_set_default");
-    // The factory publishes IsModeConfigurable true; the PDI default is false.
-    powerCapIntf->isModeConfigurable(true);
-    NsmSwitchPowerCappingMode sensor("Pcap_setdef", "NSM_NVSwitch",
-                                     powerCapIntf, assocIntf);
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_setdef", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_set_default", assocIntf);
+    readPowerCappingMode(sensor, NSM_POWER_CAPPING_MODE_DISABLED);
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
     AsyncSetOperationValueType value =
@@ -1108,7 +1144,60 @@ TEST_F(NsmSwitchFactoryBranchTest, SetPowerCappingMode_Default_Success)
     sensor.setPowerCappingMode(value, &status, nvswitch);
 
     EXPECT_EQ(status, AsyncOperationStatusType::Success);
-    EXPECT_EQ(powerCapIntf->pendingMode(), PowerCapMode::Enabled);
+    EXPECT_EQ(sensor.dbusInterface()->pendingMode(), PowerCapMode::Enabled);
+}
+
+// ============================================================================
+// NsmSwitchPowerCappingMode::setPowerCappingMode -- before the first read the
+// device still gets the request; the interface is added by the next read.
+// ============================================================================
+TEST_F(NsmSwitchFactoryBranchTest, SetPowerCappingMode_BeforeFirstRead)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_set_unread");
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_setunread", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_set_unread", assocIntf);
+
+    std::vector<uint8_t> responseData(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    encode_set_device_mode_settings_v2_resp(
+        0, NSM_SUCCESS, ERR_NULL,
+        reinterpret_cast<nsm_msg*>(responseData.data()));
+    EXPECT_CALL(*nvswitch, postPatchIO(_, _, _, _))
+        .WillOnce(mockPostPatchIO(responseData));
+
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    AsyncSetOperationValueType value =
+        PowerCappingModeServer::convertPowerCapModeToString(
+            PowerCapMode::Disabled);
+    sensor.setPowerCappingMode(value, &status, nvswitch);
+
+    EXPECT_EQ(status, AsyncOperationStatusType::Success);
+    EXPECT_EQ(nullptr, sensor.dbusInterface());
+}
+
+// ============================================================================
+// NsmSwitchPowerCappingMode::handleOfflineState removes the interface; the
+// next successful read adds it again with the device values.
+// ============================================================================
+TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_OfflineRemovesInterface)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_offline");
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_offline", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_offline", assocIntf);
+    readPowerCappingMode(sensor, NSM_POWER_CAPPING_MODE_DISABLED);
+
+    sensor.handleOfflineState();
+    EXPECT_EQ(nullptr, sensor.dbusInterface());
+
+    readPowerCappingMode(sensor, NSM_POWER_CAPPING_MODE_ENABLED);
+    EXPECT_EQ(sensor.dbusInterface()->currentMode(), PowerCapMode::Enabled);
+    EXPECT_EQ(sensor.dbusInterface()->pendingMode(), PowerCapMode::Enabled);
 }
 
 // ============================================================================
@@ -1180,14 +1269,16 @@ TEST_F(NsmSwitchFactoryBranchTest,
        PowerCappingMode_HandleResponse_NoPendingSyncsPending)
 {
     static auto& testBus = utils::DBusHandler::getBus();
-    auto powerCapIntf = std::make_shared<PowerCappingModeIntf>(
-        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_no_pending");
     auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
         testBus, "/xyz/openbmc_project/inventory/fabr/pcap_no_pending");
-    // Stale pending from a prior write / factory seed.
-    powerCapIntf->pendingMode(PowerCapMode::Disabled);
-    NsmSwitchPowerCappingMode sensor("Pcap_nopending", "NSM_NVSwitch",
-                                     powerCapIntf, assocIntf);
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_nopending", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_no_pending", assocIntf);
+    // Stale pending from a prior read.
+    readPowerCappingMode(sensor, NSM_POWER_CAPPING_MODE_ENABLED,
+                         NSM_POWER_CAPPING_MODE_DISABLED);
+    auto* powerCapIntf = sensor.dbusInterface();
+    ASSERT_EQ(powerCapIntf->pendingMode(), PowerCapMode::Disabled);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) +
@@ -1210,12 +1301,11 @@ TEST_F(NsmSwitchFactoryBranchTest,
 TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_HandleResponse_BadLength)
 {
     static auto& testBus = utils::DBusHandler::getBus();
-    auto powerCapIntf = std::make_shared<PowerCappingModeIntf>(
-        testBus, "/xyz/openbmc_project/inventory/fabr/pcap_bad_len");
     auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
         testBus, "/xyz/openbmc_project/inventory/fabr/pcap_bad_len");
-    NsmSwitchPowerCappingMode sensor("Pcap_badlen", "NSM_NVSwitch",
-                                     powerCapIntf, assocIntf);
+    NsmSwitchPowerCappingMode sensor(
+        "Pcap_badlen", "NSM_NVSwitch", testBus,
+        "/xyz/openbmc_project/inventory/fabr/pcap_bad_len", assocIntf);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_settings_v2_resp) + 4,
@@ -1233,6 +1323,7 @@ TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_HandleResponse_BadLength)
 
     rc = sensor.handleResponseMsg(response, responseMsg.size());
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    EXPECT_EQ(nullptr, sensor.dbusInterface());
 }
 
 // ============================================================================
