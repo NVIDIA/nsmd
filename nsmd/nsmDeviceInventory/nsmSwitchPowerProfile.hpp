@@ -41,7 +41,11 @@ using PowerProfileServer =
 using PowerProfileIntf = sdbusplus::server::object_t<PowerProfileServer>;
 
 /** @brief Power profiles using NSM Type 1 Get/Set Power Profile (0x0D/0x0C),
- *         published as com.nvidia.PowerCapping.Profile. */
+ *         published as com.nvidia.PowerCapping.Profile.
+ *
+ *  The interface exists only while its values come from the device: it is
+ *  added on the first successful Get Power Profile and removed when the
+ *  device goes offline. */
 class NsmSwitchPowerProfile : public NsmSensor
 {
   public:
@@ -53,12 +57,13 @@ class NsmSwitchPowerProfile : public NsmSensor
     static constexpr auto hardwareDefaultProfileName = "HardwareDefault";
 
     NsmSwitchPowerProfile(const std::string& name, const std::string& type,
-                          std::shared_ptr<PowerProfileServer> profileIntf);
+                          sdbusplus::bus_t& bus, const std::string& objPath);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void handleOfflineState() override;
 
     /** @brief Async set handler for ActiveProfileId. Success means the
      *         device accepted the request; the dispatcher then re-polls this
@@ -76,6 +81,11 @@ class NsmSwitchPowerProfile : public NsmSensor
     {
         return profiles;
     }
+    /** @brief The published interface, or nullptr while not on D-Bus. */
+    const PowerProfileIntf* dbusInterface() const
+    {
+        return profileIntf.get();
+    }
 
   private:
     /** @brief Decode a Get Power Profile reply and publish it.
@@ -83,7 +93,9 @@ class NsmSwitchPowerProfile : public NsmSensor
     int decodeAndPublish(const nsm_msg* responseMsg, size_t responseLen,
                          uint8_t& cc, uint16_t& reasonCode);
 
-    std::shared_ptr<PowerProfileServer> profileIntf;
+    sdbusplus::bus_t& bus;
+    std::string objPath;
+    std::unique_ptr<PowerProfileIntf> profileIntf;
     uint8_t activeId = NSM_POWER_PROFILE_ID_HW_DEFAULT;
     std::vector<ProfileEntry> profiles;
     std::set<uint8_t> knownIds;

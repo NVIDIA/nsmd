@@ -59,10 +59,11 @@ AsyncOperationStatusType setFailureStatus(int rc, uint8_t cc,
 }
 } // namespace
 
-NsmSwitchPowerProfile::NsmSwitchPowerProfile(
-    const std::string& name, const std::string& type,
-    std::shared_ptr<PowerProfileServer> profileIntf) :
-    NsmSensor(name, type), profileIntf(std::move(profileIntf))
+NsmSwitchPowerProfile::NsmSwitchPowerProfile(const std::string& name,
+                                             const std::string& type,
+                                             sdbusplus::bus_t& bus,
+                                             const std::string& objPath) :
+    NsmSensor(name, type), bus(bus), objPath(objPath)
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -139,8 +140,24 @@ int NsmSwitchPowerProfile::decodeAndPublish(const nsm_msg* responseMsg,
         profileIntf->activeProfileId(activeId);
         profileIntf->activeProfileName(activeName);
         profileIntf->availableProfiles(profiles);
+        return NSM_SW_SUCCESS;
     }
+
+    profileIntf = std::make_unique<PowerProfileIntf>(
+        bus, objPath.c_str(), PowerProfileIntf::action::defer_emit);
+    profileIntf->activeProfileId(activeId, true);
+    profileIntf->activeProfileName(activeName, true);
+    profileIntf->availableProfiles(profiles, true);
+    profileIntf->emit_object_added();
     return NSM_SW_SUCCESS;
+}
+
+void NsmSwitchPowerProfile::handleOfflineState()
+{
+    profileIntf.reset();
+    activeId = NSM_POWER_PROFILE_ID_HW_DEFAULT;
+    profiles.clear();
+    knownIds.clear();
 }
 
 uint8_t NsmSwitchPowerProfile::handleResponseMsg(const nsm_msg* responseMsg,
@@ -231,10 +248,8 @@ void createNsmSwitchPowerProfile(std::shared_ptr<NsmDevice> device,
                                  const std::string& type)
 {
     const auto dbusObjPath = objPath + name + "/Oem/Nvidia/PowerProfile";
-    auto profileIntf = std::make_shared<PowerProfileIntf>(bus,
-                                                          dbusObjPath.c_str());
     auto profile = std::make_shared<NsmSwitchPowerProfile>(
-        name + "_PowerProfile", type, profileIntf);
+        name + "_PowerProfile", type, bus, dbusObjPath);
 
     device->addSensor(profile, PollingType::RoundRobin);
 

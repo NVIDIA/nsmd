@@ -110,7 +110,8 @@ class NsmSwitchPowerProfileTest :
     NsmSwitchPowerProfile makeProfileSensor()
     {
         return NsmSwitchPowerProfile("NVSwitch_0_PowerProfile", "NSM_NVSwitch",
-                                     nullptr);
+                                     utils::DBusHandler::getBus(),
+                                     "/test/switchprofile/sensor");
     }
 
     AsyncOperationStatusType setWithDeviceReply(uint8_t cc,
@@ -233,16 +234,15 @@ TEST_F(NsmSwitchPowerProfileTest, Profile_PublishesListAndActive)
 
 TEST_F(NsmSwitchPowerProfileTest, Profile_PublishesToDbus)
 {
-    static auto& testBus = utils::DBusHandler::getBus();
-    auto intf = std::make_shared<PowerProfileIntf>(
-        testBus, "/test/switchprofile/publish");
-    NsmSwitchPowerProfile sensor("NVSwitch_0_PowerProfile", "NSM_NVSwitch",
-                                 intf);
+    auto sensor = makeProfileSensor();
+    EXPECT_EQ(nullptr, sensor.dbusInterface());
 
     auto response = encodeProfiles(1, {{1, "compute"}, {2, "networking"}});
     ASSERT_EQ(NSM_SW_SUCCESS, sensor.handleResponseMsg(
                                   reinterpret_cast<nsm_msg*>(response.data()),
                                   response.size()));
+    const auto* intf = sensor.dbusInterface();
+    ASSERT_NE(nullptr, intf);
     EXPECT_EQ(1, intf->activeProfileId());
     EXPECT_EQ("compute", intf->activeProfileName());
     ASSERT_EQ(3u, intf->availableProfiles().size());
@@ -269,6 +269,32 @@ TEST_F(NsmSwitchPowerProfileTest, Profile_ErrorReturnsCompletionCode)
         NSM_ERR_NOT_READY,
         sensor.handleResponseMsg(reinterpret_cast<nsm_msg*>(response.data()),
                                  response.size()));
+    EXPECT_EQ(nullptr, sensor.dbusInterface());
+}
+
+TEST_F(NsmSwitchPowerProfileTest, Profile_OfflineRemovesInterfaceUntilNextRead)
+{
+    auto sensor = makeProfileSensor();
+    auto response = encodeProfiles(1, {{1, "compute"}});
+    ASSERT_EQ(NSM_SW_SUCCESS, sensor.handleResponseMsg(
+                                  reinterpret_cast<nsm_msg*>(response.data()),
+                                  response.size()));
+    ASSERT_NE(nullptr, sensor.dbusInterface());
+
+    sensor.handleOfflineState();
+    EXPECT_EQ(nullptr, sensor.dbusInterface());
+    EXPECT_TRUE(sensor.availableProfiles().empty());
+
+    EXPECT_CALL(*nvswitch, postPatchIO(_, _, _, _)).Times(0);
+    AsyncOperationStatusType status = AsyncOperationStatusType::Success;
+    sensor.setActiveProfile(uint8_t{1}, &status, nvswitch);
+    EXPECT_EQ(AsyncOperationStatusType::InvalidArgument, status);
+
+    ASSERT_EQ(NSM_SW_SUCCESS, sensor.handleResponseMsg(
+                                  reinterpret_cast<nsm_msg*>(response.data()),
+                                  response.size()));
+    ASSERT_NE(nullptr, sensor.dbusInterface());
+    EXPECT_EQ(1, sensor.dbusInterface()->activeProfileId());
 }
 
 TEST_F(NsmSwitchPowerProfileTest, ProfileUpdate_PollsAndPublishes)
