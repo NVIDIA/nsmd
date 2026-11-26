@@ -730,9 +730,16 @@ class NsmDevice :
     requester::Coroutine updateFruDeviceIntf();
     requester::Coroutine getFRU(nsm::InventoryProperties& properties,
                                 const uint8_t& deviceType);
-    requester::Coroutine
-        getInventoryInformation(uint8_t& propertyIdentifier,
-                                nsm::InventoryProperties& properties);
+    /** @brief Read one inventory property into properties
+     *
+     *  @param[out] deviceCc - completion code of the device, written only
+     *              when the device answered with a non-success response
+     *  @param[out] deviceReasonCode - reason code of that response
+     *  @return the software status, or that completion code
+     */
+    requester::Coroutine getInventoryInformation(
+        uint8_t& propertyIdentifier, nsm::InventoryProperties& properties,
+        uint8_t* deviceCc = nullptr, uint16_t* deviceReasonCode = nullptr);
     requester::Coroutine getSupportedNvidiaMessageType(
         std::vector<uint8_t>& supportedNvidiaMessageTypes);
     requester::Coroutine

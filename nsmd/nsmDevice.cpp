@@ -913,8 +913,19 @@ requester::Coroutine NsmDevice::getFRU(nsm::InventoryProperties& properties,
 
     for (auto propertyId : propertyIds)
     {
-        auto rc = co_await getInventoryInformation(propertyId, properties);
-        if (rc != NSM_SW_SUCCESS)
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        auto rc = co_await getInventoryInformation(propertyId, properties, &cc,
+                                                   &reasonCode);
+        if (cc != NSM_SUCCESS)
+        {
+            lg2::error(
+                "NsmDevice::getFRU getInventoryInformation failed for propertyId={PID} eid={EID} cc={CC} reasonCode={REASONCODE}",
+                "PID", propertyId, "EID", eid, "CC",
+                utils::nsmCompletionCodeToString(cc), "REASONCODE",
+                utils::nsmReasonCodeToString(reasonCode));
+        }
+        else if (rc != NSM_SW_SUCCESS)
         {
             lg2::error(
                 "NsmDevice::getFRU getInventoryInformation failed for propertyId={PID} eid={EID} rc={RC}",
@@ -926,9 +937,9 @@ requester::Coroutine NsmDevice::getFRU(nsm::InventoryProperties& properties,
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine
-    NsmDevice::getInventoryInformation(uint8_t& propertyIdentifier,
-                                       nsm::InventoryProperties& properties)
+requester::Coroutine NsmDevice::getInventoryInformation(
+    uint8_t& propertyIdentifier, nsm::InventoryProperties& properties,
+    uint8_t* deviceCc, uint16_t* deviceReasonCode)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -964,8 +975,21 @@ requester::Coroutine
                                                data.data());
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
+        if (rc != NSM_SW_SUCCESS)
+        {
+            // coverity[missing_return]
+            co_return rc;
+        }
+        if (deviceCc != nullptr)
+        {
+            *deviceCc = cc;
+        }
+        if (deviceReasonCode != nullptr)
+        {
+            *deviceReasonCode = reasonCode;
+        }
         // coverity[missing_return]
-        co_return cc ? cc : rc;
+        co_return cc;
     }
 
     std::optional<nsm::InventoryPropertyData> property;

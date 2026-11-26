@@ -87,6 +87,16 @@ static std::vector<uint8_t> makeInvInfoResp3(uint8_t cc, uint16_t dataSize = 0,
     return buf;
 }
 
+static std::vector<uint8_t> makeInvInfoErrorResp3(uint8_t cc,
+                                                  uint16_t reasonCode)
+{
+    std::vector<uint8_t> buf(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp), 0);
+    auto msg = reinterpret_cast<nsm_msg*>(buf.data());
+    encode_get_inventory_information_resp(0, cc, reasonCode, 0, nullptr, msg);
+    return buf;
+}
+
 static void allocMessage3(const std::vector<uint8_t>& response,
                           std::shared_ptr<const nsm_msg>& responseMsg,
                           size_t& responseLen)
@@ -494,6 +504,34 @@ TEST_F(NsmDeviceDI3Test, GetFRU_GPU_OnePropertyFails)
     EXPECT_TRUE(props.find(SERIAL_NUMBER) != props.end());
 }
 
+// getFRU — with one property rejected by the device (non-success CC)
+TEST_F(NsmDeviceDI3Test, GetFRU_GPU_DeviceRejectsOneProperty)
+{
+    const char* strValue = "ok";
+    auto strResp = makeInvInfoResp3(NSM_SUCCESS, strlen(strValue),
+                                    reinterpret_cast<const uint8_t*>(strValue));
+    std::vector<uint8_t> uuidData(UUID_INT_SIZE, 0xEF);
+    auto uuidResp = makeInvInfoResp3(NSM_SUCCESS, UUID_INT_SIZE,
+                                     uuidData.data());
+    auto rejectResp = makeInvInfoErrorResp3(NSM_ERR_INVALID_DATA,
+                                            ERR_NOT_SUPPORTED);
+
+    EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _))
+        .WillOnce(mockSendRecv3(rejectResp)) // BOARD_PART_NUMBER - rejected
+        .WillOnce(mockSendRecv3(strResp))    // FRU_PART_NUMBER
+        .WillOnce(mockSendRecv3(strResp))    // SERIAL_NUMBER
+        .WillOnce(mockSendRecv3(uuidResp))   // DEVICE_GUID
+        .WillOnce(mockSendRecv3(strResp))    // MARKETING_NAME
+        .WillOnce(mockSendRecv3(strResp));   // BUILD_DATE
+
+    InventoryProperties props;
+    auto coro = device->getFRU(props, NSM_DEV_ID_GPU);
+
+    EXPECT_TRUE(props.find(BOARD_PART_NUMBER) == props.end());
+    EXPECT_TRUE(props.find(FRU_PART_NUMBER) != props.end());
+    EXPECT_TRUE(props.find(BUILD_DATE) != props.end());
+}
+
 // ===========================================================================
 // refreshCommandMatrix — message types not yet retrieved
 // ===========================================================================
@@ -777,6 +815,67 @@ TEST_F(NsmDeviceDI3Test, GetInventoryInfo_ErrorCC_ReturnsError)
     EXPECT_TRUE(props.empty());
 }
 
+TEST_F(NsmDeviceDI3Test, GetInventoryInfo_ErrorCC_ReportsCcAndReasonCode)
+{
+    auto resp = makeInvInfoErrorResp3(NSM_ERR_INVALID_DATA, ERR_NOT_SUPPORTED);
+
+    EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _))
+        .WillOnce(mockSendRecv3(resp));
+
+    InventoryProperties props;
+    uint8_t propId = BOARD_PART_NUMBER;
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    auto coro = device->getInventoryInformation(propId, props, &cc,
+                                                &reasonCode);
+
+    EXPECT_EQ(coro.data(), NSM_ERR_INVALID_DATA);
+    EXPECT_EQ(cc, NSM_ERR_INVALID_DATA);
+    EXPECT_EQ(reasonCode, ERR_NOT_SUPPORTED);
+    EXPECT_TRUE(props.empty());
+}
+
+// A non-success response of the wrong length does not decode: the result is
+// the decode error and no completion code is handed back
+TEST_F(NsmDeviceDI3Test, GetInventoryInfo_MalformedErrorCC_ReturnsDecodeError)
+{
+    auto resp = makeInvInfoResp3(NSM_ERR_INVALID_DATA);
+
+    EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _))
+        .WillOnce(mockSendRecv3(resp));
+
+    InventoryProperties props;
+    uint8_t propId = BOARD_PART_NUMBER;
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    auto coro = device->getInventoryInformation(propId, props, &cc,
+                                                &reasonCode);
+
+    EXPECT_EQ(coro.data(), NSM_SW_ERROR_LENGTH);
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    EXPECT_EQ(reasonCode, ERR_NULL);
+    EXPECT_TRUE(props.empty());
+}
+
+TEST_F(NsmDeviceDI3Test, GetInventoryInfo_TruncatedResponse_NoCompletionCode)
+{
+    std::vector<uint8_t> resp(sizeof(nsm_msg_hdr) + 1, 0);
+
+    EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _))
+        .WillOnce(mockSendRecv3(resp));
+
+    InventoryProperties props;
+    uint8_t propId = BOARD_PART_NUMBER;
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    auto coro = device->getInventoryInformation(propId, props, &cc,
+                                                &reasonCode);
+
+    EXPECT_EQ(coro.data(), NSM_SW_ERROR_LENGTH);
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    EXPECT_EQ(reasonCode, ERR_NULL);
+}
+
 // ===========================================================================
 // refreshCommandMatrix — mixed types: one valid, one out-of-range, one
 // already retrieved
@@ -959,6 +1058,23 @@ TEST_F(NsmDeviceDI3Test, GetInventoryInfo_SendRecvFail)
     device->getInventoryInformation(propId, props);
 
     EXPECT_TRUE(props.empty());
+}
+
+TEST_F(NsmDeviceDI3Test, GetInventoryInfo_SendRecvFail_NoCompletionCode)
+{
+    EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _))
+        .WillOnce(mockSendRecvFail3(NSM_SW_ERROR));
+
+    InventoryProperties props;
+    uint8_t propId = BOARD_PART_NUMBER;
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    auto coro = device->getInventoryInformation(propId, props, &cc,
+                                                &reasonCode);
+
+    EXPECT_EQ(coro.data(), NSM_SW_ERROR);
+    EXPECT_EQ(cc, NSM_SUCCESS);
+    EXPECT_EQ(reasonCode, ERR_NULL);
 }
 
 // ===========================================================================
