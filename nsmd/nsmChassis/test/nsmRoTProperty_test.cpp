@@ -1640,6 +1640,12 @@ TEST_F(NsmImageCopySetResultTest, SetImageCopyResult_AllReasonCodes)
                                   ERR_IMAGE_COPY_COMPLETED);
     EXPECT_EQ(imageCopy->errorCode(), ErrorCode::ImageCopyCompleted);
 
+    // Bali 0x109 is the same completed condition.
+    imageCopy->setImageCopyResult(
+        valueIntf, NSM_ERR_INVALID_REQUEST_TYPE, ERR_IMAGE_COPY_COMPLETED_BALI,
+        RequestStatus::Rejected, ERR_IMAGE_COPY_COMPLETED_BALI);
+    EXPECT_EQ(imageCopy->errorCode(), ErrorCode::ImageCopyCompleted);
+
     // ERR_FLASH_WEAR_MITIGATION → ErrorCode::FlashWearMitigation
     imageCopy->setImageCopyResult(valueIntf, NSM_SUCCESS, ERR_NULL,
                                   RequestStatus::Rejected,

@@ -172,7 +172,9 @@ enum nsm_reason_codes {
 	ERR_IMAGE_COPY_IN_PROGRESS = 0x105,
 	ERR_IMAGE_COPY_COMPLETED = 0x106,
 	ERR_FLASH_WEAR_MITIGATION = 0x107,
-	ERR_INCOMPLETE_COMPONENT_SET = 0x108
+	ERR_INCOMPLETE_COMPONENT_SET = 0x108,
+	/* Bali IRoT uses 0x109 for image copy already completed. */
+	ERR_IMAGE_COPY_COMPLETED_BALI = 0x109
 };
 
 /** @brief NSM Software Error codes

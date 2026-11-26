@@ -1670,6 +1670,7 @@ class ImageCopyControl : public CommandInterface
             case ERR_IMAGE_COPY_IN_PROGRESS:
                 return "IMAGE_COPY_IN_PROGRESS (An image copy is in progress)";
             case ERR_IMAGE_COPY_COMPLETED:
+            case ERR_IMAGE_COPY_COMPLETED_BALI:
                 return "IMAGE_COPY_COMPLETED (An image copy was completed successfully)";
             case ERR_FLASH_WEAR_MITIGATION:
                 return "FLASH_WEAR_MITIGATION (A flash wear out mitigation policy is in effect)";

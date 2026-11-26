@@ -175,6 +175,22 @@ TEST_F(NsmFirmwareUtilsCommonTest, InvalidStateImageCopyCompleted)
     EXPECT_EQ(msg, "An image copy was completed successfully");
 }
 
+TEST_F(NsmFirmwareUtilsCommonTest, BaliImageCopyCompletedReason)
+{
+    auto [stateCode, stateMsg] = getErrorCode(NSM_FW_IMAGE_COPY_CONTROL,
+                                              NSM_ERR_INVALID_STATE_FOR_COMMAND,
+                                              ERR_IMAGE_COPY_COMPLETED_BALI);
+    EXPECT_EQ(stateCode, NSM_ERR_INVALID_STATE_FOR_COMMAND);
+    EXPECT_EQ(stateMsg, "An image copy was completed successfully");
+
+    // Bali sends this reason with completion code 0x81.
+    auto [requestCode, requestMsg] =
+        getErrorCode(NSM_FW_IMAGE_COPY_CONTROL, NSM_ERR_INVALID_REQUEST_TYPE,
+                     ERR_IMAGE_COPY_COMPLETED_BALI);
+    EXPECT_EQ(requestCode, NSM_ERR_INVALID_REQUEST_TYPE);
+    EXPECT_EQ(requestMsg, "An image copy was completed successfully");
+}
+
 TEST_F(NsmFirmwareUtilsCommonTest, InvalidStateFlashWearMitigation)
 {
     auto [code, msg] = getErrorCode(NSM_FW_IMAGE_COPY_CONTROL,

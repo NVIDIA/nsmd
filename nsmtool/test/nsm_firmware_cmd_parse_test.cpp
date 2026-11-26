@@ -1822,6 +1822,7 @@ TEST_F(NsmFirmwareCmdParseTest, ImageCopyControl_ReasonCode_AllKnownValues)
         ERR_UPDATE_IN_PROGRESS,
         ERR_IMAGE_COPY_IN_PROGRESS,
         ERR_IMAGE_COPY_COMPLETED,
+        ERR_IMAGE_COPY_COMPLETED_BALI,
         ERR_FLASH_WEAR_MITIGATION,
         ERR_INCOMPLETE_COMPONENT_SET,
         0xFFFF, // unknown - default case

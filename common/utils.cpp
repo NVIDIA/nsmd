@@ -1137,6 +1137,9 @@ std::string nsmReasonCodeToString(uint16_t reasonCode)
         case ERR_IMAGE_COPY_COMPLETED:
             result = "ERR_IMAGE_COPY_COMPLETED";
             break;
+        case ERR_IMAGE_COPY_COMPLETED_BALI:
+            result = "ERR_IMAGE_COPY_COMPLETED_BALI";
+            break;
         case ERR_FLASH_WEAR_MITIGATION:
             result = "ERR_FLASH_WEAR_MITIGATION";
             break;

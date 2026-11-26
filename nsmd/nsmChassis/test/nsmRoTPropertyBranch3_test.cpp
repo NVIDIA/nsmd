@@ -167,6 +167,13 @@ TEST_F(NsmRoTPropertyBranch3Test, MapReasonCode_ImageCopyCompleted)
               ErrorCode::ImageCopyCompleted);
 }
 
+TEST_F(NsmRoTPropertyBranch3Test, MapReasonCode_ImageCopyCompletedBali)
+{
+    using ErrorCode = sdbusplus::common::com::nvidia::ImageCopy::ErrorCode;
+    EXPECT_EQ(mapReasonCodeToErrorCode(ERR_IMAGE_COPY_COMPLETED_BALI),
+              ErrorCode::ImageCopyCompleted);
+}
+
 TEST_F(NsmRoTPropertyBranch3Test, MapReasonCode_FlashWearMitigation)
 {
     using ErrorCode = sdbusplus::common::com::nvidia::ImageCopy::ErrorCode;

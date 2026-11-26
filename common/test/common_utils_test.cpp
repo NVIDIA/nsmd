@@ -917,6 +917,13 @@ TEST(NsmStringConversion, testNsmReasonCodeToStringImageCopyCompleted)
     EXPECT_NE(result.find("ERR_IMAGE_COPY_COMPLETED"), std::string::npos);
 }
 
+TEST(NsmStringConversion, testNsmReasonCodeToStringImageCopyCompletedBali)
+{
+    std::string result =
+        utils::nsmReasonCodeToString(ERR_IMAGE_COPY_COMPLETED_BALI);
+    EXPECT_NE(result.find("ERR_IMAGE_COPY_COMPLETED_BALI"), std::string::npos);
+}
+
 TEST(NsmStringConversion, testNsmReasonCodeToStringFlashWearMitigation)
 {
     std::string result =

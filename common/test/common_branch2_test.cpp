@@ -746,6 +746,9 @@ TEST(NsmReasonCodeBranch3, AllCases)
     EXPECT_NE(nsmReasonCodeToString(ERR_IMAGE_COPY_COMPLETED)
                   .find("ERR_IMAGE_COPY_COMPLETED"),
               std::string::npos);
+    EXPECT_NE(nsmReasonCodeToString(ERR_IMAGE_COPY_COMPLETED_BALI)
+                  .find("ERR_IMAGE_COPY_COMPLETED_BALI"),
+              std::string::npos);
     EXPECT_NE(nsmReasonCodeToString(ERR_FLASH_WEAR_MITIGATION)
                   .find("ERR_FLASH_WEAR_MITIGATION"),
               std::string::npos);

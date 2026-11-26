@@ -40,6 +40,8 @@ const static std::unordered_map<uint16_t, std::string>
         {ERR_UPDATE_IN_PROGRESS, "A firmware update is in progress"},
         {ERR_IMAGE_COPY_IN_PROGRESS, "An image copy is in progress"},
         {ERR_IMAGE_COPY_COMPLETED, "An image copy was completed successfully"},
+        {ERR_IMAGE_COPY_COMPLETED_BALI,
+         "An image copy was completed successfully"},
         {ERR_FLASH_WEAR_MITIGATION,
          "A flash wear out mitigation policy is in effect"},
 };
@@ -124,6 +126,17 @@ inline std::tuple<uint16_t, std::string>
                     imageCopyInvalidRequestErrors.end())
                 {
                     return {cc, imageCopyInvalidRequestErrors.at(reasonCode)};
+                }
+                // Bali reports image-copy-already-completed as reason 0x109
+                // with completion code 0x81.
+                if (reasonCode == ERR_IMAGE_COPY_COMPLETED_BALI)
+                {
+                    auto stateError =
+                        imageCopyInvalidStateErrors.find(reasonCode);
+                    if (stateError != imageCopyInvalidStateErrors.end())
+                    {
+                        return {cc, stateError->second};
+                    }
                 }
                 return {cc, "Invalid Request Type"};
             }

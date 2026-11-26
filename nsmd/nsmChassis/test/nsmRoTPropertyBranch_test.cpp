@@ -192,6 +192,12 @@ TEST_F(NsmRoTPropertyBranchTest, MapReasonCode_AllCases)
                                   ERR_IMAGE_COPY_COMPLETED);
     EXPECT_EQ(imageCopy->errorCode(), ErrorCode::ImageCopyCompleted);
 
+    // Bali reason 0x109 -> ImageCopyCompleted
+    imageCopy->setImageCopyResult(
+        valueIntf, NSM_ERR_INVALID_REQUEST_TYPE, ERR_IMAGE_COPY_COMPLETED_BALI,
+        RequestStatus::Rejected, ERR_IMAGE_COPY_COMPLETED_BALI);
+    EXPECT_EQ(imageCopy->errorCode(), ErrorCode::ImageCopyCompleted);
+
     // ERR_FLASH_WEAR_MITIGATION -> FlashWearMitigation
     imageCopy->setImageCopyResult(valueIntf, NSM_SUCCESS, ERR_NULL,
                                   RequestStatus::Rejected,
@@ -1272,6 +1278,8 @@ TEST_F(NsmRoTPropertyBranchTest, MapReasonCodeDirect_ImageCopyCompleted)
 {
     using ErrorCode = sdbusplus::common::com::nvidia::ImageCopy::ErrorCode;
     EXPECT_EQ(mapReasonCodeToErrorCode(ERR_IMAGE_COPY_COMPLETED),
+              ErrorCode::ImageCopyCompleted);
+    EXPECT_EQ(mapReasonCodeToErrorCode(ERR_IMAGE_COPY_COMPLETED_BALI),
               ErrorCode::ImageCopyCompleted);
 }
 

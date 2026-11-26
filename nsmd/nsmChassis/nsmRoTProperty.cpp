@@ -37,6 +37,7 @@ namespace nsm
  * - 0x106: ImageCopyCompleted - An image copy was completed successfully
  * - 0x107: FlashWearMitigation - Flash wear mitigation policy is active
  * - 0x108: IncompleteComponentSet - Additional components required in request
+ * - 0x109: ImageCopyCompleted - Bali IRoT image copy already completed
  *
  * @param reasonCode The reason code from the NSM response
  * @return sdbusplus::common::com::nvidia::ImageCopy::ErrorCode
@@ -55,6 +56,7 @@ sdbusplus::common::com::nvidia::ImageCopy::ErrorCode
         case ERR_IMAGE_COPY_IN_PROGRESS:
             return ErrorCode::ImageCopyInProgress;
         case ERR_IMAGE_COPY_COMPLETED:
+        case ERR_IMAGE_COPY_COMPLETED_BALI:
             return ErrorCode::ImageCopyCompleted;
         case ERR_FLASH_WEAR_MITIGATION:
             return ErrorCode::FlashWearMitigation;
