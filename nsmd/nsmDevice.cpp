@@ -887,9 +887,12 @@ requester::Coroutine NsmDevice::getFRU(nsm::InventoryProperties& properties,
             {NSM_DEV_ID_SWITCH,
              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
               BUILD_DATE}},
+            // ConnectX and BlueField NICs (all PCIe bridge roles) have no
+            // board part number; their part number is the device part
+            // number(3), which the NIC chassis Asset reads
             {NSM_DEV_ID_PCIE_BRIDGE,
-             {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
-              PRODUCT_NAME, BUILD_DATE, ASSET_TAG}},
+             {SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME, PRODUCT_NAME,
+              BUILD_DATE, ASSET_TAG}},
             {NSM_DEV_ID_BASEBOARD, {}},
             {NSM_DEV_ID_EROT,
              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,

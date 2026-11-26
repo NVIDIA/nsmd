@@ -151,6 +151,27 @@ struct NsmDeviceDI3Test : public Test
         return [rc](eid_t, Request&, std::shared_ptr<const nsm_msg>&,
                     size_t*) -> requester::Coroutine { co_return rc; };
     }
+
+    auto mockSendRecvRecordProperty3(
+        std::shared_ptr<std::vector<uint8_t>> requestedIds,
+        const std::vector<uint8_t>& strResp,
+        const std::vector<uint8_t>& uuidResp)
+    {
+        return [requestedIds, strResp,
+                uuidResp](eid_t, Request& request,
+                          std::shared_ptr<const nsm_msg>& responseMsg,
+                          size_t* responseLen) -> requester::Coroutine {
+            uint8_t propertyId = 0xff;
+            EXPECT_EQ(decode_get_inventory_information_req(
+                          reinterpret_cast<const nsm_msg*>(request.data()),
+                          request.size(), &propertyId),
+                      NSM_SW_SUCCESS);
+            requestedIds->push_back(propertyId);
+            allocMessage3(propertyId == DEVICE_GUID ? uuidResp : strResp,
+                          responseMsg, *responseLen);
+            co_return NSM_SW_SUCCESS;
+        };
+    }
 };
 
 // ===========================================================================
@@ -316,7 +337,7 @@ TEST_F(NsmDeviceDI3Test, GetFRU_Switch_QueriesCorrectProps)
     EXPECT_TRUE(props.find(SERIAL_NUMBER) != props.end());
 }
 
-// getFRU — PCIE_BRIDGE (7 properties including PRODUCT_NAME and ASSET_TAG)
+// getFRU — PCIE_BRIDGE (6 properties including PRODUCT_NAME and ASSET_TAG)
 TEST_F(NsmDeviceDI3Test, GetFRU_PcieBridge_IncludesAssetTag)
 {
     const char* strValue = "bridge";
@@ -327,7 +348,6 @@ TEST_F(NsmDeviceDI3Test, GetFRU_PcieBridge_IncludesAssetTag)
                                      uuidData.data());
 
     EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _))
-        .WillOnce(mockSendRecv3(strResp))  // BOARD_PART_NUMBER
         .WillOnce(mockSendRecv3(strResp))  // SERIAL_NUMBER
         .WillOnce(mockSendRecv3(uuidResp)) // DEVICE_GUID
         .WillOnce(mockSendRecv3(strResp))  // MARKETING_NAME
@@ -338,7 +358,35 @@ TEST_F(NsmDeviceDI3Test, GetFRU_PcieBridge_IncludesAssetTag)
     InventoryProperties props;
     auto coro = device->getFRU(props, NSM_DEV_ID_PCIE_BRIDGE);
 
-    EXPECT_TRUE(props.find(BOARD_PART_NUMBER) != props.end());
+    EXPECT_TRUE(props.find(SERIAL_NUMBER) != props.end());
+    EXPECT_TRUE(props.find(PRODUCT_NAME) != props.end());
+}
+
+// getFRU — PCIE_BRIDGE (board part number is never requested, the other
+// properties still are)
+TEST_F(NsmDeviceDI3Test, GetFRU_PcieBridge_SkipsBoardPartNumber)
+{
+    const char* strValue = "bridge";
+    auto strResp = makeInvInfoResp3(NSM_SUCCESS, strlen(strValue),
+                                    reinterpret_cast<const uint8_t*>(strValue));
+    std::vector<uint8_t> uuidData(UUID_INT_SIZE, 0xEF);
+    auto uuidResp = makeInvInfoResp3(NSM_SUCCESS, UUID_INT_SIZE,
+                                     uuidData.data());
+
+    auto requestedIds = std::make_shared<std::vector<uint8_t>>();
+    EXPECT_CALL(*mockMsgHandler, SendRecvNsmMsg(_, _, _, _))
+        .WillRepeatedly(
+            mockSendRecvRecordProperty3(requestedIds, strResp, uuidResp));
+
+    InventoryProperties props;
+    auto coro = device->getFRU(props, NSM_DEV_ID_PCIE_BRIDGE);
+
+    const std::vector<uint8_t> stillRequested{
+        SERIAL_NUMBER, MARKETING_NAME, PRODUCT_NAME, BUILD_DATE, ASSET_TAG};
+    EXPECT_THAT(*requestedIds, Not(Contains(BOARD_PART_NUMBER)));
+    EXPECT_THAT(*requestedIds, IsSupersetOf(stillRequested));
+    EXPECT_TRUE(props.find(BOARD_PART_NUMBER) == props.end());
+    EXPECT_TRUE(props.find(SERIAL_NUMBER) != props.end());
 }
 
 // getFRU — BASEBOARD (empty property list)
