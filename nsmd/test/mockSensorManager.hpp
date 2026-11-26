@@ -234,6 +234,25 @@ class SensorManagerTest
     {
         return mockSensorIO(Response(), code);
     }
+    /** @brief sensorIO action that takes @p device offline the way
+     *         setOffline() does while the request is pending, then delivers
+     *         @p response. With @p reconnect the device is online again
+     *         before the reply arrives. */
+    auto mockSensorIOAcrossOffline(NsmDevice& device, NsmObject& sensor,
+                                   const Response& response, bool reconnect)
+    {
+        return [&device, &sensor, response, reconnect](
+                   eid_t, Request&, std::shared_ptr<const nsm_msg>& responseMsg,
+                   size_t& responseLen, bool) -> requester::Coroutine {
+            device.isDeviceActive = false;
+            ++device.offlineCount;
+            sensor.handleOfflineState();
+            device.isDeviceActive = reconnect;
+            allocMessage(response, responseMsg, responseLen);
+            // coverity[missing_return]
+            co_return NSM_SUCCESS;
+        };
+    }
 
     auto mockPostPatchIO(const Response& response,
                          nsm_completion_codes code = NSM_SUCCESS)

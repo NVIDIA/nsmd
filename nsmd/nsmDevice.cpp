@@ -311,6 +311,7 @@ requester::Coroutine NsmDevice::updateSensorsForOffline()
 requester::Coroutine NsmDevice::setOffline()
 {
     isDeviceActive = false;
+    ++offlineCount;
     if (gpuDriverSensor)
     {
         lg2::info(

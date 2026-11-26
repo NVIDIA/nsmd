@@ -515,6 +515,14 @@ class NsmDevice :
         return isDeviceActive;
     }
 
+    /** @brief Number of times the device has gone offline. A reply to a
+     *         request sent under an older count belongs to a connection that
+     *         has ended and must not be published. */
+    size_t getOfflineCount() const
+    {
+        return offlineCount;
+    }
+
     /** @brief getter of Device Ready State*/
     bool isReady()
     {
@@ -658,6 +666,7 @@ class NsmDevice :
     bool hasNsmEventSettingConfigFlag = false;
     uuid_t uuid;
     bool isDeviceActive = false;
+    size_t offlineCount = 0;
     bool isDeviceReady = false;
     bool discoveryPending = false;
     uint8_t deviceType = 0;

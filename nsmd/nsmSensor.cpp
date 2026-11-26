@@ -44,12 +44,21 @@ requester::Coroutine NsmSensor::update(std::shared_ptr<NsmDevice> nsmDevice)
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
+    const auto offlineCount = nsmDevice->getOfflineCount();
     auto rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), *requestMsg,
                                            responseMsg, responseLen);
     if (rc)
     {
         // coverity[missing_return]
         co_return rc;
+    }
+
+    // The device went offline while the request was pending; publishing the
+    // reply would undo the offline cleanup in handleOfflineState().
+    if (offlineCount != nsmDevice->getOfflineCount())
+    {
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR;
     }
 
     if (!responseMsg)

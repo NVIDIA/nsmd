@@ -1201,6 +1201,42 @@ TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_OfflineRemovesInterface)
 }
 
 // ============================================================================
+// NsmSwitchPowerCappingMode::update -- a reply to a request sent before the
+// device went offline is dropped, whether or not the device has reconnected.
+// ============================================================================
+TEST_F(NsmSwitchFactoryBranchTest, PowerCappingMode_ReplyAfterOfflineIsDropped)
+{
+    static auto& testBus = utils::DBusHandler::getBus();
+    for (bool reconnect : {false, true})
+    {
+        SCOPED_TRACE(reconnect ? "reconnected" : "still offline");
+        auto assocIntf = std::make_shared<AssociationDefinitionsInft>(
+            testBus, "/xyz/openbmc_project/inventory/fabr/pcap_stale");
+        NsmSwitchPowerCappingMode sensor(
+            "Pcap_stale", "NSM_NVSwitch", testBus,
+            "/xyz/openbmc_project/inventory/fabr/pcap_stale", assocIntf);
+        readPowerCappingMode(sensor, NSM_POWER_CAPPING_MODE_DISABLED);
+
+        EXPECT_CALL(*nvswitch, sensorIO(_, _, _, _, _))
+            .WillOnce(mockSensorIOAcrossOffline(
+                *nvswitch, sensor,
+                encodePowerCappingModeResp(NSM_POWER_CAPPING_MODE_ENABLED),
+                reconnect));
+        sensor.update(nvswitch);
+        EXPECT_EQ(nullptr, sensor.dbusInterface());
+
+        // The next poll after reconnecting publishes again.
+        nvswitch->isDeviceActive = true;
+        EXPECT_CALL(*nvswitch, sensorIO(_, _, _, _, _))
+            .WillOnce(mockSensorIO(
+                encodePowerCappingModeResp(NSM_POWER_CAPPING_MODE_ENABLED)));
+        sensor.update(nvswitch);
+        ASSERT_NE(nullptr, sensor.dbusInterface());
+        EXPECT_EQ(sensor.dbusInterface()->currentMode(), PowerCapMode::Enabled);
+    }
+}
+
+// ============================================================================
 // createNsmSwitchDI gate: SupportPowerCappingMode true/false
 //
 // NSM_NVSwitch adds several round-robin sensors whose number depends on build

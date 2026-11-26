@@ -307,6 +307,38 @@ TEST_F(NsmSwitchPowerProfileTest, ProfileUpdate_PollsAndPublishes)
     EXPECT_EQ(1, sensor.activeProfileId());
 }
 
+TEST_F(NsmSwitchPowerProfileTest, ProfileUpdate_ReplyAfterOfflineIsDropped)
+{
+    for (bool reconnect : {false, true})
+    {
+        SCOPED_TRACE(reconnect ? "reconnected" : "still offline");
+        auto sensor = makeProfileSensor();
+        auto response = encodeProfiles(1, {{1, "compute"}});
+        ASSERT_EQ(
+            NSM_SW_SUCCESS,
+            sensor.handleResponseMsg(
+                reinterpret_cast<nsm_msg*>(response.data()), response.size()));
+        ASSERT_NE(nullptr, sensor.dbusInterface());
+
+        EXPECT_CALL(*nvswitch, sensorIO(_, _, _, _, _))
+            .WillOnce(mockSensorIOAcrossOffline(
+                *nvswitch, sensor, encodeProfiles(2, {{2, "networking"}}),
+                reconnect));
+        sensor.update(nvswitch);
+
+        EXPECT_EQ(nullptr, sensor.dbusInterface());
+        EXPECT_TRUE(sensor.availableProfiles().empty());
+
+        // The next poll after reconnecting publishes again.
+        nvswitch->isDeviceActive = true;
+        EXPECT_CALL(*nvswitch, sensorIO(_, _, _, _, _))
+            .WillOnce(mockSensorIO(encodeProfiles(2, {{2, "networking"}})));
+        sensor.update(nvswitch);
+        ASSERT_NE(nullptr, sensor.dbusInterface());
+        EXPECT_EQ(2, sensor.dbusInterface()->activeProfileId());
+    }
+}
+
 // ============================================================================
 // setActiveProfile
 // ============================================================================
